@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.44.0"
+
+jobs:
+  analyze:
+    name: Analyze & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze
+
+  unit:
+    name: Unit tests (pure Dart)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # These packages carry the algorithmic core — merge scoring, the merged
+      # timeline watermark, hybrid search ranking — and need no device.
+      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp
+        run: |
+          set -e
+          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp; do
+            if [ -d "packages/$pkg/test" ]; then
+              echo "::group::$pkg"
+              (cd "packages/$pkg" && dart test --reporter expanded)
+              echo "::endgroup::"
+            fi
+          done
+
+  widget:
+    name: Widget & golden tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+        working-directory: apps/weft
+      # Goldens are font- and platform-sensitive; publishing the diff makes a
+      # failure diagnosable without reproducing the runner locally.
+      - name: Upload golden failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: apps/weft/test/**/failures/**
+          if-no-files-found: ignore
+
+  integration:
+    name: Integration tests (against Synapse)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Generate Synapse config
+        run: |
+          docker run --rm -v "$PWD/tooling/docker/synapse-data:/data" \
+            -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no \
+            matrixdotorg/synapse:latest generate
+      - name: Open registration for the test stack
+        run: |
+          cat >> tooling/docker/synapse-data/homeserver.yaml <<'EOF'
+
+          enable_registration: true
+          enable_registration_without_verification: true
+          registration_shared_secret: "weft-test-shared-secret"
+          rc_login:
+            address: { per_second: 100, burst_count: 100 }
+            account: { per_second: 100, burst_count: 100 }
+          EOF
+      - name: Start homeserver
+        run: docker compose -f tooling/docker/compose.yaml up -d --wait
+      - name: Seed test accounts
+        run: ./tooling/docker/seed.sh
+      # The integration tests drive a real Flutter engine, so they need a
+      # desktop target and a display even though nothing is rendered.
+      - name: Install Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev xvfb
+      - run: flutter config --enable-linux-desktop
+      - run: flutter pub get
+      - name: Run integration tests
+        working-directory: apps/weft
+        run: xvfb-run -a flutter test integration_test -d linux
+      - name: Homeserver logs on failure
+        if: failure()
+        run: docker compose -f tooling/docker/compose.yaml logs synapse

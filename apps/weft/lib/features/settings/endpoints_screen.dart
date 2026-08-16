@@ -1,0 +1,287 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart';
+import 'package:weft_store/weft_store.dart';
+
+import '../../app/stores.dart';
+import 'models_screen.dart';
+
+/// Configuration for the user's own transcription and embedding endpoints.
+///
+/// Both are off by default and gated behind an explicit warning: enabling them
+/// sends decrypted message content to whatever endpoint is configured, which
+/// undoes E2EE for that content. The warning states this plainly rather than
+/// hiding it in a tooltip.
+class EndpointsScreen extends ConsumerStatefulWidget {
+  const EndpointsScreen({super.key});
+
+  @override
+  ConsumerState<EndpointsScreen> createState() => _EndpointsScreenState();
+}
+
+class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
+  late final SettingsStore _settings = ref.read(storesProvider).settings;
+
+  late bool _embeddingEnabled = _settings.getBool(
+    WeftSettings.embeddingEnabled,
+  );
+  late final _embeddingUrl = TextEditingController(
+    text: _settings.getString(WeftSettings.embeddingBaseUrl) ?? '',
+  );
+  late final _embeddingModel = TextEditingController(
+    text: _settings.getString(WeftSettings.embeddingModel) ?? '',
+  );
+  late final _embeddingDims = TextEditingController(
+    text: '${_settings.getInt('search.embedding_dimensions') ?? 1536}',
+  );
+  final _embeddingKey = TextEditingController();
+
+  late bool _sttEnabled = _settings.getBool(WeftSettings.transcriptionEnabled);
+  late bool _sttAuto = _settings.getBool(WeftSettings.transcriptionAutoRun);
+  late final _sttUrl = TextEditingController(
+    text: _settings.getString(WeftSettings.transcriptionBaseUrl) ?? '',
+  );
+  late final _sttModel = TextEditingController(
+    text: _settings.getString(WeftSettings.transcriptionModel) ?? 'whisper-1',
+  );
+  final _sttKey = TextEditingController();
+
+  @override
+  void dispose() {
+    for (final c in [
+      _embeddingUrl,
+      _embeddingModel,
+      _embeddingDims,
+      _embeddingKey,
+      _sttUrl,
+      _sttModel,
+      _sttKey,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final stores = ref.read(storesProvider);
+    final oldModel = _settings.getString(WeftSettings.embeddingModel);
+
+    _settings.setBool(WeftSettings.embeddingEnabled, value: _embeddingEnabled);
+    _settings.setString(
+      WeftSettings.embeddingBaseUrl,
+      _embeddingUrl.text.trim(),
+    );
+    _settings.setString(
+      WeftSettings.embeddingModel,
+      _embeddingModel.text.trim(),
+    );
+    _settings.setInt(
+      'search.embedding_dimensions',
+      int.tryParse(_embeddingDims.text) ?? 1536,
+    );
+    if (_embeddingKey.text.isNotEmpty) {
+      await stores.setEmbeddingApiKey(_embeddingKey.text);
+    }
+
+    _settings.setBool(WeftSettings.transcriptionEnabled, value: _sttEnabled);
+    _settings.setBool(WeftSettings.transcriptionAutoRun, value: _sttAuto);
+    _settings.setString(WeftSettings.transcriptionBaseUrl, _sttUrl.text.trim());
+    _settings.setString(WeftSettings.transcriptionModel, _sttModel.text.trim());
+    if (_sttKey.text.isNotEmpty) {
+      await stores.setTranscriptionApiKey(_sttKey.text);
+    }
+
+    // A model change invalidates every stored vector: different models share
+    // no coordinate space, and mixing them silently corrupts ranking.
+    final newModel = _embeddingModel.text.trim();
+    if (oldModel != null && oldModel.isNotEmpty && oldModel != newModel) {
+      stores.search.reindexEmbeddings();
+    }
+
+    ref.read(settingsRevisionProvider.notifier).bump();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Endpoints'),
+        actions: [
+          TextButton(onPressed: _save, child: const Text('Save')),
+          const SizedBox(width: WeftSpace.sm),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(WeftSpace.lg),
+        children: [
+          const _PrivacyWarning(),
+          const SizedBox(height: WeftSpace.lg),
+          Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.download_for_offline_outlined),
+              title: const Text('Local models'),
+              subtitle: const Text(
+                'Run search and transcription on this device instead of an '
+                'endpoint. If you use these, the settings below can stay off.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ModelsScreen()),
+              ),
+            ),
+          ),
+          const SizedBox(height: WeftSpace.xl),
+
+          _SectionHeader(
+            title: 'Semantic search embeddings',
+            subtitle:
+                'Only needed if you are NOT using an on-device model. With a '
+                'local model installed and switched on, leave this off — the '
+                'device does the work and nothing is sent anywhere.',
+          ),
+          SwitchListTile(
+            title: const Text('Enable embeddings'),
+            value: _embeddingEnabled,
+            onChanged: (v) => setState(() => _embeddingEnabled = v),
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (_embeddingEnabled) ...[
+            _field(_embeddingUrl, 'Base URL', hint: 'http://localhost:8080/v1'),
+            _field(_embeddingModel, 'Model', hint: 'text-embedding-3-small'),
+            _field(_embeddingDims, 'Dimensions', hint: '1536', number: true),
+            _field(
+              _embeddingKey,
+              'API key (stored in the system keychain)',
+              secret: true,
+              hint: 'leave blank to keep the current key',
+            ),
+          ],
+          const SizedBox(height: WeftSpace.xl),
+
+          _SectionHeader(
+            title: 'Voice transcription',
+            subtitle:
+                'Only needed if you are NOT using an on-device model. A local '
+                'Whisper model switched on for voice always takes precedence '
+                'over anything configured here.',
+          ),
+          SwitchListTile(
+            title: const Text('Enable transcription'),
+            value: _sttEnabled,
+            onChanged: (v) => setState(() => _sttEnabled = v),
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (_sttEnabled) ...[
+            _field(_sttUrl, 'Base URL', hint: 'http://localhost:9000/v1'),
+            _field(_sttModel, 'Model', hint: 'whisper-1'),
+            _field(
+              _sttKey,
+              'API key (stored in the system keychain)',
+              secret: true,
+              hint: 'leave blank to keep the current key',
+            ),
+            SwitchListTile(
+              title: const Text('Transcribe voice messages automatically'),
+              subtitle: const Text(
+                'Otherwise each voice message has a Transcribe action.',
+              ),
+              value: _sttAuto,
+              onChanged: (v) => setState(() => _sttAuto = v),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    String? hint,
+    bool secret = false,
+    bool number = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: WeftSpace.md),
+      child: TextField(
+        controller: controller,
+        obscureText: secret,
+        autocorrect: false,
+        keyboardType: number ? TextInputType.number : TextInputType.url,
+        decoration: InputDecoration(labelText: label, hintText: hint),
+      ),
+    );
+  }
+}
+
+class _PrivacyWarning extends StatelessWidget {
+  const _PrivacyWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(WeftSpace.md),
+      decoration: BoxDecoration(
+        color: context.colors.errorContainer.withValues(alpha: 0.5),
+        borderRadius: WeftRadius.allMd,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.privacy_tip_outlined,
+            size: 20,
+            color: context.colors.onErrorContainer,
+          ),
+          const SizedBox(width: WeftSpace.md),
+          Expanded(
+            child: Text(
+              'These endpoints receive decrypted message text or audio. For a '
+              'remote endpoint, that undoes end-to-end encryption for whatever '
+              'is sent to it. Point them at software you run yourself to keep '
+              'everything local.',
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: context.text.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: context.text.bodySmall?.copyWith(
+              color: context.colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

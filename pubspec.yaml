@@ -1,0 +1,21 @@
+# Weft — Dart pub workspace root.
+#
+# This file exists only to tie the app and packages into a single resolution
+# unit; it ships no code of its own. Every member declares `resolution: workspace`.
+name: weft_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+workspace:
+  - apps/weft
+  - packages/weft_bridges
+  - packages/weft_design
+  - packages/weft_domain
+  - packages/weft_matrix
+  - packages/weft_mcp
+  - packages/weft_merge
+  - packages/weft_search
+  - packages/weft_store
+  - packages/weft_transcribe

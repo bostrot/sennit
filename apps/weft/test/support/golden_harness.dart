@@ -1,0 +1,158 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:weft_design/weft_design.dart';
+
+import 'package:weft/app/providers.dart';
+import 'package:weft/app/settings.dart';
+import 'package:weft/data/demo_repository.dart';
+
+bool _fontsLoaded = false;
+
+/// Loads real text and icon fonts so golden images show actual glyphs.
+///
+/// `flutter_test` otherwise substitutes a placeholder that draws every glyph as
+/// a filled box, which makes a golden useless for judging layout or catching a
+/// text overflow. Both fonts ship inside the Flutter SDK, so this works on any
+/// machine that can run the tests — no vendored font files, no network.
+///
+/// **Call this from `setUpAll`, never from inside `testWidgets`.** A test body
+/// runs in a `FakeAsync` zone, and awaiting real file I/O there never completes
+/// — the read finishes on a real timer that fake async will not advance, and
+/// the test hangs until its timeout.
+Future<void> loadGoldenFonts() async {
+  if (_fontsLoaded) return;
+  _fontsLoaded = true;
+
+  final root = _flutterRoot();
+  if (root == null) return;
+
+  final fonts = Directory('$root/bin/cache/artifacts/material_fonts');
+  if (!fonts.existsSync()) return;
+
+  await _load('Roboto', [
+    '${fonts.path}/Roboto-Regular.ttf',
+    '${fonts.path}/Roboto-Medium.ttf',
+    '${fonts.path}/Roboto-Bold.ttf',
+  ]);
+  await _load('MaterialIcons', ['${fonts.path}/MaterialIcons-Regular.otf']);
+  // Registered under the package-qualified family: an IconData carrying
+  // `fontPackage` resolves to `packages/<pkg>/<family>`, so registering the
+  // bare family name loads the font but never matches the glyphs.
+  await _loadPackageFont(
+    'packages/simple_icons/SimpleIcons',
+    'simple_icons',
+    'fonts/SimpleIcons.ttf',
+  );
+}
+
+/// Loads a font shipped inside a pub package, read from its resolved location
+/// on disk.
+///
+/// Network brand glyphs come from `simple_icons`; without this every logo in a
+/// golden is an empty box, which hides exactly the layout problems goldens
+/// exist to catch. The asset bundle is not used because package assets are not
+/// resolvable from the `flutter test` runner — reading the file the way the
+/// SDK fonts are read is both simpler and actually works.
+Future<void> _loadPackageFont(
+  String family,
+  String package,
+  String assetPath,
+) async {
+  final root = _packageRoot(package);
+  if (root == null) return;
+
+  final file = File(p.join(root, assetPath));
+  if (!file.existsSync()) return;
+
+  final bytes = await file.readAsBytes();
+  await (FontLoader(
+    family,
+  )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
+}
+
+/// Resolves a package's root directory from the workspace package config.
+String? _packageRoot(String package) {
+  var dir = Directory.current;
+  for (var depth = 0; depth < 5; depth++) {
+    final config = File(p.join(dir.path, '.dart_tool', 'package_config.json'));
+    if (config.existsSync()) {
+      final decoded =
+          jsonDecode(config.readAsStringSync()) as Map<String, Object?>;
+      for (final entry in (decoded['packages'] as List? ?? const [])) {
+        if (entry is! Map || entry['name'] != package) continue;
+        final uri = Uri.parse(entry['rootUri'] as String);
+        return uri.scheme == 'file'
+            ? uri.toFilePath()
+            : p.normalize(p.join(config.parent.path, uri.path));
+      }
+    }
+    final parent = dir.parent;
+    if (parent.path == dir.path) break;
+    dir = parent;
+  }
+  return null;
+}
+
+Future<void> _load(String family, List<String> paths) async {
+  final loader = FontLoader(family);
+  var any = false;
+  for (final path in paths) {
+    final file = File(path);
+    if (!file.existsSync()) continue;
+    any = true;
+    loader.addFont(file.readAsBytes().then((b) => ByteData.sublistView(b)));
+  }
+  if (any) await loader.load();
+}
+
+/// `flutter test` exports FLUTTER_ROOT; the executable path is the fallback for
+/// a bare `dart test` run.
+String? _flutterRoot() {
+  final fromEnv = Platform.environment['FLUTTER_ROOT'];
+  if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+
+  final exe = File(Platform.resolvedExecutable).parent.parent.parent.path;
+  return Directory('$exe/bin/cache/artifacts/material_fonts').existsSync()
+      ? exe
+      : null;
+}
+
+/// Pumps [child] inside a themed [ProviderScope] at a fixed logical size.
+Future<void> pumpWeft(
+  WidgetTester tester,
+  Widget child, {
+  Size size = const Size(1400, 900),
+  WeftThemeMode mode = WeftThemeMode.dark,
+  Color seed = WeftTheme.defaultSeed,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      // Goldens always run on fixtures. Without this the widget tree would
+      // reach for a live Matrix session and throw. Note the overrides list is
+      // never given an explicit type: Riverpod's `Override` is not exported
+      // from either barrel, so it can only be produced by inference.
+      overrides: [
+        chatRepositoryProvider.overrideWithValue(DemoChatRepository()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: WeftAppearance(mode: mode, seed: seed).themeFor(Brightness.dark),
+        home: child,
+      ),
+    ),
+  );
+
+  // Settle the entry animations rather than capturing them mid-flight, which
+  // would make every golden non-deterministic.
+  await tester.pumpAndSettle(const Duration(milliseconds: 50));
+}

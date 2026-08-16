@@ -1,0 +1,135 @@
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'weft_database.dart';
+
+/// Non-secret preferences, as a typed key/value store.
+///
+/// Anything that would be embarrassing in a plain database file — API keys,
+/// tokens — belongs in [SecretStore] instead.
+class SettingsStore {
+  SettingsStore(this._db);
+
+  final WeftDatabase _db;
+
+  String? getString(String key) {
+    final rows = _db.raw.select('SELECT value FROM settings WHERE key = ?', [
+      key,
+    ]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  void setString(String key, String value) {
+    _db.raw.execute(
+      '''
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      ''',
+      [key, value],
+    );
+  }
+
+  bool getBool(String key, {bool fallback = false}) {
+    final raw = getString(key);
+    return raw == null ? fallback : raw == 'true';
+  }
+
+  void setBool(String key, {required bool value}) =>
+      setString(key, value ? 'true' : 'false');
+
+  int? getInt(String key) => int.tryParse(getString(key) ?? '');
+
+  void setInt(String key, int value) => setString(key, '$value');
+
+  double? getDouble(String key) => double.tryParse(getString(key) ?? '');
+
+  void setDouble(String key, double value) => setString(key, '$value');
+
+  Map<String, Object?>? getJson(String key) {
+    final raw = getString(key);
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on FormatException {
+      // A corrupt value should read as "unset" rather than crash startup.
+      return null;
+    }
+  }
+
+  void setJson(String key, Map<String, Object?> value) =>
+      setString(key, jsonEncode(value));
+
+  void remove(String key) =>
+      _db.raw.execute('DELETE FROM settings WHERE key = ?', [key]);
+}
+
+/// Credentials, in the platform keychain rather than the database.
+///
+/// Weft asks users to supply their own transcription and embedding endpoints,
+/// which means holding their API keys. Those go to Keychain / Keystore /
+/// libsecret, never to a file next to the messages.
+class SecretStore {
+  SecretStore({FlutterSecureStorage? storage})
+    // Defaults are already backed by Keychain on Apple platforms, the
+    // Keystore-encrypted store on Android, and libsecret on Linux.
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  final FlutterSecureStorage _storage;
+
+  static const String transcriptionApiKey = 'transcription_api_key';
+  static const String embeddingApiKey = 'embedding_api_key';
+  static const String mcpTunnelToken = 'mcp_tunnel_token';
+
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  Future<void> write(String key, String? value) async {
+    if (value == null || value.isEmpty) {
+      await _storage.delete(key: key);
+      return;
+    }
+    await _storage.write(key: key, value: value);
+  }
+
+  Future<void> delete(String key) => _storage.delete(key: key);
+}
+
+/// Setting keys, gathered so a typo is a compile error rather than a silently
+/// missing preference.
+abstract final class WeftSettings {
+  static const String themeMode = 'appearance.theme_mode';
+
+  /// When false (the default), the network rail is single-select: tapping a
+  /// network shows only it, tapping again returns to All.
+  static const String railMultiSelect = 'rail.multi_select';
+  static const String seedColor = 'appearance.seed_color';
+  static const String density = 'appearance.density';
+
+  static const String autoMergeOnIdentitySignal = 'merge.auto_on_identity';
+  static const String mergeSuggestThreshold = 'merge.suggest_threshold';
+  static const String defaultCountryCode = 'merge.default_country_code';
+
+  static const String transcriptionEnabled = 'transcribe.enabled';
+  static const String transcriptionProvider = 'transcribe.provider';
+  static const String transcriptionBaseUrl = 'transcribe.base_url';
+  static const String transcriptionModel = 'transcribe.model';
+  static const String transcriptionLanguage = 'transcribe.language';
+  static const String transcriptionAutoRun = 'transcribe.auto';
+
+  /// Which downloaded model on-device transcription should use, by catalog id.
+  /// Empty means "use the configured endpoint instead".
+  static const String transcriptionLocalModel = 'transcribe.local_model';
+
+  static const String embeddingEnabled = 'search.embedding_enabled';
+  static const String embeddingProvider = 'search.embedding_provider';
+  static const String embeddingBaseUrl = 'search.embedding_base_url';
+  static const String embeddingModel = 'search.embedding_model';
+
+  /// Networks excluded from any remote endpoint, as a JSON list of network ids.
+  static const String remoteExcludedNetworks = 'privacy.remote_excluded';
+
+  static const String mcpEnabled = 'mcp.enabled';
+  static const String mcpPort = 'mcp.port';
+  static const String mcpTunnelEnabled = 'mcp.tunnel_enabled';
+}

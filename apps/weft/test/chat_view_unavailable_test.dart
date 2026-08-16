@@ -1,0 +1,112 @@
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/providers.dart';
+import 'package:weft/data/chat_repository.dart';
+import 'package:weft/data/demo_repository.dart';
+import 'package:weft/features/chat/chat_view.dart';
+import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_merge/weft_merge.dart';
+
+/// Wraps the demo repository but reports every chat as having no reachable
+/// rooms, standing in for a room the account has since left.
+class _NoRoomsRepository implements ChatRepository {
+  _NoRoomsRepository(this._inner);
+
+  final DemoChatRepository _inner;
+
+  @override
+  Future<MergedTimeline> timelineFor(String chatId) async =>
+      throw StateError('Chat $chatId has no reachable rooms');
+
+  @override
+  List<ChatNetwork> get availableNetworks => _inner.availableNetworks;
+  @override
+  IdentityGraph get identityGraph => _inner.identityGraph;
+  @override
+  Stream<List<Chat>> watchChats() => _inner.watchChats();
+  @override
+  Future<void> send(String chatId, String body, {ChatNetwork? via}) =>
+      _inner.send(chatId, body, via: via);
+  @override
+  Future<void> setSendNetwork(String chatId, ChatNetwork network) =>
+      _inner.setSendNetwork(chatId, network);
+  @override
+  Future<void> markRead(String chatId) => _inner.markRead(chatId);
+  @override
+  Future<void> mergeHandles(String a, String b) => _inner.mergeHandles(a, b);
+  @override
+  Future<void> unmergeHandle(String h) => _inner.unmergeHandle(h);
+  @override
+  Future<void> rejectSuggestion(String a, String b) =>
+      _inner.rejectSuggestion(a, b);
+  @override
+  void indexMessages(
+    String chatId,
+    List<WeftMessage> messages, {
+    String chatTitle = '',
+  }) {}
+  @override
+  Future<void> setArchived(String chatId, {required bool archived}) =>
+      _inner.setArchived(chatId, archived: archived);
+  @override
+  Future<void> setMuted(String chatId, {required bool muted}) =>
+      _inner.setMuted(chatId, muted: muted);
+  @override
+  Future<void> deleteChat(String chatId) => _inner.deleteChat(chatId);
+  @override
+  Future<Uint8List?> attachmentBytes(
+    String roomId,
+    String eventId, {
+    bool thumbnail = true,
+  }) => _inner.attachmentBytes(roomId, eventId, thumbnail: thumbnail);
+}
+
+void main() {
+  Future<void> pump(WidgetTester tester, ChatRepository repository, String id) {
+    return tester.pumpWidget(
+      ProviderScope(
+        overrides: [chatRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(
+          theme: WeftTheme.build(),
+          home: ChatView(chatId: id),
+        ),
+      ),
+    );
+  }
+
+  // Regression: a deep link to an unknown chat used to throw
+  // `Invalid argument (chatId): Unknown chat` as an unhandled async exception.
+  // Found by firing `weft://chat/!abc:example.org` at a real device.
+  testWidgets('an unknown chat id renders a message, not an exception', (
+    tester,
+  ) async {
+    await pump(tester, DemoChatRepository(), '!does-not-exist:example.org');
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.text('That conversation is not in your inbox.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a chat whose rooms are gone explains itself', (tester) async {
+    await pump(tester, _NoRoomsRepository(DemoChatRepository()), 'merged:anna');
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('no reachable rooms'), findsOneWidget);
+  });
+
+  testWidgets('a known chat still opens normally', (tester) async {
+    await pump(tester, DemoChatRepository(), 'merged:anna');
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Anna Maven'), findsWidgets);
+  });
+}

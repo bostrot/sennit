@@ -1,0 +1,188 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart';
+
+import 'package:weft_store/weft_store.dart';
+
+import '../../app/settings.dart';
+import '../../app/stores.dart';
+
+/// Live theme controls: mode, accent and density.
+///
+/// Everything applies instantly — picking a theme you then have to confirm is
+/// a needless step when the whole app is visible behind the sheet.
+Future<void> showAppearanceSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (_) => const _AppearanceSheet(),
+  );
+}
+
+class _AppearanceSheet extends ConsumerWidget {
+  const _AppearanceSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appearance = ref.watch(appearanceProvider);
+    final notifier = ref.read(appearanceProvider.notifier);
+    ref.watch(settingsRevisionProvider);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          WeftSpace.xl,
+          0,
+          WeftSpace.xl,
+          WeftSpace.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Appearance',
+              style: context.text.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: WeftSpace.xl),
+
+            Text('Theme', style: context.text.labelLarge),
+            const SizedBox(height: WeftSpace.sm),
+            SegmentedButton<WeftThemeMode>(
+              segments: const [
+                ButtonSegment(
+                  value: WeftThemeMode.system,
+                  icon: Icon(Icons.brightness_auto_rounded, size: 18),
+                  label: Text('Auto'),
+                ),
+                ButtonSegment(
+                  value: WeftThemeMode.light,
+                  icon: Icon(Icons.light_mode_rounded, size: 18),
+                  label: Text('Light'),
+                ),
+                ButtonSegment(
+                  value: WeftThemeMode.dark,
+                  icon: Icon(Icons.dark_mode_rounded, size: 18),
+                  label: Text('Dark'),
+                ),
+                ButtonSegment(
+                  value: WeftThemeMode.amoled,
+                  icon: Icon(Icons.contrast_rounded, size: 18),
+                  label: Text('AMOLED'),
+                ),
+              ],
+              selected: {appearance.mode},
+              onSelectionChanged: (s) => notifier.setMode(s.first),
+            ),
+            const SizedBox(height: WeftSpace.xl),
+
+            Text('Accent', style: context.text.labelLarge),
+            const SizedBox(height: WeftSpace.md),
+            Wrap(
+              spacing: WeftSpace.md,
+              runSpacing: WeftSpace.md,
+              children: [
+                for (final preset in weftAccentPresets)
+                  _SwatchButton(
+                    color: preset.color,
+                    name: preset.name,
+                    selected:
+                        preset.color.toARGB32() == appearance.seed.toARGB32(),
+                    onTap: () => notifier.setSeed(preset.color),
+                  ),
+              ],
+            ),
+            const SizedBox(height: WeftSpace.xl),
+
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Select several networks at once'),
+              subtitle: const Text('Off: the rail is one-network-at-a-time.'),
+              value: _railMultiSelect(ref),
+              onChanged: (value) {
+                ref
+                    .read(storesProvider)
+                    .settings
+                    .setBool(WeftSettings.railMultiSelect, value: value);
+                ref.read(settingsRevisionProvider.notifier).bump();
+              },
+            ),
+            const SizedBox(height: WeftSpace.lg),
+
+            Text('Density', style: context.text.labelLarge),
+            Slider(
+              value: appearance.densityScale,
+              min: -2,
+              max: 2,
+              divisions: 4,
+              label: switch (appearance.densityScale) {
+                <= -1 => 'Compact',
+                >= 1 => 'Comfortable',
+                _ => 'Default',
+              },
+              onChanged: notifier.setDensity,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+bool _railMultiSelect(WidgetRef ref) {
+  try {
+    return ref
+        .watch(storesProvider)
+        .settings
+        .getBool(WeftSettings.railMultiSelect);
+  } on StateError {
+    return false;
+  }
+}
+
+class _SwatchButton extends StatelessWidget {
+  const _SwatchButton({
+    required this.color,
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color color;
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$name accent',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: WeftMotion.fast,
+          curve: WeftMotion.spring,
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? context.colors.onSurface : Colors.transparent,
+              width: 3,
+            ),
+            boxShadow: selected ? WeftShadow.glow(color) : null,
+          ),
+          child: selected
+              ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+              : null,
+        ),
+      ),
+    );
+  }
+}

@@ -1,0 +1,118 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_store/weft_store.dart';
+
+import 'session_providers.dart';
+
+/// Every store, opened once at startup.
+///
+/// Secrets are read into memory here so the providers that need them —
+/// embedding and transcription builders — can stay synchronous. They are
+/// re-read only when the user edits them in settings.
+class WeftStores {
+  WeftStores._({
+    required this.db,
+    required this.identity,
+    required this.settings,
+    required this.search,
+    required this.secrets,
+    required this.embeddingApiKey,
+    required this.transcriptionApiKey,
+  });
+
+  final WeftDatabase db;
+  final IdentityStore identity;
+  final SettingsStore settings;
+  final SearchStore search;
+  final SecretStore secrets;
+
+  String? embeddingApiKey;
+  String? transcriptionApiKey;
+
+  /// Test construction: everything in memory, no platform channels.
+  ///
+  /// [open] awaits secure-storage reads, which are method-channel calls that
+  /// never complete under flutter_test's fake-async zone — a test using the
+  /// real factory hangs at its first pump.
+  @visibleForTesting
+  factory WeftStores.inMemory() {
+    final db = WeftDatabase.openAt(':memory:');
+    return WeftStores._(
+      db: db,
+      identity: IdentityStore(db),
+      settings: SettingsStore(db),
+      search: SearchStore(db),
+      secrets: SecretStore(),
+      embeddingApiKey: null,
+      transcriptionApiKey: null,
+    );
+  }
+
+  static Future<WeftStores> open({String? directoryOverride}) async {
+    final db = directoryOverride != null
+        ? WeftDatabase.openAt(directoryOverride)
+        : await WeftDatabase.open();
+    final secrets = SecretStore();
+
+    String? embeddingKey;
+    String? transcriptionKey;
+    if (!kDemoMode) {
+      // Secure storage prompts on some platforms; demo mode skips it entirely.
+      embeddingKey = await secrets.read(SecretStore.embeddingApiKey);
+      transcriptionKey = await secrets.read(SecretStore.transcriptionApiKey);
+    }
+
+    return WeftStores._(
+      db: db,
+      identity: IdentityStore(db),
+      settings: SettingsStore(db),
+      search: SearchStore(db),
+      secrets: secrets,
+      embeddingApiKey: embeddingKey,
+      transcriptionApiKey: transcriptionKey,
+    );
+  }
+
+  Future<void> setEmbeddingApiKey(String? value) async {
+    embeddingApiKey = value;
+    await secrets.write(SecretStore.embeddingApiKey, value);
+  }
+
+  Future<void> setTranscriptionApiKey(String? value) async {
+    transcriptionApiKey = value;
+    await secrets.write(SecretStore.transcriptionApiKey, value);
+  }
+
+  void dispose() => db.dispose();
+}
+
+/// Opened before the first frame that needs data; the auth gate waits on this
+/// alongside the session, so everything below may read it synchronously.
+final storesBootstrapProvider = FutureProvider<WeftStores>((ref) async {
+  final stores = await WeftStores.open(
+    directoryOverride: kDemoMode ? ':memory:' : null,
+  );
+  ref.onDispose(stores.dispose);
+  return stores;
+});
+
+/// Synchronous access, valid once the gate has passed.
+final storesProvider = Provider<WeftStores>((ref) {
+  final stores = ref.watch(storesBootstrapProvider).value;
+  if (stores == null) {
+    throw StateError('Stores read before bootstrap completed');
+  }
+  return stores;
+});
+
+/// Bumped whenever settings change, so providers derived from them rebuild.
+class SettingsRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final settingsRevisionProvider = NotifierProvider<SettingsRevision, int>(
+  SettingsRevision.new,
+);

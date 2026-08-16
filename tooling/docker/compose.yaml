@@ -1,0 +1,51 @@
+# Local Matrix homeserver for Weft's integration and e2e tests.
+#
+# This is a throwaway test stack, not a deployment template — it runs Synapse
+# with registration wide open and no TLS. Never point it at anything real.
+#
+#   docker compose -f tooling/docker/compose.yaml up -d
+#   ./tooling/docker/seed.sh          # creates @alice / @bob and a shared room
+#
+# Weft then connects to http://localhost:8008.
+
+name: weft-test
+
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: weft-synapse
+    environment:
+      SYNAPSE_SERVER_NAME: localhost
+      SYNAPSE_REPORT_STATS: "no"
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      UID: "1000"
+      GID: "1000"
+    volumes:
+      - ./synapse-data:/data
+    ports:
+      - "8008:8008"
+    healthcheck:
+      # Weft's tests wait on this rather than sleeping, so a slow first boot
+      # doesn't produce flaky failures on CI.
+      test: ["CMD-SHELL", "curl -fSs http://localhost:8008/health || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  # A second homeserver, so federation and cross-server DMs can be exercised.
+  # Not required for the core suite; start it with `--profile federation`.
+  synapse-remote:
+    image: matrixdotorg/synapse:latest
+    container_name: weft-synapse-remote
+    profiles: [federation]
+    environment:
+      SYNAPSE_SERVER_NAME: remote.localhost
+      SYNAPSE_REPORT_STATS: "no"
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+    volumes:
+      - ./synapse-remote-data:/data
+    ports:
+      - "8009:8008"
+    restart: unless-stopped

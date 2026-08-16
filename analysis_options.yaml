@@ -1,0 +1,29 @@
+# One lint policy for the whole workspace. Every package and the app include
+# this file rather than carrying their own, so a rule is changed in one place.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Treat unused code as an error rather than a note — in a codebase this
+    # young, a dangling symbol is nearly always an incomplete refactor.
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+
+linter:
+  rules:
+    # Off: it fires on the legitimate pattern of a private field fed by a
+    # differently-named public parameter, e.g.
+    #   Chat({ChatNetwork? preferredSendNetwork})
+    #       : _preferredSendNetwork = preferredSendNetwork;
+    # where an initializing formal is impossible.
+    prefer_initializing_formals: false
+
+    # On: these matter for a messenger that has to stay responsive and correct.
+    always_declare_return_types: true
+    avoid_slow_async_io: true
+    cancel_subscriptions: true
+    close_sinks: true
+    prefer_final_locals: true
+    unawaited_futures: true
+    use_super_parameters: true

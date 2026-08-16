@@ -1,0 +1,250 @@
+import 'package:collection/collection.dart';
+import 'package:meta/meta.dart';
+import 'package:weft_domain/weft_domain.dart';
+
+import 'scoring/merge_scorer.dart';
+
+/// What the user decided about a pair of handles.
+enum MergeVerdict { merged, rejected }
+
+/// Who decided.
+enum MergeDecisionSource { user, auto }
+
+/// A recorded, sticky decision about one handle pair.
+///
+/// Decisions always beat heuristics. Once a user says "these two are not the
+/// same person", no amount of matching avatars re-suggests it.
+@immutable
+class MergeDecision {
+  const MergeDecision({
+    required this.pair,
+    required this.verdict,
+    required this.source,
+    required this.decidedAt,
+  });
+
+  /// Order-independent key from [pairKey].
+  final String pair;
+  final MergeVerdict verdict;
+  final MergeDecisionSource source;
+  final DateTime decidedAt;
+}
+
+/// The cross-network identity graph: which handles are the same person.
+///
+/// Handles are partitioned into contacts. A handle always belongs to exactly
+/// one contact, so an unmerged handle is simply a contact of size one and the
+/// rest of the app never branches on "merged or not".
+///
+/// This class is deliberately in-memory and synchronous. `weft_store` persists
+/// and rehydrates it; keeping the logic pure makes every merge and unmerge path
+/// unit-testable without a database.
+class IdentityGraph {
+  IdentityGraph({
+    required List<NetworkHandle> handles,
+    List<MergeDecision> decisions = const [],
+    MergeScorer scorer = const MergeScorer(),
+    String Function()? idFactory,
+  }) : _scorer = scorer,
+       _nextId = idFactory ?? _defaultIdFactory() {
+    for (final h in handles) {
+      _handles[h.id] = h;
+      _contactOf[h.id] = h.unifiedContactId ?? _nextId();
+    }
+    for (final d in decisions) {
+      _decisions[d.pair] = d;
+      if (d.verdict == MergeVerdict.merged) {
+        final ids = d.pair.split('|');
+        if (_handles.containsKey(ids[0]) && _handles.containsKey(ids[1])) {
+          _union(ids[0], ids[1]);
+        }
+      }
+    }
+  }
+
+  final MergeScorer _scorer;
+  final String Function() _nextId;
+
+  final Map<String, NetworkHandle> _handles = {};
+  final Map<String, String> _contactOf = {};
+  final Map<String, MergeDecision> _decisions = {};
+
+  static String Function() _defaultIdFactory() {
+    var counter = 0;
+    return () =>
+        'contact_${DateTime.now().microsecondsSinceEpoch}_${counter++}';
+  }
+
+  Iterable<NetworkHandle> get handles => _handles.values;
+
+  List<MergeDecision> get decisions =>
+      _decisions.values.toList(growable: false);
+
+  /// Contact id a handle currently belongs to.
+  String? contactIdOf(String handleId) => _contactOf[handleId];
+
+  /// All handles sharing a contact.
+  List<NetworkHandle> handlesInContact(String contactId) => _contactOf.entries
+      .where((e) => e.value == contactId)
+      .map((e) => _handles[e.key]!)
+      .sorted((a, b) => a.network.index.compareTo(b.network.index));
+
+  /// Materialises the current partition as contacts.
+  List<UnifiedContact> contacts() {
+    final grouped = <String, List<NetworkHandle>>{};
+    for (final entry in _contactOf.entries) {
+      grouped.putIfAbsent(entry.value, () => []).add(_handles[entry.key]!);
+    }
+    return grouped.entries
+        .map((e) {
+          final members = e.value.sorted(
+            (a, b) => a.network.index.compareTo(b.network.index),
+          );
+          return UnifiedContact(
+            id: e.key,
+            displayName: _bestName(members),
+            avatarUrl: members
+                .firstWhereOrNull((h) => h.avatarUrl != null)
+                ?.avatarUrl,
+            handles: members
+                .map((h) => h.copyWith(unifiedContactId: e.key))
+                .toList(growable: false),
+          );
+        })
+        .sorted((a, b) => a.displayName.compareTo(b.displayName));
+  }
+
+  /// Longest available name wins — "Anna Maven" is more useful than "Anna",
+  /// and bridges often supply only a phone number for one of the two.
+  static String _bestName(List<NetworkHandle> members) {
+    final named = members
+        .map((h) => h.displayName)
+        .whereType<String>()
+        .where((n) => n.trim().isNotEmpty)
+        .toList();
+    if (named.isEmpty) return members.first.remoteId;
+    named.sort((a, b) => b.length.compareTo(a.length));
+    return named.first;
+  }
+
+  /// Merge suggestions the user hasn't already ruled on.
+  List<MergeCandidate> suggestions({
+    Map<String, Set<String>> sharedGroupsByPair = const {},
+  }) {
+    final rejected = _decisions.entries
+        .where((e) => e.value.verdict == MergeVerdict.rejected)
+        .map((e) => e.key)
+        .toSet();
+
+    final withContacts = _handles.values
+        .map((h) => h.copyWith(unifiedContactId: _contactOf[h.id]))
+        .toList(growable: false);
+
+    return _scorer.scoreAll(
+      withContacts,
+      rejectedPairs: rejected,
+      sharedGroupsByPair: sharedGroupsByPair,
+    );
+  }
+
+  /// Auto-merges candidates carrying a standalone identity signal, when the
+  /// user has opted in. Returns the pairs actually merged.
+  List<MergeCandidate> applyAutoMerges({DateTime? now}) {
+    if (!_scorer.config.autoMergeOnIdentitySignal) return const [];
+    final applied = <MergeCandidate>[];
+    for (final c in suggestions()) {
+      if (!c.hasIdentitySignal) continue;
+      merge(c.a.id, c.b.id, source: MergeDecisionSource.auto, now: now);
+      applied.add(c);
+    }
+    return applied;
+  }
+
+  /// Merges two handles into one contact, along with everything already merged
+  /// into either of them.
+  String merge(
+    String handleIdA,
+    String handleIdB, {
+    MergeDecisionSource source = MergeDecisionSource.user,
+    DateTime? now,
+  }) {
+    _require(handleIdA);
+    _require(handleIdB);
+
+    _decisions[pairKey(handleIdA, handleIdB)] = MergeDecision(
+      pair: pairKey(handleIdA, handleIdB),
+      verdict: MergeVerdict.merged,
+      source: source,
+      decidedAt: now ?? DateTime.now(),
+    );
+    return _union(handleIdA, handleIdB);
+  }
+
+  /// Splits [handleId] out into a contact of its own.
+  ///
+  /// Also records a rejection against each former group-mate, otherwise the
+  /// scorer would cheerfully re-suggest the merge on the next pass and the
+  /// unmerge would appear not to have worked.
+  String unmerge(String handleId, {DateTime? now}) {
+    _require(handleId);
+    final oldContact = _contactOf[handleId]!;
+    final formerPeers = _contactOf.entries
+        .where((e) => e.value == oldContact && e.key != handleId)
+        .map((e) => e.key)
+        .toList();
+
+    final at = now ?? DateTime.now();
+    for (final peer in formerPeers) {
+      final key = pairKey(handleId, peer);
+      _decisions[key] = MergeDecision(
+        pair: key,
+        verdict: MergeVerdict.rejected,
+        source: MergeDecisionSource.user,
+        decidedAt: at,
+      );
+    }
+
+    final fresh = _nextId();
+    _contactOf[handleId] = fresh;
+    return fresh;
+  }
+
+  /// Records that two handles are *not* the same person without changing the
+  /// current partition — the "dismiss suggestion" action.
+  void reject(String handleIdA, String handleIdB, {DateTime? now}) {
+    _require(handleIdA);
+    _require(handleIdB);
+    final key = pairKey(handleIdA, handleIdB);
+    _decisions[key] = MergeDecision(
+      pair: key,
+      verdict: MergeVerdict.rejected,
+      source: MergeDecisionSource.user,
+      decidedAt: now ?? DateTime.now(),
+    );
+  }
+
+  /// Adds or refreshes a handle, preserving its current contact assignment.
+  void upsertHandle(NetworkHandle handle) {
+    _handles[handle.id] = handle;
+    _contactOf.putIfAbsent(
+      handle.id,
+      () => handle.unifiedContactId ?? _nextId(),
+    );
+  }
+
+  String _union(String a, String b) {
+    final target = _contactOf[a]!;
+    final absorbed = _contactOf[b]!;
+    if (target == absorbed) return target;
+    for (final key in _contactOf.keys.toList()) {
+      if (_contactOf[key] == absorbed) _contactOf[key] = target;
+    }
+    return target;
+  }
+
+  void _require(String handleId) {
+    if (!_handles.containsKey(handleId)) {
+      throw ArgumentError.value(handleId, 'handleId', 'Unknown handle');
+    }
+  }
+}

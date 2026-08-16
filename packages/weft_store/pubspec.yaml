@@ -1,0 +1,32 @@
+name: weft_store
+description: >-
+  Persistence: the identity graph, chat preferences, settings, and the search
+  index (FTS5 keywords plus quantised embedding vectors), on plain SQLite.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^11.0.0
+  meta: ^1.17.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  # sqlite3 3.x bundles its own natives via Dart build hooks; the old
+  # sqlite3_flutter_libs package is end-of-life and deliberately not used.
+  # Used directly rather than through drift: FTS5 and the vector table need
+  # hand-written SQL regardless, and dropping drift_dev removes a heavyweight
+  # codegen step from every build.
+  sqlite3: ^3.0.0
+  weft_domain: ^0.1.0
+  weft_search: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

@@ -1,0 +1,2 @@
+# Workspace-wide lint policy. Change rules in the root file, not here.
+include: ../../analysis_options.yaml
