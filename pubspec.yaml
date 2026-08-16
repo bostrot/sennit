@@ -10,6 +10,7 @@ environment:
 
 workspace:
   - apps/weft
+  - packages/weft_attachments
   - packages/weft_bridges
   - packages/weft_design
   - packages/weft_domain

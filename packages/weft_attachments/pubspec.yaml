@@ -1,0 +1,20 @@
+name: weft_attachments
+description: >-
+  The attachment pipeline's core: mime sniffing, upload planning, and the bounded
+  upload queue. Deliberately pure Dart with transport injected, so the event-shape
+  and retry rules are unit-testable without a homeserver or a device.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  collection: ^1.19.0
+  meta: ^1.17.0
+  weft_domain: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0
