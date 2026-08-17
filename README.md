@@ -41,15 +41,15 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Share-in — Android SEND/SEND_MULTIPLE, cold-start replay, share-target sheet | **Done** for text and files; shared URIs are streamed to a staged copy and sent through the same upload path as the composer, 15 tests |
 | Merge management UI — suggestions with evidence, accept/reject, unmerge | **Done**, 4 widget tests |
 | Bridge QR login — rendered QR + copyable payload, re-transcribe language picker, auto-transcribe | **Done** |
-| Notification decisions — suppression rules, merged-chat grouping, body rendering, summaries | **Done**, pure Dart, 165 tests |
-| Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 57 tests. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
-| Notification actions — direct reply, mark read, mute for an hour, on Android and iOS | **Done**, wired to `ChatRepository`. All three bring Weft to the foreground on Android: an action handled without doing so runs in a background isolate with no Matrix client. |
-| Notification settings — master switch, per-network on/muted/off, mentions-only, quiet hours, lock-screen previews, muted-chat list, push gateway, test notification | **Done**, 12 widget tests. The test button runs a synthetic message through the real `evaluateNotification` path and reports the rule that suppressed it. No per-chat notification screen yet: the policy has per-chat `mentionsOnly` and `bypassQuietHours` and nothing writes them. |
+| Notification decisions — suppression rules, merged-chat grouping, body rendering, summaries | **Done**, pure Dart, 171 tests |
+| Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 78 tests, and **verified on an Android device**: channels, shortcut, `MessagingStyle`, actions, and a tap that opens the right chat both warm and from a killed process. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
+| Notification actions — direct reply, mark read, mute for an hour, on Android and iOS | **Done**, wired to `ChatRepository`; a reply typed in the Android shade has been sent as a real encrypted event. All three bring Weft to the foreground on Android: an action handled without doing so runs in a background isolate with no Matrix client. |
+| Notification settings — master switch, per-network on/muted/off, mentions-only, quiet hours, lock-screen previews, muted-chat list, push gateway, test notification | **Done**, 25 widget tests. The test button runs a synthetic message through the real `evaluateNotification` path and reports the rule that suppressed it. No per-chat notification screen yet: the policy has per-chat `mentionsOnly` and `bypassQuietHours` and nothing writes them. |
 | iOS Share Extension, notification service extension, Direct Share/People API, widgets, watch | **Not built** — the notification service extension is authored at `apps/weft/ios/NotificationService/` but needs Xcode targets and signing |
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**903 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added.
+**943 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added, and the Android APK after core library desugaring was enabled for the same plugin — the whole notification loop was then driven on an Android 16 emulator against the local Synapse.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -82,7 +82,10 @@ Also valid: `-d linux`, `-d windows`, `-d ios`, `-d android`.
 > Homebrew puts its own `rustc` (no Android std) ahead of rustup's on PATH, and
 > cargo resolves `rustc` from PATH, so without the pin every Android target
 > fails with a misleading `E0463: can't find crate for core`. `compileSdk` is
-> pinned to 37 for `flutter_secure_storage`.
+> pinned to 37 for `flutter_secure_storage`, and **core library desugaring is
+> on** because `flutter_local_notifications` requires it — without it every
+> Android build fails at `checkDebugAarMetadata`, before a line of Weft is
+> compiled.
 
 > **Push note.** Weft notifies out of the box while it is running — that path
 > needs nothing configured. Being notified while it is *closed* needs two things
@@ -198,6 +201,8 @@ subtle logic lives there and runs under `dart test` in about a second, with no
 device and no homeserver.
 
 Longer-form design notes live in `docs/architecture/` —
+[notifications](docs/architecture/notifications.md) covers the `event_id_only`
+pusher, merged-chat grouping and the read-receipt dismissal loop, and
 [the attachment pipeline](docs/architecture/attachment-pipeline.md) covers
 sniff-first detection, the plain-vs-encrypted event shapes, and why the upload
 queue bounds concurrency.

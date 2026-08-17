@@ -14,6 +14,12 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications, which schedules against
+        // `java.time` and so needs the desugared JDK library on every API level
+        // Weft supports. Without it the whole Android build fails at
+        // `checkDebugAarMetadata` — not at runtime — so it is the notification
+        // plugin's hard prerequisite rather than a nicety.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -50,6 +56,8 @@ dependencies {
     // dependency that a plugin upgrade drops would break the build with an
     // unresolved import rather than a version conflict.
     implementation("androidx.core:core-ktx:1.13.1")
+    // The other half of `isCoreLibraryDesugaringEnabled` above.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

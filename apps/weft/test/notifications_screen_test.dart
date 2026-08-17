@@ -9,11 +9,15 @@ import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/data/chat_repository.dart';
 import 'package:weft/features/settings/notifications_screen.dart';
+import 'package:weft/services/notifications/notification_service.dart';
 import 'package:weft/services/notifications/push_registration.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
+
+import 'support/notification_fixtures.dart';
 
 /// The screen is the only place a [NotificationPolicy] is *written* by a human,
 /// so what these tests pin is the round trip rather than the pixels: a control
@@ -31,17 +35,36 @@ void main() {
     WeftStores stores,
     ChatRepository repository, {
     required Widget home,
+    PushRegistrationOutcome push = const PushRegistrationOutcome(
+      PushRegistrationStatus.noToken,
+    ),
+    RecordingNotificationSink? sink,
   }) => ProviderScope(
     overrides: [
       storesProvider.overrideWithValue(stores),
       chatRepositoryProvider.overrideWithValue(repository),
-      pushRegistrationProvider.overrideWith(
-        (ref) async =>
-            const PushRegistrationOutcome(PushRegistrationStatus.noToken),
-      ),
-      // Desktop, or a build with no Firebase config. Nothing to post through,
-      // which is the state the button has to survive.
-      notificationServiceProvider.overrideWith((ref) async => null),
+      pushRegistrationProvider.overrideWith((ref) async => push),
+      // Without a sink: desktop, or a build with no Firebase config. Nothing to
+      // post through, which is the state the button has to survive. With one:
+      // the real service over the real pipeline, so pressing the button
+      // exercises the chain it exists to prove rather than a stub of it.
+      notificationServiceProvider.overrideWith((ref) async {
+        if (sink == null) return null;
+        final session = FakeNotificationSession();
+        final pipeline = MatrixNotificationPipeline(
+          session: session,
+          chatForRoom: (_) => null,
+          policy: () => ref.read(notificationPolicyProvider),
+        );
+        final service = WeftNotificationService(sink: sink, pipeline: pipeline);
+        ref.onDispose(() {
+          unawaited(service.dispose());
+          unawaited(pipeline.dispose());
+          unawaited(session.close());
+        });
+        await service.start();
+        return service;
+      }),
     ],
     child: MaterialApp(
       theme: WeftTheme.build(),
@@ -71,6 +94,10 @@ void main() {
     ],
     _FakeChatRepository? repository,
     NotificationPolicy? policy,
+    PushRegistrationOutcome push = const PushRegistrationOutcome(
+      PushRegistrationStatus.noToken,
+    ),
+    RecordingNotificationSink? sink,
   }) async {
     tester.view.physicalSize = const Size(900, 4000);
     tester.view.devicePixelRatio = 1;
@@ -87,6 +114,8 @@ void main() {
         stores,
         repository ?? _FakeChatRepository(chats: chats, networks: networks),
         home: const NotificationsScreen(),
+        push: push,
+        sink: sink,
       ),
     );
     await tester.pumpAndSettle();
@@ -200,6 +229,38 @@ void main() {
     expect(container.read(notificationPolicyProvider).mentionsOnly, isTrue);
   });
 
+  testWidgets('a network with no bridge says so instead of showing nothing', (
+    tester,
+  ) async {
+    // First launch, before any bridge has connected. An empty "Networks"
+    // heading reads as a screen that failed to load.
+    await pump(tester, networks: const []);
+
+    expect(
+      find.textContaining('No bridges are configured yet'),
+      findsOneWidget,
+    );
+    expect(find.text('Muted'), findsNothing);
+  });
+
+  testWidgets('mute bypass is a switch of its own, and persists', (
+    tester,
+  ) async {
+    // Slack semantics and Matrix semantics both have users, which is why this
+    // is a setting rather than a constant — and why `push_rules.dart` refuses
+    // to send a bypassable mute to the homeserver.
+    final (:stores, :container) = await pump(tester);
+    expect(
+      container.read(notificationPolicyProvider).mentionsBypassMute,
+      isTrue,
+    );
+
+    await tester.tap(find.text('Mentions break through a mute'));
+    await tester.pumpAndSettle();
+
+    expect(persisted(stores).mentionsBypassMute, isFalse);
+  });
+
   testWidgets('quiet hours start as a window, not as empty pickers', (
     tester,
   ) async {
@@ -232,6 +293,42 @@ void main() {
       expect(container.read(notificationPolicyProvider).quietHours, isNotNull);
     });
   });
+
+  testWidgets(
+    'delivering silently is a property of the window, not of a new one',
+    (tester) async {
+      await withClock(Clock.fixed(now), () async {
+        final (:stores, container: _) = await pump(
+          tester,
+          policy: NotificationPolicy(
+            quietHours: QuietHours(
+              startMinute: 23 * 60,
+              endMinute: 6 * 60,
+              offsetMinutes: now.timeZoneOffset.inMinutes,
+              allowMentions: false,
+            ),
+          ),
+        );
+
+        await tester.tap(
+          find.widgetWithText(
+            SwitchListTile,
+            'Deliver silently instead of hiding',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final quiet = persisted(stores).quietHours!;
+        expect(quiet.deliverSilently, isTrue);
+        // Every other edge of the window survives: this is the switch that turns
+        // "nothing happened at 3am" into "it is in the shade in the morning", not
+        // a reset to the defaults.
+        expect(quiet.startMinute, 23 * 60);
+        expect(quiet.endMinute, 6 * 60);
+        expect(quiet.allowMentions, isFalse);
+      });
+    },
+  );
 
   testWidgets('the time picker moves one edge of the window, not both', (
     tester,
@@ -340,6 +437,80 @@ void main() {
       expect(repository.unmuted, ['!wa:example.org']);
     });
 
+    testWidgets('an indefinite mute is not described as expiring', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(now), () async {
+        await pump(
+          tester,
+          chats: const [chat],
+          policy: NotificationPolicy().muteChat(chat.id),
+        );
+
+        expect(find.text('Muted in Weft'), findsOneWidget);
+        expect(find.textContaining('for another'), findsNothing);
+      });
+    });
+
+    testWidgets('a chat muted both ways is listed once and lifted twice', (
+      tester,
+    ) async {
+      // Silenced from the chat screen — a homeserver push rule — and then again
+      // for an hour from a notification action. Lifting only one leaves the
+      // phone quiet, which reads as an Unmute button that does nothing.
+      await withClock(Clock.fixed(now), () async {
+        const muted = Chat(
+          id: '!wa:example.org',
+          title: 'Standup',
+          isGroup: true,
+          muted: true,
+          sources: [
+            ChatSource(
+              roomId: '!wa:example.org',
+              network: ChatNetwork.whatsapp,
+            ),
+          ],
+        );
+        final repository = _FakeChatRepository(chats: const [muted]);
+        final (:stores, :container) = await pump(
+          tester,
+          repository: repository,
+          policy: NotificationPolicy().muteChat(
+            muted.id,
+            until: now.add(const Duration(hours: 3)),
+          ),
+        );
+
+        expect(find.text('Standup'), findsOneWidget);
+        expect(
+          find.text('Muted for another 3 hours · Muted on the homeserver'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Unmute'));
+        await tester.pumpAndSettle();
+
+        expect(persisted(stores).chats, isEmpty);
+        expect(repository.unmuted, ['!wa:example.org']);
+        expect(find.text('Nothing is muted.'), findsOneWidget);
+      });
+    });
+
+    testWidgets('a muted chat the inbox has not resolved still appears', (
+      tester,
+    ) async {
+      // Archived, or not yet synced. Dropping it from the list would leave
+      // something silencing the user with no way to find it.
+      await withClock(Clock.fixed(now), () async {
+        await pump(
+          tester,
+          policy: NotificationPolicy().muteChat('merged:contact_9'),
+        );
+
+        expect(find.text('merged:contact_9'), findsOneWidget);
+      });
+    });
+
     testWidgets('a lapsed timed mute is pruned on open', (tester) async {
       await withClock(Clock.fixed(now), () async {
         final (:stores, :container) = await pump(
@@ -398,6 +569,142 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  group('push status', () {
+    // Three of the six statuses are not failures at all, and the sentence is
+    // the whole of what the user has to act on. One test each rather than a
+    // loop inside one, because a second `pumpWidget` reuses the `ProviderScope`
+    // element and its container — the override would be replaced without the
+    // provider being recomputed, and the screen would still show the first
+    // status.
+    for (final (status, expected) in const [
+      (
+        PushRegistrationStatus.notConfigured,
+        'No push gateway configured, so this device is not woken.',
+      ),
+      (
+        PushRegistrationStatus.unsupportedPlatform,
+        'This platform has no push. Notifications arrive while Weft is '
+            'running.',
+      ),
+      (PushRegistrationStatus.registered, 'Registered with your homeserver.'),
+    ]) {
+      testWidgets('${status.name} says what to do about it', (tester) async {
+        await pump(tester, push: PushRegistrationOutcome(status));
+        expect(find.text(expected), findsOneWidget);
+      });
+    }
+
+    testWidgets('an outcome that carries its own sentence uses it', (
+      tester,
+    ) async {
+      // `WeftPushRegistration` writes the actionable ones itself — the enum
+      // label is only the fallback.
+      await pump(
+        tester,
+        push: const PushRegistrationOutcome(
+          PushRegistrationStatus.failed,
+          message: 'The homeserver rejected the pusher (M_UNKNOWN).',
+        ),
+      );
+
+      expect(
+        find.text('The homeserver rejected the pusher (M_UNKNOWN).'),
+        findsOneWidget,
+      );
+      expect(find.text('Registration failed.'), findsNothing);
+    });
+
+    testWidgets('Retry asks again', (tester) async {
+      var attempts = 0;
+      final stores = WeftStores.inMemory();
+      addTearDown(stores.dispose);
+      tester.view.physicalSize = const Size(900, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            storesProvider.overrideWithValue(stores),
+            chatRepositoryProvider.overrideWithValue(_FakeChatRepository()),
+            notificationServiceProvider.overrideWith((ref) async => null),
+            pushRegistrationProvider.overrideWith((ref) async {
+              attempts++;
+              return const PushRegistrationOutcome(
+                PushRegistrationStatus.noToken,
+              );
+            }),
+          ],
+          child: MaterialApp(
+            theme: WeftTheme.build(),
+            home: const NotificationsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(attempts, 1);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+
+      // Invalidating the provider *is* the retry button — there is no second
+      // registration path for it to have gone down.
+      expect(attempts, 2);
+    });
+  });
+
+  group('the test notification', () {
+    testWidgets('posts through the real path and says where it went', (
+      tester,
+    ) async {
+      final sink = RecordingNotificationSink();
+      await pump(tester, sink: sink);
+
+      await tester.tap(find.text('Send test notification'));
+      await tester.pumpAndSettle();
+
+      // A real notification, in a conversation of its own — attributing Weft's
+      // sample text to a contact would put words in their mouth in the shade.
+      expect(sink.shown, hasLength(1));
+      expect(sink.shown.single.groupKey, kTestNotificationChatId);
+      expect(sink.shown.single.title, 'Notification test');
+      // The first available network, so the channel under test is the one the
+      // user's own messages arrive on.
+      expect(
+        sink.shown.single.details.android!.channelId,
+        'weft.messages.whatsapp',
+      );
+      expect(
+        find.textContaining('Posted on the WhatsApp channel'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a suppressed test names the setting responsible', (
+      tester,
+    ) async {
+      // The answer the button exists to give. A button that appears to do
+      // nothing teaches the user that notifications are broken.
+      final sink = RecordingNotificationSink();
+      await pump(
+        tester,
+        sink: sink,
+        policy: NotificationPolicy(mentionsOnly: true),
+      );
+
+      await tester.tap(find.text('Send test notification'));
+      await tester.pumpAndSettle();
+
+      expect(sink.shown, isEmpty);
+      expect(
+        find.textContaining(
+          'Only mentions get through, and a test message does not mention you.',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }
 

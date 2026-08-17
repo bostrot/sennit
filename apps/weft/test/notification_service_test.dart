@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:weft/app/intents.dart';
 import 'package:weft/data/chat_repository.dart';
 import 'package:weft/services/notifications/notification_actions.dart';
@@ -15,10 +19,16 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 
+import 'support/notification_fixtures.dart';
+
 /// A fixed instant, so nothing here depends on when the suite runs.
 final DateTime _now = DateTime.utc(2026, 1, 15, 21);
 
 void main() {
+  // Needed by the groups that stand a fake platform behind the real plugin;
+  // harmless to the rest, which never send a platform message.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('stableNotificationId', () {
     test('is a function of the key, not of call order', () {
       expect(stableNotificationId(r'$abc'), stableNotificationId(r'$abc'));
@@ -270,8 +280,8 @@ void main() {
   });
 
   group('WeftNotificationService', () {
-    late _RecordingSink sink;
-    late _FakeNotificationSession session;
+    late RecordingNotificationSink sink;
+    late FakeNotificationSession session;
     late MatrixNotificationPipeline pipeline;
     late WeftNotificationService service;
 
@@ -279,8 +289,8 @@ void main() {
     late NotificationPolicy policy;
 
     setUp(() {
-      sink = _RecordingSink();
-      session = _FakeNotificationSession();
+      sink = RecordingNotificationSink();
+      session = FakeNotificationSession();
       policy = NotificationPolicy();
       pipeline = MatrixNotificationPipeline(
         session: session,
@@ -550,6 +560,191 @@ void main() {
       expect(decision.suppression, NotificationSuppression.globallyDisabled);
       expect(sink.shown, isEmpty);
     });
+
+    test('a tap on a Signal message opens the merged conversation', () async {
+      // The sentence this whole phase is built around, asserted at the top of
+      // the stack: what the user tapped was a Signal notification, and where
+      // they land is the conversation — not `!sg:example.org`.
+      String? opened;
+      service.onOpenLink = (link) => opened = link;
+      await service.start();
+      await deliver(
+        _message(
+          eventId: r'$sg',
+          roomId: '!sg:example.org',
+          network: ChatNetwork.signal,
+        ),
+      );
+
+      sink.activate(sink.shown.first);
+
+      final link = WeftLink.parse(opened!)! as OpenChatLink;
+      expect(link.chatId, 'merged:contact_1');
+      expect(link.chatId, isNot('!sg:example.org'));
+    });
+
+    test('a cold-start action is an action, not a tap', () async {
+      // The reply typed in the shade of a phone where Weft had been killed. It
+      // arrives through the launch details rather than the callback, and
+      // routing it to the link handler would open a chat and drop the message.
+      String? opened;
+      NotificationActivation? action;
+      sink.launch = NotificationActivation(
+        payload: NotificationPayload.forContent(_content()),
+        actionId: WeftNotificationActions.reply,
+        input: 'five minutes',
+      );
+      service.onOpenLink = (link) => opened = link;
+      service.onAction = (a) => action = a;
+
+      await service.start();
+
+      expect(opened, isNull);
+      expect(action!.input, 'five minutes');
+    });
+
+    test('starting twice does not notify twice', () async {
+      // The session state stream re-emits `ready` on every reconnection, and a
+      // second subscription on the pipeline is two notifications per message.
+      await service.start();
+      await service.start();
+      await deliver(_message());
+
+      expect(sink.shown, hasLength(1));
+    });
+
+    test('permission is the sink\'s to ask for', () async {
+      expect(await service.requestPermission(), isTrue);
+    });
+
+    test('the three shapes a push really arrives in all post', () async {
+      await service.start();
+      // The gateway's own envelope, a flattened FCM data map where every value
+      // is a string, and an APNs payload with the Matrix keys beside `aps`.
+      final payloads = <Map<String, Object?>>[
+        {
+          'notification': {'room_id': '!wa:example.org', 'event_id': r'$p1'},
+        },
+        {'room_id': '!wa:example.org', 'event_id': r'$p2', 'unread': '3'},
+        {
+          'aps': {'mutable-content': 1},
+          'room_id': '!wa:example.org',
+          'event_id': r'$p3',
+        },
+      ];
+      for (var i = 0; i < payloads.length; i++) {
+        session.messages['\$p${i + 1}'] = _message(eventId: '\$p${i + 1}');
+        await service.handlePush(payloads[i]);
+        await pumpEventQueue();
+      }
+
+      expect(service.postedFor('merged:contact_1'), hasLength(3));
+    });
+
+    test('a clearing push for a room no chat claims still clears it', () async {
+      // `dismissRoom` falls back to the group keys holding a notification from
+      // that room. Without it a chat the inbox has since dropped keeps its
+      // notification forever, because nothing else will ever name it.
+      final orphan = WeftNotificationService(sink: sink, pipeline: pipeline);
+      addTearDown(orphan.dispose);
+      await orphan.start();
+      await deliver(_message(eventId: r'$e1'));
+
+      await orphan.dismissRoom('!wa:example.org');
+
+      expect(orphan.postedFor('merged:contact_1'), isEmpty);
+      expect(
+        sink.cancelled.map((c) => c.id),
+        contains(stableNotificationId(r'$e1')),
+      );
+    });
+
+    test('quiet hours that deliver silently post silently', () async {
+      // The only producer of the silent case, end to end: policy → decision →
+      // the flag every backend reads. `_now` is 21:00 UTC, inside the window.
+      policy = NotificationPolicy(
+        quietHours: const QuietHours(
+          startMinute: 20 * 60,
+          endMinute: 7 * 60,
+          offsetMinutes: 0,
+          deliverSilently: true,
+        ),
+      );
+      await service.start();
+      await deliver(_message());
+
+      final posted = sink.shown.single;
+      expect(posted.details.android!.silent, isTrue);
+      expect(posted.details.iOS!.presentSound, isFalse);
+      expect(posted.body, 'hello', reason: 'silent is not suppressed');
+    });
+
+    test('the avatar is fetched once and drawn on every surface', () async {
+      final requested = <String>[];
+      final withAvatars = WeftNotificationService(
+        sink: sink,
+        pipeline: pipeline,
+        chatForRoom: _chatForRoom,
+        avatarLoader: (url) async {
+          requested.add(url);
+          return '/tmp/grace.png';
+        },
+      );
+      addTearDown(withAvatars.dispose);
+      await withAvatars.start();
+      await deliver(_message(eventId: r'$1'));
+      await deliver(_message(eventId: r'$2'));
+
+      expect(requested, hasLength(2), reason: 'cached inside the loader');
+      expect(requested.first, 'https://example.org/thumb/grace');
+      // A file path, because every backend draws the icon itself.
+      final message = sink.shown.firstWhere(
+        (p) => p.details.android!.setAsGroupSummary != true,
+      );
+      expect(
+        (message.details.android!.largeIcon! as FilePathAndroidBitmap).data,
+        '/tmp/grace.png',
+      );
+      expect(sink.shortcuts.last.id, chatShortcutId('merged:contact_1'));
+    });
+
+    test(
+      'an avatar that will not load costs a face, not a notification',
+      () async {
+        final withAvatars = WeftNotificationService(
+          sink: sink,
+          pipeline: pipeline,
+          chatForRoom: _chatForRoom,
+          avatarLoader: (url) async => null,
+        );
+        addTearDown(withAvatars.dispose);
+        await withAvatars.start();
+        await deliver(_message());
+
+        expect(sink.shown, hasLength(1));
+        expect(sink.shown.single.details.android!.largeIcon, isNull);
+      },
+    );
+
+    test(
+      'a weekend of unread messages is counted, not remembered forever',
+      () async {
+        await service.start();
+        for (var i = 0; i < kMaxTrackedNotificationsPerChat + 20; i++) {
+          await deliver(_message(eventId: '\$e$i', body: 'm$i'));
+        }
+
+        // The count and the row are different questions, and both are bounded.
+        expect(
+          service.postedFor('merged:contact_1'),
+          hasLength(kMaxTrackedNotificationsPerChat),
+        );
+        expect(
+          sink.shown.last.body,
+          '$kMaxTrackedNotificationsPerChat new messages',
+        );
+      },
+    );
   });
 
   group('push registration', () {
@@ -980,8 +1175,8 @@ void main() {
       // The whole chain in one test: a decided notification is posted, the
       // platform hands back an activation for the reply button, and the
       // repository sees a send — through exactly the wiring `main.dart` builds.
-      final sink = _RecordingSink();
-      final session = _FakeNotificationSession();
+      final sink = RecordingNotificationSink();
+      final session = FakeNotificationSession();
       addTearDown(session.close);
       final repository = _ActionRepository();
 
@@ -1030,15 +1225,356 @@ void main() {
       );
     });
   });
+
+  // ------------------------------------------------------- the plugin itself
+
+  /// [LocalNotificationSink] against a fake platform plugin.
+  ///
+  /// Everything above this point stops at [NotificationSink], which is the
+  /// seam — and so leaves the one implementation that actually talks to
+  /// `flutter_local_notifications` untested. Here the *real* Dart half of the
+  /// plugin runs and only the native half is faked, which buys two things a
+  /// fake sink cannot: the method call a device would genuinely receive, and
+  /// the fact that every `NotificationDetails` Weft builds survives the
+  /// standard codec. A `Color`, a `Person` or a `FilePathAndroidBitmap` that
+  /// would not encode is a crash on a phone and silence in a pure-Dart test.
+  group('LocalNotificationSink', () {
+    late _FakePlatformPlugin plugin;
+    late _FakeIntentsHost intents;
+
+    setUp(() {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      AndroidFlutterLocalNotificationsPlugin.registerWith();
+      plugin = _FakePlatformPlugin();
+      intents = _FakeIntentsHost();
+    });
+
+    tearDown(() {
+      plugin.dispose();
+      intents.dispose();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    test('creates the group before the channels that name it', () async {
+      await LocalNotificationSink().initialize((_) {});
+
+      final methods = plugin.calls.map((c) => c.method).toList();
+      expect(methods.first, 'initialize');
+      // Android drops a channel whose group does not exist yet, and the
+      // consequence is seventeen loose entries in the system settings screen
+      // rather than one "Messages" heading — visible only on a device.
+      expect(
+        methods.indexOf('createNotificationChannelGroup'),
+        lessThan(methods.indexOf('createNotificationChannel')),
+      );
+
+      final created = plugin.calls
+          .where((c) => c.method == 'createNotificationChannel')
+          .map((c) => (c.arguments as Map)['id'])
+          .toList();
+      expect(created, hasLength(weftNotificationChannels().length));
+      expect(
+        created,
+        containsAll([
+          messageChannelFor(ChatNetwork.whatsapp).id,
+          kCallsChannelId,
+          kBackgroundChannelId,
+        ]),
+      );
+    });
+
+    test('a posted notification crosses the channel whole', () async {
+      final sink = LocalNotificationSink();
+      await sink.initialize((_) {});
+      final presentation = NotificationPresentation.forMessage(
+        content: _content(),
+        conversation: [
+          _content(eventId: r'$0', body: 'earlier'),
+          _content(),
+        ],
+        avatarPaths: {r'$event_1': '/tmp/grace.png'},
+      );
+
+      await sink.show(presentation);
+
+      final call = plugin.calls.lastWhere((c) => c.method == 'show');
+      final args = call.arguments as Map;
+      expect(args['id'], stableNotificationId(r'$event_1'));
+      expect(args['title'], 'Grace');
+      expect(args['body'], 'hello');
+      // The payload is a string by the time it is an intent extra, and it is
+      // the whole of what a tap after a cold start has to work from.
+      expect(
+        NotificationPayload.decode(args['payload'] as String),
+        presentation.payload,
+      );
+
+      final specifics = args['platformSpecifics']! as Map;
+      expect(
+        specifics['channelId'],
+        messageChannelFor(ChatNetwork.whatsapp).id,
+      );
+      expect(specifics['groupKey'], 'merged:contact_1');
+      expect(specifics['tag'], 'merged:contact_1');
+      expect(specifics['shortcutId'], chatShortcutId('merged:contact_1'));
+      expect(specifics['style'], AndroidNotificationStyle.messaging.index);
+      expect(
+        (specifics['actions']! as List).map((a) => (a as Map)['id']),
+        weftAndroidMessageActions().map((a) => a.id),
+      );
+    });
+
+    test('a cancel carries the tag it was posted with', () async {
+      final sink = LocalNotificationSink();
+      await sink.initialize((_) {});
+
+      await sink.cancel(id: 42, tag: 'merged:contact_1');
+
+      final args =
+          plugin.calls.lastWhere((c) => c.method == 'cancel').arguments as Map;
+      // Android matches a cancel on (id, tag). Drop the tag and the call
+      // silently does nothing, which is a notification that will not go away.
+      expect(args['id'], 42);
+      expect(args['tag'], 'merged:contact_1');
+    });
+
+    test('a tap the platform reports reaches the callback', () async {
+      NotificationActivation? seen;
+      final sink = LocalNotificationSink();
+      await sink.initialize((activation) => seen = activation);
+
+      await _fireNotificationResponse(
+        payload: NotificationPayload.forContent(_content()).encode(),
+        actionId: WeftNotificationActions.reply,
+        input: 'on my way',
+      );
+
+      expect(seen!.actionId, WeftNotificationActions.reply);
+      expect(seen!.input, 'on my way');
+      expect(seen!.payload.chatId, 'merged:contact_1');
+    });
+
+    test('a response carrying nothing usable is dropped, not thrown', () async {
+      var fired = 0;
+      final sink = LocalNotificationSink();
+      await sink.initialize((_) => fired++);
+
+      await _fireNotificationResponse(payload: null);
+      await _fireNotificationResponse(payload: '{not json');
+
+      expect(fired, isZero);
+    });
+
+    test('a cold start is replayed from the launch details', () async {
+      plugin.launchDetails = {
+        'notificationLaunchedApp': true,
+        'notificationResponse': {
+          'notificationId': stableNotificationId(r'$event_1'),
+          'notificationResponseType': 0,
+          'payload': NotificationPayload.forContent(_content()).encode(),
+          'data': <String, Object?>{},
+        },
+      };
+
+      final activation = await LocalNotificationSink().launchActivation();
+
+      expect(activation!.isTap, isTrue);
+      expect(activation.payload.link, 'weft://chat/merged%3Acontact_1');
+    });
+
+    test('a launch that was not a notification is null', () async {
+      plugin.launchDetails = {'notificationLaunchedApp': false};
+      expect(await LocalNotificationSink().launchActivation(), isNull);
+
+      plugin.launchDetails = null;
+      expect(await LocalNotificationSink().launchActivation(), isNull);
+    });
+
+    test(
+      'a conversation shortcut goes to the channel WeftIntents owns',
+      () async {
+        await LocalNotificationSink().publishConversationShortcut(
+          id: chatShortcutId('merged:contact_1'),
+          label: 'Grace',
+          link: notificationLinkFor('merged:contact_1'),
+          iconPath: '/tmp/grace.png',
+        );
+
+        final call = intents.calls.single;
+        expect(call.method, 'publishChatShortcut');
+        final args = call.arguments! as Map;
+        expect(args['id'], 'chat_merged_contact_1');
+        expect(args['label'], 'Grace');
+        // A plain `weft://chat/<id>` VIEW, so a long-press in the launcher goes
+        // through the *existing* intent replay rather than a second front door.
+        expect(
+          (WeftLink.parse(args['link'] as String)! as OpenChatLink).chatId,
+          'merged:contact_1',
+        );
+      },
+    );
+
+    test('a launcher that refuses costs a bubble, not a notification', () async {
+      intents.answer = (call) => throw PlatformException(code: 'refused');
+      await LocalNotificationSink().publishConversationShortcut(
+        id: 'chat_x',
+        label: 'x',
+        link: 'weft://chat/x',
+      );
+
+      intents.answer = (call) => throw MissingPluginException();
+      await LocalNotificationSink().publishConversationShortcut(
+        id: 'chat_x',
+        label: 'x',
+        link: 'weft://chat/x',
+      );
+      // Both swallowed: the platform without the handler is every desktop, and
+      // the refusal is a launcher at its shortcut limit.
+    });
+
+    test('a platform with no shortcuts is never asked', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+
+      await LocalNotificationSink().publishConversationShortcut(
+        id: 'chat_x',
+        label: 'x',
+        link: 'weft://chat/x',
+      );
+
+      expect(intents.calls, isEmpty);
+    });
+
+    test(
+      'permission is asked for where it is asked for, and not where it is not',
+      () async {
+        plugin.permission = true;
+        expect(await LocalNotificationSink().requestPermission(), isTrue);
+        expect(
+          plugin.calls.map((c) => c.method),
+          contains('requestNotificationsPermission'),
+        );
+
+        // Linux and Windows never prompt. Answering false there would leave the
+        // caller believing notifications are blocked on a platform that has no
+        // way to block them.
+        plugin.calls.clear();
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        expect(await LocalNotificationSink().requestPermission(), isTrue);
+        expect(plugin.calls, isEmpty);
+      },
+    );
+
+    test('a refused prompt is reported as refused', () async {
+      plugin.permission = false;
+      expect(await LocalNotificationSink().requestPermission(), isFalse);
+    });
+  });
+
+  // ------------------------------------------------------------------ avatars
+
+  group('MatrixNotificationAvatars', () {
+    late Directory cache;
+    late List<Uri> fetched;
+
+    setUp(() {
+      cache = Directory.systemTemp.createTempSync('weft-avatar-test');
+      fetched = [];
+    });
+
+    tearDown(() => cache.deleteSync(recursive: true));
+
+    MatrixNotificationAvatars avatars({
+      Map<String, String>? headers,
+      Future<http.Response> Function(http.Request)? respond,
+    }) => MatrixNotificationAvatars(
+      cacheDirectory: cache,
+      headers: headers,
+      client: MockClient((request) async {
+        fetched.add(request.url);
+        return respond?.call(request) ?? http.Response.bytes([1, 2, 3], 200);
+      }),
+    );
+
+    test('downloads once and answers from memory after that', () async {
+      final loader = avatars();
+      const url = 'https://example.org/_matrix/media/v3/thumbnail/x';
+
+      final first = await loader.load(url);
+      final second = await loader.load(url);
+
+      expect(first, isNotNull);
+      expect(File(first!).readAsBytesSync(), [1, 2, 3]);
+      expect(second, first);
+      // A bridge backfill posts twenty notifications from one sender; twenty
+      // fetches of the same face is twenty sockets on a phone that was woken.
+      expect(fetched, hasLength(1));
+    });
+
+    test('a file already on disk survives the next launch', () async {
+      const url = 'https://example.org/thumb/grace';
+      final path = await avatars().load(url);
+      fetched.clear();
+
+      // A second process, same cache directory.
+      expect(await avatars().load(url), path);
+      expect(fetched, isEmpty);
+    });
+
+    test('sends the headers the inbox fetches avatars with', () async {
+      String? authorization;
+      await avatars(
+        headers: const {'Authorization': 'Bearer token'},
+        respond: (request) async {
+          authorization = request.headers['Authorization'];
+          return http.Response.bytes([1], 200);
+        },
+      ).load('https://example.org/thumb/grace');
+
+      // Matrix v1.11 put media behind a bearer token, so without these every
+      // face is a 401 — which looks exactly like having no avatar at all.
+      expect(authorization, 'Bearer token');
+    });
+
+    test('an unresolved mxc URI is not fetched', () async {
+      expect(await avatars().load('mxc://example.org/abc'), isNull);
+      expect(await avatars().load(''), isNull);
+      expect(await avatars().load('not a url'), isNull);
+      expect(fetched, isEmpty);
+    });
+
+    test(
+      'a failure costs the notification its face, not its existence',
+      () async {
+        for (final failure in <Future<http.Response> Function(http.Request)>[
+          (_) async => http.Response('nope', 401),
+          (_) async => http.Response.bytes(const [], 200),
+          (_) async => throw const SocketException('no route to host'),
+        ]) {
+          final loader = avatars(respond: failure);
+          expect(await loader.load('https://example.org/thumb/x'), isNull);
+          // And the answer is remembered, so a dead endpoint is not retried once
+          // per message for the rest of the session.
+          fetched.clear();
+          expect(await loader.load('https://example.org/thumb/x'), isNull);
+          expect(fetched, isEmpty);
+        }
+      },
+    );
+  });
 }
 
 // --------------------------------------------------------------------- helpers
 
 /// The merged chat every fixture here belongs to: one contact, two legs.
+///
+/// [Chat.avatarUrl] is already the resolved HTTP thumbnail — that is what the
+/// repository stores — which is what `MatrixNotificationAvatars` expects and
+/// what makes the avatar path reachable from a delivered message.
 final Chat _mergedChat = Chat(
   id: 'merged:contact_1',
   title: 'Grace',
   contactId: 'contact_1',
+  avatarUrl: 'https://example.org/thumb/grace',
   sources: const [
     ChatSource(roomId: '!wa:example.org', network: ChatNetwork.whatsapp),
     ChatSource(roomId: '!sg:example.org', network: ChatNetwork.signal),
@@ -1142,86 +1678,6 @@ class _ActionRepository implements ChatRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-/// A [NotificationSink] that records instead of posting.
-class _RecordingSink implements NotificationSink {
-  final List<NotificationPresentation> shown = [];
-  final List<({int id, String? tag})> cancelled = [];
-  final List<({String id, String label, String link})> shortcuts = [];
-
-  NotificationActivation? launch;
-  void Function(NotificationActivation)? _onActivation;
-
-  /// Fires the callback the platform would fire when a notification is tapped.
-  void activate(
-    NotificationPresentation presentation, {
-    String? actionId,
-    String? input,
-  }) {
-    _onActivation?.call(
-      NotificationActivation(
-        payload: NotificationPayload.decode(presentation.payload.encode())!,
-        actionId: actionId,
-        input: input,
-      ),
-    );
-  }
-
-  @override
-  Future<void> initialize(
-    void Function(NotificationActivation) onActivation,
-  ) async {
-    _onActivation = onActivation;
-  }
-
-  @override
-  Future<NotificationActivation?> launchActivation() async => launch;
-
-  @override
-  Future<bool> requestPermission() async => true;
-
-  @override
-  Future<void> show(NotificationPresentation presentation) async =>
-      shown.add(presentation);
-
-  @override
-  Future<void> cancel({required int id, String? tag}) async =>
-      cancelled.add((id: id, tag: tag));
-
-  @override
-  Future<void> publishConversationShortcut({
-    required String id,
-    required String label,
-    required String link,
-    String? iconPath,
-  }) async => shortcuts.add((id: id, label: label, link: link));
-}
-
-/// A [MatrixNotificationSession] with no homeserver behind it.
-class _FakeNotificationSession implements MatrixNotificationSession {
-  final Map<String, WeftMessage> messages = {};
-  final _incoming = StreamController<WeftMessage>.broadcast();
-
-  Future<void> close() => _incoming.close();
-
-  @override
-  Set<String> get ownUserIds => {'@me:example.org'};
-
-  @override
-  Set<String> get ownDisplayNames => {'Me'};
-
-  @override
-  Stream<WeftMessage> get incomingMessages => _incoming.stream;
-
-  @override
-  Future<WeftMessage?> messageFor({
-    required String roomId,
-    required String eventId,
-  }) async => messages[eventId];
-
-  @override
-  DateTime? lastReadAt(String roomId) => null;
-}
-
 class _MemoryPushKeyStore implements PushKeyStore {
   String? _key;
 
@@ -1246,6 +1702,93 @@ class _FakePushTransport implements PushTransport {
   @override
   Stream<String> get tokenRefreshes => const Stream.empty();
 }
+
+/// The native half of `flutter_local_notifications`, faked.
+///
+/// The Dart half is the real one — this only answers its method channel — so
+/// what lands in [calls] is what a device would have been asked to do, already
+/// through the standard codec in both directions.
+class _FakePlatformPlugin {
+  _FakePlatformPlugin() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_channel, _handle);
+  }
+
+  static const MethodChannel _channel = MethodChannel(
+    'dexterous.com/flutter/local_notifications',
+  );
+
+  final List<MethodCall> calls = [];
+
+  /// What `getNotificationAppLaunchDetails` answers.
+  Map<Object?, Object?>? launchDetails;
+
+  /// What the OS says to the permission prompt.
+  bool permission = true;
+
+  Future<Object?> _handle(MethodCall call) async {
+    calls.add(call);
+    return switch (call.method) {
+      'initialize' => true,
+      'getNotificationAppLaunchDetails' => launchDetails,
+      'requestNotificationsPermission' => permission,
+      _ => null,
+    };
+  }
+
+  void dispose() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_channel, null);
+  }
+}
+
+/// `MainActivity`'s side of the channel `WeftIntents` already owns.
+class _FakeIntentsHost {
+  _FakeIntentsHost() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_channel, _handle);
+  }
+
+  static const MethodChannel _channel = MethodChannel(
+    'com.bostrot.weft/intents',
+  );
+
+  final List<MethodCall> calls = [];
+
+  /// Set to make the platform refuse. Both realistic failures are exceptions.
+  Object? Function(MethodCall call)? answer;
+
+  Future<Object?> _handle(MethodCall call) async {
+    calls.add(call);
+    return answer?.call(call) ?? true;
+  }
+
+  void dispose() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_channel, null);
+  }
+}
+
+/// Fires the platform→Dart call the plugin makes when a notification is
+/// tapped, which is the only half of a tap a fake sink cannot reproduce.
+Future<void> _fireNotificationResponse({
+  required String? payload,
+  String? actionId,
+  String? input,
+}) => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+    .handlePlatformMessage(
+      'dexterous.com/flutter/local_notifications',
+      const StandardMethodCodec().encodeMethodCall(
+        MethodCall('didReceiveNotificationResponse', <String, Object?>{
+          'notificationId': 1,
+          'actionId': actionId,
+          'input': input,
+          'payload': payload,
+          'notificationResponseType': actionId == null ? 0 : 1,
+        }),
+      ),
+      (_) {},
+    );
 
 /// An API session that would fail if anything actually called it — which is the
 /// assertion: the outcomes tested here are reached before any HTTP happens.
