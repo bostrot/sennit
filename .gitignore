@@ -23,6 +23,8 @@ tooling/docker/synapse-remote-data/
 # Golden test failure output
 **/failures/
 
+# Playbook scratch space: run artifacts, screenshots, notes-in-progress.
+
 # macOS
 .DS_Store
 apps/weft/macos/Pods/

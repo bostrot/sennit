@@ -115,6 +115,64 @@ void main() {
       );
     });
 
+    test('the photo just sent can be fetched back by event id', () async {
+      final repository = demo();
+      addTearDown(repository.dispose);
+
+      // The whole file, not a 64 KiB slice of a larger one — which is the
+      // condition demo mode keeps the bytes under.
+      final source = photo(sizeBytes: 4);
+      await repository.sendAttachment('!design_room:example.org', source);
+      await pumpEventQueue();
+
+      final chats = await repository.watchChats().first;
+      final message = chats
+          .firstWhere((c) => c.id == '!design_room:example.org')
+          .lastMessage!;
+
+      expect(
+        await repository.attachmentBytes(message.roomId, message.eventId),
+        source.header,
+        reason:
+            'without this the bubble for a photo the user just picked is the '
+            'broken-image placeholder, and the viewer cannot be opened at all',
+      );
+      // There is still no homeserver, so there is still no URL to fetch from.
+      expect(
+        await repository.attachmentLocation(message.roomId, message.eventId),
+        isNull,
+      );
+    });
+
+    test('nothing else in demo mode has bytes to fetch', () async {
+      final repository = demo();
+      addTearDown(repository.dispose);
+
+      // A fixture message: it never carried pixels, and inventing some would
+      // make the placeholder branch unreachable in the mode the goldens run in.
+      expect(
+        await repository.attachmentBytes('!design_room:example.org', r'$demo'),
+        isNull,
+      );
+
+      // A file larger than its header slice: half a JPEG decodes to a grey band
+      // or to nothing, and a preview that looks corrupt is worse than none.
+      await repository.sendAttachment(
+        '!design_room:example.org',
+        photo(sizeBytes: 96000),
+      );
+      await pumpEventQueue();
+
+      final chats = await repository.watchChats().first;
+      final message = chats
+          .firstWhere((c) => c.id == '!design_room:example.org')
+          .lastMessage!;
+      expect(
+        await repository.attachmentBytes(message.roomId, message.eventId),
+        isNull,
+      );
+    });
+
     test('the task is dropped once its message exists', () async {
       final repository = demo();
       addTearDown(repository.dispose);

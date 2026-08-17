@@ -55,6 +55,13 @@ class DemoChatRepository implements ChatRepository {
   /// the thread when the user backs out and opens it again.
   final Map<String, List<WeftMessage>> _localMessages = {};
 
+  /// The bytes of attachments sent in this session, keyed first by upload task
+  /// id and then — once the event exists — by event id.
+  ///
+  /// See [attachmentBytes] for why these are kept and why nothing else is.
+  final Map<String, Uint8List> _pendingBytes = {};
+  final Map<String, Uint8List> _sentBytes = {};
+
   static final DateTime _now = DateTime(2026, 8, 15, 16, 42);
 
   @override
@@ -163,17 +170,40 @@ class DemoChatRepository implements ChatRepository {
     _controller.add(_chats);
   }
 
+  /// The bytes of a photo *this session sent*, and null for everything else.
+  ///
+  /// Demo mode has no homeserver, so nothing in the fixture history has bytes
+  /// to fetch and null is the honest answer — it routes the bubble down the same
+  /// placeholder branch an undecryptable attachment takes, and no pixels are
+  /// invented for a message that never carried any.
+  ///
+  /// A file the user just picked is the one exception, because those bytes
+  /// genuinely exist: [sendAttachment] already holds the slice it handed to the
+  /// transport. Returning it is what makes the send loop demonstrable end to end
+  /// without credentials — pick a photo, watch it upload, see it settle, open it
+  /// full screen — which is the whole reason demo mode exists.
+  ///
+  /// Only kept when the slice **is** the whole file. `AttachmentSource.header`
+  /// is capped at 64 KiB, and half a JPEG decodes to a grey band or to nothing
+  /// depending on the platform codec: a preview that looks like the file is
+  /// corrupt is worse than no preview, so a larger file keeps the placeholder.
+  /// The same cap is why this cannot grow without bound.
+  ///
+  /// [thumbnail] is ignored: a file small enough to be kept here is one
+  /// `ThumbnailSpec` would suppress a preview for anyway — a 40 KB photo is its
+  /// own thumbnail.
   @override
   Future<Uint8List?> attachmentBytes(
     String roomId,
     String eventId, {
     bool thumbnail = true,
-  }) async => null;
+  }) async => _sentBytes[eventId];
 
-  /// Always null, and for the same reason [attachmentBytes] is: demo mode has
-  /// no homeserver to fetch from. Null is the honest answer rather than a
-  /// placeholder — it routes the viewer down its "nothing to fetch" branch,
-  /// which is exactly the branch an encrypted attachment takes.
+  /// Always null: demo mode has no homeserver, so there is no URL to fetch from
+  /// even for the photo [attachmentBytes] can still hand back. That is the
+  /// honest answer rather than a placeholder, and it routes the viewer down its
+  /// "no URL, ask for the bytes" branch — which is exactly the branch an
+  /// encrypted attachment takes.
   @override
   Future<AttachmentLocation?> attachmentLocation(
     String roomId,
@@ -232,10 +262,16 @@ class DemoChatRepository implements ChatRepository {
       throw AttachmentRejectedException(decision);
     }
 
+    final id = 'upload-${_nextUploadId++}';
+    // Kept only when the slice is the entire file — see [attachmentBytes].
+    if (source.header.length == source.sizeBytes) {
+      _pendingBytes[id] = source.header;
+    }
+
     _uploads.enqueue(
       decision as UploadPlan,
       roomId: chatSource.roomId,
-      id: 'upload-${_nextUploadId++}',
+      id: id,
       // The header slice, which demo mode already holds, stands in for the file:
       // reading the real thing would put I/O in the one repository that exists
       // so the UI can be driven without any.
@@ -285,16 +321,17 @@ class DemoChatRepository implements ChatRepository {
       body: plan.filename,
       deliveryState: DeliveryState.sent,
       // The event id, exactly as `mapEvent` writes it: the field is a flag
-      // saying "there is a file here", and the bytes are fetched by event id.
-      // Demo mode's [attachmentBytes] returns null, so this renders through the
-      // same placeholder branch an undecryptable photo does — no fixture pixels
-      // are invented.
+      // saying "there is a file here", and the bytes are fetched by event id —
+      // which is why the slice moves to the same key here.
       attachmentUrl: eventId,
       durationMs: plan.durationMs,
       mediaWidth: plan.dimensions?.width,
       mediaHeight: plan.dimensions?.height,
       mediaSizeBytes: plan.sizeBytes,
     );
+
+    final bytes = _pendingBytes.remove(task.id);
+    if (bytes != null) _sentBytes[eventId] = bytes;
 
     _localMessages.putIfAbsent(task.roomId, () => []).add(message);
     _chats = [..._chats]
@@ -321,7 +358,12 @@ class DemoChatRepository implements ChatRepository {
   Future<void> retryUpload(String taskId) async => _uploads.retry(taskId);
 
   @override
-  Future<void> cancelUpload(String taskId) async => _uploads.cancel(taskId);
+  Future<void> cancelUpload(String taskId) async {
+    // A cancelled upload never becomes an event, so its slice has nothing left
+    // to be keyed by.
+    _pendingBytes.remove(taskId);
+    _uploads.cancel(taskId);
+  }
 
   /// Releases the queue's stream and anything still in flight.
   Future<void> dispose() async {

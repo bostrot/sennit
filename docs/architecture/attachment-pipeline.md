@@ -20,8 +20,10 @@ Everything Weft decides about a file *before* a byte moves lives in
 (what is this file really, which event shape does this room take, how many
 sockets may be open at once), so they run under `dart test` in about a second
 with no device and no homeserver. The parts that need a network or a rasteriser
-sit behind an injected interface and land in [[Encrypted-Media]] work in Phase
-02.
+sit behind an injected interface, and Phase 02 filled every one of them in:
+`MatrixAttachmentTransport` moves the bytes, the repositories own the queue and
+emit the events, and the UI renders the result. The encryption half of that is
+[Encrypted media](#encrypted-media) below.
 
 The package is three files and a barrel:
 
@@ -285,40 +287,138 @@ decision, and the pretty-printed event content, with obviously-fake
 observable; `--voice` and `--duration-ms` stand in for the recorder; `--json`
 pipes into `jq`. Exit codes are 0 planned, 1 usage or read error, 2 rejected.
 
+## Encrypted media
+
+This is the [[Encrypted-Media]] half of the pipeline: what actually happens to a
+photo in an end-to-end encrypted room, which is every room Weft cares about.
+`weft_attachments` describes the shape; `packages/weft_matrix/lib/src/upload.dart`
+produces it.
+
+**Encryption happens before the transport, in the payload loader.** A transport
+never sees plaintext it has no business seeing, and `UploadPayload` carries the
+`EncryptedFileInfo` beside the bytes because the `sha256` in it must be the hash
+of *exactly* the bytes going up. The crypto itself is the SDK's `encryptFile`
+(AES-CTR, vodozemac behind FFI) rather than anything hand-rolled — injected as an
+`AttachmentEncryptor` typedef only so tests need no initialised binding.
+
+### One attachment, two uploads
+
+A photo in an encrypted room is **two** media items on the homeserver, encrypted
+independently with their own key and IV:
+
+```mermaid
+sequenceDiagram
+  participant Q as UploadQueue
+  participant T as MatrixAttachmentTransport
+  participant M as Media repo
+  participant R as Room
+
+  Q->>T: preparePayload(bytes, encrypted: true)
+  T-->>Q: ciphertext + EncryptedFileInfo(key, iv, sha256)
+  Q->>T: upload(ciphertext, id)
+  T->>M: POST /_matrix/media/v3/upload (no ?filename=)
+  M-->>T: mxc://… (the file)
+  Q->>T: uploadThumbnail(plan, sourceBytes, id)
+  T->>T: rasteriseThumbnail in compute()
+  T->>T: preparePayload(preview, encrypted: true)
+  T->>M: POST … as application/octet-stream, id + "#thumbnail"
+  M-->>T: mxc://… (the preview)
+  Q->>R: toEventContent(file:…, thumbnail_file:…)
+```
+
+Five rules hold this together, and each of them is a way it goes wrong:
+
+- **The preview is encrypted too, and its URI goes in `thumbnail_file`.** A plain
+  `thumbnail_url` beside an encrypted `file` is the leak described above: the
+  attachment is safe and a legible copy of the same image is sitting on the media
+  repo for anyone who can reach the URI. It looks completely correct in the
+  timeline, which is what makes it dangerous.
+- **The preview goes up as `application/octet-stream`.** Announcing `image/jpeg`
+  over ciphertext tells the media repo what it is holding for no gain.
+- **No `?filename=` is ever sent.** The body is ciphertext, but
+  `holiday-with-sam.jpg` in the query string is not — and the name already
+  travels inside the (encrypted) event.
+- **The thumbnail's upload id is the attachment's plus `#thumbnail`.** Derived
+  rather than allocated, so one `cancel` reaches both; two unrelated ids leave a
+  cancelled photo still pushing its preview up.
+- **A retry re-encrypts the file but does not re-upload the preview.** The
+  repository records the thumbnail per task id — including a "tried, no preview"
+  as a present null, so a video is not re-rasterised on every attempt — and a
+  second copy of the preview never lands on the media repo.
+
+`thumbnail_info` carries the size the preview **actually** came out at, not the
+spec's. `ThumbnailSpec` falls back to an 800x800 box whenever the header could
+not be probed, and writing that square into the event when the real preview is
+800x450 makes receiving clients reserve the wrong shape and reflow it.
+
+### Coming back down
+
+The read path is the same asymmetry from the other side, and it is why
+`ChatRepository` has two members instead of one:
+
+- `attachmentBytes(roomId, eventId, thumbnail:)` — decrypt-and-download through
+  the SDK, which forks on the room type inside that single call. It returns
+  *bytes* rather than a URL because **an encrypted attachment has no fetchable
+  URL at all**, and it holds the whole file in memory: the honest cost of E2EE,
+  and not something a transport can be talked into avoiding.
+- `attachmentLocation(roomId, eventId)` — non-null only for plain media, where a
+  real mxc→http URL exists and `background_transport.dart` can stream a 200 MB
+  video to disk without ever holding it. Spec v1.11 put media behind
+  `Authorization: Bearer`, so the location carries headers too; without them a
+  Save writes a 401 page into the user's Downloads folder.
+
+`stageAttachment` picks between them once, materialises the file, and everything
+after — the picture, the video decoder, Save, Share — reads that one file rather
+than fetching the same video three times.
+
 ## Not yet handled
 
-Phase 02 ([[Attachments-End-to-End]]) picks all of this up:
-
-- **Actual Matrix upload** — `MatrixAttachmentTransport` in
-  `packages/weft_matrix/lib/src/upload.dart`, wrapping the SDK's upload,
-  resolving and caching the homeserver's `m.upload.size`, reporting byte-level
-  progress.
-- **Real encryption** — AES-CTR key and IV generation via the SDK's own
-  attachment helpers, producing the `EncryptedFileInfo` this package only
-  describes. See [[Encrypted-Media]].
-- **Thumbnail rasterisation** — turning `ThumbnailSpec` into actual pixels with
-  `package:image`, and the *second* upload it implies (also encrypted, when the
-  room is).
-- **Repository wiring** — `sendAttachment`, `watchUploads`, `retryUpload` and
-  `cancelUpload` on `ChatRepository`, with local echo as a `DeliveryState.sending`
-  message so the attachment appears in the timeline immediately, and the ordered
-  event sends the queue explicitly does not promise.
-- **Incoming mapping** — `m.video`, `m.audio` and `m.file` currently fall
-  through to text in `weft_matrix`'s `mapping.dart`; only `m.image` maps today.
-- **UI** — composer attach affordance, pre-send preview, `AttachmentBubble`
-  variants, the in-progress/failed/retry bubble, and the full-screen media
-  viewer.
-- **Android share-in for files** — today the share target handles text and drops
-  everything else; the URIs need resolving into `AttachmentSource`s, carrying
-  the intent's (probably lying) declared mime type through.
+- **Video posters.** `package:image` is a still-image codec and cannot open an
+  MP4, so a video is sent with no preview rather than a wrong one. Frame
+  extraction is a platform capability, not a pure-Dart one; `uploadThumbnail`
+  takes `sourceBytes`, so a caller that *has* a poster can already supply one.
 - **HEIC dimensions** — deliberately not probed. They live in an `ispe` box
   behind the full item-properties tree, which is disproportionate for a header
   slice; the plan falls back to an 800x800 bounding box, as it does for video.
+- **A live timeline.** `ChatView` reads its timeline once when the chat opens, so
+  a photo that finishes uploading while the thread is on screen is not drawn
+  until the chat is reopened — the upload bubble disappears with the task and
+  nothing takes its place. The inbox tile updates, because it watches a stream.
+  This is not in the attachment pipeline at all: it is how `ChatView` refreshes,
+  and it applies equally to a text send in demo mode and to an event arriving
+  from a sync. Found by running the app on macOS, not by any test.
+- **iOS share-in.** Android's share target streams `content://` URIs to a staged
+  copy and sends them through the composer's own upload path; the iOS equivalent
+  needs a Share Extension target and signing.
+- **Voice notes are recorded nowhere.** `isVoiceNote` is plumbed end to end and
+  `m.audio` + the MSC keys round-trip correctly, but nothing in the app records
+  audio yet.
 
 ## Tests
 
-149 tests in the package — `detect` 61, `plan` 46, `queue` 32, `plan_cli` 10 —
-part of the workspace's 421. Every fixture is built programmatically from byte
+156 tests in the package — `detect` 68, `plan` 46, `queue` 32, `plan_cli` 10 —
+part of the workspace's 592. Every fixture is built programmatically from byte
 literals in `test/support/fixtures.dart`; **no binaries are checked into the
 repo**, which is why a new format can be added to the sniff table without
 sourcing a sample file.
+
+The pipeline above it is covered where it lives: `weft_matrix`'s `upload_test`
+and `mapping_test` for the transport and the incoming events, `apps/weft`'s
+`attachment_send_test`, `attachment_bubble_test`, `media_viewer_test` and
+`share_files_test` for the repositories and the UI, and eight golden images for
+the bubbles and the pre-send sheet.
+
+One test is not run by either — `apps/weft/integration_test/attachment_flow_test.dart`
+drives the whole loop against a **real** engine on a real desktop:
+
+```bash
+cd apps/weft && flutter test integration_test/attachment_flow_test.dart -d macos \
+  --dart-define=WEFT_DEMO=true
+```
+
+It exists because `flutter test` runs in a `FakeAsync` zone where no image ever
+decodes and a decoded picture therefore has no hit area to tap: pick, preview,
+upload, settle, tap, full screen is a sequence only a real event loop and a real
+rasteriser can perform. Only the file picker is faked, because a real
+`NSOpenPanel` is a modal a test cannot dismiss. Add
+`--dart-define=WEFT_SHOT_DIR=…` to write a PNG of each step.

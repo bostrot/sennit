@@ -45,7 +45,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**590 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**592 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -109,6 +109,19 @@ cd apps/weft && flutter test integration_test -d macos
 
 These cover a real login, a real encrypted round trip between two accounts, and
 the mapping of decrypted events onto Weft's domain model.
+
+The attachment flow needs no homeserver, only a real engine:
+
+```bash
+cd apps/weft && flutter test integration_test/attachment_flow_test.dart \
+  -d macos --dart-define=WEFT_DEMO=true
+```
+
+It picks a photo, watches it upload, opens the settled bubble full screen — a
+sequence `flutter test` cannot perform at all, because its `FakeAsync` zone
+never decodes an image and an undecoded picture has nothing to tap. Add
+`--dart-define=WEFT_SHOT_DIR=/some/dir` to write a PNG of each step; on macOS
+the app is sandboxed, so the run prints where the images actually landed.
 
 Regenerate goldens after an intentional visual change:
 
