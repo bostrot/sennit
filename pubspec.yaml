@@ -19,5 +19,6 @@ workspace:
   - packages/weft_merge
   - packages/weft_notify
   - packages/weft_search
+  - packages/weft_share
   - packages/weft_store
   - packages/weft_transcribe

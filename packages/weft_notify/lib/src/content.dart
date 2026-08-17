@@ -54,15 +54,13 @@ String notificationGroupKey(Chat chat) => chat.id;
 
 /// The deep link that opens [chatId], for a notification tap.
 ///
-/// Percent-encoded because chat ids are full of characters a URI reserves: a
-/// room id is `!abc:example.org` and a merged id is `merged:contact_17…`. The
-/// receiving end is `WeftLink.parse`, which applies `Uri.decodeComponent` to
-/// the segment, so this must encode — and must encode the *whole* id as one
-/// segment, or a merged id's colon reads as a second path segment and the link
-/// resolves to nothing. (`Uri.encodeComponent` leaves `!` alone, which is
-/// correct: it is a legal path character. The colon is the one that matters.)
-String notificationLinkFor(String chatId) =>
-    'weft://chat/${Uri.encodeComponent(chatId)}';
+/// Delegates to [chatDeepLink]: a launcher shortcut and an iOS share slot now
+/// have to produce the byte-identical string for the same chat, and the
+/// escaping rule that makes a merged id survive the round trip is a property of
+/// the link, not of notifications. Kept as a name of its own because a caller
+/// building a `NotificationContent` is asking for a *notification's* tap
+/// target, and that is worth saying at the call site.
+String notificationLinkFor(String chatId) => chatDeepLink(chatId);
 
 /// One notification, rendered but not yet posted.
 ///

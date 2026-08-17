@@ -7,5 +7,6 @@ library;
 export 'src/chat.dart';
 export 'src/contact.dart';
 export 'src/handle.dart';
+export 'src/link.dart';
 export 'src/message.dart';
 export 'src/network.dart';

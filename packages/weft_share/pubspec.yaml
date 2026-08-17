@@ -1,0 +1,23 @@
+name: weft_share
+description: >-
+  The share surfaces' core: which conversations are offered as share targets and
+  in what order, what a published shortcut looks like, and the on-disk shape a
+  share captured outside the app takes until the app can drain it. Pure Dart, so
+  one ranking and one staging format serve Android Direct Share and the iOS
+  Share Extension without either platform being present to test them.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  collection: ^1.19.0
+  meta: ^1.17.0
+  weft_attachments: ^0.1.0
+  weft_domain: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0
