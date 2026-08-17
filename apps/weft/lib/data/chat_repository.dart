@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:weft_attachments/weft_attachments.dart';
@@ -115,6 +116,150 @@ abstract class ChatRepository {
   /// immediate from the user's point of view: a late success is discarded
   /// rather than resurrecting the task.
   Future<void> cancelUpload(String taskId);
+}
+
+/// Thrown by [ChatRepository.sendAttachment] for a file that will not be sent.
+///
+/// A rejection is not a failure to be retried — the file is empty, or nameless,
+/// or larger than the homeserver accepts, and none of those change by trying
+/// again. It therefore never becomes an [UploadTask]: there is nothing for the
+/// timeline to show progress for, and a bubble the user could only dismiss would
+/// be worse than a message on the composer. [message] is already user-facing and
+/// is shown as-is.
+class AttachmentRejectedException implements Exception {
+  const AttachmentRejectedException(this.rejection);
+
+  final UploadRejection rejection;
+
+  UploadRejectionReason get reason => rejection.reason;
+
+  /// Plain language, fit to put in front of the user unchanged.
+  String get message => rejection.message;
+
+  @override
+  String toString() => 'AttachmentRejectedException: $message';
+}
+
+/// Which of a chat's rooms an outgoing message rides.
+///
+/// The one resolution both repositories and both send paths share: an explicit
+/// [via] wins, then the chat's own [Chat.sendNetwork] (an explicit user choice,
+/// else the network of the last inbound message), and a chat that has no source
+/// on the chosen network falls back to its first — a merged conversation must
+/// still send somewhere when the preferred leg has gone away.
+ChatSource sendSourceFor(Chat chat, {ChatNetwork? via}) {
+  if (chat.sources.isEmpty) {
+    throw StateError('Chat ${chat.id} has no rooms to send to');
+  }
+  final network = via ?? chat.sendNetwork;
+  if (network == null) return chat.sources.first;
+  return chat.sourceFor(network) ?? chat.sources.first;
+}
+
+/// The uploads in [tasks] whose events may be sent now, in enqueue order.
+///
+/// `UploadQueue` promises only that uploads *start* in order; two photos
+/// uploaded concurrently finish in whatever order the network decides, and
+/// sending each event the moment its bytes land would put a twenty-photo share
+/// into the room shuffled. Emitting them in order is the sender's job, and this
+/// is that rule as a value: everything at the head of the queue that has
+/// finished uploading may go, and the first task still in flight stops the line.
+///
+/// Two deliberate exceptions:
+/// - A failed or cancelled task never produces an event, so it is skipped
+///   rather than blocking the photos behind it forever.
+/// - [blocked] holds tasks whose *event* send already failed. They keep their
+///   uri and key material, so they can be re-sent without re-uploading, but they
+///   must not be retried in a loop while the rest of the batch waits.
+///
+/// A task the user retries by hand therefore loses its place in line, which is
+/// the honest trade: the alternative is stalling everything picked after it
+/// behind a file the server has already refused once.
+List<UploadTask> dispatchableUploads(
+  List<UploadTask> tasks, {
+  Set<String> blocked = const {},
+}) {
+  final out = <UploadTask>[];
+  for (final task in tasks) {
+    if (task.state == UploadState.sent) {
+      if (!blocked.contains(task.id)) out.add(task);
+      continue;
+    }
+    if (task.isTerminal) continue;
+    break;
+  }
+  return out;
+}
+
+/// [ChatRepository.watchUploads] over an [UploadQueue], with [filter] deciding
+/// which of its tasks belong to the chat being watched.
+///
+/// The subscription is opened *before* the current snapshot is delivered, and
+/// that ordering is the whole reason this is a function rather than an
+/// `async*`. A generator subscribes to what it delegates to only after its
+/// first value has been taken, and a share started in that gap — which is
+/// exactly what happens when the composer opens the picker and the watcher in
+/// the same frame — would never emit its `queued` state at all. The bubble
+/// would then appear mid-upload, or not until the first progress report.
+Stream<List<UploadTask>> watchUploadQueue(
+  UploadQueue queue,
+  List<UploadTask> Function(List<UploadTask> tasks) filter,
+) {
+  late final StreamController<List<UploadTask>> controller;
+  StreamSubscription<List<UploadTask>>? subscription;
+
+  controller = StreamController<List<UploadTask>>(
+    onListen: () {
+      subscription = queue.updates.listen(
+        (tasks) => controller.add(filter(tasks)),
+        onDone: controller.close,
+      );
+      controller.add(filter(queue.tasks));
+    },
+    onCancel: () => subscription?.cancel(),
+  );
+  return controller.stream;
+}
+
+/// The timeline bubble for an upload that has no event yet.
+///
+/// An in-flight upload is not a message: it has no event id, the homeserver has
+/// never heard of it, and it may yet fail. It still has to *render* as one, so
+/// the attachment appears in the thread the instant the user picks it rather
+/// than a minute later when the bytes land. This builds that stand-in from the
+/// task, with a synthetic `local:` event id that cannot collide with a real one
+/// and [DeliveryState.sending] until the queue says otherwise.
+///
+/// [attachmentUrl] is deliberately left null: it is how the timeline asks the
+/// repository for bytes by event id, and there is no event to ask about. The
+/// progress bubble draws from the [UploadTask] itself.
+WeftMessage uploadEchoMessage(
+  UploadTask task, {
+  required ChatNetwork network,
+  required String senderId,
+  String senderName = 'You',
+  DateTime? timestamp,
+}) {
+  final plan = task.plan;
+  return WeftMessage(
+    eventId: 'local:${task.id}',
+    roomId: task.roomId,
+    network: network,
+    senderId: senderId,
+    senderName: senderName,
+    timestamp: timestamp ?? DateTime.now(),
+    kind: plan.kind,
+    isOwn: true,
+    body: plan.filename,
+    // Failed and cancelled both read as failed here: the distinction matters to
+    // the retry button, which reads the task, not to the bubble's tick.
+    deliveryState: task.isTerminal && task.state != UploadState.sent
+        ? DeliveryState.failed
+        : DeliveryState.sending,
+    durationMs: plan.durationMs,
+    mediaWidth: plan.dimensions?.width,
+    mediaHeight: plan.dimensions?.height,
+  );
 }
 
 /// Filters the inbox by the rail's selection.

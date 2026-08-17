@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as sdk;
@@ -10,6 +11,25 @@ import 'package:weft_store/weft_store.dart';
 
 import 'chat_repository.dart';
 
+/// Reads the whole of a picked file.
+///
+/// The one place the send path touches the disk, and injected for exactly that
+/// reason: everything else about an attachment is decided from an
+/// [AttachmentSource]'s header slice, so a test that supplies bytes here can
+/// drive the entire pipeline without one.
+typedef AttachmentBytesLoader =
+    Future<Uint8List> Function(AttachmentSource source);
+
+/// Reads the file [AttachmentSource.filename] names.
+///
+/// The pickers Weft uses hand over a real path, and Android's share-in copies a
+/// `content://` grant to a temp file before building a source, so by the time a
+/// source reaches the repository its name is always openable. Read per upload
+/// attempt rather than held: a twenty-photo share must not pin twenty files in
+/// memory from the moment it is enqueued.
+Future<Uint8List> readAttachmentFile(AttachmentSource source) =>
+    File(source.filename).readAsBytes();
+
 /// [ChatRepository] backed by a live Matrix session.
 ///
 /// Rooms become chats; the identity graph decides which of those chats are the
@@ -20,8 +40,12 @@ class MatrixChatRepository implements ChatRepository {
     this._session, {
     IdentityStore? store,
     SearchStore? searchStore,
+    MatrixAttachmentTransport? transport,
+    AttachmentBytesLoader readBytes = readAttachmentFile,
   }) : _store = store,
-       _searchStore = searchStore {
+       _searchStore = searchStore,
+       _transportOverride = transport,
+       _readBytes = readBytes {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     _graph = IdentityGraph(
@@ -50,6 +74,7 @@ class MatrixChatRepository implements ChatRepository {
   final WeftMatrixSession _session;
   final IdentityStore? _store;
   final SearchStore? _searchStore;
+  final AttachmentBytesLoader _readBytes;
 
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
@@ -183,17 +208,27 @@ class MatrixChatRepository implements ChatRepository {
 
   @override
   Future<void> send(String chatId, String body, {ChatNetwork? via}) async {
-    final chat = _chats.firstWhere((c) => c.id == chatId);
-    final network = via ?? chat.sendNetwork;
-    final source = network == null
-        ? chat.sources.first
-        : chat.sourceFor(network) ?? chat.sources.first;
+    await _sendRoom(chatId, via: via).sendTextEvent(body);
+  }
+
+  /// The room an outgoing message or attachment for [chatId] goes to.
+  ///
+  /// Distinct from [_roomsOf], which fans out to *every* room of a merged chat:
+  /// muting or archiving applies to the whole conversation, whereas sending
+  /// picks exactly one leg. Throws rather than returning null because a send
+  /// with nowhere to go must surface to the composer, not fail silently.
+  sdk.Room _sendRoom(String chatId, {ChatNetwork? via}) {
+    final chat = _chats.firstWhere(
+      (c) => c.id == chatId,
+      orElse: () => throw ArgumentError.value(chatId, 'chatId', 'Unknown chat'),
+    );
+    final source = sendSourceFor(chat, via: via);
 
     final room = _client.getRoomById(source.roomId);
     if (room == null) {
       throw StateError('Room ${source.roomId} is no longer available');
     }
-    await room.sendTextEvent(body);
+    return room;
   }
 
   @override
@@ -299,11 +334,42 @@ class MatrixChatRepository implements ChatRepository {
     }
   }
 
-  // The send path is contract-only for now: the queue, the Matrix transport and
-  // the local echo land together, and half of them would be worse than none.
-  // Until they do, nothing can start an upload, so [watchUploads] has a
-  // truthful empty answer while the three mutators have no honest behaviour at
-  // all — silently succeeding would lose the user's file without saying so.
+  // --------------------------------------------------------------- send path
+
+  /// Built on first use, not in the constructor: a session that never sends a
+  /// file should not open a transport, and the transport caches a homeserver
+  /// probe it would otherwise make for nothing.
+  MatrixAttachmentTransport? _transportOverride;
+  UploadQueue? _queue;
+  StreamSubscription<List<UploadTask>>? _uploadSub;
+
+  /// Thumbnails already uploaded, keyed by their attachment's task id.
+  ///
+  /// Present with a null value means "tried, no preview" — a video, a photo the
+  /// spec suppressed, bytes that would not decode. Retrying the attachment must
+  /// not put a second copy of the preview on the media repo.
+  final Map<String, MatrixThumbnailUpload?> _thumbnails = {};
+
+  /// Rooms with a dispatch loop running, so two queue updates arriving during
+  /// one `sendEvent` cannot send the same event twice.
+  final Set<String> _dispatching = {};
+
+  /// Uploads whose *event* send failed. See [dispatchableUploads].
+  final Set<String> _undispatchable = {};
+
+  int _nextUploadId = 0;
+
+  MatrixAttachmentTransport get _transport =>
+      _transportOverride ??= MatrixAttachmentTransport.forClient(_client);
+
+  UploadQueue get _uploads {
+    final existing = _queue;
+    if (existing != null) return existing;
+
+    final queue = UploadQueue(transport: _transport);
+    _uploadSub = queue.updates.listen(_onUploadsChanged);
+    return _queue = queue;
+  }
 
   @override
   Future<void> sendAttachment(
@@ -311,28 +377,155 @@ class MatrixChatRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
-  }) {
-    throw UnimplementedError(
-      'MatrixChatRepository.sendAttachment awaits MatrixAttachmentTransport',
+  }) async {
+    final room = _sendRoom(chatId, via: via);
+
+    // Every branch of the decision belongs to `weft_attachments`; this supplies
+    // only the two things it cannot know — whether the destination room is
+    // encrypted, and what the homeserver will accept.
+    final decision = planUpload(
+      source,
+      encrypted: room.encrypted,
+      maxUploadBytes: await _transport.maxUploadBytes(),
+      isVoiceNote: isVoiceNote,
     );
+    if (decision is UploadRejection) {
+      throw AttachmentRejectedException(decision);
+    }
+    final plan = decision as UploadPlan;
+
+    // The id is allocated here rather than by the queue because the payload
+    // loader needs it before `enqueue` returns: it is what the thumbnail's own
+    // upload is keyed to, and therefore what one `cancel` has to reach.
+    final taskId = 'upload-${_nextUploadId++}';
+    _uploads.enqueue(
+      plan,
+      roomId: room.id,
+      id: taskId,
+      loadPayload: () => _loadPayload(plan, taskId),
+    );
+    // Returns on acceptance, not on arrival: awaiting the bytes here would put
+    // a twenty-photo share through the picker one file at a time.
+  }
+
+  /// Reads the file, uploads its preview once, and encrypts what goes on the
+  /// wire. Runs per attempt, inside [UploadState.hashing].
+  Future<UploadPayload> _loadPayload(UploadPlan plan, String taskId) async {
+    final bytes = await _readBytes(plan.source);
+
+    if (!_thumbnails.containsKey(taskId)) {
+      _thumbnails[taskId] = await _transport.uploadThumbnail(
+        plan,
+        sourceBytes: bytes,
+        uploadId: taskId,
+      );
+    }
+
+    return _transport.preparePayload(bytes, encrypted: plan.encrypted);
+  }
+
+  void _onUploadsChanged(List<UploadTask> tasks) {
+    for (final roomId in {for (final task in tasks) task.roomId}) {
+      unawaited(_dispatchRoom(roomId));
+    }
+  }
+
+  /// Sends the events for every upload at the head of [roomId]'s queue that has
+  /// finished, oldest first, and drops each task once its event is away.
+  Future<void> _dispatchRoom(String roomId) async {
+    if (!_dispatching.add(roomId)) return;
+    try {
+      while (true) {
+        final next = dispatchableUploads(
+          _uploads.tasksFor(roomId),
+          blocked: _undispatchable,
+        ).firstOrNull;
+        if (next == null) return;
+        await _sendUploadedEvent(next);
+      }
+    } finally {
+      _dispatching.remove(roomId);
+    }
+  }
+
+  Future<void> _sendUploadedEvent(UploadTask task) async {
+    final room = _client.getRoomById(task.roomId);
+    final uri = task.uri;
+    if (room == null || uri == null) {
+      // The room has gone, or a transport reported success without a URI.
+      // Either way there is nothing to send and nothing a retry would fix.
+      _forgetUpload(task.id);
+      return;
+    }
+
+    final thumbnail = _thumbnails[task.id];
+    try {
+      await room.sendEvent(
+        task.plan.toEventContent(
+          uri: uri,
+          file: task.file,
+          thumbnailUri: thumbnail?.uri,
+          thumbnailFile: thumbnail?.file,
+          thumbnailSizeBytes: thumbnail?.sizeBytes,
+          thumbnailDimensions: thumbnail?.dimensions,
+        ),
+      );
+      // The SDK's own local echo takes over from here — the event is in the
+      // room's timeline as `sending` before this returns — so the queue's task
+      // has done its job and would otherwise render as a second bubble.
+      _forgetUpload(task.id);
+    } on Object catch (error) {
+      // The bytes are on the server; only the event failed. The task keeps its
+      // uri and key material, so [retryUpload] re-sends the event without
+      // pushing a megabyte a second time, and blocking it here stops the rest
+      // of the batch queueing behind a send that will not recover on its own.
+      debugPrint('weft: attachment event for ${task.id} failed to send: $error');
+      _undispatchable.add(task.id);
+    }
+  }
+
+  void _forgetUpload(String taskId) {
+    _uploads.remove(taskId);
+    _thumbnails.remove(taskId);
+    _undispatchable.remove(taskId);
   }
 
   @override
   Stream<List<UploadTask>> watchUploads(String chatId) =>
-      const Stream<List<UploadTask>>.empty();
+      watchUploadQueue(_uploads, (tasks) => _uploadsForChat(chatId, tasks));
 
-  @override
-  Future<void> retryUpload(String taskId) {
-    throw UnimplementedError(
-      'MatrixChatRepository.retryUpload awaits the upload queue',
-    );
+  /// Resolved per emission rather than once: merging two conversations changes
+  /// which rooms a chat id covers, and a share in flight across that change
+  /// should follow the chat the user is looking at.
+  List<UploadTask> _uploadsForChat(String chatId, List<UploadTask> tasks) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    // An unmerged chat's id *is* its room id, which is what keeps this working
+    // for a chat the inbox has not rebuilt yet.
+    final rooms = chat?.roomIds ?? [chatId];
+    return [
+      for (final task in tasks)
+        if (rooms.contains(task.roomId)) task,
+    ];
   }
 
   @override
-  Future<void> cancelUpload(String taskId) {
-    throw UnimplementedError(
-      'MatrixChatRepository.cancelUpload awaits the upload queue',
-    );
+  Future<void> retryUpload(String taskId) async {
+    // An upload whose event send failed has nothing left to upload: re-sending
+    // it is the whole retry, and pushing the bytes again would leave an orphan
+    // copy on the media repo.
+    if (_undispatchable.remove(taskId)) {
+      final task = _uploads.task(taskId);
+      if (task != null) await _sendUploadedEvent(task);
+      return;
+    }
+    _uploads.retry(taskId);
+  }
+
+  @override
+  Future<void> cancelUpload(String taskId) async {
+    _uploads.cancel(taskId);
+    _thumbnails.remove(taskId);
+    _undispatchable.remove(taskId);
   }
 
   @override
@@ -377,6 +570,11 @@ class MatrixChatRepository implements ChatRepository {
 
   Future<void> dispose() async {
     await _syncSub?.cancel();
+    await _uploadSub?.cancel();
+    // Cancels everything outstanding: an upload with no repository left to send
+    // its event would push bytes nobody will ever reference.
+    await _queue?.dispose();
+    _transportOverride?.dispose();
     for (final chatId in _sources.keys.toList()) {
       closeTimeline(chatId);
     }

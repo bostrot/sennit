@@ -7,6 +7,23 @@ import 'package:weft_merge/weft_merge.dart';
 
 import 'chat_repository.dart';
 
+/// How long the fake transport waits between progress reports.
+///
+/// Slow enough that the progress bubble is visibly a progress bubble when
+/// someone sends a photo in demo mode, and injectable so a test does not spend
+/// a real second watching it.
+const Duration kDemoUploadTick = Duration(milliseconds: 140);
+
+/// How many times a demo upload reports progress before finishing.
+const int kDemoUploadSteps = 6;
+
+/// The size limit demo mode pretends its homeserver advertises.
+///
+/// A real number rather than 0 ("unknown"), so the rejection path is reachable
+/// without a server: dropping a 200 MB video onto a demo chat produces the same
+/// plain-language refusal a real one would.
+const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
+
 /// An in-memory [ChatRepository] with a realistic multi-network inbox.
 ///
 /// This exists so the UI, the merge behaviour and the golden tests can all be
@@ -14,7 +31,8 @@ import 'chat_repository.dart';
 /// `--dart-define=WEFT_DEMO=true`; the Matrix-backed repository is the default
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
-  DemoChatRepository() {
+  DemoChatRepository({Duration uploadTick = kDemoUploadTick})
+    : _uploadTick = uploadTick {
     _graph = IdentityGraph(handles: _handles, idFactory: _ids());
     // Anna is the showcase: the same person reachable three ways.
     _graph.merge('anna_wa', 'anna_sg');
@@ -30,6 +48,12 @@ class DemoChatRepository implements ChatRepository {
   late final IdentityGraph _graph;
   late List<Chat> _chats;
   final _controller = StreamController<List<Chat>>.broadcast();
+
+  final Duration _uploadTick;
+
+  /// Attachments sent in this session, per room, so a demo photo is still in
+  /// the thread when the user backs out and opens it again.
+  final Map<String, List<WeftMessage>> _localMessages = {};
 
   static final DateTime _now = DateTime(2026, 8, 15, 16, 42);
 
@@ -80,8 +104,8 @@ class DemoChatRepository implements ChatRepository {
     final index = _chats.indexWhere((c) => c.id == chatId);
     if (index < 0) return;
     final chat = _chats[index];
-    final network = via ?? chat.sendNetwork ?? ChatNetwork.matrix;
-    final source = chat.sourceFor(network) ?? chat.sources.first;
+    final source = sendSourceFor(chat, via: via);
+    final network = source.network;
 
     _chats = [..._chats]
       ..[index] = chat.copyWith(
@@ -146,9 +170,29 @@ class DemoChatRepository implements ChatRepository {
     bool thumbnail = true,
   }) async => null;
 
-  // As in the Matrix repository, the send path is contract-only until the fake
-  // transport lands: no upload can be started, so there are none to watch, and
-  // pretending a send succeeded would drop the file on the floor silently.
+  // --------------------------------------------------------------- send path
+  //
+  // Demo mode runs the *real* `UploadQueue` over a fake transport rather than
+  // faking the queue: the concurrency cap, the retry budget, the progress
+  // stream and the ordered event sends are then exactly the ones the Matrix
+  // path uses, so a bubble that looks right here looks right there. Only the
+  // bytes are pretend.
+
+  UploadQueue? _queue;
+  StreamSubscription<List<UploadTask>>? _uploadSub;
+  final Set<String> _dispatching = {};
+  int _nextUploadId = 0;
+
+  UploadQueue get _uploads {
+    final existing = _queue;
+    if (existing != null) return existing;
+
+    final queue = UploadQueue(
+      transport: _DemoUploadTransport(tick: _uploadTick),
+    );
+    _uploadSub = queue.updates.listen(_onUploadsChanged);
+    return _queue = queue;
+  }
 
   @override
   Future<void> sendAttachment(
@@ -156,28 +200,123 @@ class DemoChatRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
-  }) {
-    throw UnimplementedError(
-      'DemoChatRepository.sendAttachment awaits its fake transport',
+  }) async {
+    // An unknown id is an ArgumentError here rather than the silent return the
+    // other demo mutators take: losing a file is not the same as failing to
+    // mute a chat that has gone.
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    if (index < 0) {
+      throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
+    }
+    final chatSource = sendSourceFor(_chats[index], via: via);
+
+    final decision = planUpload(
+      source,
+      // No demo room is encrypted: the fake transport has no key material to
+      // produce, and `toEventContent` would rightly refuse the mismatch.
+      encrypted: false,
+      maxUploadBytes: kDemoMaxUploadBytes,
+      isVoiceNote: isVoiceNote,
     );
+    if (decision is UploadRejection) {
+      throw AttachmentRejectedException(decision);
+    }
+
+    _uploads.enqueue(
+      decision as UploadPlan,
+      roomId: chatSource.roomId,
+      id: 'upload-${_nextUploadId++}',
+      // The header slice, which demo mode already holds, stands in for the file:
+      // reading the real thing would put I/O in the one repository that exists
+      // so the UI can be driven without any.
+      loadPayload: () async => UploadPayload(bytes: source.header),
+    );
+  }
+
+  void _onUploadsChanged(List<UploadTask> tasks) {
+    for (final roomId in {for (final task in tasks) task.roomId}) {
+      _dispatchRoom(roomId);
+    }
+  }
+
+  /// Turns each finished upload into a message, oldest first — the same
+  /// ordering promise the Matrix repository keeps.
+  void _dispatchRoom(String roomId) {
+    if (!_dispatching.add(roomId)) return;
+    try {
+      for (final task in dispatchableUploads(_uploads.tasksFor(roomId))) {
+        _appendSentAttachment(task);
+        _uploads.remove(task.id);
+      }
+    } finally {
+      _dispatching.remove(roomId);
+    }
+  }
+
+  void _appendSentAttachment(UploadTask task) {
+    final index = _chats.indexWhere((c) => c.roomIds.contains(task.roomId));
+    if (index < 0) return;
+
+    final chat = _chats[index];
+    final network = chat.sources
+        .firstWhere((s) => s.roomId == task.roomId)
+        .network;
+    final plan = task.plan;
+    final eventId = '\$demo_${task.id}';
+    final message = WeftMessage(
+      eventId: eventId,
+      roomId: task.roomId,
+      network: network,
+      senderId: '@me:example.org',
+      senderName: 'You',
+      timestamp: DateTime.now(),
+      kind: plan.kind,
+      isOwn: true,
+      body: plan.filename,
+      deliveryState: DeliveryState.sent,
+      // The event id, exactly as `mapEvent` writes it: the field is a flag
+      // saying "there is a file here", and the bytes are fetched by event id.
+      // Demo mode's [attachmentBytes] returns null, so this renders through the
+      // same placeholder branch an undecryptable photo does — no fixture pixels
+      // are invented.
+      attachmentUrl: eventId,
+      durationMs: plan.durationMs,
+      mediaWidth: plan.dimensions?.width,
+      mediaHeight: plan.dimensions?.height,
+    );
+
+    _localMessages.putIfAbsent(task.roomId, () => []).add(message);
+    _chats = [..._chats]
+      ..[index] = chat.copyWith(lastMessage: message, unreadCount: 0);
+    _controller.add(_chats);
   }
 
   @override
   Stream<List<UploadTask>> watchUploads(String chatId) =>
-      const Stream<List<UploadTask>>.empty();
+      watchUploadQueue(_uploads, (tasks) => _uploadsForChat(chatId, tasks));
 
-  @override
-  Future<void> retryUpload(String taskId) {
-    throw UnimplementedError(
-      'DemoChatRepository.retryUpload awaits its fake transport',
-    );
+  List<UploadTask> _uploadsForChat(String chatId, List<UploadTask> tasks) {
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    // An unmerged chat's id is its room id, which is what keeps this answering
+    // for a chat that is not in the fixture list.
+    final rooms = index < 0 ? [chatId] : _chats[index].roomIds;
+    return [
+      for (final task in tasks)
+        if (rooms.contains(task.roomId)) task,
+    ];
   }
 
   @override
-  Future<void> cancelUpload(String taskId) {
-    throw UnimplementedError(
-      'DemoChatRepository.cancelUpload awaits its fake transport',
-    );
+  Future<void> retryUpload(String taskId) async => _uploads.retry(taskId);
+
+  @override
+  Future<void> cancelUpload(String taskId) async => _uploads.cancel(taskId);
+
+  /// Releases the queue's stream and anything still in flight.
+  Future<void> dispose() async {
+    await _uploadSub?.cancel();
+    await _queue?.dispose();
+    await _controller.close();
   }
 
   @override
@@ -489,6 +628,9 @@ class DemoChatRepository implements ChatRepository {
     final lines =
         _sampleLines[source.network] ?? _sampleLines[ChatNetwork.matrix]!;
     return [
+      // Anything sent this session comes first: the fixtures are a fixed past,
+      // and an attachment the user just sent belongs on top of it.
+      ..._localMessages[source.roomId] ?? const <WeftMessage>[],
       for (var i = 0; i < 24; i++)
         _msg(
           source.roomId,
@@ -538,4 +680,58 @@ class DemoChatRepository implements ChatRepository {
       'All 54 passing.',
     ],
   };
+}
+
+/// An [AttachmentTransport] that moves no bytes and takes its time about it.
+///
+/// The delay is the point rather than an artefact: a transport that returned a
+/// URI immediately would render the progress bubble for a single frame, so the
+/// one state the attachment UI exists to show would never be seen in demo mode
+/// or in a golden. It is a [Timer] under the hood and touches no I/O, so a test
+/// with `Duration.zero` runs it in microseconds.
+class _DemoUploadTransport implements AttachmentTransport {
+  _DemoUploadTransport({required this.tick});
+
+  final Duration tick;
+  final Set<String> _cancelled = {};
+
+  @override
+  String get id => 'demo';
+
+  @override
+  String get displayName => 'Demo';
+
+  @override
+  Future<String> upload(
+    List<int> bytes, {
+    required String mimeType,
+    required String uploadId,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    // A retry reuses the task id, so a stale flag would abort the new attempt
+    // before it started — the same rule the Matrix transport follows.
+    _cancelled.remove(uploadId);
+
+    final total = bytes.isEmpty ? 1 : bytes.length;
+    for (var step = 1; step <= kDemoUploadSteps; step++) {
+      await Future<void>.delayed(tick);
+      if (_cancelled.contains(uploadId)) {
+        throw const AttachmentTransportException(
+          'This upload was cancelled.',
+          retryable: false,
+        );
+      }
+      onProgress?.call(total * step ~/ kDemoUploadSteps, total);
+    }
+
+    // Derived from the id rather than random, so the same demo send produces
+    // the same URI on every run and a golden cannot flake on it.
+    return 'mxc://demo.weft/${uploadId.replaceAll(RegExp('[^a-zA-Z0-9]'), '')}';
+  }
+
+  @override
+  void cancel(String uploadId) => _cancelled.add(uploadId);
+
+  @override
+  void dispose() => _cancelled.clear();
 }

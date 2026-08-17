@@ -146,6 +146,38 @@ void main() {
     });
   });
 
+  group('WeftMessage media dimensions', () {
+    WeftMessage sized(int? width, int? height) => WeftMessage(
+      eventId: r'$e',
+      roomId: '!r',
+      network: ChatNetwork.matrix,
+      senderId: '@p:hs',
+      senderName: 'P',
+      timestamp: DateTime.utc(2026, 8, 16),
+      kind: MessageKind.image,
+      isOwn: false,
+      mediaWidth: width,
+      mediaHeight: height,
+    );
+
+    test('an aspect ratio is only offered when both edges are known', () {
+      expect(sized(1600, 900).mediaAspectRatio, closeTo(16 / 9, 1e-9));
+      expect(sized(1600, null).mediaAspectRatio, isNull);
+      expect(sized(null, null).mediaAspectRatio, isNull);
+      // A sender that fills in `w`/`h` whether or not it knows them must not
+      // become a division by zero in the middle of a layout pass.
+      expect(sized(0, 0).mediaAspectRatio, isNull);
+    });
+
+    test('copyWith carries the dimensions through', () {
+      // They describe the attachment, not the message's mutable state, so an
+      // edit or a redaction must not silently reshape the bubble.
+      final edited = sized(1400, 900).copyWith(body: 'caption');
+      expect(edited.mediaWidth, 1400);
+      expect(edited.mediaHeight, 900);
+    });
+  });
+
   group('UnifiedContact', () {
     test('handleFor and roomIds resolve per network', () {
       const contact = UnifiedContact(

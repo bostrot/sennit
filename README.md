@@ -29,7 +29,8 @@ Weft is early. This is what is actually built and tested today, and what is not.
 |---|---|
 | Workspace, CI, test homeserver, design system, goldens | **Done** |
 | Merge engine — identity graph, scoring, merged timeline | **Done**, persisted, 54 tests |
-| Matrix session — login, E2EE, device verification, media upload transport | **Done**, 73 unit + 5 integration tests |
+| Matrix session — login, E2EE, device verification, media upload transport | **Done**, 82 unit + 5 integration tests |
+| Attachments — sniffing, upload plan, bounded queue, Matrix upload transport, repository send path with ordered event sends | **Done** below the UI, 149 + 37 tests; the composer affordance, bubbles and viewer are not built |
 | App shell — rail, inbox, chat, composer, live or demo data | **Done** |
 | Hybrid search — FTS5 + vectors + RRF, **wired**: search screen, ingest-on-read, backfill | **Done**, 63 tests |
 | Transcription — **wired**: Transcribe action on voice bubbles, endpoint settings, privacy gate | **Done**, 15 tests |
@@ -43,7 +44,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**463 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**492 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in

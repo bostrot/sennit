@@ -43,6 +43,8 @@ class WeftMessage {
     this.deliveryState,
     this.attachmentUrl,
     this.durationMs,
+    this.mediaWidth,
+    this.mediaHeight,
   });
 
   final String eventId;
@@ -71,6 +73,26 @@ class WeftMessage {
   final DeliveryState? deliveryState;
   final String? attachmentUrl;
   final int? durationMs;
+
+  /// Pixel size of the attached image or video, when the sender announced it.
+  ///
+  /// Carried on the message rather than derived from the bytes because the
+  /// bubble has to reserve the right shape *before* the attachment has been
+  /// downloaded — an encrypted photo takes a round trip and a decrypt to
+  /// measure, and laying out a square placeholder that becomes a 16:9 photo
+  /// reflows the whole timeline under the reader's thumb. Null is normal and
+  /// not an error: plenty of clients omit `info.w`/`info.h`, and Weft's own
+  /// sender omits them for a video whose header could not be probed.
+  final int? mediaWidth;
+  final int? mediaHeight;
+
+  /// Aspect ratio of the attachment, when both dimensions are known.
+  double? get mediaAspectRatio {
+    final w = mediaWidth;
+    final h = mediaHeight;
+    if (w == null || h == null || w <= 0 || h <= 0) return null;
+    return w / h;
+  }
 
   bool get isEdited => editedAt != null;
   bool get canTranscribe =>
@@ -109,6 +131,8 @@ class WeftMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       attachmentUrl: attachmentUrl,
       durationMs: durationMs,
+      mediaWidth: mediaWidth,
+      mediaHeight: mediaHeight,
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
@@ -189,6 +190,200 @@ void main() {
     test('returns null when there is no relation at all', () {
       expect(replyTargetEventId({'msgtype': 'm.text'}), isNull);
       expect(replyTargetEventId({'m.relates_to': 'nonsense'}), isNull);
+    });
+  });
+
+  group('mapEvent', () {
+    // One client and one room for the whole group: an `sdk.Event` cannot exist
+    // without a room, and a room cannot exist without a client with a database.
+    // Nothing here syncs or logs in, so an in-memory database is enough.
+    late sdk.Room room;
+
+    setUpAll(() async {
+      final client = sdk.Client(
+        'weft-mapping-test',
+        database: await sdk.MatrixSdkDatabase.init(
+          'weft-mapping-test',
+          database: await openWeftSqfliteDatabase(inMemoryDatabasePath),
+        ),
+      );
+      room = sdk.Room(id: '!room:example.org', client: client);
+      // Without a member event the SDK asks the (absent) homeserver for the
+      // sender's profile on every mapped event, which fills the run with
+      // stack traces for a lookup no assertion here depends on.
+      room.setState(
+        sdk.Event(
+          type: sdk.EventTypes.RoomMember,
+          stateKey: '@sam:example.org',
+          content: const {'membership': 'join', 'displayname': 'Sam'},
+          eventId: r'$member:example.org',
+          senderId: '@sam:example.org',
+          originServerTs: DateTime(2026, 8, 17, 9),
+          room: room,
+        ),
+      );
+    });
+
+    WeftMessage? map(Map<String, Object?> content, {String? type}) {
+      return mapEvent(
+        sdk.Event(
+          type: type ?? sdk.EventTypes.Message,
+          content: content,
+          eventId: r'$event:example.org',
+          senderId: '@sam:example.org',
+          originServerTs: DateTime(2026, 8, 17, 9, 30),
+          room: room,
+        ),
+        network: ChatNetwork.matrix,
+        ownUserId: '@me:example.org',
+      );
+    }
+
+    test('an m.video carries its kind, dimensions and duration', () {
+      final message = map({
+        'msgtype': 'm.video',
+        'body': 'clip.mp4',
+        'url': 'mxc://example.org/video',
+        'info': {
+          'mimetype': 'video/mp4',
+          'size': 4900000,
+          'w': 1920,
+          'h': 1080,
+          'duration': 12400,
+        },
+      })!;
+
+      expect(message.kind, MessageKind.video);
+      expect(message.mediaWidth, 1920);
+      expect(message.mediaHeight, 1080);
+      expect(message.durationMs, 12400);
+      // Not a fetchable URL — the flag that says there is something to load.
+      expect(message.attachmentUrl, r'$event:example.org');
+    });
+
+    test('an m.audio is audio, and stays audio without the voice key', () {
+      final message = map({
+        'msgtype': 'm.audio',
+        'body': 'set.mp3',
+        'url': 'mxc://example.org/audio',
+        'info': {'mimetype': 'audio/mpeg', 'duration': 214000},
+      })!;
+
+      // A music file is not a voice note, and only the latter offers Transcribe.
+      expect(message.kind, MessageKind.audio);
+      expect(message.durationMs, 214000);
+      expect(message.canTranscribe, isTrue);
+    });
+
+    test('MSC3245 turns the same msgtype into a voice note', () {
+      final message = map({
+        'msgtype': 'm.audio',
+        'body': 'Voice message',
+        'url': 'mxc://example.org/voice',
+        'org.matrix.msc3245.voice': <String, Object?>{},
+        'org.matrix.msc1767.audio': {'duration': 8400},
+      })!;
+
+      expect(message.kind, MessageKind.voice);
+      // Read from the MSC1767 extension when `info` carries no duration.
+      expect(message.durationMs, 8400);
+    });
+
+    test('an m.file is a file rather than falling through to text', () {
+      final message = map({
+        'msgtype': 'm.file',
+        'body': 'contract.pdf',
+        'url': 'mxc://example.org/file',
+        'info': {'mimetype': 'application/pdf', 'size': 183000},
+      })!;
+
+      // The regression this guards: a received PDF rendering as a bare filename
+      // in a text bubble, with no indication a file is attached at all.
+      expect(message.kind, MessageKind.file);
+      expect(message.body, 'contract.pdf');
+      expect(message.attachmentUrl, isNotNull);
+      expect(message.mediaWidth, isNull);
+    });
+
+    test('an encrypted attachment counts even with no top-level url', () {
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'holiday.jpg',
+        'file': {
+          'url': 'mxc://example.org/ciphertext',
+          'iv': 'aaaa',
+          'hashes': {'sha256': 'bbbb'},
+          'key': {'k': 'cccc', 'alg': 'A256CTR'},
+        },
+        'info': {'mimetype': 'image/jpeg', 'w': 1400, 'h': 900},
+      })!;
+
+      expect(message.kind, MessageKind.image);
+      expect(message.attachmentUrl, isNotNull);
+      expect(message.mediaWidth, 1400);
+      expect(message.mediaHeight, 900);
+    });
+
+    test('a text message has no attachment and no dimensions', () {
+      final message = map({'msgtype': 'm.text', 'body': 'hello'})!;
+
+      expect(message.kind, MessageKind.text);
+      expect(message.attachmentUrl, isNull);
+      expect(message.mediaWidth, isNull);
+      expect(message.durationMs, isNull);
+    });
+
+    test('unusable dimensions are dropped rather than believed', () {
+      // `info` is whatever the sending client wrote. A zero would otherwise
+      // become an aspect ratio the bubble cannot divide by, and a string would
+      // be a cast exception in the middle of rendering a timeline.
+      final zeros = map({
+        'msgtype': 'm.image',
+        'body': 'photo.jpg',
+        'url': 'mxc://example.org/photo',
+        'info': {'w': 0, 'h': 0},
+      })!;
+      expect(zeros.mediaWidth, isNull);
+      expect(zeros.mediaHeight, isNull);
+
+      final strings = map({
+        'msgtype': 'm.image',
+        'body': 'photo.jpg',
+        'url': 'mxc://example.org/photo',
+        'info': {'w': '1600', 'h': '900'},
+      })!;
+      expect(strings.mediaWidth, isNull);
+
+      final noInfo = map({
+        'msgtype': 'm.image',
+        'body': 'photo.jpg',
+        'url': 'mxc://example.org/photo',
+      })!;
+      expect(noInfo.mediaWidth, isNull);
+
+      final floats = map({
+        'msgtype': 'm.image',
+        'body': 'photo.jpg',
+        'url': 'mxc://example.org/photo',
+        'info': {'w': 1599.6, 'h': 899.4},
+      })!;
+      expect(floats.mediaWidth, 1600);
+      expect(floats.mediaHeight, 899);
+    });
+
+    test('a sticker maps by event type, not by msgtype', () {
+      final message = map({
+        'body': 'party parrot',
+        'url': 'mxc://example.org/sticker',
+        'info': {'mimetype': 'image/png', 'w': 128, 'h': 128},
+      }, type: sdk.EventTypes.Sticker)!;
+
+      expect(message.kind, MessageKind.sticker);
+      expect(message.mediaWidth, 128);
+    });
+
+    test('a state change is not conversation content', () {
+      expect(map(const {'membership': 'join'}, type: 'm.room.member'), isNull);
     });
   });
 }

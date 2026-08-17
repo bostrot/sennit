@@ -164,6 +164,8 @@ WeftMessage? mapEvent(
     // this only records that something is there to load.
     attachmentUrl: _hasAttachment(content) ? event.eventId : null,
     durationMs: _durationMs(content),
+    mediaWidth: _dimension(content, 'w'),
+    mediaHeight: _dimension(content, 'h'),
   );
 }
 
@@ -198,6 +200,24 @@ DeliveryState? _deliveryFor(sdk.Event event) {
 /// Whether the event carries a file, plain (`url`) or encrypted (`file`).
 bool _hasAttachment(Map<String, Object?> content) =>
     content['url'] is String || content['file'] is Map;
+
+/// Reads `info.w` or `info.h`, which is the only place a sender announces the
+/// size of an image or a video.
+///
+/// Defensive about the value's type and sign because `info` is whatever the
+/// sending client wrote: a string `"1600"`, a float, a zero from a client that
+/// fills the key in whether or not it knows the answer. Anything that is not a
+/// usable positive integer comes back null, which the bubble already handles as
+/// "shape unknown" — a zero would otherwise become an aspect ratio nobody can
+/// divide by.
+int? _dimension(Map<String, Object?> content, String key) {
+  final info = content['info'];
+  if (info is! Map) return null;
+  final value = info[key];
+  if (value is! num) return null;
+  final pixels = value.round();
+  return pixels > 0 ? pixels : null;
+}
 
 int? _durationMs(Map<String, Object?> content) {
   final info = content['info'];
