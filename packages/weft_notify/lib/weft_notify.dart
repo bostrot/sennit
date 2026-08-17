@@ -16,6 +16,5 @@
 library;
 
 // Consumers import this barrel, never src/.
-//
-// Still to come: `src/content.dart` (rendering, grouping, summarisation).
+export 'src/content.dart';
 export 'src/rules.dart';

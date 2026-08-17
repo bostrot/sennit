@@ -43,11 +43,15 @@ Chat chat({
   ChatNetwork network = ChatNetwork.whatsapp,
   bool muted = false,
   bool sourceMuted = false,
+  bool isGroup = false,
+  String? avatarUrl,
 }) {
   return Chat(
     id: id,
     title: title,
     muted: muted,
+    isGroup: isGroup,
+    avatarUrl: avatarUrl,
     sources: [ChatSource(roomId: id, network: network, muted: sourceMuted)],
   );
 }
@@ -62,12 +66,14 @@ Chat mergedChat({
   bool muted = false,
   bool whatsappMuted = false,
   bool signalMuted = false,
+  String? avatarUrl,
 }) {
   return Chat(
     id: 'merged:$contactId',
     title: title,
     contactId: contactId,
     muted: muted,
+    avatarUrl: avatarUrl,
     sources: [
       ChatSource(
         roomId: whatsappRoomId,
