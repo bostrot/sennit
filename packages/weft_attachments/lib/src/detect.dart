@@ -127,6 +127,46 @@ String sniffMimeType(AttachmentSource source) {
   return declared ?? fromExtension ?? kFallbackMimeType;
 }
 
+/// Whether [value] reads as a bare filename rather than as prose.
+///
+/// A single token, no whitespace, ending in a short alphanumeric extension:
+/// `IMG_4021.jpg`, `report-final.pdf`. Deliberately shape-based, because both
+/// callers are looking at a Matrix `body` and neither has the real name to
+/// compare against — the timeline hides such a body instead of showing it as a
+/// caption under a photo, and the save path adopts it as the file's name instead
+/// of writing a file called `Forwarded`. One rule for both, so a body cannot be
+/// a caption in the bubble and a filename on disk.
+///
+/// Says no to a sentence that merely mentions `report.pdf`, which is a real
+/// caption and must survive.
+bool looksLikeFilename(String value) {
+  if (value.isEmpty || value.contains(RegExp(r'\s'))) return false;
+  final dot = value.lastIndexOf('.');
+  if (dot <= 0 || dot == value.length - 1) return false;
+  final extension = value.substring(dot + 1);
+  return extension.length <= 5 && RegExp(r'^[A-Za-z0-9]+$').hasMatch(extension);
+}
+
+/// The filename extension conventionally used for [mimeType], without a dot.
+///
+/// The inverse of the extension table [sniffMimeType] already consults, read
+/// backwards rather than written out a second time — a second table would be
+/// the thing that says `image/jpeg` is `.jpg` here and `.jpeg` there. Insertion
+/// order picks the winner where several extensions share a type, which is why
+/// the table lists the conventional spelling first (`jpg` before `jpeg`, `mp4`
+/// before `m4v`).
+///
+/// Null for a type with no entry, including [kFallbackMimeType]: a file whose
+/// type is unknown gets no invented extension, because a `.bin` suffix on a
+/// photo is worse than a name the user completes themselves.
+String? extensionForMimeType(String mimeType) {
+  final type = _meaningfulMimeType(mimeType);
+  if (type == null) return null;
+  return _mimeTypesByExtension.entries
+      .firstWhereOrNull((entry) => entry.value == type)
+      ?.key;
+}
+
 /// Maps a mime type onto the existing [MessageKind] vocabulary.
 ///
 /// [isVoiceNote] is the caller's assertion that this was *recorded in the app*,

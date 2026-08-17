@@ -16,6 +16,7 @@ import '../merge/merge_screen.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
 import 'attachment_source_sheet.dart';
+import 'media_viewer.dart';
 import 'send_network_chip.dart';
 
 /// One conversation — merged across networks or not.
@@ -280,6 +281,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
                         message: message,
                         highlighted: message.eventId == _highlightEventId,
                         transcribing: _transcribing.contains(message.eventId),
+                        onOpen: rendersAsAttachment(message)
+                            ? () => _openMedia(message)
+                            : null,
                         onTranscribe:
                             message.canTranscribe && message.transcript == null
                             ? () => _transcribe(message)
@@ -487,6 +491,28 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (mounted) setState(() {});
   }
 
+  /// Opens [message] full screen, in the company of the rest of the
+  /// conversation's media.
+  ///
+  /// The gallery is built from the *loaded* timeline rather than fetched: it is
+  /// the pictures the user has already scrolled past, which is what "swipe to
+  /// the previous photo" means to them. Anything the viewer can only show on its
+  /// own — a PDF, a song — opens as a gallery of one rather than being dropped
+  /// between two photographs.
+  void _openMedia(WeftMessage message) {
+    final gallery = viewableMedia(_view.messages);
+    final index = gallery.indexWhere(
+      (m) => m.eventId == message.eventId && m.roomId == message.roomId,
+    );
+    unawaited(
+      openMediaViewer(
+        context,
+        items: index < 0 ? [message] : gallery,
+        initialIndex: index < 0 ? 0 : index,
+      ),
+    );
+  }
+
   void _pickNetwork(ChatNetwork network) {
     unawaited(
       ref.read(chatRepositoryProvider).setSendNetwork(widget.chatId, network),
@@ -681,9 +707,13 @@ class _MessageBubble extends StatelessWidget {
     this.content,
     this.highlighted = false,
     this.transcribing = false,
+    this.onOpen,
     this.onTranscribe,
     this.onRetranscribe,
   });
+
+  /// Opens the attachment full screen. Null for a message that has none.
+  final VoidCallback? onOpen;
 
   /// Replaces the bubble's own content.
   ///
@@ -784,6 +814,7 @@ class _MessageBubble extends StatelessWidget {
                     AttachmentBubble(
                       message: message,
                       own: own,
+                      onOpen: onOpen,
                       transcribing: transcribing,
                       onTranscribe: onTranscribe,
                       onRetranscribe: onRetranscribe,

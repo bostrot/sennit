@@ -334,6 +334,43 @@ class MatrixChatRepository implements ChatRepository {
     }
   }
 
+  @override
+  Future<AttachmentLocation?> attachmentLocation(
+    String roomId,
+    String eventId,
+  ) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) return null;
+    // The whole point of the check: in an encrypted room the mxc URI addresses
+    // ciphertext, and only `downloadAndDecryptAttachment` — i.e.
+    // [attachmentBytes] — can turn that into the file the user asked for.
+    if (room.encrypted) return null;
+
+    try {
+      final event = await room.getEventById(eventId);
+      final mxc = event?.content['url'];
+      if (mxc is! String) return null;
+
+      final url = mxcToDownloadUrl(
+        _client,
+        mxc,
+        authenticatedMedia: _authenticatedMedia,
+      );
+      final parsed = url == null ? null : Uri.tryParse(url);
+      if (parsed == null) return null;
+
+      // Read per call rather than captured: the SDK refreshes access tokens
+      // underneath us, and a saved download that 401s ten minutes into a film
+      // is the failure this avoids.
+      return AttachmentLocation(
+        url: parsed,
+        headers: mediaAuthHeaders(_client) ?? const {},
+      );
+    } on Exception {
+      return null;
+    }
+  }
+
   // --------------------------------------------------------------- send path
 
   /// Built on first use, not in the constructor: a session that never sends a

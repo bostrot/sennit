@@ -170,6 +170,16 @@ class DemoChatRepository implements ChatRepository {
     bool thumbnail = true,
   }) async => null;
 
+  /// Always null, and for the same reason [attachmentBytes] is: demo mode has
+  /// no homeserver to fetch from. Null is the honest answer rather than a
+  /// placeholder — it routes the viewer down its "nothing to fetch" branch,
+  /// which is exactly the branch an encrypted attachment takes.
+  @override
+  Future<AttachmentLocation?> attachmentLocation(
+    String roomId,
+    String eventId,
+  ) async => null;
+
   // --------------------------------------------------------------- send path
   //
   // Demo mode runs the *real* `UploadQueue` over a fake transport rather than

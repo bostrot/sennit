@@ -18,6 +18,19 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
 
+/// The hero tag joining a bubble's thumbnail to its full-screen self.
+///
+/// Published here, where the flight starts, so the viewer has one place to read
+/// it from and the two cannot drift into two different strings — a hero whose
+/// ends disagree does not fail, it simply stops animating, which is the kind of
+/// bug nobody files.
+///
+/// Keyed by room *and* event: a merged conversation draws messages from several
+/// rooms at once, and two servers issuing the same event id — unlikely, but
+/// nothing forbids it — would make Flutter throw on a duplicate tag.
+String mediaHeroTag(WeftMessage message) =>
+    'attachment:${message.roomId}/${message.eventId}';
+
 /// Kinds that render as an attachment rather than as their `body` text.
 ///
 /// [MessageKind.voice] is deliberately absent: a voice note has its own bubble
@@ -50,21 +63,11 @@ String? attachmentCaption(WeftMessage message) {
   final caption = message.body.trim();
   if (caption.isEmpty) return null;
   if (caption.toLowerCase() == 'forwarded') return null;
-  // A body that is exactly the filename is a filename, not a caption. Matched
-  // by shape rather than by comparing against the name, which the timeline does
-  // not carry separately.
-  if (_looksLikeBareFilename(caption)) return null;
+  // A body that is exactly the filename is a filename, not a caption. The same
+  // rule the save path uses to decide whether that body is worth writing the
+  // file under, so the two cannot disagree about what is a name.
+  if (looksLikeFilename(caption)) return null;
   return caption;
-}
-
-/// A single token ending in a short extension, with no spaces — `IMG_4021.jpg`,
-/// `image.png`, `report-final.pdf`.
-bool _looksLikeBareFilename(String body) {
-  if (body.contains(RegExp(r'\s'))) return false;
-  final dot = body.lastIndexOf('.');
-  if (dot <= 0 || dot == body.length - 1) return false;
-  final extension = body.substring(dot + 1);
-  return extension.length <= 5 && RegExp(r'^[A-Za-z0-9]+$').hasMatch(extension);
 }
 
 /// A byte count as a person would say it.
@@ -198,12 +201,20 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
               children: [
                 GestureDetector(
                   onTap: _bytes == null ? null : widget.onOpen,
+                  // The flight the viewer lands: the same decoded bytes on both
+                  // ends, so the picture the user tapped is visibly the picture
+                  // that fills the screen. Only wrapped once there *are* bytes —
+                  // a hero whose source is a grey placeholder animates a grey
+                  // box into a photo, which reads as a glitch.
                   child: switch ((_bytes, _failed)) {
-                    (final Uint8List bytes, _) => Image.memory(
-                      bytes,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          _placeholder(context, broken: true),
+                    (final Uint8List bytes, _) => Hero(
+                      tag: mediaHeroTag(widget.message),
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            _placeholder(context, broken: true),
+                      ),
                     ),
                     (_, true) => _placeholder(context, broken: true),
                     _ => _placeholder(context, broken: false),

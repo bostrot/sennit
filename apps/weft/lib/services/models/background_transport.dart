@@ -71,6 +71,7 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
     required File target,
     required int expectedBytes,
     required String displayName,
+    Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
   }) async {
@@ -80,6 +81,7 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
         target: target,
         expectedBytes: expectedBytes,
         displayName: displayName,
+        headers: headers,
         onBytes: onBytes,
         shouldContinue: shouldContinue,
       );
@@ -92,6 +94,7 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
         target: target,
         expectedBytes: expectedBytes,
         displayName: displayName,
+        headers: headers,
         onBytes: onBytes,
         shouldContinue: shouldContinue,
       );
@@ -104,6 +107,7 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
       filename: p.basename(target.path),
       directory: p.relative(target.parent.path, from: support.path),
       baseDirectory: BaseDirectory.applicationSupport,
+      headers: headers,
       displayName: displayName,
       updates: Updates.statusAndProgress,
       allowPause: true,

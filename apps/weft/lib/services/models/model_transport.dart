@@ -21,11 +21,19 @@ class DownloadFailure implements Exception {
 /// desktop, and the OS download service for mobile (see
 /// `background_transport.dart` for why mobile cannot just use HTTP).
 abstract class ModelDownloadTransport {
+  /// [headers] are sent with the request.
+  ///
+  /// Empty for a model file, which is a public URL on a CDN. Not empty for
+  /// Matrix media since spec v1.11, which moved every download behind
+  /// `Authorization: Bearer` — the media viewer's Save action reuses this
+  /// transport, and without the header a saved photo would be a 401 page
+  /// written to the user's Downloads folder.
   Future<void> download({
     required Uri url,
     required File target,
     required int expectedBytes,
     required String displayName,
+    Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
   });
@@ -53,6 +61,7 @@ class HttpModelDownloadTransport implements ModelDownloadTransport {
     required File target,
     required int expectedBytes,
     required String displayName,
+    Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
   }) async {
@@ -65,6 +74,7 @@ class HttpModelDownloadTransport implements ModelDownloadTransport {
     if (have >= expectedBytes && expectedBytes > 0) return;
 
     final request = http.Request('GET', url);
+    request.headers.addAll(headers);
     if (have > 0) request.headers['range'] = 'bytes=$have-';
 
     final http.StreamedResponse response;

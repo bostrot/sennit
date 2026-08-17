@@ -25,6 +25,8 @@ dependencies:
   qr_flutter: ^4.1.0
   scrollable_positioned_list: ^0.3.8
   riverpod_annotation: ^4.0.3
+  share_plus: ^13.1.0
+  video_player: ^2.11.1
 
   whisper_ggml: ^2.6.0
 

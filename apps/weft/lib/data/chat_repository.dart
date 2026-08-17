@@ -70,6 +70,24 @@ abstract class ChatRepository {
     bool thumbnail = true,
   });
 
+  /// Where a message's attachment can be fetched from directly, or null when
+  /// there is no such place.
+  ///
+  /// The complement of [attachmentBytes], and deliberately allowed to answer
+  /// "nowhere": an *encrypted* attachment's mxc URI serves ciphertext, so a
+  /// caller that fetched it would write an unopenable file to the user's disk
+  /// with nothing to say it had gone wrong. Null is therefore the correct answer
+  /// for every encrypted room, for a redacted or unmapped event, and for demo
+  /// mode — and the contract is that a null sends the caller to
+  /// [attachmentBytes], which is the one path that works for both room types.
+  ///
+  /// It exists at all because [attachmentBytes] returns a `Uint8List`: holding a
+  /// 200 MB video in memory to write it straight back out is the difference
+  /// between saving a film and being killed by the OS for it. A URL can instead
+  /// be handed to the background download service, which streams it to disk
+  /// outside the app.
+  Future<AttachmentLocation?> attachmentLocation(String roomId, String eventId);
+
   /// Sends [source] as an attachment, uploading it first.
   ///
   /// Takes an [AttachmentSource] — a name, a size and a header slice — rather
@@ -116,6 +134,22 @@ abstract class ChatRepository {
   /// immediate from the user's point of view: a late success is discarded
   /// rather than resurrecting the task.
   Future<void> cancelUpload(String taskId);
+}
+
+/// A fetchable address for one attachment, with whatever it takes to be let in.
+///
+/// [headers] is not optional decoration. Matrix v1.11 moved media behind
+/// `Authorization: Bearer`, so on any current homeserver the URL alone answers
+/// 401 — and the two travel together here precisely so a caller cannot hold one
+/// without the other.
+class AttachmentLocation {
+  const AttachmentLocation({required this.url, this.headers = const {}});
+
+  final Uri url;
+  final Map<String, String> headers;
+
+  @override
+  String toString() => 'AttachmentLocation($url)';
 }
 
 /// Thrown by [ChatRepository.sendAttachment] for a file that will not be sent.

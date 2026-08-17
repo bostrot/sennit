@@ -65,6 +65,11 @@ class _NoRoomsRepository implements ChatRepository {
     bool thumbnail = true,
   }) => _inner.attachmentBytes(roomId, eventId, thumbnail: thumbnail);
   @override
+  Future<AttachmentLocation?> attachmentLocation(
+    String roomId,
+    String eventId,
+  ) => _inner.attachmentLocation(roomId, eventId);
+  @override
   Future<void> sendAttachment(
     String chatId,
     AttachmentSource source, {

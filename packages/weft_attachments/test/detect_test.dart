@@ -498,4 +498,60 @@ void main() {
       expect(source([], filename: 'trailing.').extension, isNull);
     });
   });
+
+  group('extensionForMimeType', () {
+    test('gives the conventional spelling where several map to one type', () {
+      expect(extensionForMimeType('image/jpeg'), 'jpg');
+      expect(extensionForMimeType('video/mp4'), 'mp4');
+      expect(extensionForMimeType('audio/ogg'), 'ogg');
+    });
+
+    test('round-trips against the sniffer it inverts', () {
+      for (final mime in [
+        'image/png',
+        'image/webp',
+        'application/pdf',
+        'video/quicktime',
+        'text/csv',
+      ]) {
+        final extension = extensionForMimeType(mime);
+        expect(extension, isNotNull, reason: mime);
+        expect(sniffMimeType(source([], filename: 'x.$extension')), mime);
+      }
+    });
+
+    test('parameters and casing do not defeat it', () {
+      expect(extensionForMimeType('IMAGE/PNG; charset=binary'), 'png');
+    });
+
+    // Inventing `.bin` for a file nobody could identify is worse than leaving
+    // the name alone: it makes an unrecognised photo look like a memory dump.
+    test('an unknown or placeholder type gets no extension at all', () {
+      expect(extensionForMimeType(kFallbackMimeType), isNull);
+      expect(extensionForMimeType('application/x-nonsense'), isNull);
+      expect(extensionForMimeType('*/*'), isNull);
+    });
+  });
+
+  group('looksLikeFilename', () {
+    test('accepts a bare name with a short extension', () {
+      expect(looksLikeFilename('IMG_4021.jpg'), isTrue);
+      expect(looksLikeFilename('report-final.pdf'), isTrue);
+      expect(looksLikeFilename('archive.tar.gz'), isTrue);
+    });
+
+    // The case both callers exist for: a real caption that happens to name a
+    // file must stay a caption, and must not become the name on disk.
+    test('rejects a sentence, even one mentioning a file', () {
+      expect(looksLikeFilename('here is report.pdf'), isFalse);
+      expect(looksLikeFilename('Forwarded'), isFalse);
+      expect(looksLikeFilename(''), isFalse);
+    });
+
+    test('rejects a dot that is not an extension', () {
+      expect(looksLikeFilename('trailing.'), isFalse);
+      expect(looksLikeFilename('.hidden'), isFalse);
+      expect(looksLikeFilename('version.1.2.3-notes'), isFalse);
+    });
+  });
 }

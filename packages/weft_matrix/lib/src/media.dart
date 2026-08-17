@@ -21,6 +21,54 @@ String? mxcToThumbnailUrl(
   required bool authenticatedMedia,
   int size = 96,
 }) {
+  return _mediaUrl(
+    client,
+    url,
+    endpoint: 'thumbnail',
+    authenticatedMedia: authenticatedMedia,
+    query: {
+      'width': '$size',
+      'height': '$size',
+      'method': 'crop',
+      'animated': 'false',
+    },
+  );
+}
+
+/// Turns an `mxc://` URI into an HTTP URL for the media *itself*, full size.
+///
+/// The download counterpart of [mxcToThumbnailUrl], and it exists for exactly
+/// one caller: saving or sharing a picture out of the viewer, where the file
+/// the user asked for is the original and not a 96-pixel crop.
+///
+/// **Only ever correct for an unencrypted room.** The bytes behind an encrypted
+/// attachment's mxc URI are ciphertext, and a client that fetched them would
+/// write an unopenable file to the user's Downloads folder with no sign that
+/// anything went wrong. Callers must check the room and fall back to
+/// `downloadAndDecryptAttachment` instead — this function cannot see the room
+/// and therefore cannot make that check for them.
+String? mxcToDownloadUrl(
+  sdk.Client client,
+  String? url, {
+  required bool authenticatedMedia,
+}) {
+  return _mediaUrl(
+    client,
+    url,
+    endpoint: 'download',
+    authenticatedMedia: authenticatedMedia,
+  );
+}
+
+/// The shared half of both: parse the mxc URI, pick the endpoint generation,
+/// and rebuild it against the homeserver this client is actually talking to.
+String? _mediaUrl(
+  sdk.Client client,
+  String? url, {
+  required String endpoint,
+  required bool authenticatedMedia,
+  Map<String, String>? query,
+}) {
   if (url == null || url.isEmpty) return null;
 
   final uri = Uri.tryParse(url);
@@ -37,20 +85,15 @@ String? mxcToThumbnailUrl(
   final mediaId = uri.pathSegments.first;
 
   final path = authenticatedMedia
-      ? '/_matrix/client/v1/media/thumbnail/$server/$mediaId'
-      : '/_matrix/media/v3/thumbnail/$server/$mediaId';
+      ? '/_matrix/client/v1/media/$endpoint/$server/$mediaId'
+      : '/_matrix/media/v3/$endpoint/$server/$mediaId';
 
   return Uri(
     scheme: homeserver.scheme,
     host: homeserver.host,
     port: homeserver.hasPort ? homeserver.port : null,
     path: path,
-    queryParameters: {
-      'width': '$size',
-      'height': '$size',
-      'method': 'crop',
-      'animated': 'false',
-    },
+    queryParameters: query,
   ).toString();
 }
 
