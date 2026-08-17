@@ -20,3 +20,13 @@ No Flutter, no `dart:io`, no codegen. Transport is injected through
 ```sh
 dart run weft_attachments:plan path/to/file.png --encrypted
 ```
+
+It reads at most the first 64 KiB of the file and prints the sniffed mime type,
+the `MessageKind`, the dimensions it could read from the header, the thumbnail
+decision, and the pretty-printed `m.room.message` content — with the mxc URI and
+key material stubbed, since neither exists until the homeserver and the crypto
+layer have run. `--mime=<type>` simulates a share intent's claim, `--voice` and
+`--duration-ms` stand in for the recorder, `--max-bytes` for the homeserver's
+`m.upload.size`, and `--json` prints the content alone for piping into `jq`.
+It exits 0 when it planned, 1 on a usage or read error, and 2 when the file was
+rejected.

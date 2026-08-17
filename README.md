@@ -43,7 +43,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**411 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**421 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -101,6 +101,16 @@ Regenerate goldens after an intentional visual change:
 
 ```bash
 cd apps/weft && flutter test test/goldens --update-goldens
+```
+
+The attachment pipeline also has a runnable prototype. It reads only the leading
+bytes of a real file and prints what Weft would send for it — sniffed mime type,
+`MessageKind`, dimensions, thumbnail decision, and the `m.room.message` content,
+with the URI under `url` for a plain room and under `file.url` for an encrypted
+one:
+
+```bash
+dart run weft_attachments:plan path/to/file.png --encrypted
 ```
 
 ## Layout
