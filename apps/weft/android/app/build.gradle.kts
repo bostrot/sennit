@@ -42,6 +42,16 @@ kotlin {
     }
 }
 
+dependencies {
+    // `ShortcutManagerCompat` and `IconCompat`, for the conversation shortcuts
+    // a notification needs before Android will let it become a bubble. Both
+    // arrive transitively through the Flutter embedding today; declared
+    // explicitly because MainActivity imports them directly, and a transitive
+    // dependency that a plugin upgrade drops would break the build with an
+    // unresolved import rather than a version conflict.
+    implementation("androidx.core:core-ktx:1.13.1")
+}
+
 flutter {
     source = "../.."
 }

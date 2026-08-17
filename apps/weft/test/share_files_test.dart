@@ -522,6 +522,9 @@ class _RecordingRepository implements ChatRepository {
   Stream<List<Chat>> watchChats() => inner.watchChats();
 
   @override
+  Chat? chatForRoom(String roomId) => inner.chatForRoom(roomId);
+
+  @override
   Stream<List<UploadTask>> watchUploads(String chatId) =>
       inner.watchUploads(chatId);
 

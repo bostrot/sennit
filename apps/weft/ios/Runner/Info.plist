@@ -44,6 +44,18 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- An `event_id_only` push carries no text, so the app has to be given the
+	     chance to fetch and decrypt the event before anything can be shown.
+	     Without `remote-notification` iOS delivers the payload only when the app
+	     is already in the foreground, and every push while it is backgrounded
+	     shows the placeholder alert from `kIosDefaultPayload` and nothing else.
+	     `fetch` is what lets the client catch up on sync in the background so a
+	     notification is not the first the app has heard of a conversation. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

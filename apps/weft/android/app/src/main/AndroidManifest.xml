@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 13+ will not show a single notification until the user has
+         granted this at runtime. Declaring it is only half the job: the prompt
+         is spent deliberately, behind the rationale sheet, because the system
+         gives an app exactly one. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="weft"
         android:name="${applicationName}"
@@ -63,6 +68,25 @@
                 <data android:mimeType="*/*"/>
             </intent-filter>
         </activity>
+        <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
+             declared by the firebase_messaging plugin and merged in from its
+             own manifest — redeclaring it here would be a second entry for one
+             service. What is *not* supplied by the plugin is where a message
+             lands when Weft is not running to place it: without this channel
+             id, Android drops such a notification into a "Miscellaneous"
+             channel the user cannot tune and Weft does not know about. Weft's
+             own pokes are data-only and are posted by Dart onto the per-network
+             channels, so this is the fallback, not the normal path. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="weft.messages.matrix" />
+        <!-- Data-only messages must not be shown by the system at all: an
+             `event_id_only` push carries no text, so a system-rendered
+             notification would say nothing. Dart fetches, decrypts and posts. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.auto_init_enabled"
+            android:value="true" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

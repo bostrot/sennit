@@ -41,11 +41,13 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Share-in — Android SEND/SEND_MULTIPLE, cold-start replay, share-target sheet | **Done** for text and files; shared URIs are streamed to a staged copy and sent through the same upload path as the composer, 15 tests |
 | Merge management UI — suggestions with evidence, accept/reject, unmerge | **Done**, 4 widget tests |
 | Bridge QR login — rendered QR + copyable payload, re-transcribe language picker, auto-transcribe | **Done** |
-| iOS Share Extension, Direct Share/People API, notifications, widgets, watch | **Not built** — needs Xcode targets and signing |
+| Notification decisions — suppression rules, merged-chat grouping, body rendering, summaries | **Done**, pure Dart, 165 tests |
+| Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 37 tests. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
+| iOS Share Extension, notification service extension, Direct Share/People API, widgets, watch | **Not built** — the notification service extension is authored at `apps/weft/ios/NotificationService/` but needs Xcode targets and signing |
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**592 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer.
+**855 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -79,6 +81,28 @@ Also valid: `-d linux`, `-d windows`, `-d ios`, `-d android`.
 > cargo resolves `rustc` from PATH, so without the pin every Android target
 > fails with a misleading `E0463: can't find crate for core`. `compileSdk` is
 > pinned to 37 for `flutter_secure_storage`.
+
+> **Push note.** Weft notifies out of the box while it is running — that path
+> needs nothing configured. Being notified while it is *closed* needs two things
+> Weft cannot host for you:
+>
+> 1. **A push gateway.** Run your own [sygnal](https://github.com/matrix-org/sygnal)
+>    and put its `/_matrix/push/v1/notify` URL in Notification settings, or build
+>    with `--dart-define=WEFT_PUSH_GATEWAY=https://…`. The app ids it must be
+>    configured for are `com.bostrot.weft.android` and `com.bostrot.weft.ios`.
+> 2. **A Firebase project**, for `google-services.json` (Android) or
+>    `GoogleService-Info.plist` (iOS). Without one the app starts normally and
+>    logs that push is unavailable; it does not fail.
+>
+> Weft registers its pusher with `format: event_id_only`, so the homeserver
+> tells the gateway *that* something happened and never *what* — the body is
+> fetched and decrypted on the device. On iOS that makes a notification service
+> extension necessary; one is authored at `apps/weft/ios/NotificationService/`
+> and is not yet part of the Xcode project. See the README in that directory.
+>
+> Firebase's CocoaPods distribution is deprecated after October 2026 and this
+> project has Swift Package Manager disabled (see the macOS note above), so the
+> Apple side of push will need that resolved before then.
 
 ## Testing
 

@@ -18,6 +18,21 @@ abstract class ChatRepository {
   /// The unified inbox, newest activity first.
   Stream<List<Chat>> watchChats();
 
+  /// The conversation [roomId] belongs to, as the inbox has already resolved
+  /// it, or null when it has not resolved one yet.
+  ///
+  /// Synchronous and by room because the notification path asks this question
+  /// about an event that has just arrived, from outside the widget tree, and
+  /// must get *the* answer rather than a second one: a merged contact's
+  /// WhatsApp room and Signal room both return the same `merged:<contactId>`
+  /// chat, which is what makes them one notification thread. A closure over
+  /// [watchChats] at the call site would be that second answer, and the two
+  /// would drift the moment the merge fold changed.
+  ///
+  /// Null during first sync, and for a room that has just been joined. The
+  /// caller's correct response is to stay quiet rather than to invent a key.
+  Chat? chatForRoom(String roomId);
+
   /// A merged (or single-source) timeline for one chat.
   ///
   /// Async because a Matrix timeline has to be opened before it can be read;

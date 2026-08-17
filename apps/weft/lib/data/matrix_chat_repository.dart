@@ -158,6 +158,10 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Chat? chatForRoom(String roomId) =>
+      _chats.where((c) => c.roomIds.contains(roomId)).firstOrNull;
+
+  @override
   Future<MergedTimeline> timelineFor(String chatId) async {
     final existing = _timelines[chatId];
     if (existing != null) return existing;
@@ -724,7 +728,18 @@ class MatrixChatRepository implements ChatRepository {
       contactId: room.directChatMatrixID == null
           ? null
           : _graph.contactIdOf(room.directChatMatrixID!),
-      sources: [ChatSource(roomId: room.id, network: network)],
+      sources: [
+        ChatSource(
+          roomId: room.id,
+          network: network,
+          // Per leg, and it is not the same fact as [Chat.muted]: a merged
+          // chat is muted only when *every* leg is, so a contact muted on
+          // WhatsApp and live on Signal reads as unmuted at chat level. This
+          // is what `evaluateNotification`'s `sourceMuted` rule tests, and
+          // without it that rule can never fire against a real chat.
+          muted: room.pushRuleState != sdk.PushRuleState.notify,
+        ),
+      ],
       avatarUrl: _avatarFor(room),
       lastMessage: lastEvent == null
           ? null

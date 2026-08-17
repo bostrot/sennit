@@ -85,6 +85,10 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
+  Chat? chatForRoom(String roomId) =>
+      _chats.where((c) => c.roomIds.contains(roomId)).firstOrNull;
+
+  @override
   Future<MergedTimeline> timelineFor(String chatId) async {
     // Same failure contract as the Matrix repository: an unknown id is an
     // ArgumentError, not a bare `firstWhere` StateError, so callers can render

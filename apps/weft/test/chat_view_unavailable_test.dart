@@ -30,6 +30,8 @@ class _NoRoomsRepository implements ChatRepository {
   @override
   Stream<List<Chat>> watchChats() => _inner.watchChats();
   @override
+  Chat? chatForRoom(String roomId) => _inner.chatForRoom(roomId);
+  @override
   Future<void> send(String chatId, String body, {ChatNetwork? via}) =>
       _inner.send(chatId, body, via: via);
   @override

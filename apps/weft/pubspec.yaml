@@ -16,8 +16,21 @@ dependencies:
   clock: ^1.1.2
   collection: ^1.19.0
   file_selector: ^1.1.0
+  # Push. Only ever touched behind `NotificationPlatform.supportsPush`, which is
+  # Android and iOS — but a pub dependency has no per-platform form, and both of
+  # these declare desktop implementations: firebase_messaging builds for macOS
+  # and firebase_core for macOS *and* Windows, so they are linked into desktop
+  # builds whether or not they are wanted. Calling into them there asks for an
+  # APNs token no unsigned desktop Weft has an entitlement for, which is why the
+  # guard is a platform check and not a compile-time one.
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
   flutter:
     sdk: flutter
+  # The one plugin that draws a notification on all five platforms. Android and
+  # Darwin are its own; Linux and Windows come from its federated backends,
+  # which is what lets the desktop foreground path post without a gateway.
+  flutter_local_notifications: ^22.3.0
   flutter_riverpod: ^3.3.2
   go_router: ^17.5.0
   http: ^1.6.0
@@ -41,6 +54,7 @@ dependencies:
   weft_matrix: ^0.1.0
   weft_mcp: ^0.1.0
   weft_merge: ^0.1.0
+  weft_notify: ^0.1.0
   weft_search: ^0.1.0
   weft_store: ^0.1.0
   weft_transcribe: ^0.1.0

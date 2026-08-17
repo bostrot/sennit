@@ -132,4 +132,36 @@ abstract final class WeftSettings {
   static const String mcpEnabled = 'mcp.enabled';
   static const String mcpPort = 'mcp.port';
   static const String mcpTunnelEnabled = 'mcp.tunnel_enabled';
+
+  /// The whole of `NotificationPolicy`, as one JSON blob.
+  ///
+  /// One key rather than a dozen because the policy is read as a unit on every
+  /// message and written as a unit by the settings screen, and because
+  /// `NotificationPolicy.fromJson` already degrades field by field — so a blob
+  /// written by a newer build loses the fields this one does not know about and
+  /// keeps the rest, which a column-per-setting layout could not do.
+  static const String notifyPolicy = 'notify.policy';
+
+  /// The push gateway's `/_matrix/push/v1/notify` endpoint.
+  ///
+  /// Deliberately a *setting* and not a constant. Weft hosts nothing, and which
+  /// sygnal instance a user's pokes travel through is a deployment decision
+  /// they make, exactly like their homeserver. Empty means "no push" — the app
+  /// still notifies from the foreground sync path.
+  static const String notifyPushGateway = 'notify.push_gateway';
+
+  /// The push key this device registered with last time.
+  ///
+  /// Persisted because it cannot be inferred: every device of the account
+  /// registers under the same app id, so "the other pushers with my app id" is
+  /// the user's other phones. Without this record a rotated FCM token leaves a
+  /// dead pusher on the account forever.
+  static const String notifyPushKey = 'notify.push_key';
+
+  /// Whether the notification permission has already been asked for once.
+  ///
+  /// Android and iOS both give an app exactly one prompt; a second call
+  /// returns the previous answer without showing anything. This is what lets
+  /// the rationale sheet be shown *before* that one chance is spent.
+  static const String notifyPermissionAsked = 'notify.permission_asked';
 }
