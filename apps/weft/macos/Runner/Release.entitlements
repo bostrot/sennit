@@ -9,5 +9,11 @@
 	     sandbox rejects every outbound connection with "Operation not permitted". -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- The attachment picker goes through NSOpenPanel, and under the sandbox
+	     the powerbox only extends read access to the chosen file when this is
+	     present. Without it the panel opens, the user picks a photo, and the
+	     upload fails to read a file they just selected. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 </dict>
 </plist>

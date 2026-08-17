@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
@@ -39,6 +40,27 @@ final mediaHeadersProvider = Provider<Map<String, String>?>((ref) {
 final chatsProvider = StreamProvider<List<Chat>>((ref) {
   return ref.watch(chatRepositoryProvider).watchChats();
 });
+
+/// Uploads in flight for one chat, keyed by chat id.
+///
+/// Separate from the timeline because an upload is not a message yet — see
+/// [ChatRepository.watchUploads]. The chat view draws these below the settled
+/// messages and each disappears when its real event arrives.
+final chatUploadsProvider = StreamProvider.family<List<UploadTask>, String>((
+  ref,
+  chatId,
+) {
+  return ref.watch(chatRepositoryProvider).watchUploads(chatId);
+});
+
+/// Reads a picked file's bytes.
+///
+/// The same loader the Matrix send path uses, exposed as a provider so the
+/// preview sheet renders a real thumbnail through it and a widget test can hand
+/// back fixture pixels instead of touching a disk that has no such file.
+final attachmentFileReaderProvider = Provider<AttachmentBytesLoader>(
+  (ref) => readAttachmentFile,
+);
 
 /// Networks selected in the left rail. Empty means "show everything".
 class NetworkFilterNotifier extends Notifier<Set<ChatNetwork>> {

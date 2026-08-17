@@ -164,8 +164,9 @@ WeftMessage? mapEvent(
     // this only records that something is there to load.
     attachmentUrl: _hasAttachment(content) ? event.eventId : null,
     durationMs: _durationMs(content),
-    mediaWidth: _dimension(content, 'w'),
-    mediaHeight: _dimension(content, 'h'),
+    mediaWidth: _positiveInfoInt(content, 'w'),
+    mediaHeight: _positiveInfoInt(content, 'h'),
+    mediaSizeBytes: _positiveInfoInt(content, 'size'),
   );
 }
 
@@ -201,16 +202,16 @@ DeliveryState? _deliveryFor(sdk.Event event) {
 bool _hasAttachment(Map<String, Object?> content) =>
     content['url'] is String || content['file'] is Map;
 
-/// Reads `info.w` or `info.h`, which is the only place a sender announces the
-/// size of an image or a video.
+/// Reads a positive integer out of `info` — `w`, `h` or `size`, which is where
+/// a sender announces the shape and the length of an attachment.
 ///
 /// Defensive about the value's type and sign because `info` is whatever the
 /// sending client wrote: a string `"1600"`, a float, a zero from a client that
 /// fills the key in whether or not it knows the answer. Anything that is not a
 /// usable positive integer comes back null, which the bubble already handles as
-/// "shape unknown" — a zero would otherwise become an aspect ratio nobody can
-/// divide by.
-int? _dimension(Map<String, Object?> content, String key) {
+/// "unknown" — a zero would otherwise become an aspect ratio nobody can divide
+/// by, or a file that claims to be empty.
+int? _positiveInfoInt(Map<String, Object?> content, String key) {
   final info = content['info'];
   if (info is! Map) return null;
   final value = info[key];

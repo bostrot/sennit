@@ -1,16 +1,22 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
 import '../../app/providers.dart';
 import '../../app/transcription_service.dart';
+import '../../data/chat_repository.dart';
+import '../../services/attachments/attachment_picker.dart';
 import '../merge/merge_screen.dart';
+import 'attachment_bubble.dart';
+import 'attachment_preview_sheet.dart';
+import 'attachment_source_sheet.dart';
+import 'send_network_chip.dart';
 
 /// One conversation — merged across networks or not.
 ///
@@ -205,6 +211,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
     final chat = chats.where((c) => c.id == widget.chatId).firstOrNull;
+    // Uploads sit *below* the settled messages in a reversed list, which is the
+    // bottom of the thread: a photo the user just picked belongs where the next
+    // message would go, not above the history they were reading.
+    final uploads =
+        ref.watch(chatUploadsProvider(widget.chatId)).value ??
+        const <UploadTask>[];
     if (chat == null) {
       // Still syncing, or genuinely gone; either way there is nothing to draw
       // yet and the timeline load will settle it.
@@ -230,8 +242,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   horizontal: WeftSpace.lg,
                   vertical: WeftSpace.md,
                 ),
-                itemCount: _view.messages.length + 1,
-                itemBuilder: (context, i) {
+                itemCount: uploads.length + _view.messages.length + 1,
+                itemBuilder: (context, index) {
+                  if (index < uploads.length) {
+                    // Reversed: index 0 is the newest, and the newest upload is
+                    // the last one enqueued.
+                    return _uploadBubble(
+                      chat,
+                      uploads[uploads.length - 1 - index],
+                    );
+                  }
+                  final i = index - uploads.length;
                   if (i == _view.messages.length) return _historyFooter();
                   var message = _view.messages[i];
                   // Transcripts arrive after the event was mapped; overlay the
@@ -287,12 +308,41 @@ class _ChatViewState extends ConsumerState<ChatView> {
             chat: chat,
             controller: _composer,
             onSend: _send,
-            onPickNetwork: (n) => ref
-                .read(chatRepositoryProvider)
-                .setSendNetwork(widget.chatId, n),
+            onAttach: () => _attach(chat),
+            onPickNetwork: _pickNetwork,
           ),
         ],
       ),
+    );
+  }
+
+  /// One in-flight upload, wearing the same bubble chrome a sent message wears.
+  ///
+  /// Built from [uploadEchoMessage] rather than from a hand-made widget so the
+  /// thread does not visibly change shape at the moment the event lands: the
+  /// network hairline, the grouping padding and the timestamp row are literally
+  /// the ones the settled bubble will use.
+  Widget _uploadBubble(Chat chat, UploadTask task) {
+    final network =
+        chat.sources.where((s) => s.roomId == task.roomId).firstOrNull?.network ??
+        chat.networks.firstOrNull ??
+        ChatNetwork.matrix;
+    final repository = ref.read(chatRepositoryProvider);
+
+    return _MessageBubble(
+      message: uploadEchoMessage(
+        task,
+        network: network,
+        senderId: _localSenderId,
+      ),
+      content: UploadProgressBubble(
+        task: task,
+        own: true,
+        onCancel: () => repository.cancelUpload(task.id),
+        onRetry: () => repository.retryUpload(task.id),
+      ),
+      showNetwork: chat.isMerged,
+      groupedWithPrevious: false,
     );
   }
 
@@ -436,7 +486,86 @@ class _ChatViewState extends ConsumerState<ChatView> {
     await ref.read(chatRepositoryProvider).send(widget.chatId, text);
     if (mounted) setState(() {});
   }
+
+  void _pickNetwork(ChatNetwork network) {
+    unawaited(
+      ref.read(chatRepositoryProvider).setSendNetwork(widget.chatId, network),
+    );
+  }
+
+  /// Pick → confirm → send, in that order.
+  ///
+  /// Three separate steps because each can be abandoned and none of them should
+  /// leave anything behind: dismissing the source sheet picks nothing, cancelling
+  /// the preview sends nothing, and removing every file from the preview is the
+  /// same as cancelling it.
+  Future<void> _attach(Chat chat) async {
+    final picker = ref.read(attachmentPickerProvider);
+    final source = await showAttachmentSourceSheet(context, picker);
+    if (source == null || !mounted) return;
+
+    final List<AttachmentSource> picked;
+    try {
+      picked = await picker.pick(source);
+    } on Object catch (error) {
+      // Deliberately Object: a picker is a method channel, and a platform that
+      // denies the photo permission throws rather than returning nothing.
+      debugPrint('weft: attachment picker failed: $error');
+      _showMessage('Could not open the picker.');
+      return;
+    }
+    if (picked.isEmpty || !mounted) return;
+
+    final confirmed = await showAttachmentPreviewSheet(
+      context,
+      chat: chat,
+      sources: picked,
+      onPickNetwork: _pickNetwork,
+    );
+    if (confirmed == null || confirmed.isEmpty || !mounted) return;
+
+    await _sendAttachments(confirmed);
+  }
+
+  /// Sends each confirmed file, reporting the ones that will never be sent.
+  ///
+  /// Awaited in series, which costs nothing: `sendAttachment` returns on
+  /// *acceptance*, so this is twenty enqueues rather than twenty uploads, and
+  /// enqueuing in order is what puts a batch into the room in the order the user
+  /// picked it.
+  Future<void> _sendAttachments(List<AttachmentSource> sources) async {
+    final repository = ref.read(chatRepositoryProvider);
+    final rejected = <String>[];
+
+    for (final source in sources) {
+      try {
+        await repository.sendAttachment(widget.chatId, source);
+      } on AttachmentRejectedException catch (e) {
+        // Not retryable and never a bubble — the sentence is already written
+        // for the user, so it goes straight in front of them.
+        rejected.add('${source.basename}: ${e.message}');
+      } on Object catch (error) {
+        debugPrint('weft: attachment ${source.basename} failed to send: $error');
+        rejected.add('${source.basename} could not be sent.');
+      }
+    }
+
+    if (rejected.isNotEmpty) _showMessage(rejected.join('\n'));
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
+
+/// Sender id on an upload's stand-in message.
+///
+/// Never rendered: the echo is always the user's own, so the bubble draws it on
+/// the own side with no sender line. It exists because [WeftMessage] requires an
+/// id, and inventing a plausible-looking Matrix user id here would be a value
+/// something downstream could one day believe.
+const String _localSenderId = 'local:self';
 
 class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _ChatAppBar({required this.chat});
@@ -549,11 +678,18 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.showNetwork,
     required this.groupedWithPrevious,
+    this.content,
     this.highlighted = false,
     this.transcribing = false,
     this.onTranscribe,
     this.onRetranscribe,
   });
+
+  /// Replaces the bubble's own content.
+  ///
+  /// Set only for an in-flight upload, which is driven by an `UploadTask` rather
+  /// than by the stand-in message supplying the chrome around it.
+  final Widget? content;
 
   /// Pulse marking the message a jump landed on.
   final bool highlighted;
@@ -642,11 +778,16 @@ class _MessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                   ],
-                  if (message.attachmentUrl != null &&
-                      (message.kind == MessageKind.image ||
-                          message.kind == MessageKind.video ||
-                          message.kind == MessageKind.sticker))
-                    _AttachmentContent(message: message)
+                  if (content != null)
+                    content!
+                  else if (rendersAsAttachment(message))
+                    AttachmentBubble(
+                      message: message,
+                      own: own,
+                      transcribing: transcribing,
+                      onTranscribe: onTranscribe,
+                      onRetranscribe: onRetranscribe,
+                    )
                   else if (message.kind == MessageKind.voice)
                     _VoiceContent(
                       message: message,
@@ -683,9 +824,19 @@ class _MessageBubble extends StatelessWidget {
                       if (own) ...[
                         const SizedBox(width: 3),
                         Icon(
-                          Icons.done_all_rounded,
+                          // An upload still on the wire, and one that failed,
+                          // must not wear the same double tick a delivered
+                          // message does.
+                          switch (message.deliveryState) {
+                            DeliveryState.sending => Icons.schedule_rounded,
+                            DeliveryState.failed =>
+                              Icons.error_outline_rounded,
+                            _ => Icons.done_all_rounded,
+                          },
                           size: 13,
-                          color: palette.ownBubbleText.withValues(alpha: 0.7),
+                          color: message.deliveryState == DeliveryState.failed
+                              ? context.colors.error
+                              : palette.ownBubbleText.withValues(alpha: 0.7),
                         ),
                       ],
                     ],
@@ -696,113 +847,6 @@ class _MessageBubble extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// An image, video poster or sticker, loaded through the repository so an
-/// encrypted attachment is decrypted locally before display.
-///
-/// Without this an image message rendered as its `body` — often just the
-/// filename, or "Forwarded" for a forwarded picture — which looked like the
-/// picture had been lost.
-class _AttachmentContent extends ConsumerStatefulWidget {
-  const _AttachmentContent({required this.message});
-
-  final WeftMessage message;
-
-  @override
-  ConsumerState<_AttachmentContent> createState() => _AttachmentContentState();
-}
-
-class _AttachmentContentState extends ConsumerState<_AttachmentContent> {
-  Uint8List? _bytes;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final bytes = await ref
-        .read(chatRepositoryProvider)
-        .attachmentBytes(widget.message.roomId, widget.message.eventId);
-    if (!mounted) return;
-    setState(() {
-      _bytes = bytes;
-      _failed = bytes == null;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final caption = widget.message.body;
-    // Bridges label a forwarded picture "Forwarded" in the body; showing that
-    // under the image is noise, not a caption.
-    final showCaption =
-        caption.isNotEmpty &&
-        caption.toLowerCase() != 'forwarded' &&
-        !caption.startsWith('image.') &&
-        !caption.startsWith('video.');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: WeftRadius.allSm,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320, minWidth: 140),
-            child: switch ((_bytes, _failed)) {
-              (final Uint8List bytes, _) => Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _placeholder(context, broken: true),
-              ),
-              (_, true) => _placeholder(context, broken: true),
-              _ => _placeholder(context, broken: false),
-            },
-          ),
-        ),
-        if (widget.message.kind == MessageKind.video)
-          Padding(
-            padding: const EdgeInsets.only(top: WeftSpace.xs),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.play_circle_outline_rounded, size: 14),
-                const SizedBox(width: WeftSpace.xs),
-                Text('Video', style: context.text.labelSmall),
-              ],
-            ),
-          ),
-        if (showCaption)
-          Padding(
-            padding: const EdgeInsets.only(top: WeftSpace.xs),
-            child: Text(caption, style: context.text.bodyMedium),
-          ),
-      ],
-    );
-  }
-
-  Widget _placeholder(BuildContext context, {required bool broken}) {
-    return Container(
-      width: 180,
-      height: 120,
-      color: context.colors.surfaceContainerHighest,
-      alignment: Alignment.center,
-      child: broken
-          ? Icon(
-              Icons.broken_image_outlined,
-              color: context.colors.onSurfaceVariant,
-            )
-          : const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
     );
   }
 }
@@ -872,103 +916,22 @@ class _VoiceContent extends StatelessWidget {
             ),
             const SizedBox(width: WeftSpace.sm),
             Text(
-              _duration(message.durationMs),
+              formatMediaDuration(message.durationMs) ?? '',
               style: context.text.labelSmall?.copyWith(
                 color: onBubble.withValues(alpha: 0.75),
               ),
             ),
           ],
         ),
-        if (transcribing)
-          Padding(
-            padding: const EdgeInsets.only(top: WeftSpace.xs),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: onBubble.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(width: WeftSpace.sm),
-                Text(
-                  'Transcribing…',
-                  style: context.text.labelSmall?.copyWith(
-                    color: onBubble.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else if (message.transcript == null && onTranscribe != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onTranscribe,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 28),
-              ),
-              icon: Icon(
-                Icons.graphic_eq_rounded,
-                size: 14,
-                color: onBubble.withValues(alpha: 0.8),
-              ),
-              label: Text(
-                'Transcribe',
-                style: context.text.labelSmall?.copyWith(
-                  color: onBubble.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-          ),
-        if (message.transcript != null) ...[
-          const SizedBox(height: WeftSpace.sm),
-          GestureDetector(
-            onLongPress: onRetranscribe,
-            child: Container(
-              padding: const EdgeInsets.all(WeftSpace.sm),
-              decoration: BoxDecoration(
-                color: onBubble.withValues(alpha: 0.08),
-                borderRadius: WeftRadius.allSm,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.graphic_eq_rounded,
-                    size: 13,
-                    color: onBubble.withValues(alpha: 0.7),
-                  ),
-                  const SizedBox(width: WeftSpace.xs),
-                  Flexible(
-                    child: Text(
-                      message.transcript!,
-                      style: context.text.bodySmall?.copyWith(
-                        color: onBubble.withValues(alpha: 0.9),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        AttachmentTranscript(
+          message: message,
+          own: own,
+          transcribing: transcribing,
+          onTranscribe: onTranscribe,
+          onRetranscribe: onRetranscribe,
+        ),
       ],
     );
-  }
-
-  static String _duration(int? ms) {
-    if (ms == null) return '';
-    final total = Duration(milliseconds: ms);
-    final m = total.inMinutes;
-    final s = total.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }
 
@@ -981,12 +944,14 @@ class _Composer extends StatelessWidget {
     required this.chat,
     required this.controller,
     required this.onSend,
+    required this.onAttach,
     required this.onPickNetwork,
   });
 
   final Chat chat;
   final TextEditingController controller;
   final VoidCallback onSend;
+  final VoidCallback onAttach;
   final ValueChanged<ChatNetwork> onPickNetwork;
 
   @override
@@ -1010,7 +975,7 @@ class _Composer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (chat.isMerged && sendNetwork != null) ...[
-              _SendNetworkChip(
+              SendNetworkChip(
                 chat: chat,
                 current: sendNetwork,
                 onPick: onPickNetwork,
@@ -1020,7 +985,7 @@ class _Composer extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.add_rounded),
               tooltip: 'Attach',
-              onPressed: () {},
+              onPressed: onAttach,
             ),
             Expanded(
               child: TextField(
@@ -1043,66 +1008,6 @@ class _Composer extends StatelessWidget {
               icon: const Icon(Icons.send_rounded, size: 18),
               tooltip: 'Send',
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SendNetworkChip extends StatelessWidget {
-  const _SendNetworkChip({
-    required this.chat,
-    required this.current,
-    required this.onPick,
-  });
-
-  final Chat chat;
-  final ChatNetwork current;
-  final ValueChanged<ChatNetwork> onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = context.palette.networkColor(current);
-
-    return PopupMenuButton<ChatNetwork>(
-      tooltip: 'Send via…',
-      onSelected: onPick,
-      itemBuilder: (context) => [
-        for (final n in chat.networks)
-          PopupMenuItem(
-            value: n,
-            child: Row(
-              children: [
-                NetworkGlyph(network: n, size: 20),
-                const SizedBox(width: WeftSpace.md),
-                Text(n.label),
-                if (n == current) ...[
-                  const Spacer(),
-                  Icon(Icons.check_rounded, size: 16, color: accent),
-                ],
-              ],
-            ),
-          ),
-      ],
-      child: AnimatedContainer(
-        duration: WeftMotion.fast,
-        curve: WeftMotion.standard,
-        padding: const EdgeInsets.symmetric(
-          horizontal: WeftSpace.sm,
-          vertical: WeftSpace.sm,
-        ),
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.15),
-          borderRadius: WeftRadius.pill,
-          border: Border.all(color: accent.withValues(alpha: 0.5)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            NetworkGlyph(network: current, size: 18),
-            const SizedBox(width: WeftSpace.xs),
-            Icon(Icons.expand_more_rounded, size: 16, color: accent),
           ],
         ),
       ),

@@ -259,6 +259,7 @@ WeftMessage uploadEchoMessage(
     durationMs: plan.durationMs,
     mediaWidth: plan.dimensions?.width,
     mediaHeight: plan.dimensions?.height,
+    mediaSizeBytes: plan.sizeBytes,
   );
 }
 

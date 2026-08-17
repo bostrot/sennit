@@ -283,6 +283,7 @@ class DemoChatRepository implements ChatRepository {
       durationMs: plan.durationMs,
       mediaWidth: plan.dimensions?.width,
       mediaHeight: plan.dimensions?.height,
+      mediaSizeBytes: plan.sizeBytes,
     );
 
     _localMessages.putIfAbsent(task.roomId, () => []).add(message);

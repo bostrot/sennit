@@ -26,6 +26,12 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Both are required to exist before iOS will let the picker open at all;
+	     the strings are what the permission prompt shows the user. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Weft needs your photo library so you can send photos and videos in a conversation.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Weft needs the camera so you can take a photo and send it in a conversation.</string>
 	<key>CFBundleName</key>
 	<string>weft</string>
 	<key>CFBundlePackageType</key>

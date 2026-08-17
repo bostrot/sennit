@@ -45,6 +45,7 @@ class WeftMessage {
     this.durationMs,
     this.mediaWidth,
     this.mediaHeight,
+    this.mediaSizeBytes,
   });
 
   final String eventId;
@@ -85,6 +86,15 @@ class WeftMessage {
   /// sender omits them for a video whose header could not be probed.
   final int? mediaWidth;
   final int? mediaHeight;
+
+  /// Length of the attached file in bytes, as the sender announced it.
+  ///
+  /// The one number a file bubble needs and cannot work out for itself: the
+  /// bytes are not downloaded until the user asks for them, and the whole point
+  /// of showing "18.4 MB" beside a name is to let them decide *before* that
+  /// happens. Null where the sender omitted `info.size`, which is common enough
+  /// that the bubble simply shows no size rather than a zero.
+  final int? mediaSizeBytes;
 
   /// Aspect ratio of the attachment, when both dimensions are known.
   double? get mediaAspectRatio {
@@ -133,6 +143,7 @@ class WeftMessage {
       durationMs: durationMs,
       mediaWidth: mediaWidth,
       mediaHeight: mediaHeight,
+      mediaSizeBytes: mediaSizeBytes,
     );
   }
 
