@@ -43,7 +43,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**264 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**411 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -108,6 +108,7 @@ cd apps/weft && flutter test test/goldens --update-goldens
 ```
 apps/weft/                  Flutter app, all five platforms
 packages/
+  weft_attachments/         mime sniffing, upload plans, upload queue state machine
   weft_domain/              entities: Chat, WeftMessage, NetworkHandle, ChatNetwork
   weft_merge/               identity graph + merged timeline   ← the hard part
   weft_search/              BM25 + vector kNN + RRF
@@ -120,8 +121,8 @@ packages/
 tooling/docker/             disposable Synapse for tests
 ```
 
-`weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`, `weft_transcribe`
-and `weft_mcp` are **pure Dart** — no Flutter, no I/O. That is deliberate: the
+`weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
+`weft_transcribe` and `weft_mcp` are **pure Dart** — no Flutter, no I/O. That is deliberate: the
 subtle logic lives there and runs under `dart test` in about a second, with no
 device and no homeserver.
 
