@@ -275,7 +275,7 @@ class ShareStagingCodec {
     final text = parsed['text'];
     final targetChatId = parsed['targetChatId'];
     final files = [
-      for (final file in (parsed['files'] as List?) ?? const [])
+      for (final file in _listOrEmpty(parsed['files']))
         ?StagedFile.fromJson(file),
     ];
 
@@ -348,10 +348,21 @@ class ShareStagingCodec {
     if (parsed is! Map) return const [];
 
     return [
-      for (final slot in (parsed['targets'] as List?) ?? const [])
+      for (final slot in _listOrEmpty(parsed['targets']))
         ?ShareTargetSlot.fromJson(slot),
     ];
   }
+
+  /// [raw] as a list, or empty for anything that is not one.
+  ///
+  /// A cast would be shorter and would throw a [TypeError], which no `catch`
+  /// above is looking for — and this runs on the host app's launch path and
+  /// inside an extension that cannot show an error. The writer on the other
+  /// side is hand-written Swift with no compiler checking these key names, so
+  /// a `files` that arrives as a string is a skew to survive, not an
+  /// impossibility.
+  static List<Object?> _listOrEmpty(Object? raw) =>
+      raw is List ? raw : const [];
 
   /// Accepts what Swift's `ISO8601DateFormatter` and Dart's
   /// `toIso8601String` both emit, plus epoch milliseconds — a number is what a

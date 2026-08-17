@@ -50,6 +50,14 @@ the container. So an unreadable share is dropped, and dropping is the documented
 contract rather than a side effect of a `try` somewhere. The caller deletes what
 `decode` refused.
 
+Truncation is only half of it. The writer is hand-written Swift with no
+compiler checking these key names, so a value can arrive with the wrong *type*
+as easily as with the wrong length — a `files` that is a string, a `targets`
+that is a number. Those are read through a guard rather than a cast, because a
+cast raises a `TypeError`, which is not a `FormatException` and so is not
+caught by the parse guard that surrounds it. `staging_test.dart` pins this by
+decoding **every prefix** of a valid blob and asserting each one is dropped.
+
 The JSON key names are a cross-language contract: `ShareViewController.swift`
 writes them by hand, with no Dart on the other side. Renaming one here is a
 silent break there.
