@@ -154,6 +154,66 @@ void main() {
     });
   });
 
+  group('the update stream', () {
+    test('is broadcast, so two widgets can both render it', () async {
+      final transport = FakeTransport();
+      final queue = UploadQueue(transport: transport);
+      addTearDown(queue.dispose);
+
+      final left = <UploadState>[];
+      final right = <UploadState>[];
+      final subs = [
+        queue.updates.listen((s) => left.add(s.single.state)),
+        queue.updates.listen((s) => right.add(s.single.state)),
+      ];
+      addTearDown(() => Future.wait(subs.map((s) => s.cancel())));
+
+      final task = queue.enqueue(
+        planFor(),
+        roomId: '!room:example.org',
+        loadPayload: payload(),
+      );
+      await pump();
+      transport.last.succeed();
+      await pump();
+
+      expect(left, [
+        UploadState.queued,
+        UploadState.hashing,
+        UploadState.uploading,
+        UploadState.sent,
+      ]);
+      expect(right, left);
+      expect(queue.task(task.id)!.state, UploadState.sent);
+    });
+
+    test('emits an unmodifiable copy, not the list it keeps', () async {
+      final queue = UploadQueue(transport: FakeTransport());
+      addTearDown(queue.dispose);
+
+      final snapshots = <List<UploadTask>>[];
+      final sub = queue.updates.listen(snapshots.add);
+      addTearDown(sub.cancel);
+
+      queue.enqueue(
+        planFor(),
+        roomId: '!room:example.org',
+        loadPayload: payload(),
+      );
+      await pump();
+
+      expect(snapshots.length, greaterThan(1));
+      // A snapshot the UI is mid-build against must not move underneath it.
+      expect(snapshots.first.single.state, UploadState.queued);
+      expect(snapshots.last.single.state, UploadState.uploading);
+      expect(
+        () => snapshots.first.clear(),
+        throwsA(isA<UnsupportedError>()),
+        reason: 'a mutable snapshot invites a widget to edit the queue',
+      );
+    });
+  });
+
   group('ordering and concurrency', () {
     test('starts tasks in the order they were enqueued', () async {
       final transport = FakeTransport(autoComplete: true);

@@ -212,6 +212,40 @@ void main() {
     test('a header of pure zeroes is octet-stream, not a crash', () {
       expect(sniffMimeType(source(List.filled(64, 0))), kFallbackMimeType);
     });
+
+    test('every fixture sniffs at every truncation length', () {
+      // The probes already have this sweep; the sniffer needs it just as much,
+      // because a share intent can hand over a file that is still being
+      // written. Any length must yield a type rather than an index error.
+      final fixtures = <List<int>>[
+        png(width: 8, height: 8),
+        jpeg(width: 8, height: 8),
+        gif(width: 8, height: 8),
+        webpLossy(width: 8, height: 8),
+        webpLossless(width: 8, height: 8),
+        webpExtended(width: 8, height: 8),
+        isoBaseMedia(brand: 'heic'),
+        mp4WithTracks(const [MediaDimensions(64, 64)]),
+        webm(),
+        ogg(),
+        mp3(),
+        wav(),
+        pdf(),
+        zip(),
+      ];
+
+      for (final full in fixtures) {
+        for (var take = 0; take <= full.length; take++) {
+          final head = full.take(take).toList();
+          expect(
+            () => sniffMimeType(source(head, filename: 'partial')),
+            returnsNormally,
+            reason: '$take of ${full.length} bytes',
+          );
+          expect(sniffMimeType(source(head, filename: 'partial')), isNotEmpty);
+        }
+      }
+    });
   });
 
   group('messageKindFor', () {
