@@ -34,6 +34,24 @@ String? chatIdFromLink(String link) {
   return Uri.decodeComponent(uri.pathSegments.single);
 }
 
+/// The same answer, decoding the raw segment exactly once.
+///
+/// [chatIdFromLink] mirrors `WeftLink.parse`, which reads `uri.pathSegments` —
+/// already decoded — and then calls `Uri.decodeComponent` on the result. The
+/// two decodes cancel out for every id Weft generates today (room ids and
+/// `contact_<micros>_<n>` are ASCII with no `%`), which is why both readers
+/// agree in the tests above. They stop agreeing for an id carrying a literal
+/// `%` or a non-ASCII character, where the second decode throws — so this is
+/// the reader the package's own guarantee is stated against, and the app-side
+/// parser is the one that has to change if such an id ever appears.
+String? chatIdFromRawLink(String link) {
+  final uri = Uri.parse(link);
+  if (uri.scheme != 'weft' || uri.host != 'chat') return null;
+  final raw = uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
+  if (raw.isEmpty || raw.contains('/')) return null;
+  return Uri.decodeComponent(raw);
+}
+
 void main() {
   group('group key', () {
     test('both legs of a merged chat land in one thread', () {
@@ -192,6 +210,75 @@ void main() {
       // Cut at a word boundary, not mid-word.
       expect(body, isNot(contains('lore…')));
     });
+
+    test('a body exactly at the cap is left alone', () {
+      final exact = 'x' * kMaxNotificationBodyLength;
+      expect(render(message: msg(body: exact)).body, exact);
+      expect(render(message: msg(body: exact)).body, isNot(endsWith('…')));
+    });
+
+    test('an unbroken run of characters is still cut', () {
+      // A pasted URL or a base64 blob has no space to cut at; the body is
+      // truncated mid-token rather than carried whole.
+      final wall = 'x' * 500;
+      final body = render(message: msg(body: wall)).body;
+      expect(body.length, kMaxNotificationBodyLength + 1);
+      expect(body, endsWith('…'));
+    });
+
+    test('the remaining kinds are labelled too', () {
+      expect(
+        render(
+          message: msg(kind: MessageKind.audio, body: 'song.mp3'),
+        ).body,
+        'Audio · song.mp3',
+      );
+      expect(
+        render(
+          message: msg(kind: MessageKind.sticker, body: 'party'),
+        ).body,
+        'Sticker · party',
+      );
+      expect(
+        render(
+          message: msg(kind: MessageKind.poll, body: 'Lunch where?'),
+        ).body,
+        'Poll · Lunch where?',
+      );
+    });
+
+    test('an audio file is not a voice note', () {
+      // Only `voice` swaps its body for a transcript. An attached music file
+      // that happens to have been transcribed is still a file.
+      final content = render(
+        message: msg(
+          kind: MessageKind.audio,
+          body: 'lecture.mp3',
+          transcript: 'today we will cover',
+        ),
+      );
+      expect(content.body, 'Audio · lecture.mp3');
+    });
+
+    test('a state event that reaches rendering still says something', () {
+      // Suppressed long before this by `evaluateNotification`; handled anyway
+      // so a caller rendering its own decision cannot post an empty body.
+      expect(
+        render(
+          message: msg(kind: MessageKind.event, body: ''),
+        ).body,
+        kHiddenPreviewBody,
+      );
+    });
+
+    test('a whitespace-only transcript is no transcript', () {
+      expect(
+        render(
+          message: msg(kind: MessageKind.voice, body: '', transcript: '  \n'),
+        ).body,
+        'Voice message',
+      );
+    });
   });
 
   group('preview suppression', () {
@@ -223,6 +310,28 @@ void main() {
       );
       expect(content.title, 'Grace Hopper');
       expect(content.senderName, 'Grace');
+    });
+
+    test('the stricter reading is one copyWith away', () {
+      // Previews-off degrades the body and leaves the title and sender, which
+      // is Android's "hide sensitive content". A caller wanting iOS's "hide
+      // previews" degrades those two as well — this is what `copyWith` is for.
+      final content = render(
+        forChat: chat(
+          title: 'Grace Hopper',
+          avatarUrl: 'mxc://example.org/grace',
+        ),
+        policy: NotificationPolicy(showPreviews: false),
+      ).copyWith(title: 'Weft', senderName: 'Someone', senderAvatarUrl: null);
+
+      expect(content.title, 'Weft');
+      expect(content.senderName, 'Someone');
+      expect(content.senderAvatarUrl, isNull);
+      // The parts an action needs are untouched by the copy.
+      expect(content.eventId, r'$event_1');
+      expect(content.roomId, '!room:example.org');
+      expect(content.groupKey, '!room:example.org');
+      expect(content.deepLink, 'weft://chat/!room%3Aexample.org');
     });
 
     test('a degraded body degrades the summary with it', () {
@@ -448,6 +557,122 @@ void main() {
 
     test('the line cap is adjustable for surfaces that show more', () {
       expect(summarise(batch(20), maxLines: 8)!.lines, hasLength(8));
+    });
+
+    test('a batch exactly at the cap hides nothing', () {
+      final summary = summarise(batch(kMaxSummaryLines))!;
+      expect(summary.lines, hasLength(kMaxSummaryLines));
+      expect(summary.hiddenCount, 0);
+    });
+
+    test('one more than the cap hides exactly one', () {
+      final summary = summarise(batch(kMaxSummaryLines + 1))!;
+      expect(summary.hiddenCount, 1);
+      expect(summary.lines.first, 'Grace: message 1');
+    });
+
+    test('identical timestamps break the tie on event id', () {
+      // Two networks stamping the same second is not rare for a bridged
+      // conversation, and the order has to be the merged timeline's own.
+      final second = render(
+        message: msg(eventId: r'$b', body: 'second'),
+      );
+      final first = render(
+        message: msg(eventId: r'$a', body: 'first'),
+      );
+      final summary = summarise([second, first])!;
+      expect(summary.lines, ['Grace: first', 'Grace: second']);
+      expect(summary.latest.body, 'second');
+    });
+
+    test('a group chat names each sender in the lines', () {
+      final standup = chat(
+        id: '!standup:example.org',
+        title: 'Standup',
+        isGroup: true,
+      );
+      final summary = summarise([
+        render(
+          message: msg(eventId: r'$a', senderName: 'Grace', body: 'morning'),
+          forChat: standup,
+        ),
+        render(
+          message: msg(
+            eventId: r'$b',
+            senderName: 'Katherine',
+            body: 'on my way',
+            timestamp: now.add(const Duration(minutes: 1)),
+          ),
+          forChat: standup,
+        ),
+      ])!;
+      expect(summary.title, 'Standup');
+      expect(summary.lines, ['Grace: morning', 'Katherine: on my way']);
+    });
+
+    test('one network in the batch is one network in the summary', () {
+      expect(summarise(batch(3))!.networks, {ChatNetwork.whatsapp});
+    });
+
+    test('mixing two conversations is a caller error', () {
+      // The argument is one chat's notifications. Debug says so loudly rather
+      // than posting a summary that counts a stranger's message.
+      expect(
+        () => summarise([
+          render(forChat: chat(id: '!grace:example.org')),
+          render(forChat: chat(id: '!hopper:example.org')),
+        ]),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+  });
+
+  group('value semantics', () {
+    test('two renderings of one message are equal', () {
+      expect(render(), render());
+      expect(render().hashCode, render().hashCode);
+    });
+
+    test('a different body is a different notification', () {
+      expect(
+        render(message: msg(body: 'a')),
+        isNot(render(message: msg(body: 'b'))),
+      );
+    });
+
+    test('the same event in two conversations is not the same notification', () {
+      // Equality includes the group key: the merged rendering and the
+      // single-room one are different posts, and a set of them must hold both.
+      final single = render(forChat: chat());
+      final merged = render(forChat: mergedChat());
+      expect(single, isNot(merged));
+      expect({single, merged}, hasLength(2));
+    });
+  });
+
+  group('the group key and link in isolation', () {
+    test('a single-source chat groups under its room id', () {
+      expect(
+        notificationGroupKey(chat(id: '!room:example.org')),
+        '!room:example.org',
+      );
+    });
+
+    test('a link is one segment however odd the id', () {
+      // Nothing in a chat id is guaranteed URI-safe, and a separator that
+      // survived encoding would resolve to a different chat or to none. Whatever
+      // the id contains, the receiving end gets exactly one segment back.
+      for (final id in [
+        'merged:contact 1',
+        'merged:contact/2',
+        'merged:ünïd',
+        'merged:100%',
+        '!room:example.org',
+      ]) {
+        final link = notificationLinkFor(id);
+        expect(Uri.parse(link).pathSegments, hasLength(1), reason: id);
+        expect(chatIdFromRawLink(link), id, reason: id);
+      }
     });
   });
 }

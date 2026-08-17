@@ -1,4 +1,5 @@
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_notify/weft_notify.dart';
 
 /// A fixed "now" every test can reason against: 2026-01-15 21:00 UTC.
 ///
@@ -92,3 +93,52 @@ Chat mergedChat({
 /// The user, as the rules see them.
 const Set<String> ownUserIds = {'@ada:example.org', '@whatsapp_me:example.org'};
 const Set<String> ownDisplayNames = {'Ada Lovelace', 'Ada'};
+
+/// Calls [evaluateNotification] with the fixture user and a default policy, so
+/// each test states only the rule it is about.
+///
+/// Lives here rather than in one test file because `rules_test.dart` and
+/// `dedupe_test.dart` both ask questions of the same entry point. A second copy
+/// would be a second set of defaults to keep in step, and a rule that fired
+/// only in one file's defaults would look like a real difference between the
+/// two suites.
+NotificationDecision decide({
+  WeftMessage? message,
+  Chat? forChat,
+  NotificationPolicy? policy,
+  DateTime? at,
+  DateTime? lastReadAt,
+  NotificationDedupe? dedupe,
+}) {
+  return evaluateNotification(
+    message: message ?? msg(),
+    chat: forChat ?? chat(),
+    policy: policy ?? NotificationPolicy(),
+    now: at ?? now,
+    lastReadAt: lastReadAt,
+    ownUserIds: ownUserIds,
+    ownDisplayNames: ownDisplayNames,
+    dedupe: dedupe,
+  );
+}
+
+/// Why [decision] posted nothing, or null when it delivers. Named so an
+/// expectation reads as the rule it is about.
+NotificationSuppression? reasonFor(NotificationDecision decision) =>
+    decision.suppression;
+
+/// A 22:00 → 07:00 window, the default a settings screen would offer.
+QuietHours nightly({
+  int offsetMinutes = 0,
+  bool deliverSilently = false,
+  bool allowMentions = true,
+}) => QuietHours(
+  startMinute: 22 * 60,
+  endMinute: 7 * 60,
+  offsetMinutes: offsetMinutes,
+  allowMentions: allowMentions,
+  deliverSilently: deliverSilently,
+);
+
+/// An instant inside [nightly]: 23:30 UTC on the fixture evening.
+final DateTime midnightish = DateTime.utc(2026, 1, 15, 23, 30);
