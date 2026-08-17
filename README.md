@@ -128,6 +128,7 @@ packages/
   weft_store/               SQLite: identity graph, settings, FTS5 + vectors
   weft_mcp/                 MCP server + cloudflared supervisor
   weft_design/              tokens, themes, components
+docs/architecture/          design notes for the subsystems worth explaining
 tooling/docker/             disposable Synapse for tests
 ```
 
@@ -135,6 +136,11 @@ tooling/docker/             disposable Synapse for tests
 `weft_transcribe` and `weft_mcp` are **pure Dart** — no Flutter, no I/O. That is deliberate: the
 subtle logic lives there and runs under `dart test` in about a second, with no
 device and no homeserver.
+
+Longer-form design notes live in `docs/architecture/` —
+[the attachment pipeline](docs/architecture/attachment-pipeline.md) covers
+sniff-first detection, the plain-vs-encrypted event shapes, and why the upload
+queue bounds concurrency.
 
 ## Two things worth knowing before contributing
 
