@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_notify/weft_notify.dart';
+import 'package:weft_share/weft_share.dart' show shareTargetSlotId;
 
 import 'notification_channels.dart';
 
@@ -363,8 +364,16 @@ class NotificationPresentation {
 /// Sanitised because a shortcut id is written into the launcher's own XML
 /// storage, and a raw room id (`!abc:example.org`) carries characters some
 /// launchers have historically choked on.
-String chatShortcutId(String chatId) =>
-    'chat_${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_')}';
+///
+/// Now one line over `weft_share`'s [shareTargetSlotId], which is the whole
+/// point of it: a bubble and a Direct Share target are the *same shortcut* seen
+/// from two places, and this had been the second derivation of that id. Two
+/// derivations only have to disagree once — a notification naming a shortcut
+/// published under a different string does not fail loudly, it simply stops
+/// bubbling. The name stays because it is what the notification path calls the
+/// thing, and `chatShortcutId` reads better at those call sites than a share
+/// concept would.
+String chatShortcutId(String chatId) => shareTargetSlotId(chatId);
 
 /// The user, as `MessagingStyle` names the person a message is *not* from.
 const Person _self = Person(name: 'You');

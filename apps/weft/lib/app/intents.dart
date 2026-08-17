@@ -213,12 +213,25 @@ abstract interface class SharedFileResolver {
   Future<ResolvedShare> resolveSharedFiles(SharedPayload payload);
 }
 
+/// Where a ranked list of conversations goes to become share targets.
+///
+/// A seam for the same reason [SharedFileResolver] is one: behind it is a
+/// method channel, and `ShareShortcutService` is worth testing without a
+/// launcher — the diff, the cap and the logout clear are all decisions, and
+/// none of them needs a device to be wrong. The real implementation is
+/// [WeftIntents]; the test's is a list.
+abstract interface class ShareTargetPublisher {
+  Future<int> publishShareTargets(List<Map<String, Object?>> slots);
+
+  Future<void> clearShareTargets();
+}
+
 /// Receives share-ins and deep links from the platform side.
 ///
 /// Cold starts are handled by replay: the platform holds the launching intent
 /// until Dart asks for it, because a share arriving via cold start fires
 /// before any Dart code is listening.
-class WeftIntents implements SharedFileResolver {
+class WeftIntents implements SharedFileResolver, ShareTargetPublisher {
   WeftIntents({
     @visibleForTesting MethodChannel? channel,
     @visibleForTesting int maxFileBytes = kMaxSharedFileBytes,
@@ -320,6 +333,7 @@ class WeftIntents implements SharedFileResolver {
   /// asked for: the per-activity shortcut cap is a device property, and pushing
   /// past it throws rather than truncating. Zero on a platform with no such
   /// channel, which is every platform except Android.
+  @override
   Future<int> publishShareTargets(List<Map<String, Object?>> slots) async {
     try {
       return await _channel.invokeMethod<int>('publishShareTargets', {
@@ -341,6 +355,7 @@ class WeftIntents implements SharedFileResolver {
   /// every app's share sheet has leaked them to whoever picks the phone up, and
   /// a long-lived shortcut is long-lived precisely because nothing else will
   /// clean it up.
+  @override
   Future<void> clearShareTargets() async {
     try {
       await _channel.invokeMethod<bool>('clearShareTargets');
@@ -471,5 +486,14 @@ final weftIntentsProvider = Provider<WeftIntents>((ref) => WeftIntents());
 /// is what puts the sheet itself — and not merely the resolution below it —
 /// under test.
 final sharedFileResolverProvider = Provider<SharedFileResolver>(
+  (ref) => ref.watch(weftIntentsProvider),
+);
+
+/// How the shortcut service reaches the launcher.
+///
+/// The app's is [WeftIntents], so publishing rides the same channel — and the
+/// same `ShareShortcuts` object — the notification path's single-shortcut
+/// publish does. A test overrides this with a recorder.
+final shareTargetPublisherProvider = Provider<ShareTargetPublisher>(
   (ref) => ref.watch(weftIntentsProvider),
 );

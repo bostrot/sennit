@@ -160,7 +160,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     sink: ref.watch(notificationSinkProvider),
     pipeline: pipeline,
     chatForRoom: repository.chatForRoom,
-    avatarLoader: await _avatarLoaderFor(ref),
+    avatarLoader: await ref.watch(avatarFileLoaderProvider.future),
     push: await ref.watch(pushTransportProvider.future),
   );
 
@@ -238,7 +238,23 @@ bool notificationPermissionAsked(SettingsStore? settings) =>
 void markNotificationPermissionAsked(SettingsStore? settings) =>
     settings?.setBool(WeftSettings.notifyPermissionAsked, value: true);
 
-Future<NotificationAvatarLoader?> _avatarLoaderFor(Ref ref) async {
+/// Resolves an avatar URL to a file the platform can draw, cached on disk.
+///
+/// Shared by the two surfaces that hand a *path* to a platform rather than
+/// drawing pixels themselves: a notification's `MessagingStyle` face and a
+/// conversation shortcut's adaptive icon. One provider because they are one
+/// cache — the same eight faces back both, the fetch is authenticated, and two
+/// loaders would mean two directories, two sets of downloads and a face that
+/// appears in the shade before it appears in the share sheet.
+///
+/// Null when there is no cache directory to write into, which is not an error:
+/// both surfaces fall back to generated initials.
+///
+/// The directory keeps its notification-era name so an upgrade does not strand
+/// every face already downloaded.
+final avatarFileLoaderProvider = FutureProvider<NotificationAvatarLoader?>((
+  ref,
+) async {
   final Directory directory;
   try {
     directory = Directory(
@@ -246,7 +262,7 @@ Future<NotificationAvatarLoader?> _avatarLoaderFor(Ref ref) async {
     );
   } on Object catch (error) {
     // No cache directory means no faces, not no notifications.
-    debugPrint('weft: no cache directory for notification avatars: $error');
+    debugPrint('weft: no cache directory for avatars: $error');
     return null;
   }
 
@@ -259,4 +275,4 @@ Future<NotificationAvatarLoader?> _avatarLoaderFor(Ref ref) async {
   );
   ref.onDispose(avatars.dispose);
   return avatars.load;
-}
+});

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import 'app/intents.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
 import 'app/session_providers.dart';
+import 'app/share_providers.dart';
 import 'app/stores.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
@@ -31,7 +33,7 @@ class WeftApp extends ConsumerStatefulWidget {
   ConsumerState<WeftApp> createState() => _WeftAppState();
 }
 
-class _WeftAppState extends ConsumerState<WeftApp> {
+class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   late final WeftIntents _intents;
 
@@ -44,11 +46,76 @@ class _WeftAppState extends ConsumerState<WeftApp> {
     _intents = ref.read(weftIntentsProvider)
       ..onLink = _handleLink
       ..onShare = _handleShare;
+    // Resume is the one refresh the chat stream cannot provide. A phone that
+    // sat in a pocket overnight comes back with a ranking whose recency terms
+    // have all decayed, and nothing has to have arrived for the order to be
+    // stale — the share sheet is often the *first* thing touched after a
+    // resume, from the gallery.
+    WidgetsBinding.instance.addObserver(this);
     // After the first frame: a cold-start share must find a navigator to
     // present into, and the initial intent is replayed by the platform side.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _intents.deliverInitialIntent();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _shareTargets?.close();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshShareTargets();
+  }
+
+  /// The inbox subscription that keeps the launcher's share targets current.
+  ///
+  /// Held rather than declared with `ref.listen` in [build] for one reason:
+  /// `ref.listen` subscribes on the first frame, and subscribing to
+  /// [chatsProvider] builds the repository — which reads the stores and the
+  /// session. Neither exists before the auth gate has passed, so the
+  /// subscription starts when the session becomes ready and is closed when it
+  /// stops being.
+  ProviderSubscription<AsyncValue<List<Chat>>>? _shareTargets;
+
+  /// Follows the inbox for as long as there is one.
+  ///
+  /// Every tick, and deliberately: [ShareShortcutService] is what decides
+  /// whether a tick is worth a launcher call, and it says no to nearly all of
+  /// them. Idempotent, because the session state stream re-emits `ready` on
+  /// every reconnection.
+  void _startShareTargets() {
+    _shareTargets ??= ref.listenManual(chatsProvider, (_, next) {
+      final chats = next.value;
+      if (chats == null) return;
+      unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
+    }, fireImmediately: true);
+  }
+
+  /// Stops following the inbox and takes the names back off the launcher.
+  ///
+  /// The subscription is closed *first*: a chat list emitted between the
+  /// removal and the unsubscribe would republish everything that was just
+  /// removed, which is the one ordering that leaks.
+  void _stopShareTargets() {
+    _shareTargets?.close();
+    _shareTargets = null;
+    unawaited(ref.read(shareShortcutServiceProvider).clear());
+  }
+
+  /// Re-ranks and republishes the device's share targets.
+  ///
+  /// Cheap to call on any signal: [ShareShortcutService] compares the ranked
+  /// slots against what it last published and does nothing at all when they
+  /// match, which is the common case.
+  void _refreshShareTargets() {
+    if (_shareTargets == null) return;
+    final chats = ref.read(chatsProvider).value;
+    if (chats == null) return;
+    unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
   }
 
   /// Whether the notification service has been started for this session.
@@ -169,8 +236,20 @@ class _WeftAppState extends ConsumerState<WeftApp> {
     // Listened to rather than watched: this starts a service, it does not
     // decide what to draw, and a rebuild must not restart it.
     ref.listen(sessionStateProvider, (_, next) {
-      if (next.value == WeftSessionState.ready) {
-        unawaited(_startNotifications());
+      switch (next.value) {
+        case WeftSessionState.ready:
+          unawaited(_startNotifications());
+          _startShareTargets();
+        // Both signed-out states take the launcher's copy away. `softLoggedOut`
+        // is the server having invalidated the token, and until the user
+        // re-auths this device is exactly as signed out as the other one —
+        // while the shortcuts it published are long-lived, sitting in every
+        // app's share sheet with contact names on them. They come back on the
+        // next publish, which costs a re-auth nothing.
+        case WeftSessionState.loggedOut || WeftSessionState.softLoggedOut:
+          _stopShareTargets();
+        case _:
+          break;
       }
     });
 

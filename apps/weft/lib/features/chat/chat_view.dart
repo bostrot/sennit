@@ -9,6 +9,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
 import '../../app/providers.dart';
+import '../../app/share_providers.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
@@ -492,8 +493,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (text.isEmpty) return;
     _composer.clear();
     await ref.read(chatRepositoryProvider).send(widget.chatId, text);
+    _noteSend();
     if (mounted) setState(() {});
   }
+
+  /// Tells the share-target ranker this conversation was written to.
+  ///
+  /// The echo moves the chat up on recency by itself; what only this call site
+  /// knows is that the *user* sent it, which is the frequency term — the
+  /// difference between the conversations that made a noise and the ones they
+  /// talk in. Not awaited: nothing on screen waits for a launcher.
+  void _noteSend() =>
+      unawaited(ref.read(shareShortcutServiceProvider).noteSend(widget.chatId));
 
   /// Opens [message] full screen, in the company of the rest of the
   /// conversation's media.
@@ -567,6 +578,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       widget.chatId,
       sources,
     );
+    if (problems.length < sources.length) _noteSend();
     if (problems.isNotEmpty) _showMessage(problems.join('\n'));
   }
 

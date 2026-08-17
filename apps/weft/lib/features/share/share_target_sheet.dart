@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/intents.dart';
 import '../../app/providers.dart';
+import '../../app/share_providers.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../chat/attachment_preview_sheet.dart';
 
@@ -100,6 +103,13 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     );
 
     final sent = (text.isNotEmpty ? 1 : 0) + resolved.sources.length;
+    // A share is the strongest signal the ranker gets: the user picked this
+    // conversation out of every conversation, for this content, on purpose.
+    // Only when something actually went — a share that failed entirely should
+    // not promote the chat it failed to reach.
+    if (sent > problems.length) {
+      unawaited(ref.read(shareShortcutServiceProvider).noteSend(chatId));
+    }
     messenger.showSnackBar(
       SnackBar(
         content: Text(
