@@ -10,6 +10,8 @@ import 'package:image/image.dart' as img;
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_attachments/weft_attachments.dart';
 
+import 'api_session.dart';
+
 /// Matrix's media upload endpoint.
 ///
 /// Unchanged by the v1.11 authenticated-media work, which moved *downloads* to
@@ -29,49 +31,6 @@ const int kUploadChunkBytes = 64 * 1024;
 /// between 80 and 95 is invisible in a bubble and roughly doubles the second
 /// upload.
 const int kThumbnailJpegQuality = 80;
-
-/// The slice of a signed-in Matrix session the upload path needs.
-///
-/// Three getters rather than an `sdk.Client`, and that is a testing decision
-/// with a real cost attached: a `Client` cannot be constructed without a
-/// database, so taking one here would put a sqflite instance between every test
-/// and the things actually worth asserting — which URI a plain upload lands on,
-/// whether a 413 is retried, whether the size limit is fetched twice. None of
-/// those need a session; they need a base URL and a token.
-///
-/// Read per call rather than captured, because the SDK refreshes access tokens
-/// underneath us on soft logout: an upload that starts an hour after the
-/// transport was built must use the token the client holds *now*.
-abstract class MatrixUploadSession {
-  /// Reads straight through to a live client.
-  const factory MatrixUploadSession.forClient(sdk.Client client) =
-      _ClientUploadSession;
-
-  /// The homeserver's client-server API root, or null before login.
-  Uri? get baseUrl;
-
-  /// The current access token, or null before login.
-  String? get accessToken;
-
-  /// The client to put requests on. Sharing the SDK's own means sharing its
-  /// timeouts and its connection pool rather than opening a second one.
-  http.Client get httpClient;
-}
-
-class _ClientUploadSession implements MatrixUploadSession {
-  const _ClientUploadSession(this._client);
-
-  final sdk.Client _client;
-
-  @override
-  Uri? get baseUrl => _client.homeserver;
-
-  @override
-  String? get accessToken => _client.accessToken;
-
-  @override
-  http.Client get httpClient => _client.httpClient;
-}
 
 /// Encrypts one attachment, returning the ciphertext and its key material.
 ///
@@ -158,7 +117,7 @@ class MatrixThumbnailUpload {
 /// the filename is already carried inside the event where it belongs.
 class MatrixAttachmentTransport implements AttachmentTransport {
   MatrixAttachmentTransport({
-    required MatrixUploadSession session,
+    required MatrixApiSession session,
     AttachmentEncryptor encryptor = sdk.encryptFile,
     ThumbnailRasteriser rasteriser = rasteriseThumbnail,
   }) : _session = session,
@@ -167,9 +126,9 @@ class MatrixAttachmentTransport implements AttachmentTransport {
 
   /// Convenience for the common case: transport over a live SDK client.
   factory MatrixAttachmentTransport.forClient(sdk.Client client) =>
-      MatrixAttachmentTransport(session: MatrixUploadSession.forClient(client));
+      MatrixAttachmentTransport(session: MatrixApiSession.forClient(client));
 
-  final MatrixUploadSession _session;
+  final MatrixApiSession _session;
   final AttachmentEncryptor _encryptor;
   final ThumbnailRasteriser _rasteriser;
 

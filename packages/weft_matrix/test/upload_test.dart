@@ -880,7 +880,7 @@ Future<RasterisedThumbnail?> _unusedRasteriser(
 
 /// A signed-in session over a mock client, with a token the test can change
 /// underneath a live transport.
-class _FakeSession implements MatrixUploadSession {
+class _FakeSession implements MatrixApiSession {
   _FakeSession(http.Client inner) : httpClient = _RecordingClient(inner);
 
   @override

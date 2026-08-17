@@ -11,11 +11,15 @@ export 'package:matrix/encryption.dart'
     show Bootstrap, BootstrapState, KeyVerification, KeyVerificationState;
 export 'package:matrix/matrix.dart' show LoginFlow;
 
+export 'src/api_session.dart';
 export 'src/bridge_discovery.dart';
 export 'src/database.dart';
 export 'src/homeserver.dart';
 export 'src/mapping.dart';
 export 'src/media.dart';
 export 'src/matrix_timeline_source.dart';
+export 'src/push_delivery.dart';
+export 'src/push_rules.dart';
+export 'src/pusher.dart';
 export 'src/session.dart';
 export 'src/upload.dart';

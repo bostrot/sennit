@@ -30,6 +30,11 @@ dependencies:
   weft_attachments: ^0.1.0
   weft_domain: ^0.1.0
   weft_merge: ^0.1.0
+  # The notification *decisions* — every suppression rule, the merged-chat group
+  # key, body rendering — stay pure Dart in weft_notify. This package only
+  # supplies what it cannot know: a decrypted event, a read receipt, and the
+  # homeserver to register a pusher with.
+  weft_notify: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

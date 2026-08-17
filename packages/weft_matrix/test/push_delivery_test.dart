@@ -1,0 +1,472 @@
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_notify/weft_notify.dart';
+
+void main() {
+  final now = DateTime.utc(2026, 8, 17, 12);
+
+  group('MatrixPushPayload', () {
+    test('reads the gateway envelope', () {
+      final payload = MatrixPushPayload.fromJson({
+        'notification': {
+          'room_id': '!wa:example.org',
+          'event_id': r'$evt1',
+          'counts': {'unread': 3},
+          'devices': [
+            {'pushkey': 'fcm-token-1'},
+          ],
+        },
+      });
+
+      expect(payload!.roomId, '!wa:example.org');
+      expect(payload.eventId, r'$evt1');
+      expect(payload.unreadCount, 3);
+      expect(payload.deviceIds, ['fcm-token-1']);
+      expect(payload.isClearing, isFalse);
+    });
+
+    test('reads a flattened FCM data map, where everything is a string', () {
+      // An FCM data message can only carry strings, so `3` arrives as `"3"`.
+      final payload = MatrixPushPayload.fromJson({
+        'room_id': '!wa:example.org',
+        'event_id': r'$evt1',
+        'unread': '3',
+        'prio': 'high',
+      });
+
+      expect(payload!.roomId, '!wa:example.org');
+      expect(payload.unreadCount, 3);
+    });
+
+    test('a poke with no event is a dismissal, not a malformed message', () {
+      final payload = MatrixPushPayload.fromJson({
+        'room_id': '!wa:example.org',
+        'counts': {'unread': 0},
+      });
+
+      expect(payload, isNotNull);
+      expect(payload!.isClearing, isTrue);
+      expect(payload.unreadCount, 0);
+    });
+
+    test('returns null for a payload with nothing Matrix-shaped in it', () {
+      expect(MatrixPushPayload.fromJson({'aps': <String, Object?>{}}), isNull);
+      expect(MatrixPushPayload.fromJson(<String, Object?>{}), isNull);
+    });
+
+    test('empty strings read as absent, not as an id', () {
+      final payload = MatrixPushPayload.fromJson({
+        'room_id': '!wa:example.org',
+        'event_id': '',
+        'unread': 'not a number',
+      });
+
+      expect(payload!.eventId, isNull);
+      expect(payload.isClearing, isTrue);
+      expect(payload.unreadCount, isNull);
+    });
+  });
+
+  group('handlePush', () {
+    test('fetches the event, decides, and renders it', () async {
+      final session = _FakeSession(messages: {r'$evt1': _message()});
+      final pipeline = _pipelineFor(session, now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handlePush({
+        'room_id': '!wa:example.org',
+        'event_id': r'$evt1',
+      });
+      await pumpEventQueue();
+
+      expect(decision, const NotifyDecision());
+      expect(posted, hasLength(1));
+      expect(posted.single.content.body, 'are you around?');
+      expect(posted.single.isSilent, isFalse);
+      await pipeline.dispose();
+    });
+
+    test('groups both legs of a merged chat under one key', () async {
+      // The reason `chatForRoom` is injected rather than derived: a WhatsApp
+      // message and a Signal message from one contact are one thread.
+      final session = _FakeSession(
+        messages: {
+          r'$wa': _message(),
+          r'$sig': _message(
+            eventId: r'$sig',
+            roomId: '!sig:example.org',
+            network: ChatNetwork.signal,
+          ),
+        },
+      );
+      final pipeline = _pipelineFor(session, now: now, merged: true);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      await pipeline.handlePush({
+        'room_id': '!wa:example.org',
+        'event_id': r'$wa',
+      });
+      await pipeline.handlePush({
+        'room_id': '!sig:example.org',
+        'event_id': r'$sig',
+      });
+      await pumpEventQueue();
+
+      expect(posted, hasLength(2));
+      expect(posted.map((n) => n.content.groupKey).toSet(), {
+        'merged:contact_1',
+      });
+      expect(posted.map((n) => n.content.deepLink).toSet(), {
+        'weft://chat/merged%3Acontact_1',
+      });
+      // The room ids differ, because an action has to land somewhere real.
+      expect(posted.map((n) => n.content.roomId), [
+        '!wa:example.org',
+        '!sig:example.org',
+      ]);
+      await pipeline.dispose();
+    });
+
+    test('a clearing push reaches no verdict', () async {
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+
+      expect(
+        await pipeline.handlePush({
+          'room_id': '!wa:example.org',
+          'counts': {'unread': 0},
+        }),
+        isNull,
+      );
+      await pipeline.dispose();
+    });
+
+    test('an event that will not resolve reaches no verdict', () async {
+      // Unsynced room, redacted away, or undecryptable. None of those is a
+      // suppression: the question could not be asked.
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+
+      expect(
+        await pipeline.handlePush({
+          'room_id': '!wa:example.org',
+          'event_id': r'$missing',
+        }),
+        isNull,
+      );
+      await pipeline.dispose();
+    });
+
+    test(
+      'a room the inbox has not folded into a chat yet is skipped',
+      () async {
+        final session = _FakeSession(messages: {r'$evt1': _message()});
+        final pipeline = MatrixNotificationPipeline(
+          session: session,
+          chatForRoom: (_) => null,
+          policy: NotificationPolicy.new,
+          now: () => now,
+        );
+
+        expect(
+          await pipeline.handlePush({
+            'room_id': '!wa:example.org',
+            'event_id': r'$evt1',
+          }),
+          isNull,
+        );
+        await pipeline.dispose();
+      },
+    );
+
+    test('does not fetch an event the sync path already decided', () async {
+      final session = _FakeSession(messages: {r'$evt1': _message()});
+      final pipeline = _pipelineFor(session, now: now);
+
+      await pipeline.handleMessage(_message());
+      final decision = await pipeline.handlePush({
+        'room_id': '!wa:example.org',
+        'event_id': r'$evt1',
+      });
+
+      expect(
+        decision,
+        const NotificationDecision.suppress(NotificationSuppression.duplicate),
+      );
+      // A round trip and a decrypt saved, which on a woken phone is the whole
+      // cost of the push.
+      expect(session.fetches, isEmpty);
+      await pipeline.dispose();
+    });
+  });
+
+  group('the two paths agree', () {
+    test('one message arriving twice notifies once', () async {
+      final session = _FakeSession(messages: {r'$evt1': _message()});
+      final pipeline = _pipelineFor(session, now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+      pipeline.start();
+
+      // Push first, then the same event down sync a second later.
+      await pipeline.handlePush({
+        'room_id': '!wa:example.org',
+        'event_id': r'$evt1',
+      });
+      session.emit(_message());
+      await pumpEventQueue();
+
+      expect(posted, hasLength(1));
+      await pipeline.dispose();
+    });
+
+    test('the foreground path evaluates sync messages', () async {
+      final session = _FakeSession();
+      final pipeline = _pipelineFor(session, now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+      pipeline.start();
+
+      session.emit(_message());
+      await pumpEventQueue();
+
+      expect(posted, hasLength(1));
+      expect(posted.single.content.groupKey, '!wa:example.org');
+      await pipeline.dispose();
+    });
+
+    test('start is idempotent, so one message is not handled twice', () async {
+      final session = _FakeSession();
+      final pipeline = _pipelineFor(session, now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+      pipeline
+        ..start()
+        ..start();
+
+      session.emit(_message());
+      await pumpEventQueue();
+
+      expect(posted, hasLength(1));
+      await pipeline.dispose();
+    });
+  });
+
+  group('the policy is honoured on both paths', () {
+    test('a muted chat is suppressed and nothing is posted', () async {
+      final session = _FakeSession();
+      final posted = <MatrixNotification>[];
+      final pipeline = MatrixNotificationPipeline(
+        session: session,
+        chatForRoom: (_) => _chat(),
+        policy: () => NotificationPolicy().muteChat('!wa:example.org'),
+        now: () => now,
+      );
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handleMessage(_message());
+      await pumpEventQueue();
+
+      expect(decision?.suppression, NotificationSuppression.chatMuted);
+      expect(posted, isEmpty);
+      await pipeline.dispose();
+    });
+
+    test('the policy is read per message, not captured', () async {
+      // A mute applied from the notification shade has to affect the next
+      // message, not the next launch.
+      var policy = NotificationPolicy();
+      final pipeline = MatrixNotificationPipeline(
+        session: _FakeSession(),
+        chatForRoom: (_) => _chat(),
+        policy: () => policy,
+        now: () => now,
+      );
+
+      expect((await pipeline.handleMessage(_message()))!.delivers, isTrue);
+      policy = policy.muteChat('!wa:example.org');
+      expect(
+        (await pipeline.handleMessage(_message(eventId: r'$evt2')))!.delivers,
+        isFalse,
+      );
+      await pipeline.dispose();
+    });
+
+    test('a read receipt from another device suppresses the push', () async {
+      // The half of "read elsewhere" the app could not do before: the receipt
+      // is account-wide, so reading on a laptop stops the phone buzzing.
+      final session = _FakeSession(
+        readMarkers: {'!wa:example.org': now.add(const Duration(minutes: 1))},
+      );
+      final pipeline = _pipelineFor(session, now: now);
+
+      final decision = await pipeline.handleMessage(_message());
+
+      expect(decision?.suppression, NotificationSuppression.alreadyRead);
+      await pipeline.dispose();
+    });
+
+    test('quiet hours can deliver silently', () async {
+      final pipeline = MatrixNotificationPipeline(
+        session: _FakeSession(),
+        chatForRoom: (_) => _chat(),
+        policy: () => NotificationPolicy(
+          quietHours: const QuietHours(
+            startMinute: 0,
+            endMinute: 1439,
+            deliverSilently: true,
+          ),
+        ),
+        now: () => now,
+      );
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      await pipeline.handleMessage(_message());
+      await pumpEventQueue();
+
+      expect(posted.single.isSilent, isTrue);
+      await pipeline.dispose();
+    });
+
+    test('a mention is carried through to the rendered notification', () async {
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      await pipeline.handleMessage(_message(body: 'ping @me:example.org'));
+      await pumpEventQueue();
+
+      expect(posted.single.content.isMention, isTrue);
+      expect(posted.single.decision.mentioned, isTrue);
+      await pipeline.dispose();
+    });
+
+    test('a bridged display name counts as a mention', () async {
+      final session = _FakeSession(displayNames: {'Sam Weft'});
+      final pipeline = _pipelineFor(session, now: now);
+
+      final decision = await pipeline.handleMessage(
+        _message(body: 'sam weft, are you there?'),
+      );
+
+      expect(decision!.mentioned, isTrue);
+      await pipeline.dispose();
+    });
+
+    test('the user\'s own message never posts', () async {
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handleMessage(
+        _message(senderId: '@me:example.org', isOwn: true),
+      );
+      await pumpEventQueue();
+
+      expect(decision?.suppression, NotificationSuppression.ownMessage);
+      expect(posted, isEmpty);
+      await pipeline.dispose();
+    });
+  });
+
+  test('a dismissed notification may notify again', () async {
+    final pipeline = _pipelineFor(_FakeSession(), now: now);
+
+    expect((await pipeline.handleMessage(_message()))!.delivers, isTrue);
+    pipeline.dedupe.forget(r'$evt1');
+    expect((await pipeline.handleMessage(_message()))!.delivers, isTrue);
+    await pipeline.dispose();
+  });
+}
+
+MatrixNotificationPipeline _pipelineFor(
+  _FakeSession session, {
+  required DateTime now,
+  bool merged = false,
+}) => MatrixNotificationPipeline(
+  session: session,
+  chatForRoom: (_) => merged ? _mergedChat() : _chat(),
+  policy: NotificationPolicy.new,
+  now: () => now,
+);
+
+WeftMessage _message({
+  String eventId = r'$evt1',
+  String roomId = '!wa:example.org',
+  ChatNetwork network = ChatNetwork.whatsapp,
+  String senderId = '@whatsapp_4915:example.org',
+  String body = 'are you around?',
+  bool isOwn = false,
+}) => WeftMessage(
+  eventId: eventId,
+  roomId: roomId,
+  network: network,
+  senderId: senderId,
+  senderName: 'Sam',
+  timestamp: DateTime.utc(2026, 8, 17, 11, 59),
+  kind: MessageKind.text,
+  isOwn: isOwn,
+  body: body,
+);
+
+Chat _chat() => const Chat(
+  id: '!wa:example.org',
+  title: 'Sam',
+  sources: [
+    ChatSource(roomId: '!wa:example.org', network: ChatNetwork.whatsapp),
+  ],
+);
+
+Chat _mergedChat() => const Chat(
+  id: 'merged:contact_1',
+  title: 'Sam',
+  contactId: 'contact_1',
+  sources: [
+    ChatSource(roomId: '!wa:example.org', network: ChatNetwork.whatsapp),
+    ChatSource(roomId: '!sig:example.org', network: ChatNetwork.signal),
+  ],
+);
+
+class _FakeSession implements MatrixNotificationSession {
+  _FakeSession({
+    Map<String, WeftMessage> messages = const {},
+    this.readMarkers = const {},
+    Set<String>? displayNames,
+  }) : _messages = messages,
+       ownDisplayNames = displayNames ?? const {'Me'};
+
+  final Map<String, WeftMessage> _messages;
+  final Map<String, DateTime> readMarkers;
+  final _controller = StreamController<WeftMessage>.broadcast();
+
+  /// Event ids actually fetched, so "the push path did not go to the server"
+  /// is assertable.
+  final List<String> fetches = [];
+
+  void emit(WeftMessage message) => _controller.add(message);
+
+  @override
+  Set<String> get ownUserIds => const {'@me:example.org'};
+
+  @override
+  final Set<String> ownDisplayNames;
+
+  @override
+  Stream<WeftMessage> get incomingMessages => _controller.stream;
+
+  @override
+  Future<WeftMessage?> messageFor({
+    required String roomId,
+    required String eventId,
+  }) async {
+    fetches.add(eventId);
+    return _messages[eventId];
+  }
+
+  @override
+  DateTime? lastReadAt(String roomId) => readMarkers[roomId];
+}
