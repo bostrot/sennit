@@ -31,21 +31,21 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Merge engine — identity graph, scoring, merged timeline | **Done**, persisted, 54 tests |
 | Matrix session — login, E2EE, device verification, media upload transport | **Done**, 82 unit + 5 integration tests |
 | Attachments — sniffing, upload plan, bounded queue, Matrix upload transport, repository send path with ordered event sends | **Done**, 149 + 37 tests |
-| Attachment UI — attach button, source sheet, pre-send preview, image/video/audio/file bubbles, upload progress with cancel and retry | **Done**, 21 widget tests. The full-screen viewer is not built. |
+| Attachment UI — attach button, source sheet, pre-send preview, image/video/audio/file bubbles, upload progress with cancel and retry, full-screen viewer with save and share | **Done**, 52 widget tests |
 | App shell — rail, inbox, chat, composer, live or demo data | **Done** |
 | Hybrid search — FTS5 + vectors + RRF, **wired**: search screen, ingest-on-read, backfill | **Done**, 63 tests |
 | Transcription — **wired**: Transcribe action on voice bubbles, endpoint settings, privacy gate | **Done**, 15 tests |
 | Bridges — **wired**: bridges screen, health probes, generic GUI login flows | **Done**, 21 tests. QR flows show a copyable code, not yet a rendered QR image. |
 | MCP — **wired**: HTTP server (loopback), keys UI, scopes, audit view, tunnel toggle | **Done**, 36 tests |
 | Deep links — weft:// + App Links parsing/routing, Android filters, Apple scheme | **Done**, 12 tests. Domain verification needs the files in `tooling/web` hosted. |
-| Share-in — Android SEND/SEND_MULTIPLE, cold-start replay, share-target sheet | **Done** for text; file upload awaits the attachment pipeline |
+| Share-in — Android SEND/SEND_MULTIPLE, cold-start replay, share-target sheet | **Done** for text and files; shared URIs are streamed to a staged copy and sent through the same upload path as the composer, 15 tests |
 | Merge management UI — suggestions with evidence, accept/reject, unmerge | **Done**, 4 widget tests |
 | Bridge QR login — rendered QR + copyable payload, re-transcribe language picker, auto-transcribe | **Done** |
 | iOS Share Extension, Direct Share/People API, notifications, widgets, watch | **Not built** — needs Xcode targets and signing |
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**513 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**576 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in

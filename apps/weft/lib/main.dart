@@ -29,7 +29,10 @@ class _WeftAppState extends ConsumerState<WeftApp> {
   @override
   void initState() {
     super.initState();
-    _intents = WeftIntents()
+    // Read from the provider rather than constructed here: the share sheet
+    // stages its files through the same instance, and a second one would take
+    // the channel's handler away from this one.
+    _intents = ref.read(weftIntentsProvider)
       ..onLink = _handleLink
       ..onShare = _handleShare;
     // After the first frame: a cold-start share must find a navigator to

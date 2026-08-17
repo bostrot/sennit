@@ -70,25 +70,6 @@ String? attachmentCaption(WeftMessage message) {
   return caption;
 }
 
-/// A byte count as a person would say it.
-///
-/// Binary units under decimal names, which is the lie every file manager tells
-/// and therefore the number the user will see elsewhere for the same file. One
-/// decimal place below 10 units so a 1.4 MB photo does not read as "1 MB", none
-/// above it where the digit adds nothing.
-String formatAttachmentSize(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  const units = ['kB', 'MB', 'GB', 'TB'];
-  var value = bytes / 1024;
-  var unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  final digits = value < 10 ? 1 : 0;
-  return '${value.toStringAsFixed(digits)} ${units[unit]}';
-}
-
 /// Playback length as `m:ss`, or null when the sender never announced one.
 String? formatMediaDuration(int? milliseconds) {
   if (milliseconds == null || milliseconds <= 0) return null;

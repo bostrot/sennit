@@ -12,6 +12,7 @@ import '../../app/providers.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
+import '../../services/attachments/send_attachments.dart';
 import '../merge/merge_screen.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
@@ -555,28 +556,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   /// Sends each confirmed file, reporting the ones that will never be sent.
   ///
-  /// Awaited in series, which costs nothing: `sendAttachment` returns on
-  /// *acceptance*, so this is twenty enqueues rather than twenty uploads, and
-  /// enqueuing in order is what puts a batch into the room in the order the user
-  /// picked it.
+  /// The loop itself is [sendAttachments], shared with the share sheet — the
+  /// two paths differ only in where the files came from.
   Future<void> _sendAttachments(List<AttachmentSource> sources) async {
-    final repository = ref.read(chatRepositoryProvider);
-    final rejected = <String>[];
-
-    for (final source in sources) {
-      try {
-        await repository.sendAttachment(widget.chatId, source);
-      } on AttachmentRejectedException catch (e) {
-        // Not retryable and never a bubble — the sentence is already written
-        // for the user, so it goes straight in front of them.
-        rejected.add('${source.basename}: ${e.message}');
-      } on Object catch (error) {
-        debugPrint('weft: attachment ${source.basename} failed to send: $error');
-        rejected.add('${source.basename} could not be sent.');
-      }
-    }
-
-    if (rejected.isNotEmpty) _showMessage(rejected.join('\n'));
+    final problems = await sendAttachments(
+      ref.read(chatRepositoryProvider),
+      widget.chatId,
+      sources,
+    );
+    if (problems.isNotEmpty) _showMessage(problems.join('\n'));
   }
 
   void _showMessage(String message) {

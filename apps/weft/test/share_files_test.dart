@@ -1,0 +1,542 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/intents.dart';
+import 'package:weft/app/providers.dart';
+import 'package:weft/data/chat_repository.dart';
+import 'package:weft/data/demo_repository.dart';
+import 'package:weft/features/chat/attachment_preview_sheet.dart';
+import 'package:weft/features/share/share_target_sheet.dart';
+import 'package:weft/services/attachments/attachment_picker.dart';
+import 'package:weft_attachments/weft_attachments.dart';
+import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
+
+/// A stand-in for `MainActivity`.
+///
+/// The platform side of a share is two questions — what is this file, and where
+/// can I open it — so a fake is a map from URI to an answer for each. Every test
+/// below stages *real* files, because the thing being tested is that a
+/// `content://` URI ends up as an [AttachmentSource] whose `filename` the upload
+/// path can actually open.
+class _FakeShareHost {
+  _FakeShareHost(this.channel) {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, _handle);
+  }
+
+  final MethodChannel channel;
+
+  /// URI → the map `readSharedFileMeta` answers with, or null for a provider
+  /// that will not say.
+  final Map<String, Map<String, Object?>?> meta = {};
+
+  /// URI → the path `stageSharedFile` returns, or null for a file that could
+  /// not be copied.
+  final Map<String, String?> staged = {};
+
+  /// What `getInitialIntent` replays on a cold start.
+  Map<String, Object?>? initialIntent;
+
+  /// URIs actually staged, in order — the assertion that a file refused for its
+  /// size was refused *before* its bytes moved.
+  final List<String> stageCalls = [];
+
+  Future<Object?> _handle(MethodCall call) async {
+    final uri = (call.arguments as Map?)?['uri'] as String?;
+    switch (call.method) {
+      case 'getInitialIntent':
+        return initialIntent;
+      case 'readSharedFileMeta':
+        return meta[uri];
+      case 'stageSharedFile':
+        stageCalls.add(uri!);
+        return staged[uri];
+      default:
+        return null;
+    }
+  }
+
+  void dispose() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+  }
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const channel = MethodChannel('weft-test/intents');
+  const roomId = '!design_room:example.org';
+
+  late Directory sandbox;
+  late _FakeShareHost host;
+
+  setUp(() {
+    sandbox = Directory.systemTemp.createTempSync('weft-share-test');
+    host = _FakeShareHost(channel);
+  });
+
+  tearDown(() {
+    host.dispose();
+    if (sandbox.existsSync()) sandbox.deleteSync(recursive: true);
+  });
+
+  /// A file on disk that sniffs as a JPEG, whatever anyone declares it to be.
+  ///
+  /// Only the first three bytes decide the type; the rest is there so the size
+  /// is a realistic one and the header slice is a genuine truncation of a bigger
+  /// file rather than the whole thing.
+  File jpegFile(String name, {int size = 96000}) {
+    final bytes = Uint8List(size);
+    bytes.setAll(0, const [0xFF, 0xD8, 0xFF, 0xE0]);
+    return File('${sandbox.path}/$name')..writeAsBytesSync(bytes);
+  }
+
+  /// Registers [uri] the way Android would: a display name and a size from the
+  /// content resolver, and a staged copy to open.
+  void share(
+    String uri,
+    File file, {
+    String? name,
+    Object? size = _unset,
+    String? mimeType,
+  }) {
+    host.meta[uri] = {
+      'name': name ?? file.uri.pathSegments.last,
+      'size': size == _unset ? file.lengthSync() : size,
+      'mimeType': mimeType,
+    };
+    host.staged[uri] = file.path;
+  }
+
+  WeftIntents intents({int maxFileBytes = kMaxSharedFileBytes}) =>
+      WeftIntents(channel: channel, maxFileBytes: maxFileBytes);
+
+  group('resolving a share intent', () {
+    test('a shared photo becomes a source the upload path can open', () async {
+      final file = jpegFile('holiday.jpg');
+      share('content://media/1', file, mimeType: '*/*');
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(mimeType: '*/*', uris: ['content://media/1']),
+      );
+
+      expect(resolved.problems, isEmpty);
+      final source = resolved.sources.single;
+      expect(source.filename, file.path, reason: 'the upload opens this path');
+      expect(source.basename, 'holiday.jpg');
+      expect(source.sizeBytes, 96000);
+      expect(
+        source.header,
+        hasLength(kAttachmentHeaderBytes),
+        reason: 'a header slice, not the file',
+      );
+      // The declared type is carried through untouched and then overruled: a
+      // share intent saying `*/*` about a JPEG is the normal case, and sending
+      // it as m.file shows a paperclip on every other client.
+      expect(source.declaredMimeType, '*/*');
+      expect(sniffMimeType(source), 'image/jpeg');
+      expect(messageKindFor(sniffMimeType(source)), MessageKind.image);
+    });
+
+    test('the resolver''s per-file type beats the intent''s batch type', () async {
+      final file = jpegFile('scan.pdf');
+      share('content://media/1', file, mimeType: 'application/pdf');
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(mimeType: '*/*', uris: ['content://media/1']),
+      );
+
+      expect(resolved.sources.single.declaredMimeType, 'application/pdf');
+    });
+
+    test('a SEND_MULTIPLE batch resolves in the order it was shared', () async {
+      share('content://media/1', jpegFile('one.jpg'));
+      share('content://media/2', jpegFile('two.jpg'));
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(
+          mimeType: 'image/*',
+          uris: ['content://media/1', 'content://media/2'],
+        ),
+      );
+
+      expect(
+        resolved.sources.map((s) => s.basename),
+        ['one.jpg', 'two.jpg'],
+        reason: 'the room must read in the order the user picked',
+      );
+    });
+
+    test('a file over the cap is refused before a byte is copied', () async {
+      final file = jpegFile('holiday.mp4');
+      share('content://media/1', file, size: 200 * 1024 * 1024);
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(mimeType: 'video/mp4', uris: ['content://media/1']),
+      );
+
+      expect(resolved.sources, isEmpty);
+      expect(
+        host.stageCalls,
+        isEmpty,
+        reason: 'the whole point of asking for the size first',
+      );
+      expect(
+        resolved.problems.single,
+        allOf(
+          contains('holiday.mp4'),
+          contains('200 MB'),
+          contains('too large'),
+          contains('100 MB'),
+        ),
+      );
+    });
+
+    test('a provider that under-reports a size is caught by the copy', () async {
+      final file = jpegFile('holiday.jpg', size: 96000);
+      // No size at all, which is legal: a stream with no backing file.
+      share('content://media/1', file, size: null);
+
+      final resolved = await intents(
+        maxFileBytes: 1024,
+      ).resolveSharedFiles(
+        const SharedPayload(uris: ['content://media/1']),
+      );
+
+      expect(resolved.sources, isEmpty);
+      expect(resolved.problems.single, contains('too large'));
+      expect(
+        file.existsSync(),
+        isFalse,
+        reason: 'the staged copy of a file that will not be sent is dropped',
+      );
+    });
+
+    test('a file that cannot be staged is a sentence, not a lost batch', () async {
+      share('content://media/1', jpegFile('one.jpg'));
+      host.meta['content://media/2'] = {'name': 'gone.jpg', 'size': 4000};
+      host.staged['content://media/2'] = null;
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(
+          uris: ['content://media/1', 'content://media/2'],
+        ),
+      );
+
+      expect(resolved.sources.single.basename, 'one.jpg');
+      expect(resolved.problems.single, 'gone.jpg could not be read.');
+    });
+
+    test('a provider with nothing to say still yields a usable name', () async {
+      final file = jpegFile('opaque');
+      host.meta['content://media/4021'] = null;
+      host.staged['content://media/4021'] = file.path;
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(uris: ['content://media/4021']),
+      );
+
+      // The staged path is the authority on the name; the URI's last segment is
+      // only what the sentence would have used had staging failed.
+      expect(resolved.sources.single.basename, 'opaque');
+    });
+
+    test('a text-only share resolves to nothing at all', () async {
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(text: 'hello'),
+      );
+
+      expect(resolved.isEmpty, isTrue);
+      expect(host.stageCalls, isEmpty);
+    });
+  });
+
+  group('cold start', () {
+    test('the replayed launching intent carries file URIs', () async {
+      host.initialIntent = const {
+        'type': 'share',
+        'mimeType': 'image/jpeg',
+        'uris': ['content://media/1'],
+      };
+
+      SharedPayload? delivered;
+      final weftIntents = intents()..onShare = (p) => delivered = p;
+      await weftIntents.deliverInitialIntent();
+
+      expect(delivered, isNotNull);
+      expect(
+        delivered!.uris,
+        ['content://media/1'],
+        reason: 'a cold-start share of a photo must not arrive as an empty '
+            'sheet',
+      );
+      expect(delivered!.text, isNull);
+    });
+
+    test('a replayed intent is only delivered once', () async {
+      host.initialIntent = const {
+        'type': 'share',
+        'uris': ['content://media/1'],
+      };
+
+      var shares = 0;
+      final weftIntents = intents()..onShare = (_) => shares++;
+      await weftIntents.deliverInitialIntent();
+      host.initialIntent = null;
+      await weftIntents.deliverInitialIntent();
+
+      expect(shares, 1);
+    });
+  });
+
+  group('the share sheet', () {
+    /// A photo already resolved — what [WeftIntents.resolveSharedFiles] returns
+    /// for a staged `content://` URI, asserted for real in the group above.
+    AttachmentSource photo({String name = 'holiday.jpg', int size = 96000}) =>
+        AttachmentSource(
+          filename: '/tmp/weft-share/$name',
+          sizeBytes: size,
+          header: Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0]),
+        );
+
+    Future<DemoChatRepository> pumpSheet(
+      WidgetTester tester,
+      SharedPayload payload, {
+      ResolvedShare resolved = const ResolvedShare(),
+      ChatRepository Function(DemoChatRepository inner)? wrap,
+    }) async {
+      final resolver = _FakeResolver(resolved);
+      // Instant uploads: the tick exists so a human can watch the progress
+      // bubble, and a `pumpAndSettle` would wait out every one of them.
+      final repository = DemoChatRepository(uploadTick: Duration.zero);
+      addTearDown(repository.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            chatRepositoryProvider.overrideWithValue(
+              wrap?.call(repository) ?? repository,
+            ),
+            sharedFileResolverProvider.overrideWithValue(resolver),
+            // The strip decodes each picked file to show a thumbnail; these
+            // sources describe files a widget test cannot read.
+            attachmentFileReaderProvider.overrideWithValue(
+              (source) async => source.header,
+            ),
+          ],
+          child: MaterialApp(
+            theme: WeftTheme.build(),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () => showShareTargetSheet(context, payload),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    /// The thread as the chat view would draw it: newest first.
+    Future<List<WeftMessage>> messages(DemoChatRepository repository) async {
+      final timeline = await repository.timelineFor(roomId);
+      await timeline.loadMore();
+      return timeline.view().messages;
+    }
+
+    Future<WeftMessage?> lastMessage(DemoChatRepository repository) async {
+      final chats = await repository.watchChats().first;
+      return chats.firstWhere((c) => c.id == roomId).lastMessage;
+    }
+
+    testWidgets('a shared photo is shown and then sent', (tester) async {
+      final repository = await pumpSheet(
+        tester,
+        const SharedPayload(mimeType: '*/*', uris: ['content://media/1']),
+        resolved: ResolvedShare(sources: [photo()]),
+      );
+
+      expect(find.text('holiday.jpg · 94 kB'), findsOneWidget);
+      expect(find.byType(AttachmentSourceThumbnail), findsOneWidget);
+
+      await tester.tap(find.text('Design Team'));
+      await tester.pumpAndSettle();
+
+      final sent = await lastMessage(repository);
+      expect(sent!.kind, MessageKind.image);
+      expect(sent.body, 'holiday.jpg');
+      expect(find.text('Sent to Design Team'), findsOneWidget);
+    });
+
+    testWidgets('a batch is summarised and sent whole', (tester) async {
+      final repository = await pumpSheet(
+        tester,
+        const SharedPayload(
+          mimeType: 'image/*',
+          uris: ['content://media/1', 'content://media/2'],
+        ),
+        resolved: ResolvedShare(
+          sources: [photo(name: 'one.jpg'), photo(name: 'two.jpg')],
+        ),
+      );
+
+      expect(find.text('2 files · 188 kB'), findsOneWidget);
+      expect(find.byType(AttachmentSourceThumbnail), findsNWidgets(2));
+
+      await tester.tap(find.text('Design Team'));
+      await tester.pumpAndSettle();
+
+      final history = await messages(repository);
+      expect(
+        history.take(2).map((m) => m.body),
+        ['two.jpg', 'one.jpg'],
+        reason: 'newest first, so the batch landed in the order it was shared',
+      );
+    });
+
+    testWidgets('a caption is sent before the photo it describes', (
+      tester,
+    ) async {
+      late _RecordingRepository recorder;
+      final repository = await pumpSheet(
+        tester,
+        const SharedPayload(
+          text: 'look at this',
+          mimeType: 'image/jpeg',
+          uris: ['content://media/1'],
+        ),
+        resolved: ResolvedShare(sources: [photo()]),
+        wrap: (inner) => recorder = _RecordingRepository(inner),
+      );
+
+      expect(find.text('"look at this" · holiday.jpg · 94 kB'), findsOneWidget);
+
+      await tester.tap(find.text('Design Team'));
+      await tester.pumpAndSettle();
+
+      expect(
+        recorder.sent,
+        ['text: look at this', 'file: holiday.jpg'],
+        reason: 'a caption that lands after its photo reads backwards',
+      );
+      expect((await messages(repository)).first.body, 'holiday.jpg');
+    });
+
+    testWidgets('text alone still goes, exactly as it did before', (
+      tester,
+    ) async {
+      final repository = await pumpSheet(
+        tester,
+        const SharedPayload(text: 'hello', mimeType: 'text/plain'),
+      );
+
+      expect(find.text('"hello"'), findsOneWidget);
+      await tester.tap(find.text('Design Team'));
+      await tester.pumpAndSettle();
+
+      expect((await lastMessage(repository))!.body, 'hello');
+    });
+
+    testWidgets('a file too large says so, and sends nothing', (tester) async {
+      final repository = await pumpSheet(
+        tester,
+        const SharedPayload(mimeType: 'video/mp4', uris: ['content://media/1']),
+        resolved: const ResolvedShare(
+          problems: [
+            'holiday.mp4 is 200 MB, which is too large to share — the limit '
+                'is 100 MB.',
+          ],
+        ),
+      );
+      final before = await lastMessage(repository);
+
+      expect(find.textContaining('too large'), findsOneWidget);
+      // Nothing left to send: the conversations are still listed, because the
+      // sheet is showing why, but tapping one must not silently do nothing.
+      await tester.tap(find.text('Design Team'));
+      await tester.pumpAndSettle();
+
+      expect(await lastMessage(repository), before);
+    });
+  });
+}
+
+/// Sentinel for "the test did not say", so that an explicit null size — a
+/// provider that does not know — is distinguishable from the default.
+const Object _unset = Object();
+
+/// Records what the sheet sent, and in which order.
+///
+/// The demo repository keeps a sent *text* only as the chat's preview, so
+/// "caption first, then the photo" cannot be read back out of it — the photo
+/// overwrites the preview a moment later. The claim is about the order of two
+/// calls, so it is asserted on the calls.
+class _RecordingRepository implements ChatRepository {
+  _RecordingRepository(this.inner);
+
+  final DemoChatRepository inner;
+  final List<String> sent = [];
+
+  @override
+  Stream<List<Chat>> watchChats() => inner.watchChats();
+
+  @override
+  Stream<List<UploadTask>> watchUploads(String chatId) =>
+      inner.watchUploads(chatId);
+
+  @override
+  Future<void> send(String chatId, String body, {ChatNetwork? via}) {
+    sent.add('text: $body');
+    return inner.send(chatId, body, via: via);
+  }
+
+  @override
+  Future<void> sendAttachment(
+    String chatId,
+    AttachmentSource source, {
+    ChatNetwork? via,
+    bool isVoiceNote = false,
+  }) {
+    sent.add('file: ${source.basename}');
+    return inner.sendAttachment(
+      chatId,
+      source,
+      via: via,
+      isVoiceNote: isVoiceNote,
+    );
+  }
+
+  /// Everything else throws on purpose: a share sheet that starts calling it
+  /// should fail loudly rather than quietly do half a send.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// A resolution that has already happened.
+///
+/// The sheet's own behaviour — the summary, the thumbnails, what a tap sends,
+/// and what a refused file does to the list — is what the widget group is about;
+/// the resolution behind it is asserted against real files and a real channel in
+/// the group above, where a real event loop exists to finish a disk read.
+class _FakeResolver implements SharedFileResolver {
+  const _FakeResolver(this.resolved);
+
+  final ResolvedShare resolved;
+
+  @override
+  Future<ResolvedShare> resolveSharedFiles(SharedPayload payload) async =>
+      resolved;
+}

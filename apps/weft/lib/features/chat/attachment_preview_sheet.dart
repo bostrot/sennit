@@ -7,7 +7,6 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
-import 'attachment_bubble.dart';
 import 'send_network_chip.dart';
 
 /// Largest file the preview will decode to show a thumbnail.
@@ -197,7 +196,7 @@ class _PickedFileTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: WeftSpace.sm),
-      leading: _PreviewThumbnail(source: source, kind: kind),
+      leading: AttachmentSourceThumbnail(source: source, kind: kind),
       title: Text(
         source.basename,
         maxLines: 1,
@@ -220,17 +219,31 @@ class _PickedFileTile extends StatelessWidget {
 /// which decodes to a grey band or to nothing at all depending on the platform
 /// codec — the one thing worse than no preview is a preview that looks like the
 /// file is corrupt.
-class _PreviewThumbnail extends ConsumerStatefulWidget {
-  const _PreviewThumbnail({required this.source, required this.kind});
+///
+/// Public because a share intent's files are previewed too, and "what a picked
+/// file looks like before it is sent" must not be answered twice: the share
+/// sheet shows a strip of these at [size] 64 above the conversation list.
+class AttachmentSourceThumbnail extends ConsumerStatefulWidget {
+  const AttachmentSourceThumbnail({
+    super.key,
+    required this.source,
+    required this.kind,
+    this.size = 44,
+  });
 
   final AttachmentSource source;
   final MessageKind kind;
 
+  /// Edge length of the square. The decode resolution follows it, so a bigger
+  /// tile is not a bigger upscale of the same pixels.
+  final double size;
+
   @override
-  ConsumerState<_PreviewThumbnail> createState() => _PreviewThumbnailState();
+  ConsumerState<AttachmentSourceThumbnail> createState() =>
+      _PreviewThumbnailState();
 }
 
-class _PreviewThumbnailState extends ConsumerState<_PreviewThumbnail> {
+class _PreviewThumbnailState extends ConsumerState<AttachmentSourceThumbnail> {
   Uint8List? _bytes;
 
   @override
@@ -258,9 +271,10 @@ class _PreviewThumbnailState extends ConsumerState<_PreviewThumbnail> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
+    final iconSize = widget.size * 0.45;
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: widget.size,
+      height: widget.size,
       child: ClipRRect(
         borderRadius: WeftRadius.allSm,
         child: bytes == null
@@ -269,7 +283,7 @@ class _PreviewThumbnailState extends ConsumerState<_PreviewThumbnail> {
                 alignment: Alignment.center,
                 child: Icon(
                   _iconFor(widget.kind),
-                  size: 20,
+                  size: iconSize,
                   color: context.colors.onSurfaceVariant,
                 ),
               )
@@ -279,13 +293,13 @@ class _PreviewThumbnailState extends ConsumerState<_PreviewThumbnail> {
             : Image.memory(
                 bytes,
                 fit: BoxFit.cover,
-                cacheWidth: 132,
+                cacheWidth: (widget.size * 3).round(),
                 errorBuilder: (_, _, _) => Container(
                   color: context.colors.surfaceContainerHighest,
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.broken_image_outlined,
-                    size: 20,
+                    size: iconSize,
                     color: context.colors.onSurfaceVariant,
                   ),
                 ),
