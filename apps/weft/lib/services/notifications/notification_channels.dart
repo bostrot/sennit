@@ -44,10 +44,15 @@ const String kMessageCategoryId = 'weft.message';
 /// receives them is one function: `flutter_local_notifications` hands back the
 /// same `actionId` whether it came from an Android action button, an iOS
 /// `UNNotificationAction`, or a Linux `org.freedesktop.Notifications` action.
-/// The handling of them lands with the notification-actions task; these exist
-/// now because iOS categories are registered at *initialisation* — an action
-/// added later does not appear on a notification posted by a build that had
-/// already registered the category without it.
+/// They are constants rather than literals because the same three strings are
+/// written in three places — the iOS category, the Android actions, and
+/// `NotificationActionHandler` — and a typo in any one of them is an action
+/// that silently does nothing.
+///
+/// iOS categories are registered at *initialisation*, so an action added later
+/// does not appear on a notification posted by a build that had already
+/// registered the category without it. That is why all three were declared
+/// before any of them did anything.
 abstract final class WeftNotificationActions {
   static const String reply = 'weft.reply';
   static const String markRead = 'weft.mark_read';
@@ -56,6 +61,74 @@ abstract final class WeftNotificationActions {
   /// The input field's id on the platforms that name one.
   static const String replyInput = 'weft.reply.input';
 }
+
+/// What the "Mute for 1 hour" action writes.
+///
+/// An hour because that is what the action says, and a *timed* mute because
+/// that is the only kind this action can be: Matrix push rules have no expiry,
+/// so a mute that lifts itself is necessarily Weft's own. `push_rules.dart`
+/// therefore never sends it to the homeserver, and the suppression happens
+/// where the body is readable — locally, in `evaluateNotification`.
+const Duration kMuteForAnHour = Duration(hours: 1);
+
+/// The three action buttons an Android message notification carries.
+///
+/// **All three set `showsUserInterface: true`, and that is a decision rather
+/// than an oversight.** Android delivers an action whose pending intent is a
+/// broadcast — which is what `showsUserInterface: false` produces — only to a
+/// *background* isolate, through
+/// `onDidReceiveBackgroundNotificationResponse`. Every one of Weft's actions
+/// needs the Matrix client that lives in the main isolate: a reply has to be
+/// encrypted with an Olm session, a read marker is a write through the same
+/// `Client`, and a timed mute lands in the settings database the app already
+/// holds open. A second isolate would need its own vodozemac initialisation and
+/// its own handle on that database — the same wall background decryption hit,
+/// and for the same reason it is not climbed here.
+///
+/// So the action's intent launches the activity instead, and the response
+/// arrives in the main isolate through `onDidReceiveNotificationResponse` —
+/// or, when Weft was not running, through `getNotificationAppLaunchDetails`,
+/// which [NotificationSink.launchActivation] already reads. The reply text is
+/// still typed in the shade: `RemoteInput` collects it before the intent fires
+/// and it travels on that intent. What it costs is that Weft comes to the
+/// foreground to do the work, which is the thing to revisit if a
+/// background-capable client isolate is ever built.
+///
+/// `cancelNotification` is false on all three: the plugin only honours it in
+/// the broadcast receiver these actions deliberately do not use, and
+/// [NotificationActionHandler] dismisses the conversation itself once the work
+/// has actually succeeded. A reply that could not be sent therefore leaves its
+/// notification standing rather than vanishing into a message that never went.
+List<AndroidNotificationAction> weftAndroidMessageActions() => [
+  AndroidNotificationAction(
+    WeftNotificationActions.reply,
+    'Reply',
+    inputs: const [AndroidNotificationActionInput(label: 'Message')],
+    // What tells Android Auto, Wear and the launcher's bubble that this is
+    // *the* reply action rather than a button that happens to be first.
+    semanticAction: SemanticAction.reply,
+    // Deliberately left at its default of false. Generated replies are the
+    // system reading the message body to propose an answer to it, and Weft
+    // has spent this whole phase keeping that body off every surface it does
+    // not have to be on.
+    showsUserInterface: true,
+    cancelNotification: false,
+  ),
+  const AndroidNotificationAction(
+    WeftNotificationActions.markRead,
+    'Mark read',
+    semanticAction: SemanticAction.markAsRead,
+    showsUserInterface: true,
+    cancelNotification: false,
+  ),
+  const AndroidNotificationAction(
+    WeftNotificationActions.muteForAnHour,
+    'Mute for 1 hour',
+    semanticAction: SemanticAction.mute,
+    showsUserInterface: true,
+    cancelNotification: false,
+  ),
+];
 
 /// The Android channel a message on [network] is posted to.
 ///
@@ -70,16 +143,17 @@ abstract final class WeftNotificationActions {
 /// correct: the group key still collapses them into one conversation in the
 /// shade, while the sound each one makes stays under the control of the network
 /// it arrived on.
-AndroidNotificationChannel messageChannelFor(ChatNetwork network) =>
-    AndroidNotificationChannel(
-      '$kMessageChannelPrefix${network.id}',
-      network.label,
-      description: 'Messages that arrive over ${network.label}.',
-      groupId: kMessagesChannelGroupId,
-      // High rather than max: max is a heads-up notification that takes over the
-      // screen, which is a phone call, not a text message.
-      importance: Importance.high,
-    );
+AndroidNotificationChannel messageChannelFor(
+  ChatNetwork network,
+) => AndroidNotificationChannel(
+  '$kMessageChannelPrefix${network.id}',
+  network.label,
+  description: 'Messages that arrive over ${network.label}.',
+  groupId: kMessagesChannelGroupId,
+  // High rather than max: max is a heads-up notification that takes over the
+  // screen, which is a phone call, not a text message.
+  importance: Importance.high,
+);
 
 /// Every channel Weft creates at startup.
 ///
@@ -130,7 +204,10 @@ List<DarwinNotificationCategory> weftDarwinCategories() => [
         buttonTitle: 'Send',
         placeholder: 'Message',
       ),
-      DarwinNotificationAction.plain(WeftNotificationActions.markRead, 'Mark read'),
+      DarwinNotificationAction.plain(
+        WeftNotificationActions.markRead,
+        'Mark read',
+      ),
       DarwinNotificationAction.plain(
         WeftNotificationActions.muteForAnHour,
         'Mute for 1 hour',

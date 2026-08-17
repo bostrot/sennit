@@ -238,6 +238,11 @@ class NotificationPresentation {
           when: content.timestamp.millisecondsSinceEpoch,
           color: Color(content.network.brandColor),
           tag: content.groupKey,
+          // Reply, mark read, mute. The payload above is what makes them
+          // answerable after this process has died: each one needs a chat to
+          // act on, a room to move a read marker in, and an event id the dedupe
+          // ledger is keyed on.
+          actions: weftAndroidMessageActions(),
         ),
         iOS: DarwinNotificationDetails(
           // Must equal the Android group key. A merged contact whose iPhone

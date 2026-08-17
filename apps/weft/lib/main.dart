@@ -15,6 +15,7 @@ import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
+import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 
 void main() {
@@ -78,6 +79,18 @@ class _WeftAppState extends ConsumerState<WeftApp> {
       final link = WeftLink.parse(url);
       if (link != null) _handleLink(link);
     };
+
+    // Reply, mark read and mute for an hour. Built here rather than in a
+    // provider because it needs `service.dismissChat`, and a provider that
+    // reached back into the one being built would be a cycle. It holds no
+    // state, so constructing it alongside the service costs nothing.
+    final actions = NotificationActionHandler(
+      repository: ref.read(chatRepositoryProvider),
+      muteChat: ref.read(notificationPolicyProvider.notifier).muteChat,
+      dismiss: service.dismissChat,
+    );
+    service.onAction = (activation) => unawaited(actions.handle(activation));
+
     await service.start();
 
     await _ensureNotificationPermission();

@@ -1,9 +1,12 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/intents.dart';
+import 'package:weft/data/chat_repository.dart';
+import 'package:weft/services/notifications/notification_actions.dart';
 import 'package:weft/services/notifications/notification_channels.dart';
 import 'package:weft/services/notifications/notification_presentation.dart';
 import 'package:weft/services/notifications/notification_service.dart';
@@ -71,18 +74,27 @@ void main() {
     });
 
     test('the link survives a chat id full of reserved characters', () {
-      // Not a literal `%`: `WeftLink.parse` decodes an already-decoded path
-      // segment and throws on one, which the test-suite task wrote up and the
-      // notification-actions task fixes. Everything else a room or merged id
-      // can carry round-trips today.
-      final payload = NotificationPayload.forContent(
-        _content(groupKey: '!weird +/:example.org'),
-      );
-      final link = WeftLink.parse(
-        NotificationPayload.decode(payload.encode())!.link,
-      );
+      // Including a literal `%` and a non-ASCII character, which used to throw
+      // `ArgumentError` out of `WeftLink.parse` — it decoded an already-decoded
+      // path segment. The test-suite task wrote that up; the double decode is
+      // gone, so the whole range a room or merged id can carry round-trips.
+      for (final chatId in [
+        '!weird +/:example.org',
+        '!100%:example.org',
+        'merged:contact_1',
+        r'!a%2Fb:example.org',
+        '!grüße:example.org',
+      ]) {
+        final payload = NotificationPayload.forContent(
+          _content(groupKey: chatId),
+        );
+        final link = WeftLink.parse(
+          NotificationPayload.decode(payload.encode())!.link,
+        );
 
-      expect((link! as OpenChatLink).chatId, '!weird +/:example.org');
+        expect(link, isA<OpenChatLink>(), reason: chatId);
+        expect((link! as OpenChatLink).chatId, chatId, reason: chatId);
+      }
     });
   });
 
@@ -96,33 +108,36 @@ void main() {
       expect(android.channelId, messageChannelFor(ChatNetwork.signal).id);
     });
 
-    test('groups on the merged chat id, and iOS threads on the same string', () {
-      final whatsapp = NotificationPresentation.forMessage(
-        content: _content(eventId: r'$1', roomId: '!wa:example.org'),
-      );
-      final signal = NotificationPresentation.forMessage(
-        content: _content(
-          eventId: r'$2',
-          roomId: '!sg:example.org',
-          network: ChatNetwork.signal,
-        ),
-      );
+    test(
+      'groups on the merged chat id, and iOS threads on the same string',
+      () {
+        final whatsapp = NotificationPresentation.forMessage(
+          content: _content(eventId: r'$1', roomId: '!wa:example.org'),
+        );
+        final signal = NotificationPresentation.forMessage(
+          content: _content(
+            eventId: r'$2',
+            roomId: '!sg:example.org',
+            network: ChatNetwork.signal,
+          ),
+        );
 
-      // The one assertion this whole layer exists for: two legs of one merged
-      // contact are one notification thread on both platforms.
-      expect(whatsapp.groupKey, signal.groupKey);
-      expect(whatsapp.details.android!.groupKey, 'merged:contact_1');
-      expect(
-        whatsapp.details.iOS!.threadIdentifier,
-        whatsapp.details.android!.groupKey,
-      );
-      expect(
-        signal.details.iOS!.threadIdentifier,
-        whatsapp.details.iOS!.threadIdentifier,
-      );
-      // …while staying two notifications, because they are two messages.
-      expect(whatsapp.id, isNot(signal.id));
-    });
+        // The one assertion this whole layer exists for: two legs of one merged
+        // contact are one notification thread on both platforms.
+        expect(whatsapp.groupKey, signal.groupKey);
+        expect(whatsapp.details.android!.groupKey, 'merged:contact_1');
+        expect(
+          whatsapp.details.iOS!.threadIdentifier,
+          whatsapp.details.android!.groupKey,
+        );
+        expect(
+          signal.details.iOS!.threadIdentifier,
+          whatsapp.details.iOS!.threadIdentifier,
+        );
+        // …while staying two notifications, because they are two messages.
+        expect(whatsapp.id, isNot(signal.id));
+      },
+    );
 
     test('two genuinely different chats do not share a group', () {
       final a = NotificationPresentation.forMessage(
@@ -188,7 +203,8 @@ void main() {
       );
 
       expect(
-        (presentation.details.android!.largeIcon! as FilePathAndroidBitmap).data,
+        (presentation.details.android!.largeIcon! as FilePathAndroidBitmap)
+            .data,
         '/tmp/grace.png',
       );
       expect(presentation.details.linux!.icon, isA<FilePathLinuxIcon>());
@@ -313,9 +329,7 @@ void main() {
 
     test('two legs of a merged contact are one thread and one link', () async {
       await service.start();
-      await deliver(
-        _message(eventId: r'$wa', roomId: '!wa:example.org'),
-      );
+      await deliver(_message(eventId: r'$wa', roomId: '!wa:example.org'));
       await deliver(
         _message(
           eventId: r'$sg',
@@ -330,16 +344,20 @@ void main() {
       expect(messages.map((p) => p.groupKey).toSet(), {'merged:contact_1'});
       expect(messages.map((p) => p.payload.link).toSet(), hasLength(1));
       // The room ids stay distinct, because an action has to land somewhere real.
-      expect(
-        messages.map((p) => p.payload.roomId).toSet(),
-        {'!wa:example.org', '!sg:example.org'},
-      );
+      expect(messages.map((p) => p.payload.roomId).toSet(), {
+        '!wa:example.org',
+        '!sg:example.org',
+      });
     });
 
     test('the second message for a chat brings a summary with it', () async {
       await service.start();
       await deliver(_message(eventId: r'$1', body: 'one'));
-      expect(sink.shown, hasLength(1), reason: 'one message is its own summary');
+      expect(
+        sink.shown,
+        hasLength(1),
+        reason: 'one message is its own summary',
+      );
 
       await deliver(_message(eventId: r'$2', body: 'two'));
 
@@ -400,9 +418,7 @@ void main() {
 
     test('reading one leg clears the whole merged conversation', () async {
       await service.start();
-      await deliver(
-        _message(eventId: r'$wa', roomId: '!wa:example.org'),
-      );
+      await deliver(_message(eventId: r'$wa', roomId: '!wa:example.org'));
       await deliver(
         _message(
           eventId: r'$sg',
@@ -424,18 +440,21 @@ void main() {
       );
     });
 
-    test('a tap hands the deep link to the router, not to a second one', () async {
-      String? opened;
-      service.onOpenLink = (link) => opened = link;
-      await service.start();
-      await deliver(_message());
+    test(
+      'a tap hands the deep link to the router, not to a second one',
+      () async {
+        String? opened;
+        service.onOpenLink = (link) => opened = link;
+        await service.start();
+        await deliver(_message());
 
-      sink.activate(sink.shown.first);
+        sink.activate(sink.shown.first);
 
-      expect(opened, 'weft://chat/merged%3Acontact_1');
-      final link = WeftLink.parse(opened!);
-      expect((link! as OpenChatLink).chatId, 'merged:contact_1');
-    });
+        expect(opened, 'weft://chat/merged%3Acontact_1');
+        final link = WeftLink.parse(opened!);
+        expect((link! as OpenChatLink).chatId, 'merged:contact_1');
+      },
+    );
 
     test('a cold-start tap is replayed through the same route', () async {
       String? opened;
@@ -449,25 +468,28 @@ void main() {
       expect(opened, 'weft://chat/merged%3Acontact_1');
     });
 
-    test('an action goes to the action handler and never opens a chat', () async {
-      String? opened;
-      NotificationActivation? action;
-      service.onOpenLink = (link) => opened = link;
-      service.onAction = (a) => action = a;
-      await service.start();
-      await deliver(_message());
+    test(
+      'an action goes to the action handler and never opens a chat',
+      () async {
+        String? opened;
+        NotificationActivation? action;
+        service.onOpenLink = (link) => opened = link;
+        service.onAction = (a) => action = a;
+        await service.start();
+        await deliver(_message());
 
-      sink.activate(
-        sink.shown.first,
-        actionId: WeftNotificationActions.reply,
-        input: 'on my way',
-      );
+        sink.activate(
+          sink.shown.first,
+          actionId: WeftNotificationActions.reply,
+          input: 'on my way',
+        );
 
-      expect(opened, isNull);
-      expect(action!.actionId, WeftNotificationActions.reply);
-      expect(action!.input, 'on my way');
-      expect(action!.payload.roomId, '!wa:example.org');
-    });
+        expect(opened, isNull);
+        expect(action!.actionId, WeftNotificationActions.reply);
+        expect(action!.input, 'on my way');
+        expect(action!.payload.roomId, '!wa:example.org');
+      },
+    );
   });
 
   group('push registration', () {
@@ -512,10 +534,7 @@ void main() {
       // The gateway routes on the app id; only iOS needs a payload that lets
       // the service extension run.
       expect(android.defaultPayload, isEmpty);
-      expect(
-        (ios.defaultPayload['aps']! as Map)['mutable-content'],
-        1,
-      );
+      expect((ios.defaultPayload['aps']! as Map)['mutable-content'], 1);
     });
 
     test('desktop is not a failure, it is a platform without push', () async {
@@ -571,21 +590,15 @@ void main() {
           .toList();
 
       expect(messageChannels, hasLength(ChatNetwork.values.length));
-      expect(
-        messageChannels.map((c) => c.groupId).toSet(),
-        {kMessagesChannelGroupId},
-      );
+      expect(messageChannels.map((c) => c.groupId).toSet(), {
+        kMessagesChannelGroupId,
+      });
       // Ids are unique, or two networks share one volume slider.
-      expect(
-        channels.map((c) => c.id).toSet(),
-        hasLength(channels.length),
-      );
+      expect(channels.map((c) => c.id).toSet(), hasLength(channels.length));
     });
 
     test('calls and background sync are separate from messages', () {
-      final channels = {
-        for (final c in weftNotificationChannels()) c.id: c,
-      };
+      final channels = {for (final c in weftNotificationChannels()) c.id: c};
 
       expect(channels[kCallsChannelId]!.importance, Importance.max);
       expect(channels[kBackgroundChannelId]!.importance, Importance.low);
@@ -596,19 +609,365 @@ void main() {
       final category = weftDarwinCategories().single;
 
       expect(category.identifier, kMessageCategoryId);
-      expect(
-        category.actions.map((a) => a.identifier),
-        [
-          WeftNotificationActions.reply,
-          WeftNotificationActions.markRead,
-          WeftNotificationActions.muteForAnHour,
-        ],
-      );
+      expect(category.actions.map((a) => a.identifier), [
+        WeftNotificationActions.reply,
+        WeftNotificationActions.markRead,
+        WeftNotificationActions.muteForAnHour,
+      ]);
       // Reply is a text field, or it is not a reply. `buttonTitle` is only ever
       // set by `DarwinNotificationAction.text`, so it is the assertion the
       // package's exported surface allows.
       expect(category.actions.first.buttonTitle, 'Send');
       expect(category.actions.first.placeholder, 'Message');
+    });
+
+    test('Android carries the same three actions under the same ids', () {
+      final android = weftAndroidMessageActions();
+
+      // The ids are what the handler switches on, and iOS and Android must
+      // agree on them or one platform's buttons quietly do nothing.
+      expect(
+        android.map((a) => a.id),
+        weftDarwinCategories().single.actions.map((a) => a.identifier),
+      );
+      expect(android.map((a) => a.id), [
+        WeftNotificationActions.reply,
+        WeftNotificationActions.markRead,
+        WeftNotificationActions.muteForAnHour,
+      ]);
+    });
+
+    test('reply is the only Android action with an input field', () {
+      final actions = {for (final a in weftAndroidMessageActions()) a.id: a};
+
+      expect(actions[WeftNotificationActions.reply]!.inputs, hasLength(1));
+      expect(
+        actions[WeftNotificationActions.reply]!.inputs.single.label,
+        'Message',
+      );
+      expect(
+        actions[WeftNotificationActions.reply]!.semanticAction,
+        SemanticAction.reply,
+      );
+      expect(actions[WeftNotificationActions.markRead]!.inputs, isEmpty);
+      expect(actions[WeftNotificationActions.muteForAnHour]!.inputs, isEmpty);
+    });
+
+    test('every Android action is delivered to the main isolate', () {
+      // The load-bearing flag on this whole layer. `showsUserInterface: false`
+      // sends the action to a *background* isolate that has no Matrix client,
+      // no vodozemac and no handle on the database — which is to say, to
+      // nowhere the work can be done. See `weftAndroidMessageActions`.
+      for (final action in weftAndroidMessageActions()) {
+        expect(action.showsUserInterface, isTrue, reason: action.id);
+        // Dismissal is the handler's, and only after the work succeeded.
+        expect(action.cancelNotification, isFalse, reason: action.id);
+        expect(action.allowGeneratedReplies, isFalse, reason: action.id);
+      }
+    });
+
+    test('a posted message notification actually carries them', () {
+      final android = NotificationPresentation.forMessage(
+        content: _content(),
+      ).details.android!;
+
+      expect(
+        android.actions?.map((a) => a.id),
+        weftAndroidMessageActions().map((a) => a.id),
+      );
+    });
+  });
+
+  group('NotificationActionHandler', () {
+    late _ActionRepository repository;
+    late List<String> dismissed;
+    late NotificationPolicy policy;
+    late NotificationActionHandler handler;
+
+    setUp(() {
+      repository = _ActionRepository();
+      dismissed = [];
+      policy = NotificationPolicy();
+      handler = NotificationActionHandler(
+        repository: repository,
+        muteChat: (chatId, {DateTime? until}) =>
+            policy = policy.muteChat(chatId, until: until),
+        dismiss: (chatId) async => dismissed.add(chatId),
+      );
+    });
+
+    test('a reply sends on the chat, not on the room that buzzed', () async {
+      final result = await handler.handle(
+        _activation(WeftNotificationActions.reply, input: 'on my way'),
+      );
+
+      expect(result, NotificationActionResult.replied);
+      expect(repository.sent, hasLength(1));
+      // The merged chat id. Sending to `!wa:example.org` would put the reply in
+      // one leg of a conversation the user answered as a whole.
+      expect(repository.sent.single.chatId, 'merged:contact_1');
+      expect(repository.sent.single.body, 'on my way');
+      // No `via`: the repository resolves the chat's own send network, exactly
+      // as the composer does. A merged contact set to Signal does not start
+      // answering over WhatsApp because WhatsApp is what happened to buzz.
+      expect(repository.sent.single.via, isNull);
+    });
+
+    test('replying marks the conversation read and clears it', () async {
+      await handler.handle(
+        _activation(WeftNotificationActions.reply, input: 'ok'),
+      );
+
+      expect(repository.markedRead, ['merged:contact_1']);
+      expect(dismissed, ['merged:contact_1']);
+    });
+
+    test('an empty reply is a closed input field, not a message', () async {
+      for (final input in [null, '', '   ', '\n']) {
+        final result = await handler.handle(
+          _activation(WeftNotificationActions.reply, input: input),
+        );
+        expect(result, NotificationActionResult.ignored, reason: '$input');
+      }
+
+      expect(repository.sent, isEmpty);
+      expect(repository.markedRead, isEmpty);
+      expect(dismissed, isEmpty, reason: 'nothing happened, so nothing clears');
+    });
+
+    test('a reply that will not send leaves the notification up', () async {
+      repository.failSend = true;
+
+      final result = await handler.handle(
+        _activation(WeftNotificationActions.reply, input: 'on my way'),
+      );
+
+      expect(result, NotificationActionResult.failed);
+      // The notification is the only remaining evidence that the message was
+      // neither read nor answered. Clearing it would hide both.
+      expect(dismissed, isEmpty);
+      expect(repository.markedRead, isEmpty);
+    });
+
+    test('a reply survives a read marker that will not move', () async {
+      repository.failMarkRead = true;
+
+      final result = await handler.handle(
+        _activation(WeftNotificationActions.reply, input: 'on my way'),
+      );
+
+      // The message went. Telling the user it failed because a receipt did not
+      // land would be a lie about the only part they care about.
+      expect(result, NotificationActionResult.replied);
+      expect(dismissed, ['merged:contact_1']);
+    });
+
+    test('mark read moves the marker for the whole chat', () async {
+      final result = await handler.handle(
+        _activation(WeftNotificationActions.markRead),
+      );
+
+      expect(result, NotificationActionResult.markedRead);
+      // The chat id, so `markRead` walks every leg — which is what makes the
+      // receipt dismiss this notification on the user's other devices.
+      expect(repository.markedRead, ['merged:contact_1']);
+      expect(dismissed, ['merged:contact_1']);
+      expect(repository.sent, isEmpty);
+    });
+
+    test('mark read that fails leaves the notification up', () async {
+      repository.failMarkRead = true;
+
+      expect(
+        await handler.handle(_activation(WeftNotificationActions.markRead)),
+        NotificationActionResult.failed,
+      );
+      expect(dismissed, isEmpty);
+    });
+
+    test('mute for an hour writes a mute an hour out, and no further', () async {
+      await withClock(Clock.fixed(_now), () async {
+        expect(
+          await handler.handle(
+            _activation(WeftNotificationActions.muteForAnHour),
+          ),
+          NotificationActionResult.muted,
+        );
+      });
+
+      final override = policy.overrideFor('merged:contact_1');
+      expect(override.mutedUntil, _now.add(const Duration(hours: 1)));
+      // A timed mute, never an indefinite one: `muted` is what would survive
+      // the hour, and what `push_rules.dart` would push down to the homeserver.
+      expect(override.muted, isFalse);
+      expect(dismissed, ['merged:contact_1']);
+    });
+
+    test('the mute it writes is the expiry rules_test already pins', () async {
+      await withClock(Clock.fixed(_now), () async {
+        await handler.handle(
+          _activation(WeftNotificationActions.muteForAnHour),
+        );
+      });
+
+      // Half an hour later: silent, and for the reason the user could go and
+      // change.
+      final during = _decide(policy, _now.add(const Duration(minutes: 30)));
+      expect(during, isA<SuppressedDecision>());
+      expect(
+        (during as SuppressedDecision).reason,
+        NotificationSuppression.chatMuted,
+      );
+
+      // An hour and a minute later: audible again, with nothing having run a
+      // timer. The expiry is read off the clock at evaluation time.
+      expect(
+        _decide(policy, _now.add(const Duration(minutes: 61))),
+        isA<NotifyDecision>(),
+      );
+    });
+
+    test(
+      'a mute the policy refuses is a failure, not a silent no-op',
+      () async {
+        final failing = NotificationActionHandler(
+          repository: repository,
+          muteChat: (chatId, {DateTime? until}) =>
+              throw StateError('no settings store'),
+          dismiss: (chatId) async => dismissed.add(chatId),
+        );
+
+        expect(
+          await failing.handle(
+            _activation(WeftNotificationActions.muteForAnHour),
+          ),
+          NotificationActionResult.failed,
+        );
+        expect(dismissed, isEmpty);
+      },
+    );
+
+    test('a tap is not an action, and is left to the link handler', () async {
+      final result = await handler.handle(_activation(null));
+
+      expect(result, NotificationActionResult.ignored);
+      expect(repository.sent, isEmpty);
+      expect(repository.markedRead, isEmpty);
+      expect(dismissed, isEmpty);
+    });
+
+    test('an action id from a newer build is ignored', () async {
+      // An iOS category registered by a later version survives on
+      // notifications this build posted; guessing at its meaning would be
+      // worse than doing nothing.
+      final result = await handler.handle(_activation('weft.snooze'));
+
+      expect(result, NotificationActionResult.ignored);
+      expect(repository.sent, isEmpty);
+    });
+
+    test('an action on a bare-link notification still finds its chat', () async {
+      // What the iOS notification service extension posts: it renders from the
+      // push payload and cannot build a `NotificationPayload`, so its
+      // notifications carry a plain `weft://chat/<id>`.
+      final result = await handler.handle(
+        NotificationActivation(
+          payload: NotificationPayload.decode(
+            notificationLinkFor('merged:contact_1'),
+          )!,
+          actionId: WeftNotificationActions.reply,
+          input: 'on my way',
+        ),
+      );
+
+      expect(result, NotificationActionResult.replied);
+      expect(repository.sent.single.chatId, 'merged:contact_1');
+    });
+
+    test('a payload naming no chat does nothing at all', () async {
+      final result = await handler.handle(
+        NotificationActivation(
+          payload: NotificationPayload.decode('weft://search?q=cats')!,
+          actionId: WeftNotificationActions.markRead,
+        ),
+      );
+
+      expect(result, NotificationActionResult.ignored);
+      expect(repository.markedRead, isEmpty);
+    });
+
+    test('notificationChatId prefers the payload over the link', () {
+      // They agree in practice. When they cannot — a link rewritten by an older
+      // build — the id the notification was rendered from is the one every
+      // other part of the payload belongs to.
+      expect(
+        notificationChatId(
+          const NotificationPayload(
+            link: 'weft://chat/!wa%3Aexample.org',
+            chatId: 'merged:contact_1',
+            roomId: '!wa:example.org',
+            eventId: r'$e',
+            network: ChatNetwork.whatsapp,
+          ),
+        ),
+        'merged:contact_1',
+      );
+    });
+  });
+
+  group('actions end to end', () {
+    test('a reply typed in the shade sends and clears the thread', () async {
+      // The whole chain in one test: a decided notification is posted, the
+      // platform hands back an activation for the reply button, and the
+      // repository sees a send — through exactly the wiring `main.dart` builds.
+      final sink = _RecordingSink();
+      final session = _FakeNotificationSession();
+      addTearDown(session.close);
+      final repository = _ActionRepository();
+
+      final pipeline = MatrixNotificationPipeline(
+        session: session,
+        chatForRoom: _chatForRoom,
+        policy: NotificationPolicy.new,
+        now: () => _now,
+      );
+      final service = WeftNotificationService(
+        sink: sink,
+        pipeline: pipeline,
+        chatForRoom: _chatForRoom,
+      );
+      addTearDown(pipeline.dispose);
+      addTearDown(service.dispose);
+
+      final handler = NotificationActionHandler(
+        repository: repository,
+        muteChat: (chatId, {DateTime? until}) {},
+        dismiss: service.dismissChat,
+      );
+      service.onAction = (activation) => unawaited(handler.handle(activation));
+
+      await service.start();
+      await pipeline.handleMessage(_message(eventId: r'$e1'));
+      await pumpEventQueue();
+      expect(sink.shown, hasLength(1), reason: 'a notification to act on');
+
+      sink.activate(
+        sink.shown.first,
+        actionId: WeftNotificationActions.reply,
+        input: 'five minutes',
+      );
+      await pumpEventQueue();
+
+      expect(repository.sent.single.chatId, 'merged:contact_1');
+      expect(repository.sent.single.body, 'five minutes');
+      expect(repository.markedRead, ['merged:contact_1']);
+      // Cleared here as well as on the user's other devices: the read receipt
+      // does the second half, `dismissChat` the first.
+      expect(service.postedFor('merged:contact_1'), isEmpty);
+      expect(
+        sink.cancelled.map((c) => c.id),
+        contains(stableNotificationId(r'$e1')),
+      );
     });
   });
 }
@@ -635,6 +994,7 @@ WeftMessage _message({
   ChatNetwork network = ChatNetwork.whatsapp,
   String body = 'hello',
   bool isOwn = false,
+  DateTime? timestamp,
 }) {
   return WeftMessage(
     eventId: eventId,
@@ -642,7 +1002,7 @@ WeftMessage _message({
     network: network,
     senderId: '@whatsapp_grace:example.org',
     senderName: 'Grace',
-    timestamp: _now,
+    timestamp: timestamp ?? _now,
     kind: MessageKind.text,
     isOwn: isOwn,
     body: body,
@@ -669,6 +1029,57 @@ NotificationContent _content({
     deepLink: notificationLinkFor(groupKey),
     isMention: isMention,
   );
+}
+
+/// One button press on the notification [_content] renders.
+NotificationActivation _activation(String? actionId, {String? input}) =>
+    NotificationActivation(
+      payload: NotificationPayload.forContent(_content()),
+      actionId: actionId,
+      input: input,
+    );
+
+/// What `evaluateNotification` makes of an ordinary message under [policy].
+///
+/// The same call the pipeline makes, so a mute written by the handler is
+/// checked against the rule that will actually read it rather than against a
+/// re-statement of it.
+NotificationDecision _decide(NotificationPolicy policy, DateTime now) =>
+    evaluateNotification(
+      message: _message(timestamp: now),
+      chat: _mergedChat,
+      policy: policy,
+      now: now,
+      lastReadAt: null,
+      ownUserIds: const {'@me:example.org'},
+    );
+
+/// Records sends and read markers, and can be told to refuse either.
+///
+/// Everything else throws on purpose: an action handler that starts calling the
+/// rest of the repository should fail loudly rather than quietly do half a
+/// send.
+class _ActionRepository implements ChatRepository {
+  final List<({String chatId, String body, ChatNetwork? via})> sent = [];
+  final List<String> markedRead = [];
+
+  bool failSend = false;
+  bool failMarkRead = false;
+
+  @override
+  Future<void> send(String chatId, String body, {ChatNetwork? via}) async {
+    if (failSend) throw StateError('offline');
+    sent.add((chatId: chatId, body: body, via: via));
+  }
+
+  @override
+  Future<void> markRead(String chatId) async {
+    if (failMarkRead) throw StateError('no read marker');
+    markedRead.add(chatId);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// A [NotificationSink] that records instead of posting.

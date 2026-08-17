@@ -185,7 +185,11 @@ class LocalNotificationSink implements NotificationSink {
           IOSFlutterLocalNotificationsPlugin
         >();
     if (ios != null) {
-      return await ios.requestPermissions(alert: true, badge: true, sound: true) ??
+      return await ios.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ??
           false;
     }
 
@@ -255,7 +259,9 @@ class LocalNotificationSink implements NotificationSink {
     return _activationFor(details.notificationResponse);
   }
 
-  static NotificationActivation? _activationFor(NotificationResponse? response) {
+  static NotificationActivation? _activationFor(
+    NotificationResponse? response,
+  ) {
     if (response == null) return null;
     final payload = NotificationPayload.decode(response.payload);
     if (payload == null) return null;
@@ -429,9 +435,7 @@ class WeftNotificationService {
       // A poke that arrives while the app is running. The pipeline dedupes it
       // against the sync path, so a message that arrives both ways is decided
       // once — which is the normal case, not the exception.
-      _pushSub ??= push.pushes.listen(
-        (data) => unawaited(handlePush(data)),
-      );
+      _pushSub ??= push.pushes.listen((data) => unawaited(handlePush(data)));
     }
 
     final launch = await _sink.launchActivation();
@@ -511,9 +515,7 @@ class WeftNotificationService {
   /// two summaries that each believe they are the latest. A chain is the whole
   /// fix, and it costs nothing: notifications are rare and already asynchronous.
   void _enqueue(MatrixNotification notification) {
-    _queue = _queue.then((_) => _post(notification)).catchError((
-      Object error,
-    ) {
+    _queue = _queue.then((_) => _post(notification)).catchError((Object error) {
       // A failure to post one notification must not stop the next one: the
       // chain would be permanently broken by a single dead socket.
       debugPrint('weft: could not post a notification: $error');
@@ -539,10 +541,7 @@ class WeftNotificationService {
     if (windowStart > 0) {
       final dropped = thread[windowStart - 1];
       _avatars.remove(dropped.eventId);
-      await _sink.cancel(
-        id: stableNotificationId(dropped.eventId),
-        tag: group,
-      );
+      await _sink.cancel(id: stableNotificationId(dropped.eventId), tag: group);
     }
     if (thread.length > kMaxTrackedNotificationsPerChat) {
       thread.removeRange(0, thread.length - kMaxTrackedNotificationsPerChat);

@@ -76,7 +76,10 @@ final pushGatewayProvider = Provider<Uri?>((ref) {
   ref.watch(settingsRevisionProvider);
   try {
     return resolvePushGateway(
-      ref.read(storesProvider).settings.getString(WeftSettings.notifyPushGateway),
+      ref
+          .read(storesProvider)
+          .settings
+          .getString(WeftSettings.notifyPushGateway),
     );
   } on StateError {
     return resolvePushGateway(null);

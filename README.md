@@ -37,17 +37,18 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Transcription — **wired**: Transcribe action on voice bubbles, endpoint settings, privacy gate | **Done**, 15 tests |
 | Bridges — **wired**: bridges screen, health probes, generic GUI login flows | **Done**, 21 tests. QR flows show a copyable code, not yet a rendered QR image. |
 | MCP — **wired**: HTTP server (loopback), keys UI, scopes, audit view, tunnel toggle | **Done**, 36 tests |
-| Deep links — weft:// + App Links parsing/routing, Android filters, Apple scheme | **Done**, 12 tests. Domain verification needs the files in `tooling/web` hosted. |
+| Deep links — weft:// + App Links parsing/routing, Android filters, Apple scheme | **Done**, 15 tests. Domain verification needs the files in `tooling/web` hosted. |
 | Share-in — Android SEND/SEND_MULTIPLE, cold-start replay, share-target sheet | **Done** for text and files; shared URIs are streamed to a staged copy and sent through the same upload path as the composer, 15 tests |
 | Merge management UI — suggestions with evidence, accept/reject, unmerge | **Done**, 4 widget tests |
 | Bridge QR login — rendered QR + copyable payload, re-transcribe language picker, auto-transcribe | **Done** |
 | Notification decisions — suppression rules, merged-chat grouping, body rendering, summaries | **Done**, pure Dart, 165 tests |
-| Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 37 tests. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
+| Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 57 tests. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
+| Notification actions — direct reply, mark read, mute for an hour, on Android and iOS | **Done**, wired to `ChatRepository`. All three bring Weft to the foreground on Android: an action handled without doing so runs in a background isolate with no Matrix client. |
 | iOS Share Extension, notification service extension, Direct Share/People API, widgets, watch | **Not built** — the notification service extension is authored at `apps/weft/ios/NotificationService/` but needs Xcode targets and signing |
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**855 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added.
+**878 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in

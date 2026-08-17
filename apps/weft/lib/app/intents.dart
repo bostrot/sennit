@@ -41,14 +41,21 @@ sealed class WeftLink {
     ];
     if (segments.isEmpty) return const OpenInboxLink();
 
+    // `Uri.pathSegments` is *already* percent-decoded, so `!abc%3Aexample.org`
+    // arrives here as `!abc:example.org`. Decoding a second time was harmless
+    // for every id Weft generates — room ids are ASCII, contact ids are
+    // `contact_<micros>_<n>`, and neither leaves a `%` behind for the second
+    // pass to find — but it threw `ArgumentError` out of a method whose whole
+    // contract is that an unknown link must not crash the router, for any id
+    // carrying a literal `%` or a non-ASCII character. Links arrive from
+    // outside the app's control; one decode is the right number.
     switch (segments.first) {
       case 'chat':
         if (segments.length < 2 || segments[1].isEmpty) return null;
-        // Room ids contain `!` and `:` which arrive percent-encoded.
-        return OpenChatLink(Uri.decodeComponent(segments[1]));
+        return OpenChatLink(segments[1]);
       case 'user':
         if (segments.length < 2 || segments[1].isEmpty) return null;
-        return OpenUserLink(Uri.decodeComponent(segments[1]));
+        return OpenUserLink(segments[1]);
       case 'search':
         return OpenSearchLink(uri.queryParameters['q'] ?? '');
       default:

@@ -24,6 +24,60 @@ void main() {
       expect((link! as OpenChatLink).chatId, '!abc:example.org');
     });
 
+    test('decodes exactly once', () {
+      // `Uri.pathSegments` has already decoded the segment, so a second
+      // `Uri.decodeComponent` on top of it either does nothing — which is why
+      // this went unnoticed for every id Weft generates — or corrupts an id
+      // that legitimately contains a `%`. `%2521` is an escaped `%21`: the id
+      // is the literal five characters `%21`, not `!`.
+      expect(
+        (WeftLink.parse('weft://chat/%2521')! as OpenChatLink).chatId,
+        '%21',
+      );
+      expect(
+        (WeftLink.parse('weft://user/%2540anna%3Aexample.org')! as OpenUserLink)
+            .userId,
+        '%40anna:example.org',
+      );
+    });
+
+    test('an id a second decode would throw on still parses', () {
+      // The failure this fixes: `Uri.decodeComponent('100% done')` is an
+      // `ArgumentError`, thrown out of a method whose contract is that an
+      // unknown link must not crash the router. Links arrive from outside the
+      // app's control, and a notification's deep link is built from a chat id
+      // Weft does not choose the shape of.
+      for (final entry in {
+        'weft://chat/100%25%20done': '100% done',
+        'weft://chat/%25zz': '%zz',
+        'weft://chat/gr%C3%BC%C3%9Fe': 'grüße',
+        'https://weft.bostrot.com/chat/100%25': '100%',
+      }.entries) {
+        final link = WeftLink.parse(entry.key);
+        expect(link, isA<OpenChatLink>(), reason: entry.key);
+        expect((link! as OpenChatLink).chatId, entry.value, reason: entry.key);
+      }
+    });
+
+    test('a notification link round-trips the chat id it was built from', () {
+      // `notificationLinkFor` in `weft_notify` is one `Uri.encodeComponent`, so
+      // this is the other half of the round trip a notification tap makes. The
+      // merged id is the case that matters: tapping a merged contact's
+      // notification must open the merged conversation, not one source room.
+      for (final chatId in [
+        'merged:contact_1730000000000_0',
+        '!abc:example.org',
+        '!weird +/:example.org',
+        '!100%:example.org',
+        '!grüße:example.org',
+      ]) {
+        final link = WeftLink.parse(
+          'weft://chat/${Uri.encodeComponent(chatId)}',
+        );
+        expect((link! as OpenChatLink).chatId, chatId, reason: chatId);
+      }
+    });
+
     test('parses user and search links', () {
       expect(
         (WeftLink.parse('weft://user/@anna:example.org')! as OpenUserLink)
