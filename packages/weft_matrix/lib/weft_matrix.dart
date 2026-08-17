@@ -18,3 +18,4 @@ export 'src/mapping.dart';
 export 'src/media.dart';
 export 'src/matrix_timeline_source.dart';
 export 'src/session.dart';
+export 'src/upload.dart';

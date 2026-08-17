@@ -16,6 +16,9 @@ dependencies:
     sdk: flutter
   flutter_vodozemac: ^0.7.1
   http: ^1.6.0
+  # Pure Dart, so thumbnail rasterisation needs no platform channel and runs in
+  # a plain `compute` isolate — and pins no analyzer version against the SDK.
+  image: ^4.5.4
   matrix: ^10.1.0
   meta: ^1.17.0
   path: ^1.9.1
@@ -24,6 +27,7 @@ dependencies:
   # which self-bundles its natives via Dart build hooks, so one code path
   # covers Android, iOS, macOS, Linux and Windows.
   sqflite_common_ffi: ^2.4.2
+  weft_attachments: ^0.1.0
   weft_domain: ^0.1.0
   weft_merge: ^0.1.0
 
