@@ -84,9 +84,12 @@ Two consequences follow, and both are load-bearing elsewhere:
   push has literally nothing to show. `kIosDefaultPayload` sets
   `mutable-content: 1` so the extension gets its chance, with a placeholder
   alert for the half-second before it runs and for the case where iOS kills it
-  for going over budget. The extension is authored at
-  `apps/weft/ios/NotificationService/` and is **not** in the Xcode project: it
-  needs an App Group and signing material that is not in this repository.
+  for going over budget. The extension lives at
+  `apps/weft/ios/NotificationService/`. Phase 03 authored it and left it out of
+  the Xcode project; **Phase 04 registered it**, alongside the Share Extension.
+  `apps/weft/ios/NotificationService/README.md` records why that turned out to be
+  an ordinary text edit after all. It still does not decrypt, and still needs a
+  provisioning profile of its own before a device build will sign.
 
 `append` defaults to false, which tells the homeserver to drop any other pusher
 registered against the same device token — two pushers on one token is two

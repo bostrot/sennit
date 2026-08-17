@@ -3,13 +3,15 @@ import UserNotifications
 /// The iOS notification service extension: the only place an `event_id_only`
 /// push can be turned into readable text while Weft is not running.
 ///
-/// **This target is authored but not wired up.** Adding it to the Xcode project
-/// needs Xcode itself — a new App Extension target, an App Group shared with the
-/// Runner, and a provisioning profile per bundle id — and none of that can be
-/// generated from this repository. See `docs/architecture/notifications.md`
-/// for the checklist. Until it is added, iOS shows the placeholder alert from
-/// `kIosDefaultPayload` and the real notification is posted when the app next
-/// runs; everything else on this file's contract is already true.
+/// **This target is registered and built, and does not decrypt.** Phase 04
+/// added it to `Runner.xcodeproj` alongside the Share Extension; what is still
+/// outstanding is a provisioning profile for
+/// `com.bostrot.weft.NotificationService`, which no repository can hold. See
+/// the README beside this file, and
+/// `docs/decisions/adr-002-ios-signing-handoff.md`. Until the decryption work
+/// below is done, iOS shows the placeholder alert from `kIosDefaultPayload`
+/// with the shape improvements made here, and the real notification is posted
+/// when the app next runs.
 ///
 /// ## Why an extension is required at all
 ///

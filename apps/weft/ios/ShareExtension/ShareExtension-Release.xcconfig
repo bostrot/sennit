@@ -1,0 +1,9 @@
+// Base configuration for the ShareExtension target, Release and Profile.
+//
+// Runner points both of its non-Debug configurations at Flutter/Release.xcconfig;
+// this does the same, for the same reason — Profile differs from Release in the
+// Dart snapshot mode, which is a Runner concern the extension has no part in.
+//
+// See ShareExtension-Debug.xcconfig for why the two includes are here at all.
+#include? "../Pods/Target Support Files/Pods-ShareExtension/Pods-ShareExtension.release.xcconfig"
+#include "../Flutter/Generated.xcconfig"

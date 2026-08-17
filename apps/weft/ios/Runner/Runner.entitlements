@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The host app's half of the Share Extension's App Group. Both bundle ids
+	     must be entitled to the same group or the two processes get two
+	     containers and the drain reads an empty directory forever.
+
+	     This file did not exist before Phase 04. Xcode writes every capability
+	     you enable in Signing & Capabilities into it, so if Push Notifications
+	     is turned on for this target an `aps-environment` key will appear here
+	     too — that is expected and should be committed. Nothing is being removed
+	     by this file's existence: there was no entitlements file to remove
+	     anything from.
+
+	     See docs/decisions/adr-002-ios-signing-handoff.md for what has to happen
+	     on the developer portal before a signed build will accept this. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.bostrot.weft</string>
+	</array>
+</dict>
+</plist>

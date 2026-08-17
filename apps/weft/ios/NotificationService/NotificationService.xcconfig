@@ -1,0 +1,12 @@
+// Base configuration for the NotificationService target, all three
+// configurations.
+//
+// One file rather than the Debug/Release pair the ShareExtension has, because
+// this target is deliberately absent from the Podfile — its README explains
+// why: it needs no pods until it decrypts, and it does not decrypt. There is
+// therefore no CocoaPods include to make conditional.
+//
+// What it does need is the Flutter version pair: NotificationService/Info.plist
+// reads FLUTTER_BUILD_NAME and FLUTTER_BUILD_NUMBER, and an app extension whose
+// version differs from its host app's is rejected at upload.
+#include "../Flutter/Generated.xcconfig"

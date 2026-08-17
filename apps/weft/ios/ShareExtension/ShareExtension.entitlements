@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The extension's only capability, and the only thing that makes it useful:
+	     without the group it gets a private container the host app cannot see,
+	     and every staged share is written somewhere nothing will ever read.
+	     Must stay identical to Runner/Runner.entitlements and to
+	     WeftShareContainer.appGroupIdentifier. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.bostrot.weft</string>
+	</array>
+</dict>
+</plist>

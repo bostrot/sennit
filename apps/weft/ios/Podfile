@@ -36,6 +36,29 @@ target 'Runner' do
   end
 end
 
+# The Share Extension is integrated with no pods, deliberately.
+#
+# It must not inherit Runner's: `flutter_install_all_ios_pods` pulls in the
+# Flutter engine and every plugin, and an app extension that links the engine is
+# an extension that will be killed for exceeding its memory limit before it has
+# copied a photo. `ShareViewController` imports UIKit and Foundation and nothing
+# else, which is the whole design — see the class doc for why it cannot hold a
+# Matrix session.
+#
+# The block is here rather than absent so that CocoaPods generates
+# `Pods-ShareExtension.{debug,release}.xcconfig`, which
+# `ShareExtension/ShareExtension-{Debug,Release}.xcconfig` includes optionally.
+# That is what stops `pod install` warning about a base configuration it did not
+# set, and it means the day this target does need a pod, adding it here is the
+# only step.
+#
+# `NotificationService` is *not* listed: it needs nothing either, and it has no
+# custom xcconfig for CocoaPods to collide with. Its README records the same
+# decision.
+target 'ShareExtension' do
+  use_frameworks!
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)

@@ -1,0 +1,15 @@
+// Base configuration for the ShareExtension target, Debug.
+//
+// Mirrors Flutter/Debug.xcconfig, and for the same two reasons:
+//
+//  * the optional CocoaPods include has to be *here*, in a config the project
+//    already points at, or `pod install` sees a custom base configuration it
+//    did not set and warns on every run. CocoaPods checks for its own include
+//    and stays quiet when it finds one;
+//  * Generated.xcconfig is where FLUTTER_BUILD_NAME and FLUTTER_BUILD_NUMBER
+//    come from, and ShareExtension/Info.plist needs both — an app extension
+//    whose version pair differs from its host app's is rejected at upload.
+//
+// Generated.xcconfig is not in version control; `flutter pub get` writes it.
+#include? "../Pods/Target Support Files/Pods-ShareExtension/Pods-ShareExtension.debug.xcconfig"
+#include "../Flutter/Generated.xcconfig"
