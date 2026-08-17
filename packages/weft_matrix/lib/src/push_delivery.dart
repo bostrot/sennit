@@ -259,6 +259,25 @@ class MatrixNotificationPipeline {
   Future<NotificationDecision?> handleMessage(WeftMessage message) =>
       _handle(message);
 
+  /// Decides on a message that did not come from the homeserver.
+  ///
+  /// This is what the settings screen's "send test notification" runs: a
+  /// synthetic message, and the [chat] the caller wants it attributed to, put
+  /// through the *same* evaluate-render-emit steps a real message takes. That
+  /// is the whole point of it living here rather than in the button — a test
+  /// that posts through a path of its own proves only that the path of its own
+  /// works. When the policy suppresses it, the returned reason is the answer
+  /// the user pressed the button for: "quiet hours", not silence.
+  ///
+  /// The dedupe ledger is deliberately skipped. Pressing the button twice must
+  /// notify twice, and a synthetic event id has no second delivery to collapse
+  /// — recording it would only spend a slot in a bounded ledger that exists to
+  /// cover the window between a push and a sync.
+  Future<NotificationDecision> handleSynthetic({
+    required WeftMessage message,
+    required Chat chat,
+  }) => _decide(message, chat, dedupe: false);
+
   Future<NotificationDecision?> _handle(WeftMessage message) async {
     final chat = _chatForRoom(message.roomId);
     // No chat means the inbox has not seen this room yet — during first sync,
@@ -267,6 +286,16 @@ class MatrixNotificationPipeline {
     // designed around.
     if (chat == null) return null;
 
+    return _decide(message, chat);
+  }
+
+  /// Evaluate, render, emit — the three steps every notification takes, with
+  /// the chat already resolved and nothing left to look up.
+  Future<NotificationDecision> _decide(
+    WeftMessage message,
+    Chat chat, {
+    bool dedupe = true,
+  }) async {
     final policy = _policy();
     final decision = evaluateNotification(
       message: message,
@@ -276,7 +305,7 @@ class MatrixNotificationPipeline {
       lastReadAt: _session.lastReadAt(message.roomId),
       ownUserIds: _session.ownUserIds,
       ownDisplayNames: _session.ownDisplayNames,
-      dedupe: _dedupe,
+      dedupe: dedupe ? _dedupe : null,
     );
 
     if (decision case final DeliveredDecision delivered) {

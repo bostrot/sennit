@@ -747,6 +747,71 @@ void main() {
       expect(lifted.overrideFor('!room:example.org').bypassQuietHours, isTrue);
       expect(lifted.chats, hasLength(1));
     });
+
+    test('pruneExpiredMutes drops a lapsed timed mute', () {
+      final pruned = policy.pruneExpiredMutes(
+        until.add(const Duration(minutes: 1)),
+      );
+      expect(pruned.chats, isEmpty);
+    });
+
+    test('pruneExpiredMutes leaves a mute that is still running', () {
+      final pruned = policy.pruneExpiredMutes(
+        until.subtract(const Duration(minutes: 1)),
+      );
+      expect(pruned.overrideFor('!room:example.org').mutedUntil, until);
+    });
+
+    test('pruneExpiredMutes never touches an indefinite mute', () {
+      // No expiry means nothing to lapse. A tidy-up that silently unmuted a
+      // chat the user muted for good would be the worst possible bug in a
+      // function whose whole job is housekeeping.
+      final forever = NotificationPolicy().muteChat('!room:example.org');
+      final pruned = forever.pruneExpiredMutes(
+        now.add(const Duration(days: 365)),
+      );
+      expect(pruned.overrideFor('!room:example.org').muted, isTrue);
+      expect(identical(pruned, forever), isTrue);
+    });
+
+    test('pruneExpiredMutes returns the same instance when nothing lapsed', () {
+      // What lets the settings screen prune on open without that being a
+      // settings write on every visit.
+      final untouched = policy.pruneExpiredMutes(
+        until.subtract(const Duration(hours: 1)),
+      );
+      expect(identical(untouched, policy), isTrue);
+    });
+
+    test('pruneExpiredMutes keeps the settings that are not the mute', () {
+      final vip = NotificationPolicy()
+          .withChatOverride(
+            '!room:example.org',
+            const ChatNotificationOverride(bypassQuietHours: true),
+          )
+          .muteChat('!room:example.org', until: until);
+      final pruned = vip.pruneExpiredMutes(until.add(const Duration(days: 1)));
+      expect(pruned.overrideFor('!room:example.org').bypassQuietHours, isTrue);
+      expect(pruned.overrideFor('!room:example.org').mutedUntil, isNull);
+      expect(pruned.chats, hasLength(1));
+    });
+
+    test('pruneExpiredMutes prunes only the chats that lapsed', () {
+      final mixed = NotificationPolicy()
+          .muteChat('!lapsed:example.org', until: until)
+          .muteChat(
+            '!running:example.org',
+            until: until.add(const Duration(days: 1)),
+          )
+          .muteChat('!forever:example.org');
+      final pruned = mixed.pruneExpiredMutes(
+        until.add(const Duration(minutes: 1)),
+      );
+      expect(
+        pruned.chats.keys,
+        unorderedEquals(['!running:example.org', '!forever:example.org']),
+      );
+    });
   });
 
   group('quiet hours window', () {

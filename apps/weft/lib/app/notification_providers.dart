@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -59,6 +60,22 @@ class NotificationPolicyNotifier extends Notifier<NotificationPolicy> {
       update(state.muteChat(chatId, until: until));
 
   void unmuteChat(String chatId) => update(state.unmuteChat(chatId));
+
+  /// Drops timed mutes whose hour is up.
+  ///
+  /// Nothing else removes them: a "mute for 1 hour" stops suppressing at the
+  /// boundary but its entry stays in the blob forever, and the settings screen
+  /// would have to filter a list that only grows. Writes only when something
+  /// actually lapsed — [NotificationPolicy.pruneExpiredMutes] returns the same
+  /// instance otherwise — so opening the screen is not a settings write.
+  ///
+  /// The clock is `package:clock`'s, not `DateTime.now()`, because the settings
+  /// screen decides what to *list* from the same one. Two clocks would let a
+  /// mute be pruned from the blob and still drawn on the screen that pruned it.
+  void pruneLapsed({DateTime? now}) {
+    final pruned = state.pruneExpiredMutes(now ?? clock.now());
+    if (!identical(pruned, state)) update(pruned);
+  }
 }
 
 final notificationPolicyProvider =

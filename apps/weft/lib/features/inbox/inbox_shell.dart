@@ -12,6 +12,7 @@ import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/endpoints_screen.dart';
 import '../settings/mcp_screen.dart';
+import '../settings/notifications_screen.dart';
 
 /// Width at which the inbox and the open conversation sit side by side.
 const double _twoPaneBreakpoint = 900;
@@ -331,6 +332,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const BridgesScreen(),
                         ),
                       );
+                    case 'notifications':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
                     case 'endpoints':
                       navigator.push(
                         MaterialPageRoute<void>(
@@ -359,6 +366,10 @@ class _InboxHeader extends ConsumerWidget {
                     child: Text('Merged chats'),
                   ),
                   const PopupMenuItem(value: 'bridges', child: Text('Bridges')),
+                  const PopupMenuItem(
+                    value: 'notifications',
+                    child: Text('Notifications'),
+                  ),
                   const PopupMenuItem(
                     value: 'endpoints',
                     child: Text('Search & transcription'),

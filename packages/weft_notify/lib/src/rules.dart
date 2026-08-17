@@ -383,6 +383,37 @@ class NotificationPolicy {
     overrideFor(chatId).copyWith(muted: false, mutedUntil: null),
   );
 
+  /// A copy with every *lapsed* timed mute cleared.
+  ///
+  /// A "mute for 1 hour" leaves an entry behind once its hour is up. It stops
+  /// suppressing anything — [ChatNotificationOverride.isMutedAt] is false past
+  /// the boundary — but it is still a key in a blob rewritten on every policy
+  /// change, and still a row the settings screen has to filter out of a list
+  /// whose whole promise is "chats that are muted *now*". Neither is a bug on
+  /// its own; both compound, because nothing else ever removes them.
+  ///
+  /// Only the mute fields are cleared, so an override that also carries
+  /// [ChatNotificationOverride.mentionsOnly] or `bypassQuietHours` keeps them
+  /// and only an override left saying nothing at all is dropped — which is
+  /// [withChatOverride]'s existing rule rather than a second one.
+  ///
+  /// Returns `this` when nothing has lapsed, so a caller can persist on a real
+  /// change instead of rewriting the settings row every time a screen opens.
+  NotificationPolicy pruneExpiredMutes(DateTime now) {
+    final lapsed = [
+      for (final entry in chats.entries)
+        if (entry.value.mutedUntil != null && !entry.value.isMutedAt(now))
+          entry.key,
+    ];
+    if (lapsed.isEmpty) return this;
+
+    var next = this;
+    for (final chatId in lapsed) {
+      next = next.unmuteChat(chatId);
+    }
+    return next;
+  }
+
   NotificationPolicy copyWith({
     bool? enabled,
     bool? mentionsOnly,

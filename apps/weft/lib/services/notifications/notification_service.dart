@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 
@@ -30,6 +31,24 @@ const int kMaxNotificationsPerChat = kMaxSummaryLines;
 /// held for as long as a notification is up, and past a certain point the exact
 /// number stops being information.
 const int kMaxTrackedNotificationsPerChat = 99;
+
+/// The conversation a test notification belongs to.
+///
+/// A real id would be better in exactly one respect — the tap would land in a
+/// real chat — and worse in every other. Attributing Weft's own sample text to
+/// a friend puts words in their mouth in the shade, counts a message they never
+/// sent into their summary, and makes the verdict depend on *their* mute rather
+/// than on the settings the user is looking at. So the test gets a conversation
+/// of its own; tapping it opens the chat view's unavailable state, which is the
+/// one rough edge and is documented rather than hidden.
+const String kTestNotificationChatId = 'weft:notification-test';
+
+/// The room behind [kTestNotificationChatId].
+///
+/// Deliberately not a resolvable room id: `MatrixNotificationSession.lastReadAt`
+/// returns null for a room the client has never synced, which is what keeps a
+/// test notification from being suppressed as already read.
+const String kTestNotificationRoomId = '!notification-test:weft.invalid';
 
 /// What the user did to a notification.
 ///
@@ -458,6 +477,51 @@ class WeftNotificationService {
       return;
     }
     await _pipeline.handlePush(data);
+  }
+
+  /// Posts a synthetic message through the real decision path.
+  ///
+  /// The settings screen's "send test notification": it proves the whole chain
+  /// — policy, rendering, channel, the platform's own permission state — in one
+  /// press, rather than making the user wait for someone to message them. There
+  /// is no shortcut in it. The message goes through [evaluateNotification] with
+  /// the live policy and through [NotificationContent.forMessage], and reaches
+  /// the shade through the same queue every real notification does, so a test
+  /// that appears means real ones will too.
+  ///
+  /// [network] decides which channel it posts on, so the sound and importance
+  /// under test are the ones the user's own messages use. The returned decision
+  /// is the point of the button as much as the notification is: a suppression
+  /// names the setting responsible, which is a far better answer than a button
+  /// that appears to do nothing.
+  Future<NotificationDecision> sendTestNotification({
+    ChatNetwork network = ChatNetwork.matrix,
+    DateTime? now,
+  }) {
+    final stamp = now ?? DateTime.now();
+    return _pipeline.handleSynthetic(
+      message: WeftMessage(
+        // Unique per press: two tests should stack into a thread the way two
+        // real messages do, rather than the second silently replacing the
+        // first and looking like nothing happened.
+        eventId: '\$weft-test-${stamp.microsecondsSinceEpoch}',
+        roomId: kTestNotificationRoomId,
+        network: network,
+        senderId: '@weft-test:weft.invalid',
+        senderName: 'Weft',
+        timestamp: stamp,
+        kind: MessageKind.text,
+        isOwn: false,
+        body: 'This is what a notification from Weft looks like.',
+      ),
+      chat: Chat(
+        id: kTestNotificationChatId,
+        title: 'Notification test',
+        sources: [
+          ChatSource(roomId: kTestNotificationRoomId, network: network),
+        ],
+      ),
+    );
   }
 
   /// Clears every notification posted for [groupKey].

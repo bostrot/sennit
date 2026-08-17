@@ -275,13 +275,17 @@ void main() {
     late MatrixNotificationPipeline pipeline;
     late WeftNotificationService service;
 
+    /// Read per message by the pipeline, so a test can change it after start.
+    late NotificationPolicy policy;
+
     setUp(() {
       sink = _RecordingSink();
       session = _FakeNotificationSession();
+      policy = NotificationPolicy();
       pipeline = MatrixNotificationPipeline(
         session: session,
         chatForRoom: _chatForRoom,
-        policy: NotificationPolicy.new,
+        policy: () => policy,
         now: () => _now,
       );
       service = WeftNotificationService(
@@ -490,6 +494,62 @@ void main() {
         expect(action!.payload.roomId, '!wa:example.org');
       },
     );
+
+    test('a test notification posts through the real path', () async {
+      await service.start();
+      final decision = await service.sendTestNotification(now: _now);
+      await pumpEventQueue();
+
+      expect(decision, const NotifyDecision());
+      expect(sink.shown, hasLength(1));
+      expect(sink.shown.single.groupKey, kTestNotificationChatId);
+      expect(sink.shown.single.title, 'Notification test');
+      // Same sink, same presentation, same payload as a real message: the
+      // button proves the chain rather than a path of its own — including that
+      // its link round-trips through the router every tap goes through.
+      final link = WeftLink.parse(sink.shown.single.payload.link);
+      expect((link! as OpenChatLink).chatId, kTestNotificationChatId);
+    });
+
+    test('a test notification never joins someone else\'s thread', () async {
+      // `_chatForRoom` resolves *every* room to the merged contact, so a test
+      // that took its chat from the room id would land in Grace's thread and
+      // count a message she never sent into her summary.
+      await service.start();
+      await service.sendTestNotification(now: _now);
+      await pumpEventQueue();
+
+      expect(service.postedFor('merged:contact_1'), isEmpty);
+      expect(service.postedFor(kTestNotificationChatId), hasLength(1));
+    });
+
+    test('two presses are two notifications, not a duplicate', () async {
+      await service.start();
+      await service.sendTestNotification(
+        now: _now.add(const Duration(seconds: 1)),
+      );
+      await service.sendTestNotification(
+        now: _now.add(const Duration(seconds: 2)),
+      );
+      await pumpEventQueue();
+
+      // Two rows, each with its own event id, plus the summary a second
+      // message in one conversation always earns — exactly what two real
+      // messages would have produced, which is the point of the button.
+      expect(service.postedFor(kTestNotificationChatId), hasLength(2));
+      expect(sink.shown.map((s) => s.body).last, contains('2 new messages'));
+    });
+
+    test('a suppressed test names the setting responsible', () async {
+      // The answer the button exists to give: not silence, but "quiet hours".
+      await service.start();
+      policy = NotificationPolicy(enabled: false);
+      final decision = await service.sendTestNotification(now: _now);
+      await pumpEventQueue();
+
+      expect(decision.suppression, NotificationSuppression.globallyDisabled);
+      expect(sink.shown, isEmpty);
+    });
   });
 
   group('push registration', () {

@@ -148,8 +148,10 @@ class NotificationActionHandler {
       // Offline, a room that has gone away, a homeserver saying no. The
       // notification is left standing on purpose: it is the only remaining
       // evidence that the message was neither read nor answered.
-      debugPrint('weft: a notification reply to $chatId could not be sent: '
-          '$error');
+      debugPrint(
+        'weft: a notification reply to $chatId could not be sent: '
+        '$error',
+      );
       return NotificationActionResult.failed;
     }
 

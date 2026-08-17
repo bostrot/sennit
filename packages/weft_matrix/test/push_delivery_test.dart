@@ -373,6 +373,99 @@ void main() {
     });
   });
 
+  group('handleSynthetic', () {
+    // The settings screen's "send test notification". A message no homeserver
+    // ever saw, attributed to a chat `chatForRoom` cannot resolve, run through
+    // the same evaluate-render-emit steps a real one takes.
+    final message = _message(
+      eventId: r'$weft-test-1',
+      roomId: '!notification-test:weft.invalid',
+      network: ChatNetwork.matrix,
+      senderId: '@weft-test:weft.invalid',
+      body: 'This is what a notification from Weft looks like.',
+    );
+    const chat = Chat(
+      id: 'weft:notification-test',
+      title: 'Notification test',
+      sources: [
+        ChatSource(
+          roomId: '!notification-test:weft.invalid',
+          network: ChatNetwork.matrix,
+        ),
+      ],
+    );
+
+    test('renders and emits under the caller\'s chat', () async {
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handleSynthetic(
+        message: message,
+        chat: chat,
+      );
+      await pumpEventQueue();
+
+      expect(decision, const NotifyDecision());
+      expect(posted, hasLength(1));
+      // Not `_chat()`, which is what `chatForRoom` would have returned: a test
+      // notification is its own conversation and must not land in someone's
+      // thread.
+      expect(posted.single.content.groupKey, 'weft:notification-test');
+      expect(
+        posted.single.content.body,
+        'This is what a notification from Weft looks like.',
+      );
+      await pipeline.dispose();
+    });
+
+    test('notifies again when the button is pressed twice', () async {
+      // The ledger is neither read nor written, so a second press is a second
+      // notification rather than a `duplicate` suppression.
+      final pipeline = _pipelineFor(_FakeSession(), now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      expect(
+        (await pipeline.handleSynthetic(message: message, chat: chat)).delivers,
+        isTrue,
+      );
+      expect(
+        (await pipeline.handleSynthetic(message: message, chat: chat)).delivers,
+        isTrue,
+      );
+      await pumpEventQueue();
+
+      expect(posted, hasLength(2));
+      // And a real message with that id would still be decided on its merits,
+      // because nothing was spent recording the test.
+      expect(pipeline.dedupe.contains(r'$weft-test-1'), isFalse);
+      await pipeline.dispose();
+    });
+
+    test('obeys the policy, and says which rule stopped it', () async {
+      // The whole point of the button returning its decision: "quiet hours" is
+      // an answer, silence is not.
+      final pipeline = _pipelineFor(
+        _FakeSession(),
+        now: now,
+        policy: NotificationPolicy(mentionsOnly: true),
+      );
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handleSynthetic(
+        message: message,
+        chat: chat,
+      );
+      await pumpEventQueue();
+
+      expect(decision.suppression, NotificationSuppression.mentionsOnly);
+      expect(posted, isEmpty);
+      await pipeline.dispose();
+    });
+  });
+
   test('a dismissed notification may notify again', () async {
     final pipeline = _pipelineFor(_FakeSession(), now: now);
 
@@ -387,10 +480,11 @@ MatrixNotificationPipeline _pipelineFor(
   _FakeSession session, {
   required DateTime now,
   bool merged = false,
+  NotificationPolicy? policy,
 }) => MatrixNotificationPipeline(
   session: session,
   chatForRoom: (_) => merged ? _mergedChat() : _chat(),
-  policy: NotificationPolicy.new,
+  policy: () => policy ?? NotificationPolicy(),
   now: () => now,
 );
 
