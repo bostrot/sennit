@@ -89,7 +89,12 @@ class OpenSearchLink extends WeftLink {
 /// Content another app shared into Weft.
 @immutable
 class SharedPayload {
-  const SharedPayload({this.text, this.mimeType, this.uris = const []});
+  const SharedPayload({
+    this.text,
+    this.mimeType,
+    this.uris = const [],
+    this.targetChatId,
+  });
 
   final String? text;
 
@@ -104,6 +109,20 @@ class SharedPayload {
   /// file path, and the grant itself dies with the activity.
   final List<String> uris;
 
+  /// The conversation the user already chose, when they chose one outside the
+  /// app.
+  ///
+  /// A `Chat.id`, not a shortcut id — the platform resolves the sanitised id it
+  /// was handed back into the chat it was published for, because the sanitising
+  /// is lossy. Set by an Android Direct Share tap (`EXTRA_SHORTCUT_ID`) and, on
+  /// iOS, by the Share Extension's own picker via `StagedShare.targetChatId`.
+  ///
+  /// Null is the ordinary case and means "ask": a plain share, or a shortcut
+  /// published by an older build that the platform can no longer resolve.
+  /// Guessing would send someone's photo to the wrong person, so an
+  /// unresolvable target is the same as no target.
+  final String? targetChatId;
+
   bool get isEmpty => (text == null || text!.trim().isEmpty) && uris.isEmpty;
 
   static SharedPayload fromMap(Map<Object?, Object?> map) => SharedPayload(
@@ -113,6 +132,15 @@ class SharedPayload {
       for (final uri in (map['uris'] as List?) ?? const [])
         if (uri is String) uri,
     ],
+    // Blank is treated as absent: the platform sends null, but a hand-written
+    // caller sending "" means the same thing and must not pre-select a chat
+    // whose id is the empty string. Not trimmed when it is kept — a chat id is
+    // matched exactly, and quietly editing one would fail to match with no
+    // sign of why.
+    targetChatId: switch (map['targetChatId']) {
+      final String id when id.trim().isNotEmpty => id,
+      _ => null,
+    },
   );
 }
 
@@ -269,6 +297,57 @@ class WeftIntents implements SharedFileResolver {
       return null;
     } on PlatformException {
       return null;
+    }
+  }
+
+  /// Publishes [slots] as the device's Direct Share targets, replacing the set.
+  ///
+  /// Each map is a `ShareTargetSlot.toJson()` with one key added: `iconPath`,
+  /// the avatar already resolved to a file the platform can decode. That key is
+  /// not on the slot itself because the slot carries an `mxc://` URI and this
+  /// package cannot fetch one — resolving it is the caller's job, and on iOS it
+  /// resolves to something else entirely.
+  ///
+  /// On the `/intents` channel rather than a channel of its own. Phase 03 made
+  /// that call for `publishChatShortcut` and wrote down why — "a second channel
+  /// would be a second front door onto the same activity" — and this is the same
+  /// activity, the same `ShareShortcuts` object and the same shortcut ids. Two
+  /// channels publishing one shortcut set is exactly the arrangement where a
+  /// notification stops bubbling because the other front door removed its
+  /// shortcut.
+  ///
+  /// Returns how many the platform actually published, which can be fewer than
+  /// asked for: the per-activity shortcut cap is a device property, and pushing
+  /// past it throws rather than truncating. Zero on a platform with no such
+  /// channel, which is every platform except Android.
+  Future<int> publishShareTargets(List<Map<String, Object?>> slots) async {
+    try {
+      return await _channel.invokeMethod<int>('publishShareTargets', {
+            'slots': slots,
+          }) ??
+          0;
+    } on MissingPluginException {
+      return 0;
+    } on PlatformException {
+      // A launcher that refuses shortcuts. The share sheet still works; it just
+      // shows the app icon instead of faces.
+      return 0;
+    }
+  }
+
+  /// Removes every published share target.
+  ///
+  /// Called on logout. A signed-out device still offering contact names in
+  /// every app's share sheet has leaked them to whoever picks the phone up, and
+  /// a long-lived shortcut is long-lived precisely because nothing else will
+  /// clean it up.
+  Future<void> clearShareTargets() async {
+    try {
+      await _channel.invokeMethod<bool>('clearShareTargets');
+    } on MissingPluginException {
+      // Nothing was ever published here.
+    } on PlatformException {
+      // Nothing useful to do; the next publish will try the removal again.
     }
   }
 

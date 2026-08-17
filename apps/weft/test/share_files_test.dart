@@ -45,9 +45,28 @@ class _FakeShareHost {
   /// size was refused *before* its bytes moved.
   final List<String> stageCalls = [];
 
+  /// Every call, for the methods whose *shape* is the thing under test rather
+  /// than their answer — publishing share targets, where what crosses the
+  /// channel is the contract `ShareShortcuts.kt` reads back.
+  final List<MethodCall> calls = [];
+
+  /// How many targets the device claims to have published. Fewer than asked for
+  /// on a launcher at its per-activity cap, which is a device property.
+  int published = 0;
+
+  /// A platform that refuses. Set to throw the way a real one does — a missing
+  /// handler on desktop, a `PlatformException` from a launcher that said no.
+  Object? Function(MethodCall call)? answer;
+
   Future<Object?> _handle(MethodCall call) async {
+    calls.add(call);
+    if (answer != null) return answer!(call);
     final uri = (call.arguments as Map?)?['uri'] as String?;
     switch (call.method) {
+      case 'publishShareTargets':
+        return published;
+      case 'clearShareTargets':
+        return true;
       case 'getInitialIntent':
         return initialIntent;
       case 'readSharedFileMeta':
@@ -498,6 +517,156 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(await lastMessage(repository), before);
+    });
+
+    group('a share aimed at a conversation', () {
+      // Android's Direct Share, and later the iOS extension's picker: the user
+      // tapped a face in another app's share sheet, so "who" is already answered
+      // and the sheet must not ask it again.
+      testWidgets('goes straight to the chosen chat', (tester) async {
+        final repository = await pumpSheet(
+          tester,
+          const SharedPayload(
+            text: 'hello',
+            mimeType: 'text/plain',
+            targetChatId: roomId,
+          ),
+        );
+
+        expect(find.text('Send to Design Team'), findsWidgets);
+        expect(
+          find.text('Signal Contact'),
+          findsNothing,
+          reason: 'the target list is a question that has been answered',
+        );
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Send to Design Team'),
+        );
+        await tester.pumpAndSettle();
+
+        expect((await lastMessage(repository))!.body, 'hello');
+      });
+
+      testWidgets('a stale shortcut falls back to the picker', (tester) async {
+        // A launcher holds a long-lived shortcut indefinitely, so the chat behind
+        // one can have been archived, left or unmerged since it was published.
+        // Sending to an id nothing on screen accounts for is the one outcome
+        // worse than asking again.
+        await pumpSheet(
+          tester,
+          const SharedPayload(
+            text: 'hello',
+            mimeType: 'text/plain',
+            targetChatId: '!gone_forever:example.org',
+          ),
+        );
+
+        expect(find.text('Share to…'), findsOneWidget);
+        expect(find.text('Design Team'), findsWidgets);
+      });
+
+      testWidgets('the user can still choose someone else', (tester) async {
+        // A Direct Share row is four small faces; a mis-tap on it is ordinary,
+        // and without a way back the only escape is to cancel and start again in
+        // the other app.
+        final repository = await pumpSheet(
+          tester,
+          const SharedPayload(
+            text: 'hello',
+            mimeType: 'text/plain',
+            targetChatId: roomId,
+          ),
+        );
+
+        await tester.tap(find.text('Choose another chat'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Share to…'), findsOneWidget);
+        await tester.tap(find.text('Design Team'));
+        await tester.pumpAndSettle();
+
+        expect((await lastMessage(repository))!.body, 'hello');
+      });
+
+      testWidgets('nothing sendable disables the send', (tester) async {
+        final repository = await pumpSheet(
+          tester,
+          const SharedPayload(
+            mimeType: 'video/mp4',
+            uris: ['content://media/1'],
+            targetChatId: roomId,
+          ),
+          resolved: const ResolvedShare(
+            problems: ['holiday.mp4 is 200 MB, which is too large to share.'],
+          ),
+        );
+        final before = await lastMessage(repository);
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Send to Design Team'),
+          warnIfMissed: false,
+        );
+        await tester.pumpAndSettle();
+
+        expect(await lastMessage(repository), before);
+      });
+    });
+  });
+
+  group('publishing share targets', () {
+    /// One `ShareTargetSlot.toJson()` with the resolved `iconPath` added, which
+    /// is the shape `ShareShortcuts.publish` reads on the other side.
+    Map<String, Object?> slot(String chatId, {String? iconPath}) => {
+      'id': 'chat_${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_')}',
+      'chatId': chatId,
+      'shortLabel': 'Grace',
+      'longLabel': 'Grace Hopper',
+      'link': 'weft://chat/$chatId',
+      'networks': const ['matrix'],
+      'iconPath': iconPath,
+      'rank': 0,
+    };
+
+    test('the slots cross the channel WeftIntents already owns', () async {
+      host.published = 2;
+
+      final count = await intents().publishShareTargets([
+        slot('merged:contact_1', iconPath: '/tmp/grace.png'),
+        slot('!design:example.org'),
+      ]);
+
+      // What the *device* published, not what was asked for: the per-activity
+      // cap is a device property and the platform clamps to it.
+      expect(count, 2);
+      final call = host.calls.single;
+      expect(call.method, 'publishShareTargets');
+      final slots = (call.arguments! as Map)['slots']! as List;
+      expect(slots, hasLength(2));
+      expect((slots.first as Map)['chatId'], 'merged:contact_1');
+      expect(
+        (slots.first as Map)['iconPath'],
+        '/tmp/grace.png',
+        reason: 'the avatar is resolved on this side; Kotlin only decodes it',
+      );
+    });
+
+    test('clearing is a call, and asks for nothing back', () async {
+      await intents().clearShareTargets();
+      expect(host.calls.single.method, 'clearShareTargets');
+    });
+
+    test('a platform with no shortcuts publishes none, quietly', () async {
+      // Every platform but Android, and an Android launcher at its limit. A
+      // share sheet showing the app icon instead of faces is a worse share
+      // sheet, not a broken app.
+      host.answer = (_) => throw MissingPluginException();
+      expect(await intents().publishShareTargets([slot('x')]), 0);
+      await intents().clearShareTargets();
+
+      host.answer = (_) => throw PlatformException(code: 'refused');
+      expect(await intents().publishShareTargets([slot('x')]), 0);
+      await intents().clearShareTargets();
     });
   });
 }

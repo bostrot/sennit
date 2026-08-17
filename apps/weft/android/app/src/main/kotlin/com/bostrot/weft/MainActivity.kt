@@ -2,13 +2,8 @@ package com.bostrot.weft
 
 import android.content.ContentResolver
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.core.app.Person
-import androidx.core.content.pm.ShortcutInfoCompat
-import androidx.core.content.pm.ShortcutManagerCompat
-import androidx.core.graphics.drawable.IconCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -79,19 +74,41 @@ class MainActivity : FlutterActivity() {
                     if (id == null || label == null || link == null) {
                         result.error("bad_args", "id, label and link are required", null)
                     } else {
-                        try {
-                            publishChatShortcut(
+                        // A launcher that refuses shortcuts costs the
+                        // conversation its bubble, not its notification.
+                        result.success(
+                            ShareShortcuts.publishOne(
+                                activity = this,
                                 id = id,
+                                chatId = call.argument<String>("chatId"),
                                 label = label,
                                 link = link,
                                 iconPath = call.argument<String>("iconPath"),
                             )
-                            result.success(true)
+                        )
+                    }
+                }
+                "publishShareTargets" -> {
+                    val slots = call.argument<List<Map<String, Any?>>>("slots")
+                    if (slots == null) {
+                        result.error("bad_args", "slots is required", null)
+                    } else {
+                        try {
+                            result.success(ShareShortcuts.publish(this, slots))
                         } catch (e: Exception) {
-                            // A launcher that refuses shortcuts costs the
-                            // conversation its bubble, not its notification.
-                            result.success(false)
+                            // Same trade as above, one surface up: no Direct
+                            // Share row is a worse share sheet, not a broken
+                            // app, and Dart has nothing useful to do about it.
+                            result.success(0)
                         }
+                    }
+                }
+                "clearShareTargets" -> {
+                    try {
+                        ShareShortcuts.clear(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
                     }
                 }
                 else -> result.notImplemented()
@@ -111,6 +128,7 @@ class MainActivity : FlutterActivity() {
                 "type" to "share",
                 "mimeType" to intent.type,
                 "text" to intent.getStringExtra(Intent.EXTRA_TEXT),
+                "targetChatId" to sharedShortcutChatId(intent),
                 "uris" to listOfNotNull(
                     @Suppress("DEPRECATION")
                     (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)?.toString()
@@ -120,6 +138,7 @@ class MainActivity : FlutterActivity() {
                 "type" to "share",
                 "mimeType" to intent.type,
                 "text" to intent.getStringExtra(Intent.EXTRA_TEXT),
+                "targetChatId" to sharedShortcutChatId(intent),
                 "uris" to (
                     @Suppress("DEPRECATION")
                     intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
@@ -140,61 +159,17 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /// Publishes the launcher shortcut a conversation's notifications hang off.
+    /// The chat a Direct Share intent was aimed at, or null for a plain share.
     ///
-    /// Android will not turn a notification into a bubble, or file it under the
-    /// shade's conversation section, unless a *long-lived dynamic shortcut* with
-    /// the notification's `shortcutId` already exists. That is the whole reason
-    /// this method is here: the notification itself is posted from Dart, but the
-    /// thing that makes it a conversation rather than an alert is native and has
-    /// to be published first.
-    ///
-    /// The shortcut's intent is a plain `weft://chat/<id>` VIEW — deliberately
-    /// the *same* link a notification tap and a shared web link produce, so
-    /// launching from a bubble, from the launcher's long-press menu and from the
-    /// shade all arrive at [handleIntent] and are replayed to Dart through the
-    /// one channel that already exists. A second route into the router is the
-    /// thing this avoids.
-    ///
-    /// The id is the merged chat's, so one person reachable on two networks is
-    /// one shortcut and one bubble rather than two.
-    private fun publishChatShortcut(id: String, label: String, link: String, iconPath: String?) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).apply {
-            setPackage(packageName)
-            setClass(this@MainActivity, MainActivity::class.java)
-        }
-
-        val icon = iconPath?.let { path ->
-            val bitmap = BitmapFactory.decodeFile(path)
-            // Adaptive so the launcher can mask it to its own shape; a raw
-            // bitmap comes out square next to every other round avatar.
-            bitmap?.let { IconCompat.createWithAdaptiveBitmap(it) }
-        }
-
-        val person = Person.Builder()
-            .setName(label)
-            .setKey(id)
-            .apply { if (icon != null) setIcon(icon) }
-            .build()
-
-        val shortcut = ShortcutInfoCompat.Builder(this, id)
-            .setShortLabel(label)
-            .setLongLabel(label)
-            .setIntent(intent)
-            // Long-lived is not optional: a shortcut the launcher may garbage
-            // collect cannot back a bubble, because the bubble outlives the
-            // notification that created it.
-            .setLongLived(true)
-            .setPerson(person)
-            .setCategories(setOf(CONVERSATION_CATEGORY))
-            .apply { if (icon != null) setIcon(icon) }
-            .build()
-
-        // Pushing rather than setting: `push` keeps the launcher's own ranking
-        // and evicts the least-used when the per-activity cap is reached, where
-        // `setDynamicShortcuts` would replace the whole list and drop every
-        // other conversation the user has bubbled.
-        ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
+    /// Android puts the shortcut's id on the `SEND` it builds when the user taps
+    /// a conversation in another app's share sheet rather than the Weft icon.
+    /// That id is sanitised and cannot be turned back into a chat id, so
+    /// [ShareShortcuts] keeps the map it was published with — see
+    /// `ShareShortcuts.chatIdFor`. Null falls through to the in-app target
+    /// picker, which is the same thing a plain share does.
+    private fun sharedShortcutChatId(intent: Intent): String? {
+        val shortcutId = intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID) ?: return null
+        return ShareShortcuts.chatIdFor(this, shortcutId)
     }
 
     /// Display name, size and type for [uri], read without opening it.
@@ -298,9 +273,6 @@ class MainActivity : FlutterActivity() {
     }
 
     private companion object {
-        /// Marks a shortcut as a conversation, which is what puts it in the
-        /// shade's conversation section and lets its notifications bubble.
-        const val CONVERSATION_CATEGORY = "android.shortcut.conversation"
         const val SHARE_CACHE_DIR = "weft-share"
         const val COPY_BUFFER_BYTES = 64 * 1024
         const val STAGED_SHARE_TTL_MS = 24L * 60 * 60 * 1000

@@ -107,6 +107,7 @@ abstract interface class NotificationSink {
   /// is a hard failure to notice from a test that cannot see a launcher.
   Future<void> publishConversationShortcut({
     required String id,
+    required String chatId,
     required String label,
     required String link,
     String? iconPath,
@@ -236,6 +237,7 @@ class LocalNotificationSink implements NotificationSink {
   @override
   Future<void> publishConversationShortcut({
     required String id,
+    required String chatId,
     required String label,
     required String link,
     String? iconPath,
@@ -247,6 +249,12 @@ class LocalNotificationSink implements NotificationSink {
       // invoked on — the handler stays where it is.
       await _platform.invokeMethod<bool>('publishChatShortcut', {
         'id': id,
+        // Sent alongside the id because [id] is sanitised and the platform
+        // cannot invert it. A Direct Share tap hands back only the id, and a
+        // conversation that got its shortcut from a notification rather than
+        // from the ranker would otherwise land on the target picker instead of
+        // the chat the user just chose by name.
+        'chatId': chatId,
         'label': label,
         'link': link,
         'iconPath': iconPath,
@@ -617,6 +625,7 @@ class WeftNotificationService {
     // its bubble with nothing said about it.
     await _sink.publishConversationShortcut(
       id: chatShortcutId(group),
+      chatId: group,
       label: content.title,
       link: content.deepLink,
       iconPath: _avatars[content.eventId],

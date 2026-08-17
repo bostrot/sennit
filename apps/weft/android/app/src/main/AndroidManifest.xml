@@ -67,6 +67,21 @@
                 <data android:mimeType="video/*"/>
                 <data android:mimeType="*/*"/>
             </intent-filter>
+            <!-- Direct Share. The filters above put *Weft* in the share sheet;
+                 this puts the user's actual conversations there, as faces above
+                 the app row. The XML declares which types can be shared to a
+                 conversation and under which category; the conversations
+                 themselves are dynamic shortcuts published at runtime by
+                 `ShareShortcuts.kt`.
+
+                 Note this is meta-data on the activity, not a category on the
+                 filters. `android.shortcut.conversation` is not an intent
+                 category — no sharing app calls `addCategory` with it — so it
+                 lives on the shortcut and on the `<share-target>` in
+                 res/xml/shortcuts.xml, which is what the system reads. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts"/>
         </activity>
         <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
              declared by the firebase_messaging plugin and merged in from its

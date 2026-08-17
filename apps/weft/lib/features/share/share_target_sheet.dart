@@ -1,8 +1,10 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/intents.dart';
 import '../../app/providers.dart';
@@ -46,6 +48,12 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   /// quick succession would send the batch twice, and the second tap is always
   /// a mis-tap on a sheet that is about to close.
   bool _sending = false;
+
+  /// The user asked for the list back after arriving with a target already
+  /// chosen. A Direct Share row is four small faces and a mis-tap on it is
+  /// ordinary; without this the only way out is to cancel the share and start
+  /// again in the other app.
+  bool _pickingAnother = false;
 
   @override
   void initState() {
@@ -107,6 +115,19 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     navigator.pop();
   }
 
+  /// The chat the share was already aimed at, or null to ask.
+  ///
+  /// Resolved against the visible chats rather than trusted: the id comes from
+  /// a shortcut the launcher may have been holding for weeks, and the chat
+  /// behind it can have been archived, left or unmerged since. A stale target
+  /// falls back to the picker, which is what a plain share does — the one thing
+  /// that must not happen is sending to an id nothing on screen accounts for.
+  Chat? _preselected(List<Chat> chats) {
+    final id = widget.payload.targetChatId;
+    if (id == null || _pickingAnother) return null;
+    return chats.firstWhereOrNull((chat) => chat.id == id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final chats = ref.watch(visibleChatsProvider);
@@ -117,6 +138,9 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     // list would be a row of taps that do nothing.
     final hasContent =
         resolved != null && (text.isNotEmpty || resolved.sources.isNotEmpty);
+    // Chosen outside the app — a Direct Share face, or the iOS extension's own
+    // picker. The list below is then not a question that still needs asking.
+    final target = _preselected(chats);
 
     return DraggableScrollableSheet(
       expand: false,
@@ -133,7 +157,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Share to…',
+                  target == null ? 'Share to…' : 'Send to ${target.title}',
                   style: context.text.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -166,30 +190,39 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              controller: controller,
-              itemCount: chats.length,
-              itemBuilder: (context, i) {
-                final chat = chats[i];
-                return ListTile(
-                  enabled: hasContent && !_sending,
-                  leading: WeftAvatar(
-                    label: chat.title,
-                    networks: chat.networks,
-                    size: 40,
-                  ),
-                  title: Text(chat.title),
-                  subtitle: chat.lastMessage == null
-                      ? null
-                      : Text(
-                          DateFormat.yMMMd().format(
-                            chat.lastMessage!.timestamp,
-                          ),
+            child: target != null
+                ? _PreselectedTarget(
+                    chat: target,
+                    enabled: hasContent && !_sending,
+                    onSend: () => _sendTo(target.id, target.title),
+                    onChooseAnother: _sending
+                        ? null
+                        : () => setState(() => _pickingAnother = true),
+                  )
+                : ListView.builder(
+                    controller: controller,
+                    itemCount: chats.length,
+                    itemBuilder: (context, i) {
+                      final chat = chats[i];
+                      return ListTile(
+                        enabled: hasContent && !_sending,
+                        leading: WeftAvatar(
+                          label: chat.title,
+                          networks: chat.networks,
+                          size: 40,
                         ),
-                  onTap: () => _sendTo(chat.id, chat.title),
-                );
-              },
-            ),
+                        title: Text(chat.title),
+                        subtitle: chat.lastMessage == null
+                            ? null
+                            : Text(
+                                DateFormat.yMMMd().format(
+                                  chat.lastMessage!.timestamp,
+                                ),
+                              ),
+                        onTap: () => _sendTo(chat.id, chat.title),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -218,6 +251,71 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
 
   static String _preview(String text) =>
       text.length > 120 ? '${text.substring(0, 120)}…' : text;
+}
+
+/// The conversation the share was already aimed at, and a way out of it.
+///
+/// Shown instead of the target list when the intent carried a `targetChatId` —
+/// an Android Direct Share face or the iOS extension's picker. The user has
+/// already answered "who", so asking again is the sheet arguing with the
+/// choice they just made in another app.
+///
+/// It is still a confirmation and not an immediate send. The strip above shows
+/// *what* is about to go, which is the half a share sheet's four small faces
+/// cannot show, and a share is unrecallable in a way that earns one tap.
+class _PreselectedTarget extends StatelessWidget {
+  const _PreselectedTarget({
+    required this.chat,
+    required this.enabled,
+    required this.onSend,
+    required this.onChooseAnother,
+  });
+
+  final Chat chat;
+
+  /// False while the files are still being read, and after the send has begun.
+  final bool enabled;
+
+  final VoidCallback onSend;
+
+  /// Null once a send is in flight — there is no longer another chat to choose.
+  final VoidCallback? onChooseAnother;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ListTile(
+          leading: WeftAvatar(
+            label: chat.title,
+            networks: chat.networks,
+            size: 40,
+          ),
+          title: Text(chat.title),
+          subtitle: const Text('Chosen from the share sheet'),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: WeftSpace.xl),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: enabled ? onSend : null,
+                  icon: const Icon(Icons.send),
+                  label: Text('Send to ${chat.title}'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: onChooseAnother,
+          child: const Text('Choose another chat'),
+        ),
+      ],
+    );
+  }
 }
 
 /// The shared files, as pictures rather than as a count.

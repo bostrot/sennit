@@ -131,5 +131,34 @@ void main() {
     test('whitespace-only text with no files is empty', () {
       expect(SharedPayload.fromMap(const {'text': '  '}).isEmpty, isTrue);
     });
+
+    test('a Direct Share tap carries the chat it was aimed at', () {
+      // What `MainActivity` builds from an `EXTRA_SHORTCUT_ID` it resolved: a
+      // `Chat.id`, not the sanitised shortcut id, because the sanitising is
+      // lossy and only the platform kept the map.
+      final payload = SharedPayload.fromMap(const {
+        'uris': ['content://media/1'],
+        'targetChatId': 'merged:contact_1',
+      });
+
+      expect(payload.targetChatId, 'merged:contact_1');
+    });
+
+    test('an unresolved shortcut is the same as no target', () {
+      // Null is what the platform sends for a plain share and for a shortcut it
+      // could not resolve — a build older than the id map, or one published
+      // before a logout cleared it. Both mean "ask", and the empty string means
+      // the same thing rather than pre-selecting a chat with no id.
+      for (final absent in [null, '', '   ', 42]) {
+        expect(
+          SharedPayload.fromMap({
+            'uris': const ['content://media/1'],
+            'targetChatId': absent,
+          }).targetChatId,
+          isNull,
+          reason: 'targetChatId: $absent',
+        );
+      }
+    });
   });
 }

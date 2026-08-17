@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Direct Share's half of the contract.
+
+     A published shortcut only appears in another app's share sheet when its
+     categories intersect a `<share-target>` whose `<data>` matches the type
+     being shared. The shortcuts themselves are dynamic and published at runtime
+     by `ShareShortcuts.kt` — nothing here names a conversation. What this file
+     declares is the *shape* of the offer: which types Weft can receive, into
+     which activity, under which category.
+
+     The category string below is `ShareShortcuts.SHARE_CATEGORY`, written twice
+     because one side is Kotlin and the other is a resource. A mismatch is
+     silent: the app still receives shares, it simply never appears as a person.
+
+     `android.shortcut.conversation` is here rather than on the manifest's
+     `SEND` intent filters — an intent filter's `<category>` is matched against
+     `Intent.addCategory`, and no sharing app adds that one. It belongs on the
+     shortcut and its share-target, which is what tells the system these targets
+     are people rather than actions.
+
+     The `<data>` rows mirror the `SEND` / `SEND_MULTIPLE` filters in
+     AndroidManifest.xml. They are two lists of the same thing: the filters
+     decide whether Weft is in the sheet at all, these decide whether the
+     conversations are. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="com.bostrot.weft.MainActivity">
+        <data android:mimeType="text/plain"/>
+        <data android:mimeType="image/*"/>
+        <data android:mimeType="video/*"/>
+        <data android:mimeType="audio/*"/>
+        <data android:mimeType="application/pdf"/>
+        <data android:mimeType="text/x-vcard"/>
+        <!-- The mixed batch. A gallery sharing a photo and a video together
+             declares `*/*`, and without this row that share — one of the most
+             common there is — falls back to the plain app icon while every
+             single-file share shows faces. Wider than the rows above but not
+             wider than the intent filters, which still decide whether Weft is
+             offered at all. -->
+        <data android:mimeType="*/*"/>
+        <category android:name="com.bostrot.weft.category.SHARE_TARGET"/>
+        <category android:name="android.shortcut.conversation"/>
+    </share-target>
+</shortcuts>

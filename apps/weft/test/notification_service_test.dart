@@ -1395,6 +1395,7 @@ void main() {
       () async {
         await LocalNotificationSink().publishConversationShortcut(
           id: chatShortcutId('merged:contact_1'),
+          chatId: 'merged:contact_1',
           label: 'Grace',
           link: notificationLinkFor('merged:contact_1'),
           iconPath: '/tmp/grace.png',
@@ -1404,6 +1405,10 @@ void main() {
         expect(call.method, 'publishChatShortcut');
         final args = call.arguments! as Map;
         expect(args['id'], 'chat_merged_contact_1');
+        // Both, because the id is sanitised and cannot be inverted: a Direct
+        // Share tap hands back only the id, and the platform needs the chat it
+        // was published for to pre-select anything.
+        expect(args['chatId'], 'merged:contact_1');
         expect(args['label'], 'Grace');
         // A plain `weft://chat/<id>` VIEW, so a long-press in the launcher goes
         // through the *existing* intent replay rather than a second front door.
@@ -1418,6 +1423,7 @@ void main() {
       intents.answer = (call) => throw PlatformException(code: 'refused');
       await LocalNotificationSink().publishConversationShortcut(
         id: 'chat_x',
+        chatId: 'x',
         label: 'x',
         link: 'weft://chat/x',
       );
@@ -1425,6 +1431,7 @@ void main() {
       intents.answer = (call) => throw MissingPluginException();
       await LocalNotificationSink().publishConversationShortcut(
         id: 'chat_x',
+        chatId: 'x',
         label: 'x',
         link: 'weft://chat/x',
       );
@@ -1437,6 +1444,7 @@ void main() {
 
       await LocalNotificationSink().publishConversationShortcut(
         id: 'chat_x',
+        chatId: 'x',
         label: 'x',
         link: 'weft://chat/x',
       );

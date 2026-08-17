@@ -63,6 +63,7 @@ class RecordingNotificationSink implements NotificationSink {
   @override
   Future<void> publishConversationShortcut({
     required String id,
+    required String chatId,
     required String label,
     required String link,
     String? iconPath,
