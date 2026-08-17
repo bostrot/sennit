@@ -348,6 +348,61 @@ void main() {
         expect(payload.file?.algorithm, 'A256CTR');
       },
     );
+
+    test('an encrypted send puts ciphertext on the wire and in `file`', () async {
+      // The three steps joined up, which is the shape a receiving client
+      // actually sees: prepare, upload, then the event content. Each half is
+      // covered on its own; what this pins is that they agree — plaintext must
+      // never reach the socket, and the mxc URI of ciphertext must never appear
+      // as a top-level `url`, where an unsuspecting client would fetch it and
+      // render the encrypted bytes as a broken image.
+      late http.Request seen;
+      final transport = _transportWith(
+        MockClient((request) async {
+          seen = request;
+          return _uriResponse('mxc://example.org/cipher');
+        }),
+        encryptor: _fakeEncryptor,
+      );
+      final plaintext = Uint8List.fromList([1, 2, 3]);
+
+      final payload = await transport.preparePayload(plaintext, encrypted: true);
+      final uri = await transport.upload(
+        payload.bytes,
+        mimeType: 'application/octet-stream',
+        uploadId: 'task-1',
+      );
+      final content = _planFor(
+        _jpegSource(),
+        encrypted: true,
+      ).toEventContent(uri: uri, file: payload.file);
+
+      expect(seen.bodyBytes, [254, 253, 252]);
+      expect(seen.bodyBytes, isNot(plaintext));
+      expect(content['url'], isNull);
+      final file = content['file']! as Map<String, Object?>;
+      expect(file['url'], 'mxc://example.org/cipher');
+      expect((file['key']! as Map)['k'], 'the-key');
+      expect((file['hashes']! as Map)['sha256'], 'hash-of-3');
+    });
+
+    test('a plain send is the file itself, addressed by `url`', () async {
+      final transport = _transportWith(
+        MockClient((_) async => _uriResponse('mxc://example.org/plain')),
+      );
+
+      final payload = await transport.preparePayload(_bytes(32), encrypted: false);
+      final uri = await transport.upload(
+        payload.bytes,
+        mimeType: 'image/jpeg',
+        uploadId: 'task-1',
+      );
+      final content = _planFor(_jpegSource()).toEventContent(uri: uri);
+
+      expect(content['url'], 'mxc://example.org/plain');
+      expect(content.containsKey('file'), isFalse);
+      expect(content['msgtype'], 'm.image');
+    });
   });
 
   group('MatrixAttachmentTransport.maxUploadBytes', () {

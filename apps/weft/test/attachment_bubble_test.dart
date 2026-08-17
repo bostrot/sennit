@@ -13,6 +13,8 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'support/attachment_fixtures.dart';
+
 /// A picker that never touches a platform channel.
 ///
 /// Every real implementation behind [AttachmentPicker] is a method channel, so
@@ -61,6 +63,8 @@ void main() {
     String? attachmentUrl = '\$event',
     int? durationMs,
     int? sizeBytes,
+    int? width,
+    int? height,
     String? transcript,
   }) => WeftMessage(
     eventId: '\$event',
@@ -75,14 +79,27 @@ void main() {
     attachmentUrl: attachmentUrl,
     durationMs: durationMs,
     mediaSizeBytes: sizeBytes,
+    mediaWidth: width,
+    mediaHeight: height,
     transcript: transcript,
   );
 
-  Future<void> pumpBubble(WidgetTester tester, Widget child) {
+  /// Pumps a bubble against a repository that answers [attachmentBytes] with
+  /// [bytes] — null being demo mode's own answer, and the same answer an
+  /// undecryptable attachment gets.
+  Future<void> pumpBubble(
+    WidgetTester tester,
+    Widget child, {
+    Uint8List? bytes,
+  }) {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
-          chatRepositoryProvider.overrideWithValue(DemoChatRepository()),
+          chatRepositoryProvider.overrideWithValue(
+            bytes == null
+                ? DemoChatRepository()
+                : StubChatRepository(bytes: bytes),
+          ),
         ],
         child: MaterialApp(
           theme: WeftTheme.build(),
@@ -165,6 +182,143 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
       expect(find.text('holiday.jpg'), findsNothing);
+    });
+
+    testWidgets('an image that decodes is the picture, and opens on tap', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image),
+          own: false,
+          onOpen: () {},
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.byIcon(Icons.broken_image_outlined), findsNothing);
+      // The flight the viewer lands on. A tag that disagrees with the viewer's
+      // does not throw — it silently stops animating — so it is asserted rather
+      // than assumed.
+      expect(
+        tester.widget<Hero>(find.byType(Hero)).tag,
+        mediaHeroTag(message(kind: MessageKind.image)),
+      );
+      // The handler is read rather than tapped: a `MemoryImage` resolves on the
+      // real event loop, which a widget test's fake-async zone never runs, so
+      // the decoded picture has no hit area to aim at. The rule under test is
+      // the guard on `onTap`, and that is what is asserted — the tap itself is
+      // exercised end to end in `media_viewer_test`.
+      final detector = tester.widget<GestureDetector>(
+        find.descendant(
+          of: find.byType(MediaAttachment),
+          matching: find.byType(GestureDetector),
+        ),
+      );
+      expect(detector.onTap, isNotNull);
+    });
+
+    testWidgets('a photo with no bytes yet cannot be opened', (tester) async {
+      // Opening the viewer on an attachment that failed to decrypt would show a
+      // full screen of the same placeholder, having animated to get there.
+      var opened = false;
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image),
+          own: false,
+          onOpen: () => opened = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.broken_image_outlined));
+      expect(opened, isFalse);
+      expect(find.byType(Hero), findsNothing);
+    });
+
+    testWidgets('an announced shape is reserved before the bytes arrive', (
+      tester,
+    ) async {
+      // The reflow this prevents: an encrypted 16:9 photo laying out as a squat
+      // box and then pushing the timeline down under the reader's thumb the
+      // moment it decodes.
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, width: 1600, height: 900),
+          own: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final wide = tester.getSize(
+        find.ancestor(
+          of: find.byIcon(Icons.broken_image_outlined),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(wide.width / wide.height, closeTo(16 / 9, 0.01));
+
+      // A sender that announced nothing gets the default box rather than a
+      // division by null.
+      await pumpBubble(
+        tester,
+        AttachmentBubble(message: message(kind: MessageKind.image), own: false),
+      );
+      await tester.pumpAndSettle();
+
+      final unknown = tester.getSize(
+        find.ancestor(
+          of: find.byIcon(Icons.broken_image_outlined),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(unknown.height, isNot(closeTo(wide.height, 1)));
+    });
+
+    testWidgets('a caption is drawn under the picture, a filename is not', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, body: 'from the beach'),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('from the beach'), findsOneWidget);
+
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, body: 'IMG_4021.HEIC'),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('IMG_4021.HEIC'), findsNothing);
+    });
+
+    testWidgets('a sticker is a picture with no play badge', (tester) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.sticker, body: 'party parrot'),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
     });
 
     testWidgets('a video is marked as one over the poster', (tester) async {

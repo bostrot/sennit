@@ -154,6 +154,22 @@ void main() {
       expect(resolved.sources.single.declaredMimeType, 'application/pdf');
     });
 
+    test('the intent''s type is used when the provider offers none', () async {
+      // The other direction of the same rule: a content provider is allowed to
+      // say nothing about a URI, and the intent's own type is then the only
+      // hint there is. Both are still only hints — `sniffMimeType` has the last
+      // word — but dropping this one sends a photo shared by an app with a
+      // terse provider as `application/octet-stream`.
+      final file = jpegFile('holiday.jpg');
+      share('content://media/1', file, mimeType: null);
+
+      final resolved = await intents().resolveSharedFiles(
+        const SharedPayload(mimeType: 'image/jpeg', uris: ['content://media/1']),
+      );
+
+      expect(resolved.sources.single.declaredMimeType, 'image/jpeg');
+    });
+
     test('a SEND_MULTIPLE batch resolves in the order it was shared', () async {
       share('content://media/1', jpegFile('one.jpg'));
       share('content://media/2', jpegFile('two.jpg'));

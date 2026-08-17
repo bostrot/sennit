@@ -371,6 +371,44 @@ void main() {
       expect(floats.mediaHeight, 899);
     });
 
+    test('an announced size is carried through for the file bubble', () {
+      // The file bubble's second line is `contract.pdf · 2.0 MB`, and there is
+      // nowhere else for the number to come from: the bytes are not fetched
+      // until the attachment is opened, and an encrypted one cannot be measured
+      // without decrypting it.
+      final file = map({
+        'msgtype': 'm.file',
+        'body': 'contract.pdf',
+        'url': 'mxc://example.org/file',
+        'info': {'mimetype': 'application/pdf', 'size': 2 * 1024 * 1024},
+      })!;
+      expect(file.mediaSizeBytes, 2 * 1024 * 1024);
+
+      final video = map({
+        'msgtype': 'm.video',
+        'body': 'clip.mp4',
+        'url': 'mxc://example.org/video',
+        'info': {'size': 4900000, 'w': 1920, 'h': 1080},
+      })!;
+      expect(video.mediaSizeBytes, 4900000);
+    });
+
+    test('an unusable size is dropped rather than shown as 0 B', () {
+      // Same rule as the dimensions, and the same reason: `info` is whatever
+      // the sending client wrote. `0 B` under a photo reads as a broken file.
+      Map<String, Object?> withSize(Object? size) => {
+        'msgtype': 'm.file',
+        'body': 'contract.pdf',
+        'url': 'mxc://example.org/file',
+        if (size != null) 'info': {'size': size},
+      };
+
+      expect(map(withSize(0))!.mediaSizeBytes, isNull);
+      expect(map(withSize('183000'))!.mediaSizeBytes, isNull);
+      expect(map(withSize(-4))!.mediaSizeBytes, isNull);
+      expect(map(withSize(null))!.mediaSizeBytes, isNull);
+    });
+
     test('a sticker maps by event type, not by msgtype', () {
       final message = map({
         'body': 'party parrot',

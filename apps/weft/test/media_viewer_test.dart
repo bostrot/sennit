@@ -20,60 +20,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
-/// A 1x1 PNG. Small enough to be a literal, real enough that `Image.memory`
-/// decodes it instead of raising, which is what makes the hero and the zoom
-/// reachable at all.
-final Uint8List kPixel = Uint8List.fromList(const [
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //
-  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-  0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
-  0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-  0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
-  0x42, 0x60, 0x82,
-]);
-
-/// The demo repository with real pixels and a controllable location.
-///
-/// Extends rather than reimplements: [ChatRepository] is twenty members wide and
-/// only two of them decide which way the staging fork goes, so a subclass keeps
-/// the test about that fork.
-class _StubRepository extends DemoChatRepository {
-  _StubRepository({this.location, this.bytes})
-    : super(uploadTick: Duration.zero);
-
-  /// Non-null stands for an unencrypted room, which is the branch that goes
-  /// through the download transport.
-  final AttachmentLocation? location;
-
-  /// What `downloadAndDecryptAttachment` would hand back. Null is an
-  /// undecryptable or missing attachment.
-  final Uint8List? bytes;
-
-  int locationCalls = 0;
-  int byteCalls = 0;
-
-  @override
-  Future<AttachmentLocation?> attachmentLocation(
-    String roomId,
-    String eventId,
-  ) async {
-    locationCalls++;
-    return location;
-  }
-
-  @override
-  Future<Uint8List?> attachmentBytes(
-    String roomId,
-    String eventId, {
-    bool thumbnail = true,
-  }) async {
-    byteCalls++;
-    return bytes;
-  }
-}
+import 'support/attachment_fixtures.dart';
 
 /// Records what it was asked to fetch and writes fixture bytes at the target.
 class _FakeTransport implements ModelDownloadTransport {
@@ -274,7 +221,7 @@ void main() {
     test(
       'a plain attachment goes through the transport, with its headers',
       () async {
-        final repository = _StubRepository(
+        final repository = StubChatRepository(
           location: AttachmentLocation(
             url: Uri.parse('https://hs.example.org/_matrix/client/v1/media/x'),
             headers: const {'authorization': 'Bearer tok'},
@@ -301,7 +248,7 @@ void main() {
     // The encrypted branch, and the reason the fork exists: ciphertext behind an
     // mxc URI is not the file, so there is no URL to give the transport.
     test('an encrypted attachment is decrypted rather than fetched', () async {
-      final repository = _StubRepository(bytes: kPixel);
+      final repository = StubChatRepository(bytes: kPixel);
       final transport = _FakeTransport();
 
       final file = await stageAttachment(
@@ -336,7 +283,7 @@ void main() {
     });
 
     test('the second call reuses the staged file', () async {
-      final repository = _StubRepository(bytes: kPixel);
+      final repository = StubChatRepository(bytes: kPixel);
       final transport = _FakeTransport();
       final message = media(kind: MessageKind.image);
 
@@ -360,7 +307,7 @@ void main() {
     // Two senders both send `image.jpg`; a flat staging folder would serve the
     // first one's photo for the second one's bubble.
     test('two events with the same filename do not collide', () async {
-      final repository = _StubRepository(bytes: kPixel);
+      final repository = StubChatRepository(bytes: kPixel);
       final one = await stageAttachment(
         media(kind: MessageKind.image, eventId: r'$one'),
         repository: repository,
@@ -381,7 +328,7 @@ void main() {
     // A half file left behind by a cancelled save would otherwise be handed on
     // by every later Share as though it were the whole thing.
     test('a download in progress is not mistaken for a finished one', () async {
-      final repository = _StubRepository(
+      final repository = StubChatRepository(
         location: AttachmentLocation(url: Uri.parse('https://hs/x')),
       );
       final transport = _FakeTransport();
@@ -403,7 +350,7 @@ void main() {
       expect(
         () => stageAttachment(
           media(kind: MessageKind.image),
-          repository: _StubRepository(),
+          repository: StubChatRepository(),
           transport: _FakeTransport(),
           directory: dir,
         ),
@@ -469,7 +416,7 @@ void main() {
         ProviderScope(
           overrides: [
             chatRepositoryProvider.overrideWithValue(
-              repository ?? _StubRepository(bytes: kPixel),
+              repository ?? StubChatRepository(bytes: kPixel),
             ),
             mediaFileStoreProvider.overrideWithValue(
               store ?? _FakeStore(staged),
@@ -634,7 +581,7 @@ void main() {
         tester,
         items: [media(kind: MessageKind.image)],
         store: _FakeStore(null, failure: 'This attachment is gone.'),
-        repository: _StubRepository(),
+        repository: StubChatRepository(),
       );
       await tester.pump();
 
@@ -731,7 +678,7 @@ void main() {
       final staged = File(p.join(dir.path, 'holiday.jpg'))
         ..writeAsBytesSync(kPixel);
 
-      final repository = _StubRepository(bytes: kPixel);
+      final repository = StubChatRepository(bytes: kPixel);
       addTearDown(repository.dispose);
 
       Widget app(Widget home) => ProviderScope(
