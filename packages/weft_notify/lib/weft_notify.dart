@@ -17,5 +17,5 @@ library;
 
 // Consumers import this barrel, never src/.
 //
-// Populated as the phase lands: `src/rules.dart` (evaluation and suppression)
-// and `src/content.dart` (rendering, grouping, summarisation).
+// Still to come: `src/content.dart` (rendering, grouping, summarisation).
+export 'src/rules.dart';
