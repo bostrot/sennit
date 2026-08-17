@@ -64,6 +64,18 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # These two depend on the Flutter SDK — weft_matrix on `compute` and the
+      # SDK's own Flutter-only bindings, weft_store on sqflite — so they cannot
+      # run under `dart test` in the unit job above, and belong here instead of
+      # going unrun. The upload transport lives in weft_matrix.
+      - name: Test weft_matrix, weft_store
+        run: |
+          set -e
+          for pkg in weft_matrix weft_store; do
+            echo "::group::$pkg"
+            (cd "packages/$pkg" && flutter test)
+            echo "::endgroup::"
+          done
       - run: flutter test
         working-directory: apps/weft
       # Goldens are font- and platform-sensitive; publishing the diff makes a

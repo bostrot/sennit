@@ -413,14 +413,16 @@ class _FileAttachment extends StatelessWidget {
   /// user recognises at a glance beats a long table nobody reads.
   static IconData _iconFor(String filename) {
     final dot = filename.lastIndexOf('.');
-    final extension = dot <= 0
-        ? ''
-        : filename.substring(dot + 1).toLowerCase();
+    final extension = dot <= 0 ? '' : filename.substring(dot + 1).toLowerCase();
     return switch (extension) {
       'pdf' => Icons.picture_as_pdf_rounded,
       'zip' || 'gz' || 'tar' || '7z' || 'rar' => Icons.folder_zip_rounded,
-      'doc' || 'docx' || 'odt' || 'rtf' || 'txt' || 'md' =>
-        Icons.description_rounded,
+      'doc' ||
+      'docx' ||
+      'odt' ||
+      'rtf' ||
+      'txt' ||
+      'md' => Icons.description_rounded,
       'xls' || 'xlsx' || 'ods' || 'csv' => Icons.table_chart_rounded,
       'ppt' || 'pptx' || 'odp' => Icons.slideshow_rounded,
       'apk' || 'exe' || 'dmg' || 'deb' => Icons.terminal_rounded,
@@ -612,9 +614,7 @@ class UploadProgressBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _AttachmentGlyph(
-              icon: failed
-                  ? Icons.error_outline_rounded
-                  : _kindIcon(plan.kind),
+              icon: failed ? Icons.error_outline_rounded : _kindIcon(plan.kind),
               tint: failed ? context.colors.error : onBubble,
             ),
             const SizedBox(width: WeftSpace.sm),

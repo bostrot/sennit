@@ -17,12 +17,14 @@ import 'package:weft_domain/weft_domain.dart';
 void main() {
   /// A JPEG header over a plausible size, which is what makes the plan an
   /// `m.image` with a thumbnail rather than an `m.file`.
-  AttachmentSource photo({String name = 'holiday.jpg', int sizeBytes = 96000}) =>
-      AttachmentSource(
-        filename: name,
-        sizeBytes: sizeBytes,
-        header: Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0]),
-      );
+  AttachmentSource photo({
+    String name = 'holiday.jpg',
+    int sizeBytes = 96000,
+  }) => AttachmentSource(
+    filename: name,
+    sizeBytes: sizeBytes,
+    header: Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0]),
+  );
 
   /// Instant uploads: the tick exists so a human can see the progress bubble,
   /// and a test that waited it out would spend a real second per send.
@@ -107,7 +109,8 @@ void main() {
       expect(
         timeline.view().messages.map((m) => m.body),
         contains('holiday.jpg'),
-        reason: 'a demo send that only updated the inbox preview would '
+        reason:
+            'a demo send that only updated the inbox preview would '
             'disappear the moment the user reopened the chat',
       );
     });
@@ -121,8 +124,10 @@ void main() {
 
       // Otherwise the timeline draws the settled bubble and the progress bubble
       // for the same photo, one above the other.
-      expect(await repository.watchUploads('!design_room:example.org').first,
-          isEmpty);
+      expect(
+        await repository.watchUploads('!design_room:example.org').first,
+        isEmpty,
+      );
     });
 
     test('uploads are only watched by the chat they belong to', () async {
@@ -141,24 +146,27 @@ void main() {
       expect(other.every((tasks) => tasks.isEmpty), isTrue);
     });
 
-    test('a merged chat sends on the leg the network selector picked', () async {
-      final repository = demo();
-      addTearDown(repository.dispose);
+    test(
+      'a merged chat sends on the leg the network selector picked',
+      () async {
+        final repository = demo();
+        addTearDown(repository.dispose);
 
-      await repository.sendAttachment(
-        'merged:anna',
-        photo(),
-        via: ChatNetwork.telegram,
-      );
-      await pumpEventQueue();
+        await repository.sendAttachment(
+          'merged:anna',
+          photo(),
+          via: ChatNetwork.telegram,
+        );
+        await pumpEventQueue();
 
-      final chats = await repository.watchChats().first;
-      final message = chats
-          .firstWhere((c) => c.id == 'merged:anna')
-          .lastMessage!;
-      expect(message.network, ChatNetwork.telegram);
-      expect(message.roomId, '!anna_tg_room:example.org');
-    });
+        final chats = await repository.watchChats().first;
+        final message = chats
+            .firstWhere((c) => c.id == 'merged:anna')
+            .lastMessage!;
+        expect(message.network, ChatNetwork.telegram);
+        expect(message.roomId, '!anna_tg_room:example.org');
+      },
+    );
 
     test('a batch arrives in the order it was picked', () async {
       final repository = demo();
@@ -174,7 +182,9 @@ void main() {
 
       final timeline = await repository.timelineFor('!design_room:example.org');
       await timeline.loadMore();
-      final sent = timeline.view().messages
+      final sent = timeline
+          .view()
+          .messages
           .where((m) => m.isOwn && m.kind == MessageKind.image)
           .map((m) => m.body)
           .toList();
@@ -221,25 +231,27 @@ void main() {
       );
     });
 
-    test('a file past the server limit is refused before any bytes move',
-        () async {
-      final repository = demo();
-      addTearDown(repository.dispose);
+    test(
+      'a file past the server limit is refused before any bytes move',
+      () async {
+        final repository = demo();
+        addTearDown(repository.dispose);
 
-      await expectLater(
-        repository.sendAttachment(
-          '!design_room:example.org',
-          photo(sizeBytes: kDemoMaxUploadBytes + 1),
-        ),
-        throwsA(
-          isA<AttachmentRejectedException>().having(
-            (e) => e.reason,
-            'reason',
-            UploadRejectionReason.tooLarge,
+        await expectLater(
+          repository.sendAttachment(
+            '!design_room:example.org',
+            photo(sizeBytes: kDemoMaxUploadBytes + 1),
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<AttachmentRejectedException>().having(
+              (e) => e.reason,
+              'reason',
+              UploadRejectionReason.tooLarge,
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('cancel and retry', () {
@@ -248,15 +260,15 @@ void main() {
       addTearDown(repository.dispose);
 
       await repository.sendAttachment('!design_room:example.org', photo());
-      final task = (await repository
-              .watchUploads('!design_room:example.org')
-              .first)
-          .single;
+      final task =
+          (await repository.watchUploads('!design_room:example.org').first)
+              .single;
 
       await repository.cancelUpload(task.id);
       await pumpEventQueue();
 
-      final tasks = await repository.watchUploads('!design_room:example.org')
+      final tasks = await repository
+          .watchUploads('!design_room:example.org')
           .first;
       expect(tasks.single.state, UploadState.cancelled);
 
@@ -270,10 +282,9 @@ void main() {
       addTearDown(repository.dispose);
 
       await repository.sendAttachment('!design_room:example.org', photo());
-      final task = (await repository
-              .watchUploads('!design_room:example.org')
-              .first)
-          .single;
+      final task =
+          (await repository.watchUploads('!design_room:example.org').first)
+              .single;
       await repository.cancelUpload(task.id);
       await pumpEventQueue();
 
@@ -316,9 +327,7 @@ void main() {
 
     test('a chat with no rooms is a StateError, not a null', () {
       expect(
-        () => sendSourceFor(
-          const Chat(id: 'x', title: 'x', sources: []),
-        ),
+        () => sendSourceFor(const Chat(id: 'x', title: 'x', sources: [])),
         throwsStateError,
       );
     });
@@ -333,12 +342,9 @@ void main() {
       return UploadTask(
         id: id,
         roomId: roomId,
-        plan: planUpload(
-              photo(),
-              encrypted: false,
-              maxUploadBytes: 0,
-            )
-            as UploadPlan,
+        plan:
+            planUpload(photo(), encrypted: false, maxUploadBytes: 0)
+                as UploadPlan,
         state: state,
       );
     }
@@ -372,10 +378,13 @@ void main() {
     });
 
     test('a blocked upload is skipped rather than retried in a loop', () {
-      final ready = dispatchableUploads([
-        task('a', state: UploadState.sent),
-        task('b', state: UploadState.sent),
-      ], blocked: {'a'});
+      final ready = dispatchableUploads(
+        [
+          task('a', state: UploadState.sent),
+          task('b', state: UploadState.sent),
+        ],
+        blocked: {'a'},
+      );
       expect(ready.map((t) => t.id), ['b']);
     });
   });
@@ -385,7 +394,8 @@ void main() {
       id: 'upload-1',
       roomId: '!room:example.org',
       plan:
-          planUpload(photo(), encrypted: false, maxUploadBytes: 0) as UploadPlan,
+          planUpload(photo(), encrypted: false, maxUploadBytes: 0)
+              as UploadPlan,
       state: state,
     );
 

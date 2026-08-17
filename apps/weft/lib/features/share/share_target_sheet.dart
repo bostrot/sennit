@@ -87,7 +87,9 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
       }
     }
 
-    problems.addAll(await sendAttachments(repository, chatId, resolved.sources));
+    problems.addAll(
+      await sendAttachments(repository, chatId, resolved.sources),
+    );
 
     final sent = (text.isNotEmpty ? 1 : 0) + resolved.sources.length;
     messenger.showSnackBar(

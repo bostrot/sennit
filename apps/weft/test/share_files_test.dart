@@ -143,7 +143,9 @@ void main() {
       expect(messageKindFor(sniffMimeType(source)), MessageKind.image);
     });
 
-    test('the resolver''s per-file type beats the intent''s batch type', () async {
+    test('the resolver'
+        's per-file type beats the intent'
+        's batch type', () async {
       final file = jpegFile('scan.pdf');
       share('content://media/1', file, mimeType: 'application/pdf');
 
@@ -154,7 +156,8 @@ void main() {
       expect(resolved.sources.single.declaredMimeType, 'application/pdf');
     });
 
-    test('the intent''s type is used when the provider offers none', () async {
+    test('the intent'
+        's type is used when the provider offers none', () async {
       // The other direction of the same rule: a content provider is allowed to
       // say nothing about a URI, and the intent's own type is then the only
       // hint there is. Both are still only hints — `sniffMimeType` has the last
@@ -164,7 +167,10 @@ void main() {
       share('content://media/1', file, mimeType: null);
 
       final resolved = await intents().resolveSharedFiles(
-        const SharedPayload(mimeType: 'image/jpeg', uris: ['content://media/1']),
+        const SharedPayload(
+          mimeType: 'image/jpeg',
+          uris: ['content://media/1'],
+        ),
       );
 
       expect(resolved.sources.single.declaredMimeType, 'image/jpeg');
@@ -213,40 +219,42 @@ void main() {
       );
     });
 
-    test('a provider that under-reports a size is caught by the copy', () async {
-      final file = jpegFile('holiday.jpg', size: 96000);
-      // No size at all, which is legal: a stream with no backing file.
-      share('content://media/1', file, size: null);
+    test(
+      'a provider that under-reports a size is caught by the copy',
+      () async {
+        final file = jpegFile('holiday.jpg', size: 96000);
+        // No size at all, which is legal: a stream with no backing file.
+        share('content://media/1', file, size: null);
 
-      final resolved = await intents(
-        maxFileBytes: 1024,
-      ).resolveSharedFiles(
-        const SharedPayload(uris: ['content://media/1']),
-      );
+        final resolved = await intents(
+          maxFileBytes: 1024,
+        ).resolveSharedFiles(const SharedPayload(uris: ['content://media/1']));
 
-      expect(resolved.sources, isEmpty);
-      expect(resolved.problems.single, contains('too large'));
-      expect(
-        file.existsSync(),
-        isFalse,
-        reason: 'the staged copy of a file that will not be sent is dropped',
-      );
-    });
+        expect(resolved.sources, isEmpty);
+        expect(resolved.problems.single, contains('too large'));
+        expect(
+          file.existsSync(),
+          isFalse,
+          reason: 'the staged copy of a file that will not be sent is dropped',
+        );
+      },
+    );
 
-    test('a file that cannot be staged is a sentence, not a lost batch', () async {
-      share('content://media/1', jpegFile('one.jpg'));
-      host.meta['content://media/2'] = {'name': 'gone.jpg', 'size': 4000};
-      host.staged['content://media/2'] = null;
+    test(
+      'a file that cannot be staged is a sentence, not a lost batch',
+      () async {
+        share('content://media/1', jpegFile('one.jpg'));
+        host.meta['content://media/2'] = {'name': 'gone.jpg', 'size': 4000};
+        host.staged['content://media/2'] = null;
 
-      final resolved = await intents().resolveSharedFiles(
-        const SharedPayload(
-          uris: ['content://media/1', 'content://media/2'],
-        ),
-      );
+        final resolved = await intents().resolveSharedFiles(
+          const SharedPayload(uris: ['content://media/1', 'content://media/2']),
+        );
 
-      expect(resolved.sources.single.basename, 'one.jpg');
-      expect(resolved.problems.single, 'gone.jpg could not be read.');
-    });
+        expect(resolved.sources.single.basename, 'one.jpg');
+        expect(resolved.problems.single, 'gone.jpg could not be read.');
+      },
+    );
 
     test('a provider with nothing to say still yields a usable name', () async {
       final file = jpegFile('opaque');
@@ -288,7 +296,8 @@ void main() {
       expect(
         delivered!.uris,
         ['content://media/1'],
-        reason: 'a cold-start share of a photo must not arrive as an empty '
+        reason:
+            'a cold-start share of a photo must not arrive as an empty '
             'sheet',
       );
       expect(delivered!.text, isNull);
@@ -405,7 +414,10 @@ void main() {
           uris: ['content://media/1', 'content://media/2'],
         ),
         resolved: ResolvedShare(
-          sources: [photo(name: 'one.jpg'), photo(name: 'two.jpg')],
+          sources: [
+            photo(name: 'one.jpg'),
+            photo(name: 'two.jpg'),
+          ],
         ),
       );
 

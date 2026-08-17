@@ -329,7 +329,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// the ones the settled bubble will use.
   Widget _uploadBubble(Chat chat, UploadTask task) {
     final network =
-        chat.sources.where((s) => s.roomId == task.roomId).firstOrNull?.network ??
+        chat.sources
+            .where((s) => s.roomId == task.roomId)
+            .firstOrNull
+            ?.network ??
         chat.networks.firstOrNull ??
         ChatNetwork.matrix;
     final repository = ref.read(chatRepositoryProvider);
@@ -569,7 +572,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -848,8 +853,7 @@ class _MessageBubble extends StatelessWidget {
                           // message does.
                           switch (message.deliveryState) {
                             DeliveryState.sending => Icons.schedule_rounded,
-                            DeliveryState.failed =>
-                              Icons.error_outline_rounded,
+                            DeliveryState.failed => Icons.error_outline_rounded,
                             _ => Icons.done_all_rounded,
                           },
                           size: 13,

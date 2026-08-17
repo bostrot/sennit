@@ -82,8 +82,19 @@ Also valid: `-d linux`, `-d windows`, `-d ios`, `-d android`.
 
 ## Testing
 
+The runner depends on the package, not on the kind of test in it. The seven pure
+Dart packages take `dart test`:
+
 ```bash
 cd packages/weft_merge && dart test
+```
+
+`weft_matrix` and `weft_store` depend on the Flutter SDK — `compute` and the
+Matrix SDK's bindings in one, sqflite in the other — so they take `flutter test`
+even though nothing in them draws:
+
+```bash
+cd packages/weft_matrix && flutter test
 ```
 
 ```bash

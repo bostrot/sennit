@@ -516,7 +516,9 @@ class MatrixChatRepository implements ChatRepository {
       // uri and key material, so [retryUpload] re-sends the event without
       // pushing a megabyte a second time, and blocking it here stops the rest
       // of the batch queueing behind a send that will not recover on its own.
-      debugPrint('weft: attachment event for ${task.id} failed to send: $error');
+      debugPrint(
+        'weft: attachment event for ${task.id} failed to send: $error',
+      );
       _undispatchable.add(task.id);
     }
   }

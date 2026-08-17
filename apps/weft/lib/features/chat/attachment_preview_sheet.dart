@@ -257,9 +257,7 @@ class _PreviewThumbnailState extends ConsumerState<AttachmentSourceThumbnail> {
 
   Future<void> _load() async {
     try {
-      final bytes = await ref.read(attachmentFileReaderProvider)(
-        widget.source,
-      );
+      final bytes = await ref.read(attachmentFileReaderProvider)(widget.source);
       if (!mounted) return;
       setState(() => _bytes = bytes);
     } on Object {

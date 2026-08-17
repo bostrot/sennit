@@ -127,13 +127,17 @@ void main() {
         isNull,
       );
       expect(
-        attachmentCaption(message(kind: MessageKind.image, body: 'IMG_4021.HEIC')),
+        attachmentCaption(
+          message(kind: MessageKind.image, body: 'IMG_4021.HEIC'),
+        ),
         isNull,
       );
       // …and the things that genuinely are captions, including the sentence
       // that merely happens to mention a file.
       expect(
-        attachmentCaption(message(kind: MessageKind.image, body: 'from the beach')),
+        attachmentCaption(
+          message(kind: MessageKind.image, body: 'from the beach'),
+        ),
         'from the beach',
       );
       expect(

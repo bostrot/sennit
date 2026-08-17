@@ -366,7 +366,10 @@ void main() {
       );
       final plaintext = Uint8List.fromList([1, 2, 3]);
 
-      final payload = await transport.preparePayload(plaintext, encrypted: true);
+      final payload = await transport.preparePayload(
+        plaintext,
+        encrypted: true,
+      );
       final uri = await transport.upload(
         payload.bytes,
         mimeType: 'application/octet-stream',
@@ -391,7 +394,10 @@ void main() {
         MockClient((_) async => _uriResponse('mxc://example.org/plain')),
       );
 
-      final payload = await transport.preparePayload(_bytes(32), encrypted: false);
+      final payload = await transport.preparePayload(
+        _bytes(32),
+        encrypted: false,
+      );
       final uri = await transport.upload(
         payload.bytes,
         mimeType: 'image/jpeg',
