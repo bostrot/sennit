@@ -45,7 +45,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling, SMS/default-app, rich content, multi-device extras (M9) | **Not built** |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**586 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
+**590 tests pass** (plus 5 integration tests against a live Synapse). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -115,6 +115,14 @@ Regenerate goldens after an intentional visual change:
 ```bash
 cd apps/weft && flutter test test/goldens --update-goldens
 ```
+
+Then re-run without the flag before committing: a golden that only passes in the
+run that wrote it is carrying something that moves — a wall clock, an animation,
+an undecoded image — and is worth less than no golden at all. The attachment
+goldens capture their bubbles inside a real `ChatView` rather than on a bare
+Scaffold, because a bubble's colour, corner and timestamp row live in
+`chat_view.dart`; and they pin an in-flight upload's clock with `withClock`, so
+the image does not disagree with itself a minute later.
 
 The attachment pipeline also has a runnable prototype. It reads only the leading
 bytes of a real file and prints what Weft would send for it — sniffed mime type,

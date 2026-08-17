@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,7 +11,10 @@ import 'package:weft_design/weft_design.dart';
 
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/settings.dart';
+import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
+import 'package:weft/data/matrix_chat_repository.dart'
+    show AttachmentBytesLoader;
 
 bool _fontsLoaded = false;
 
@@ -124,12 +128,21 @@ String? _flutterRoot() {
 }
 
 /// Pumps [child] inside a themed [ProviderScope] at a fixed logical size.
+///
+/// [repository] and [fileReader] are named rather than a general overrides list
+/// because Riverpod's `Override` is not exported from either barrel, so a typed
+/// `List<Override>` parameter cannot be written at all — the scope's own list
+/// only type-checks by inference. Two named seams cover everything the golden
+/// suites need to state: what is in the rooms, and what a picked file's bytes
+/// are.
 Future<void> pumpWeft(
   WidgetTester tester,
   Widget child, {
   Size size = const Size(1400, 900),
   WeftThemeMode mode = WeftThemeMode.dark,
   Color seed = WeftTheme.defaultSeed,
+  ChatRepository? repository,
+  AttachmentBytesLoader? fileReader,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -142,7 +155,11 @@ Future<void> pumpWeft(
       // never given an explicit type: Riverpod's `Override` is not exported
       // from either barrel, so it can only be produced by inference.
       overrides: [
-        chatRepositoryProvider.overrideWithValue(DemoChatRepository()),
+        chatRepositoryProvider.overrideWithValue(
+          repository ?? DemoChatRepository(),
+        ),
+        if (fileReader != null)
+          attachmentFileReaderProvider.overrideWithValue(fileReader),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -155,4 +172,40 @@ Future<void> pumpWeft(
   // Settle the entry animations rather than capturing them mid-flight, which
   // would make every golden non-deterministic.
   await tester.pumpAndSettle(const Duration(milliseconds: 50));
+}
+
+/// Decodes [provider] into the shared image cache before a golden is pumped.
+///
+/// `Image.memory` resolves its frame through the engine's codec, which is real
+/// asynchronous work — and a widget test's `FakeAsync` zone never advances it.
+/// Pumped the ordinary way, a golden of a photo therefore captures an *empty*
+/// box where the picture should be, which looks enough like a deliberate layout
+/// to be accepted by whoever reviews the image. Resolving under
+/// [WidgetTester.runAsync] first puts the decoded frame in the cache, so the
+/// widget's own resolve is a hit and completes synchronously.
+///
+/// Takes an [ImageProvider] rather than bytes because the cache key must match
+/// the one the widget builds: `Image.memory(bytes, cacheWidth: n)` is a
+/// `ResizeImage` wrapping a `MemoryImage`, and priming the bare `MemoryImage`
+/// would leave the thumbnail as unresolved as before.
+Future<void> primeImage(WidgetTester tester, ImageProvider provider) async {
+  await tester.runAsync(() async {
+    final done = Completer<void>();
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    void finish() {
+      stream.removeListener(listener);
+      if (!done.isCompleted) done.complete();
+    }
+
+    listener = ImageStreamListener(
+      (_, _) => finish(),
+      // A fixture that fails to decode must not hang the suite until its
+      // timeout: the golden then fails on the picture being missing, which
+      // says what actually went wrong.
+      onError: (_, _) => finish(),
+    );
+    stream.addListener(listener);
+    await done.future;
+  });
 }

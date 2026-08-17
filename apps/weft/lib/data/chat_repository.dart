@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -267,6 +268,11 @@ Stream<List<UploadTask>> watchUploadQueue(
 /// [attachmentUrl] is deliberately left null: it is how the timeline asks the
 /// repository for bytes by event id, and there is no event to ask about. The
 /// progress bubble draws from the [UploadTask] itself.
+///
+/// The default [timestamp] is `clock.now()` rather than `DateTime.now()` for
+/// one reason: a golden of an in-flight upload otherwise carries the wall-clock
+/// minute it was regenerated in, and fails every run thereafter. Production
+/// never installs a clock, so the two are the same call.
 WeftMessage uploadEchoMessage(
   UploadTask task, {
   required ChatNetwork network,
@@ -281,7 +287,7 @@ WeftMessage uploadEchoMessage(
     network: network,
     senderId: senderId,
     senderName: senderName,
-    timestamp: timestamp ?? DateTime.now(),
+    timestamp: timestamp ?? clock.now(),
     kind: plan.kind,
     isOwn: true,
     body: plan.filename,
