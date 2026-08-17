@@ -7,6 +7,7 @@ import 'package:weft/app/providers.dart';
 import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -63,6 +64,21 @@ class _NoRoomsRepository implements ChatRepository {
     String eventId, {
     bool thumbnail = true,
   }) => _inner.attachmentBytes(roomId, eventId, thumbnail: thumbnail);
+  @override
+  Future<void> sendAttachment(
+    String chatId,
+    AttachmentSource source, {
+    ChatNetwork? via,
+    bool isVoiceNote = false,
+  }) =>
+      _inner.sendAttachment(chatId, source, via: via, isVoiceNote: isVoiceNote);
+  @override
+  Stream<List<UploadTask>> watchUploads(String chatId) =>
+      _inner.watchUploads(chatId);
+  @override
+  Future<void> retryUpload(String taskId) => _inner.retryUpload(taskId);
+  @override
+  Future<void> cancelUpload(String taskId) => _inner.cancelUpload(taskId);
 }
 
 void main() {

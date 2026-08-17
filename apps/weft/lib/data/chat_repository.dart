@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
@@ -67,6 +68,53 @@ abstract class ChatRepository {
     String eventId, {
     bool thumbnail = true,
   });
+
+  /// Sends [source] as an attachment, uploading it first.
+  ///
+  /// Takes an [AttachmentSource] — a name, a size and a header slice — rather
+  /// than a path or a full byte array because *what this file is* is decided in
+  /// `weft_attachments`, not here: the sniffed mime type, the msgtype, whether
+  /// a thumbnail is worth generating, and the one that renders as a broken
+  /// attachment on every other client when it is wrong — whether the mxc URI
+  /// belongs under `url` or under `file.url`. The repository supplies only the
+  /// two things that package deliberately cannot know: transport to a
+  /// homeserver, and which room of a merged chat [via] resolves to.
+  ///
+  /// Completes when the upload has been *accepted*, not when the bytes have
+  /// landed. Sharing twenty photos would otherwise leave the caller awaiting
+  /// twenty uploads in series; progress is watched through [watchUploads]
+  /// instead.
+  ///
+  /// [isVoiceNote] is the recorder's assertion and is only meaningful for
+  /// audio — it is what separates [MessageKind.voice] from [MessageKind.audio].
+  Future<void> sendAttachment(
+    String chatId,
+    AttachmentSource source, {
+    ChatNetwork? via,
+    bool isVoiceNote = false,
+  });
+
+  /// Uploads in flight, and recently finished ones, for this chat.
+  ///
+  /// A stream of its own rather than part of [timelineFor] because an upload is
+  /// not a message yet: it has no event id, it can fail and be retried, and it
+  /// has to be renderable before the homeserver has heard of it at all. The
+  /// timeline draws these above the settled messages and drops each task once
+  /// its real event arrives.
+  Stream<List<UploadTask>> watchUploads(String chatId);
+
+  /// Tries a failed or cancelled upload again, with a fresh attempt budget.
+  ///
+  /// Keyed by [UploadTask.id] rather than by chat because the retry button
+  /// lives on one failed bubble in a chat that may hold several. The queue
+  /// still holds that task's plan, which is what spares the user picking the
+  /// file a second time.
+  Future<void> retryUpload(String taskId);
+
+  /// Abandons an upload. Best-effort against a socket already on the wire, but
+  /// immediate from the user's point of view: a late success is discarded
+  /// rather than resurrecting the task.
+  Future<void> cancelUpload(String taskId);
 }
 
 /// Filters the inbox by the rail's selection.

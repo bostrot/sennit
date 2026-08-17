@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
@@ -144,6 +145,40 @@ class DemoChatRepository implements ChatRepository {
     String eventId, {
     bool thumbnail = true,
   }) async => null;
+
+  // As in the Matrix repository, the send path is contract-only until the fake
+  // transport lands: no upload can be started, so there are none to watch, and
+  // pretending a send succeeded would drop the file on the floor silently.
+
+  @override
+  Future<void> sendAttachment(
+    String chatId,
+    AttachmentSource source, {
+    ChatNetwork? via,
+    bool isVoiceNote = false,
+  }) {
+    throw UnimplementedError(
+      'DemoChatRepository.sendAttachment awaits its fake transport',
+    );
+  }
+
+  @override
+  Stream<List<UploadTask>> watchUploads(String chatId) =>
+      const Stream<List<UploadTask>>.empty();
+
+  @override
+  Future<void> retryUpload(String taskId) {
+    throw UnimplementedError(
+      'DemoChatRepository.retryUpload awaits its fake transport',
+    );
+  }
+
+  @override
+  Future<void> cancelUpload(String taskId) {
+    throw UnimplementedError(
+      'DemoChatRepository.cancelUpload awaits its fake transport',
+    );
+  }
 
   @override
   void indexMessages(

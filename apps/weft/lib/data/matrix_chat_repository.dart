@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as sdk;
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -296,6 +297,42 @@ class MatrixChatRepository implements ChatRepository {
       // than taking the timeline down.
       return null;
     }
+  }
+
+  // The send path is contract-only for now: the queue, the Matrix transport and
+  // the local echo land together, and half of them would be worse than none.
+  // Until they do, nothing can start an upload, so [watchUploads] has a
+  // truthful empty answer while the three mutators have no honest behaviour at
+  // all — silently succeeding would lose the user's file without saying so.
+
+  @override
+  Future<void> sendAttachment(
+    String chatId,
+    AttachmentSource source, {
+    ChatNetwork? via,
+    bool isVoiceNote = false,
+  }) {
+    throw UnimplementedError(
+      'MatrixChatRepository.sendAttachment awaits MatrixAttachmentTransport',
+    );
+  }
+
+  @override
+  Stream<List<UploadTask>> watchUploads(String chatId) =>
+      const Stream<List<UploadTask>>.empty();
+
+  @override
+  Future<void> retryUpload(String taskId) {
+    throw UnimplementedError(
+      'MatrixChatRepository.retryUpload awaits the upload queue',
+    );
+  }
+
+  @override
+  Future<void> cancelUpload(String taskId) {
+    throw UnimplementedError(
+      'MatrixChatRepository.cancelUpload awaits the upload queue',
+    );
   }
 
   @override

@@ -26,6 +26,7 @@ dependencies:
 
   whisper_ggml: ^2.6.0
 
+  weft_attachments: ^0.1.0
   weft_bridges: ^0.1.0
   weft_design: ^0.1.0
   weft_domain: ^0.1.0
