@@ -9,6 +9,7 @@
 /// them is testable without a homeserver, a device, or a byte on disk.
 library;
 
-// Remaining exports land alongside their source files: src/plan.dart and
-// src/queue.dart. Consumers import this barrel, never src/.
+// The remaining export lands alongside its source file: src/queue.dart.
+// Consumers import this barrel, never src/.
 export 'src/detect.dart';
+export 'src/plan.dart';

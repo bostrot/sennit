@@ -37,12 +37,23 @@ class AttachmentSource {
   /// probe in this library degrades to null rather than assuming a minimum.
   final Uint8List header;
 
+  /// [filename] with any leading path removed.
+  ///
+  /// A picker on one platform hands over a bare name and on another a full
+  /// path, and it is the bare name that becomes the event's `body`.
+  String get basename {
+    final slash = filename.lastIndexOf('/');
+    final backslash = filename.lastIndexOf(r'\');
+    final cut = slash > backslash ? slash : backslash;
+    return cut >= 0 ? filename.substring(cut + 1) : filename;
+  }
+
   /// Lower-cased extension without the dot, or null when there is none.
   ///
   /// A leading-dot name like `.gitignore` has no extension, not an extension of
   /// `gitignore`.
   String? get extension {
-    final name = _basename(filename);
+    final name = basename;
     final dot = name.lastIndexOf('.');
     if (dot <= 0 || dot == name.length - 1) return null;
     return name.substring(dot + 1).toLowerCase();
@@ -576,10 +587,3 @@ bool _containsAscii(Uint8List b, String needle, {required int limit}) {
 /// A RIFF container whose form type at byte 8 is [form].
 bool _isRiff(Uint8List b, String form) =>
     _asciiAt(b, 0, 'RIFF') && _asciiAt(b, 8, form);
-
-String _basename(String path) {
-  final slash = path.lastIndexOf('/');
-  final backslash = path.lastIndexOf(r'\');
-  final cut = slash > backslash ? slash : backslash;
-  return cut >= 0 ? path.substring(cut + 1) : path;
-}
