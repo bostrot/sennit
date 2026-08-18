@@ -273,11 +273,19 @@ class CallStateMachine {
       ),
     );
     out.add(const DisposeMedia());
-    _resetCallState();
     _startIncoming(invite, out);
   }
 
   void _startIncoming(CallInviteSignal invite, List<CallIntent> out) {
+    // Always from a clean slate, whatever was here before — the previous call
+    // that just ended, or the one this invite has taken the place of after
+    // glare. Inheriting its state is not cosmetic: [_endCall] *closes* both
+    // candidate buffers, so a second call that reused them would discard every
+    // candidate arriving before the answer and connect on a LAN and nowhere
+    // else. That is the same silent failure [IceCandidateBuffer] exists to
+    // prevent, arriving by the back door.
+    _resetCallState();
+
     _remoteOffer = invite.offer;
     _inviteReceivedAt = invite.sentAt;
     _inviteLifetime = invite.lifetime;
@@ -495,6 +503,14 @@ class CallStateMachine {
     // exists. Offering video and then failing to open the camera produces an
     // answer for media that never arrives, which the far end shows as a frozen
     // black rectangle rather than an error.
+    //
+    // [CallSession.cameraOn] moves with it, because it means "the engine has
+    // been told to capture" everywhere else — [SetCameraEnabled] sets the two
+    // together — and a flag that disagreed with the engine for the length of a
+    // renegotiation would put the local preview and the camera button out of
+    // step with the camera. It is also what makes the undo in
+    // [_onNegotiationFailed] undo something.
+    _session = call.copyWith(cameraOn: action.video);
     out.add(ApplyVideo(action.video));
     out.add(CreateOffer(video: action.video));
   }
