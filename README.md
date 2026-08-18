@@ -246,25 +246,37 @@ packages/
   weft_search/              BM25 + vector kNN + RRF
   weft_bridges/             provisioning API v3 + admin-room fallback
   weft_transcribe/          pluggable STT adapters
+  weft_notify/              notification rules, content, dedupe ledger
+  weft_share/               share-target ranking, network capability, App Group staging
   weft_matrix/              Matrix SDK wrapper: session, E2EE, verification
   weft_store/               SQLite: identity graph, settings, FTS5 + vectors
   weft_mcp/                 MCP server + cloudflared supervisor
   weft_design/              tokens, themes, components
 docs/architecture/          design notes for the subsystems worth explaining
+docs/decisions/             ADRs, including what needs your Apple developer account
 tooling/docker/             disposable Synapse for tests
 ```
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
-`weft_transcribe` and `weft_mcp` are **pure Dart** — no Flutter, no I/O. That is deliberate: the
-subtle logic lives there and runs under `dart test` in about a second, with no
-device and no homeserver.
+`weft_transcribe`, `weft_notify`, `weft_share` and `weft_mcp` are **pure Dart** — no Flutter, no
+I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
+second, with no device and no homeserver.
 
 Longer-form design notes live in `docs/architecture/` —
 [notifications](docs/architecture/notifications.md) covers the `event_id_only`
-pusher, merged-chat grouping and the read-receipt dismissal loop, and
+pusher, merged-chat grouping and the read-receipt dismissal loop,
 [the attachment pipeline](docs/architecture/attachment-pipeline.md) covers
 sniff-first detection, the plain-vs-encrypted event shapes, and why the upload
-queue bounds concurrency.
+queue bounds concurrency, and
+[share surfaces](docs/architecture/share-surfaces.md) covers Android Direct
+Share, the iOS Share Extension's App Group contract, and the publish diff that
+keeps the launcher from thrashing.
+
+Decisions that need something this repository cannot hold live in
+`docs/decisions/` —
+[ADR-002](docs/decisions/adr-002-ios-signing-handoff.md) is the iOS signing
+handoff: the App Group, the three bundle ids and the profiles that have to exist
+before iOS share-in works.
 
 ## Two things worth knowing before contributing
 
