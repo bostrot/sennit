@@ -253,7 +253,8 @@ packages/
   weft_share/               share-target ranking, network capability, App Group staging
   weft_richtext/            formatted-body allowlist, reply fallbacks, reactions, edits
   weft_sms/                 phone identity, GSM-7/UCS-2 segments, MMS part planning
-  weft_matrix/              Matrix SDK wrapper: session, E2EE, verification
+  weft_call/                call state machine, glare resolution, ICE candidate buffering
+  weft_matrix/              Matrix SDK wrapper: session, E2EE, verification, call signalling
   weft_store/               SQLite: identity graph, settings, FTS5 + vectors
   weft_mcp/                 MCP server + cloudflared supervisor
   weft_design/              tokens, themes, components
@@ -263,7 +264,7 @@ tooling/docker/             disposable Synapse for tests
 ```
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
-`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext`, `weft_sms` and `weft_mcp` are **pure Dart** —
+`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext`, `weft_sms`, `weft_call` and `weft_mcp` are **pure Dart** —
 no Flutter, no I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
 second, with no device and no homeserver.
 

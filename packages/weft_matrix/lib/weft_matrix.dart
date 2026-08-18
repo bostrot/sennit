@@ -13,6 +13,7 @@ export 'package:matrix/matrix.dart' show LoginFlow;
 
 export 'src/api_session.dart';
 export 'src/bridge_discovery.dart';
+export 'src/call_signalling.dart';
 export 'src/database.dart';
 export 'src/devices.dart';
 export 'src/homeserver.dart';
@@ -25,5 +26,6 @@ export 'src/push_delivery.dart';
 export 'src/push_rules.dart';
 export 'src/pusher.dart';
 export 'src/session.dart';
+export 'src/turn_servers.dart';
 export 'src/upload.dart';
 export 'src/verification.dart';

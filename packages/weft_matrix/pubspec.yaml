@@ -28,6 +28,10 @@ dependencies:
   # covers Android, iOS, macOS, Linux and Windows.
   sqflite_common_ffi: ^2.4.2
   weft_attachments: ^0.1.0
+  # The call *decisions* — glare, candidate ordering, invite expiry — stay pure
+  # Dart in weft_call. This package only maps them to and from `m.call.*`
+  # events, which is the one part that needs the SDK's event types.
+  weft_call: ^0.1.0
   weft_domain: ^0.1.0
   weft_merge: ^0.1.0
   # The notification *decisions* — every suppression rule, the merged-chat group
