@@ -83,14 +83,20 @@ void main() {
 
     test('once the description is applied they go straight through', () {
       final call = CallHarness()..outgoingConnected();
-      final live = call.handle(candidatesFrom([ice('relay-1'), ice('relay-2')]));
+      final live = call.handle(
+        candidatesFrom([ice('relay-1'), ice('relay-2')]),
+      );
 
-      expect(appliedCandidates(live), orderedEquals([ice('relay-1'), ice('relay-2')]));
+      expect(
+        appliedCandidates(live),
+        orderedEquals([ice('relay-1'), ice('relay-2')]),
+      );
       expect(call.remoteBuffer.isEmpty, isTrue);
       expect(
         live.media,
         hasLength(2),
-        reason: 'one intent per candidate, so one malformed candidate cannot '
+        reason:
+            'one intent per candidate, so one malformed candidate cannot '
             'take a whole batch down with it',
       );
     });
@@ -100,7 +106,9 @@ void main() {
       // timeout, which is thirty seconds of silence on a call that was going
       // to fail anyway.
       final call = CallHarness()..ring();
-      call.handle(candidatesFrom([ice('host'), endOfCandidates], callId: 'in-1'));
+      call.handle(
+        candidatesFrom([ice('host'), endOfCandidates], callId: 'in-1'),
+      );
 
       final accepted = call.handle(const AcceptCall());
       expect(appliedCandidates(accepted).last, endOfCandidates);
@@ -120,13 +128,18 @@ void main() {
       expect(call.remoteBuffer.droppedCount, 0);
     });
 
-    test('candidates for a call we do not have are dropped without counting', () {
-      final call = CallHarness()..ring(callId: 'in-1');
-      final other = call.handle(candidatesFrom([ice('host')], callId: 'in-9'));
-      expect(other.isNoOp, isTrue);
-      expect(call.remoteBuffer.isEmpty, isTrue);
-      expect(call.remoteBuffer.droppedCount, 0);
-    });
+    test(
+      'candidates for a call we do not have are dropped without counting',
+      () {
+        final call = CallHarness()..ring(callId: 'in-1');
+        final other = call.handle(
+          candidatesFrom([ice('host')], callId: 'in-9'),
+        );
+        expect(other.isNoOp, isTrue);
+        expect(call.remoteBuffer.isEmpty, isTrue);
+        expect(call.remoteBuffer.droppedCount, 0);
+      },
+    );
   });
 
   group('inbound, after the call is over', () {

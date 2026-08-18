@@ -38,12 +38,18 @@ const SessionDescription answerSdp = SessionDescription.answer('v=0 answer');
 /// The offer and answer of a renegotiation, kept distinct from the originals so
 /// an assertion can tell which exchange a description belongs to.
 const SessionDescription reofferSdp = SessionDescription.offer('v=0 reoffer');
-const SessionDescription reanswerSdp = SessionDescription.answer('v=0 reanswer');
+const SessionDescription reanswerSdp = SessionDescription.answer(
+  'v=0 reanswer',
+);
 
 /// A candidate named after the kind it stands in for, so an ordering assertion
 /// reads as `[host, srflx, relay]` — which is also the order that matters.
 IceCandidate ice(String name, {String mid = '0', int index = 0}) =>
-    IceCandidate(candidate: 'candidate:$name', sdpMid: mid, sdpMLineIndex: index);
+    IceCandidate(
+      candidate: 'candidate:$name',
+      sdpMid: mid,
+      sdpMLineIndex: index,
+    );
 
 /// MSC2746's end-of-candidates sentinel. Forwarded rather than dropped: a peer
 /// that never learns gathering finished waits out its own ICE timeout.

@@ -6,7 +6,13 @@ import 'sdp.dart';
 /// state machine acts on. `disconnected` is kept separate from `failed` on
 /// purpose: the first is recoverable and routinely happens when a phone changes
 /// network, and treating it as fatal ends calls that would have healed.
-enum MediaConnectionState { connecting, connected, disconnected, failed, closed }
+enum MediaConnectionState {
+  connecting,
+  connected,
+  disconnected,
+  failed,
+  closed,
+}
 
 /// The seam between calling's decisions and calling's plumbing.
 ///

@@ -491,7 +491,10 @@ class CallStateMachine {
     out.add(ApplyVideo(action.enabled));
   }
 
-  void _onRequestVideoUpgrade(RequestVideoUpgrade action, List<CallIntent> out) {
+  void _onRequestVideoUpgrade(
+    RequestVideoUpgrade action,
+    List<CallIntent> out,
+  ) {
     final call = _session;
     if (call == null) return;
     if (_state != CallState.connected && _state != CallState.onHold) return;
@@ -539,7 +542,9 @@ class CallStateMachine {
 
     // A renegotiation in flight takes precedence: mid-call descriptions travel
     // in `m.call.negotiate`, never in a second invite or answer.
-    if (_negotiation != null && _state.hasPeerConnection && _localDescriptionSent) {
+    if (_negotiation != null &&
+        _state.hasPeerConnection &&
+        _localDescriptionSent) {
       out.add(
         SendNegotiate(
           callId: call.callId,
@@ -559,7 +564,9 @@ class CallStateMachine {
 
     switch (description.type) {
       case SdpType.offer:
-        if (_state != CallState.outgoingRinging || _localDescriptionSent) return;
+        if (_state != CallState.outgoingRinging || _localDescriptionSent) {
+          return;
+        }
         _inviteSentAt = _clock();
         _inviteLifetime = kDefaultInviteLifetime;
         out.add(

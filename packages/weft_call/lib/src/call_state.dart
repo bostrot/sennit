@@ -151,7 +151,9 @@ enum CallEndReason {
       case 'transferred':
         return CallEndReason.replaced;
       default:
-        return isReject ? CallEndReason.remoteReject : CallEndReason.remoteHangup;
+        return isReject
+            ? CallEndReason.remoteReject
+            : CallEndReason.remoteHangup;
     }
   }
 }

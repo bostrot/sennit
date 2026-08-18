@@ -120,30 +120,40 @@ void main() {
       expect(call.state, CallState.connected);
     });
 
-    test('our answer goes back as m.call.negotiate and settles the upgrade', () {
-      final call = CallHarness()
-        ..outgoingConnected()
-        ..handle(negotiateFrom(reofferSdp));
+    test(
+      'our answer goes back as m.call.negotiate and settles the upgrade',
+      () {
+        final call = CallHarness()
+          ..outgoingConnected()
+          ..handle(negotiateFrom(reofferSdp));
 
-      final answered = call.handle(const LocalDescriptionReady(reanswerSdp));
-      final negotiate = answered.signalling.single as SendNegotiate;
-      expect(negotiate.description, reanswerSdp);
-      expect(negotiate.video, isTrue);
-      expect(
-        call.session!.videoEnabled,
-        isTrue,
-        reason: 'answering an offer settles it — there is nothing left to wait '
-            'for',
-      );
-    });
+        final answered = call.handle(const LocalDescriptionReady(reanswerSdp));
+        final negotiate = answered.signalling.single as SendNegotiate;
+        expect(negotiate.description, reanswerSdp);
+        expect(negotiate.video, isTrue);
+        expect(
+          call.session!.videoEnabled,
+          isTrue,
+          reason:
+              'answering an offer settles it — there is nothing left to wait '
+              'for',
+        );
+      },
+    );
 
     test('a renegotiation offer is ignored before the call is up', () {
       final call = CallHarness()..ring();
-      expect(call.handle(negotiateFrom(reofferSdp, callId: 'in-1')).isNoOp, isTrue);
+      expect(
+        call.handle(negotiateFrom(reofferSdp, callId: 'in-1')).isNoOp,
+        isTrue,
+      );
 
       call.handle(const AcceptCall());
       expect(call.state, CallState.connecting);
-      expect(call.handle(negotiateFrom(reofferSdp, callId: 'in-1')).isNoOp, isTrue);
+      expect(
+        call.handle(negotiateFrom(reofferSdp, callId: 'in-1')).isNoOp,
+        isTrue,
+      );
     });
 
     test('a renegotiation from a device we did not answer is ignored', () {
@@ -193,8 +203,10 @@ void main() {
 
       expect(call.handle(const SetMuted(true)).isNoOp, isFalse);
       final hungUp = call.handle(const HangUp());
-      expect((hungUp.signalling.single as SendHangup).reason,
-          CallEndReason.userHangup);
+      expect(
+        (hungUp.signalling.single as SendHangup).reason,
+        CallEndReason.userHangup,
+      );
     });
 
     test('a failure releases the slot, so the user can try again', () {
@@ -241,7 +253,11 @@ void main() {
 
       final sent = call.handle(const LocalDescriptionReady(reofferSdp));
       final negotiate = sent.signalling.single as SendNegotiate;
-      expect(negotiate.video, isFalse, reason: 'hold does not change the media');
+      expect(
+        negotiate.video,
+        isFalse,
+        reason: 'hold does not change the media',
+      );
 
       call.handle(negotiateFrom(reanswerSdp, video: false));
       expect(call.state, CallState.onHold, reason: 'still held once agreed');

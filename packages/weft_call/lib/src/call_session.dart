@@ -58,8 +58,9 @@ class CallPeer {
   final List<ChatNetwork> networks;
 
   /// What to put on screen.
-  String get label =>
-      (displayName != null && displayName!.isNotEmpty) ? displayName! : matrixUserId;
+  String get label => (displayName != null && displayName!.isNotEmpty)
+      ? displayName!
+      : matrixUserId;
 
   @override
   bool operator ==(Object other) =>

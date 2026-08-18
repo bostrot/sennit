@@ -84,7 +84,10 @@ void main() {
         avatarUrl: 'mxc://example.org/contact',
         handles: const [matrixHandle],
       );
-      expect(CallPeer.forContact(withOwn)!.avatarUrl, 'mxc://example.org/contact');
+      expect(
+        CallPeer.forContact(withOwn)!.avatarUrl,
+        'mxc://example.org/contact',
+      );
 
       final withoutOwn = contact(handles: const [matrixHandle]);
       expect(
@@ -129,10 +132,12 @@ void main() {
       );
       expect(
         const CallPeer(matrixUserId: peerUserId),
-        isNot(const CallPeer(
-          matrixUserId: peerUserId,
-          networks: [ChatNetwork.matrix, ChatNetwork.whatsapp],
-        )),
+        isNot(
+          const CallPeer(
+            matrixUserId: peerUserId,
+            networks: [ChatNetwork.matrix, ChatNetwork.whatsapp],
+          ),
+        ),
       );
     });
 
@@ -166,7 +171,11 @@ void main() {
       for (final type in SdpType.values) {
         expect(SdpType.fromWire(type.wireType), type);
       }
-      expect(SdpType.fromWire('pranswer'), isNull, reason: 'no event carries it');
+      expect(
+        SdpType.fromWire('pranswer'),
+        isNull,
+        reason: 'no event carries it',
+      );
     });
   });
 }

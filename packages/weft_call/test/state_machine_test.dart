@@ -99,9 +99,17 @@ void main() {
       final disposed = call.handle(const MediaDisposed());
       expect(disposed.intents, isEmpty);
       expect(call.state, CallState.ended);
-      expect(call.session!.state, CallState.ended, reason: 'session kept in step');
+      expect(
+        call.session!.state,
+        CallState.ended,
+        reason: 'session kept in step',
+      );
       expect(call.session!.endReason, CallEndReason.userHangup);
-      expect(call.session!.peer.label, 'Anna', reason: 'who it was with survives');
+      expect(
+        call.session!.peer.label,
+        'Anna',
+        reason: 'who it was with survives',
+      );
     });
 
     test('the far end hanging up is not the same reason as hanging up', () {
@@ -149,7 +157,11 @@ void main() {
       final call = CallHarness();
 
       final rang = call.handle(inviteFrom(sentAt: t0));
-      expect(rang.intents, isEmpty, reason: 'nothing is sent until the user acts');
+      expect(
+        rang.intents,
+        isEmpty,
+        reason: 'nothing is sent until the user acts',
+      );
       expect(call.state, CallState.ringing);
       expect(call.session!.direction, CallDirection.incoming);
       expect(call.session!.callId, 'in-1');
@@ -272,27 +284,30 @@ void main() {
       expect(call.state, CallState.ending);
     });
 
-    test('the timeout runs from the invite, not from the user pressing call', () {
-      final call = CallHarness();
-      call.handle(
-        const PlaceCall(callId: 'out-1', roomId: roomId, peer: peer),
-      );
+    test(
+      'the timeout runs from the invite, not from the user pressing call',
+      () {
+        final call = CallHarness();
+        call.handle(
+          const PlaceCall(callId: 'out-1', roomId: roomId, peer: peer),
+        );
 
-      // Ten seconds to open the camera. The phone must still ring for a full
-      // minute after that, not for fifty seconds.
-      call.advance(const Duration(seconds: 10));
-      call.handle(const LocalDescriptionReady(offerSdp));
+        // Ten seconds to open the camera. The phone must still ring for a full
+        // minute after that, not for fifty seconds.
+        call.advance(const Duration(seconds: 10));
+        call.handle(const LocalDescriptionReady(offerSdp));
 
-      call.advance(const Duration(seconds: 59));
-      expect(call.tick().isNoOp, isTrue);
-      call.advance(const Duration(seconds: 1));
-      expect(
-        call.state,
-        CallState.outgoingRinging,
-        reason: 'time passing is not an input — only a tick ends a call',
-      );
-      expect(call.tick().signalling.single, isA<SendHangup>());
-    });
+        call.advance(const Duration(seconds: 59));
+        expect(call.tick().isNoOp, isTrue);
+        call.advance(const Duration(seconds: 1));
+        expect(
+          call.state,
+          CallState.outgoingRinging,
+          reason: 'time passing is not an input — only a tick ends a call',
+        );
+        expect(call.tick().signalling.single, isA<SendHangup>());
+      },
+    );
 
     test('the ringing side stops without sending anything', () {
       // The caller is running the same timer and is about to hang up. A reject
@@ -309,9 +324,7 @@ void main() {
 
     test('a shorter lifetime chosen by the caller is honoured', () {
       final call = CallHarness()
-        ..handle(
-          inviteFrom(sentAt: t0, lifetime: const Duration(seconds: 15)),
-        );
+        ..handle(inviteFrom(sentAt: t0, lifetime: const Duration(seconds: 15)));
       call.advance(const Duration(seconds: 14));
       expect(call.tick().isNoOp, isTrue);
       call.advance(const Duration(seconds: 1));
@@ -481,7 +494,10 @@ void main() {
       // filtering at all.
       final call = CallHarness()..handle(inviteFrom(partyId: '', sentAt: t0));
       expect(call.session!.remotePartyId, isNull);
-      expect(call.handle(hangupFrom(callId: 'in-1', partyId: '')).isNoOp, isFalse);
+      expect(
+        call.handle(hangupFrom(callId: 'in-1', partyId: '')).isNoOp,
+        isFalse,
+      );
     });
   });
 
@@ -546,23 +562,26 @@ void main() {
   });
 
   group('teardown', () {
-    test('an engine that never finishes disposing cannot strand the screen', () {
-      // "Ending…" forever is a worse failure than a slightly early dismissal,
-      // so the grace period forces the terminal state without the engine.
-      final call = CallHarness(endingGrace: const Duration(seconds: 5))
-        ..outgoingConnected();
-      call.handle(const HangUp());
-      expect(call.state, CallState.ending);
+    test(
+      'an engine that never finishes disposing cannot strand the screen',
+      () {
+        // "Ending…" forever is a worse failure than a slightly early dismissal,
+        // so the grace period forces the terminal state without the engine.
+        final call = CallHarness(endingGrace: const Duration(seconds: 5))
+          ..outgoingConnected();
+        call.handle(const HangUp());
+        expect(call.state, CallState.ending);
 
-      call.advance(const Duration(seconds: 4));
-      expect(call.tick().isNoOp, isTrue);
-      expect(call.state, CallState.ending);
+        call.advance(const Duration(seconds: 4));
+        expect(call.tick().isNoOp, isTrue);
+        expect(call.state, CallState.ending);
 
-      call.advance(const Duration(seconds: 1));
-      call.tick();
-      expect(call.state, CallState.ended);
-      expect(call.session!.endReason, CallEndReason.userHangup);
-    });
+        call.advance(const Duration(seconds: 1));
+        call.tick();
+        expect(call.state, CallState.ended);
+        expect(call.session!.endReason, CallEndReason.userHangup);
+      },
+    );
 
     test('hanging up twice sends one hangup', () {
       final call = CallHarness()..outgoingConnected();

@@ -129,8 +129,12 @@ void main() {
       // rule that quietly parsed it as a number would disagree with Element
       // exactly when both clients generate digits.
       final sides = collide(lowId: '10', highId: '9');
-      sides.low.handle(inviteFrom(callId: '9', partyId: 'DEVICE_HIGH', sentAt: t0));
-      sides.high.handle(inviteFrom(callId: '10', partyId: 'DEVICE_LOW', sentAt: t0));
+      sides.low.handle(
+        inviteFrom(callId: '9', partyId: 'DEVICE_HIGH', sentAt: t0),
+      );
+      sides.high.handle(
+        inviteFrom(callId: '10', partyId: 'DEVICE_LOW', sentAt: t0),
+      );
       expect(sides.low.session!.callId, '10');
       expect(sides.high.session!.callId, '10');
     });
@@ -207,14 +211,12 @@ void main() {
       expect(
         appliedCandidates(accepted),
         isEmpty,
-        reason: 'that candidate belonged to a peer connection that was '
+        reason:
+            'that candidate belonged to a peer connection that was '
             'disposed with the call it was gathered for',
       );
       expect(
-        high
-            .handle(const LocalDescriptionReady(answerSdp))
-            .signalling
-            .single,
+        high.handle(const LocalDescriptionReady(answerSdp)).signalling.single,
         isA<SendAnswer>().having((i) => i.callId, 'callId', 'aaa'),
       );
     });
