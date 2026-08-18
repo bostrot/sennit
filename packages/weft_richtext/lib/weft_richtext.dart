@@ -1,5 +1,6 @@
 /// Matrix's rich content as values: parsed formatted bodies, stripped reply
-/// fallbacks, resolved mentions.
+/// fallbacks, resolved mentions, and the relations — reactions, edits, replies —
+/// folded into what a bubble renders.
 ///
 /// Pure Dart, and pointedly so. The formatted-body subset has more sharp edges
 /// than its size suggests — untrusted HTML arriving from bridged networks,
@@ -24,5 +25,6 @@ library;
 export 'src/fallback.dart';
 export 'src/mentions.dart';
 export 'src/parse.dart';
+export 'src/relations.dart';
 export 'src/span.dart';
 export 'src/url_policy.dart';

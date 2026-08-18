@@ -25,9 +25,17 @@ themselves — three allowlists to keep in step instead of one.
   `<mx-reply>` block.
 - **`parseMentions` / `mentionTargetFromUrl`** — resolves `matrix.to` permalinks,
   `matrix:` uris and `@room`.
+- **`aggregateReactions` / `applyEdits` / `resolveReplyTarget`** — folds
+  `m.annotation`, `m.replace` and `m.in_reply_to` into the values a bubble
+  renders.
 
 No Flutter, no I/O. The renderer that turns a `RichSpan` into a `TextSpan` lives
 in `apps/weft/lib/features/chat/`.
+
+The *nouns* those three produce — `ReactionTally`, `EditRecord`, `ReplyPreview` —
+live in `weft_domain`, not here. The dependency runs one way (`weft_richtext` →
+`weft_domain`), so a type this package owned could never become a field on
+`WeftMessage`. This package owns the verbs.
 
 ## The allowlist is the security boundary
 
@@ -65,6 +73,47 @@ reply chip, so those lines have to go — but "starts with `>`" is not the test.
 sender (`> <@alice:example.org> …`, or `> * <@alice:example.org> …` for an
 emote); once it does, the whole leading run of `>` lines goes, which takes nested
 quotes with it for free.
+
+## One person, two legs, one reaction
+
+A merged conversation is several source rooms shown as one, and the same human
+reaches it down more than one of them. Anna thumbs-ups a message on WhatsApp; the
+bridge echoes the conversation into Signal; she thumbs-ups it again there. That is
+two `m.annotation` events, in two rooms, from two different bridge ghosts,
+carrying the same key.
+
+A tally that counts *events* renders `👍 2` for one person pressing one button. The
+worse version is the local user's: their own double reaction reads as two, and a
+single un-react then appears to do nothing, because the annotation on the other
+leg is still standing. So `aggregateReactions` collapses senders through a
+`MergedIdentityResolver` first and counts afterwards.
+
+The resolver is a parameter, not a dependency: this package must not import
+`weft_merge`, and the identity question belongs to whoever owns the graph. Two
+rules for whoever supplies one — return the sender unchanged when they are
+unknown, and resolve only through *recorded* merge decisions. Guessing from the
+shape of an id is fine for suggesting a merge and wrong here: a bad guess does not
+show a bad suggestion, it silently deletes someone's reaction.
+
+Reaction keys are normalised before they are grouped, so `👍` and `👍️` (the same
+emoji with a variation selector) and `👍🏽` are one chip. Zero-width joiners are
+left alone — a ZWJ sequence is a different emoji, not a decorated one.
+
+Tallies are ordered by *first reaction*, never by count. A bar sorted by count
+reorders itself while the reader is looking at it, and moves a chip out from under
+a thumb already travelling towards it.
+
+## Edits, and who is allowed to make them
+
+`applyEdits` is last-write-wins by origin timestamp with event id as tie-break.
+The tie-break is what makes the order total: two homeservers stamping the same
+millisecond is ordinary, and without it two readers of the same room can disagree
+about which version won.
+
+An edit from anyone but the original sender is rejected. `m.replace` is only
+meaningful from the original sender, and the homeserver does not enforce that for
+us — a room where anyone can rewrite anyone's words is a room where a screenshot
+means nothing.
 
 ## Whitespace
 

@@ -10,3 +10,4 @@ export 'src/handle.dart';
 export 'src/link.dart';
 export 'src/message.dart';
 export 'src/network.dart';
+export 'src/relations.dart';
