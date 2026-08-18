@@ -377,12 +377,30 @@ class WeftIntents implements SharedFileResolver, ShareTargetPublisher {
   /// becomes a sentence in [ResolvedShare.problems] while the rest of the batch
   /// goes through. Sharing eight photos and losing all eight because the ninth
   /// was a broken cloud-storage stub would be the worse trade.
+  ///
+  /// Two kinds of URI arrive here. A `content://` from an Android intent has to
+  /// be asked about and then copied, because its grant dies with the activity.
+  /// A `file://` is already a file on disk — that is what an iOS staged share
+  /// becomes once `StagedShareReader` has moved it out of the App Group
+  /// container — and needs neither call. Both end as an [AttachmentSource] the
+  /// upload path can open, which is the only thing the sheet below knows about.
   @override
   Future<ResolvedShare> resolveSharedFiles(SharedPayload payload) async {
     final sources = <AttachmentSource>[];
     final problems = <String>[];
 
     for (final uri in payload.uris) {
+      final localPath = _localPath(uri);
+      if (localPath != null) {
+        final problem = await _addLocalFile(
+          localPath,
+          payload.mimeType,
+          sources,
+        );
+        if (problem != null) problems.add(problem);
+        continue;
+      }
+
       final meta = await sharedFileMeta(uri);
       final name = meta?.name ?? _nameFromUri(uri);
 
@@ -426,6 +444,66 @@ class WeftIntents implements SharedFileResolver, ShareTargetPublisher {
     }
 
     return ResolvedShare(sources: sources, problems: problems);
+  }
+
+  /// Adds the file already sitting at [path], or says why it cannot be sent.
+  ///
+  /// No `readSharedFileMeta` and no `stageSharedFile`: this file is on the app's
+  /// own disk, put there by the staged-share drain, and both of those calls
+  /// exist to get a `content://` grant into exactly this state. Asking a channel
+  /// that only Android implements would fail on the one platform this branch
+  /// runs on.
+  ///
+  /// The cap is applied here too. The extension checks it twice before writing
+  /// anything, so this is the third look at the same number — and the only one
+  /// that is not in a process the app cannot see the source of. [_maxFileBytes]
+  /// is what the sheet's own error sentence quotes, so a file that got past the
+  /// others is refused in the same words as any other oversized share.
+  Future<String?> _addLocalFile(
+    String path,
+    String? declaredMimeType,
+    List<AttachmentSource> sources,
+  ) async {
+    final name = _basename(path);
+    try {
+      final length = await File(path).length();
+      if (length > _maxFileBytes) return _tooLarge(name, length);
+      sources.add(
+        await attachmentSourceForFile(
+          XFile(path, mimeType: declaredMimeType, name: name),
+        ),
+      );
+      return null;
+    } on Object catch (error) {
+      // Deliberately Object, as in the branch below: a staged file that is
+      // missing, unreadable or truncated is one sentence to the user, and the
+      // reasons differ only in the log.
+      debugPrint('weft: staged file $name could not be read: $error');
+      return '$name could not be read.';
+    }
+  }
+
+  /// [uri] as a path on this device's disk, or null when it is not one.
+  ///
+  /// Only `file://`. A `content://` is not a path and never becomes one — the
+  /// whole reason [stageSharedFile] exists — so anything else falls through to
+  /// the platform branch.
+  static String? _localPath(String uri) {
+    final parsed = Uri.tryParse(uri);
+    if (parsed == null || parsed.scheme != 'file') return null;
+    try {
+      return parsed.toFilePath();
+    } on UnsupportedError {
+      // A `file://host/path` URI, which names a file on another machine. Not
+      // something Weft writes, and not something to guess at.
+      return null;
+    }
+  }
+
+  static String _basename(String path) {
+    final cut = path.lastIndexOf('/');
+    final name = cut >= 0 ? path.substring(cut + 1) : path;
+    return name.isEmpty ? 'Shared file' : name;
   }
 
   static Future<void> _discardStaged(String path) async {

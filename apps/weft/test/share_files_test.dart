@@ -289,6 +289,75 @@ void main() {
       expect(resolved.sources.single.basename, 'opaque');
     });
 
+    test('a file:// URI is opened where it is, not staged again', () async {
+      // What an iOS staged share becomes: `StagedShareReader` has already had
+      // the platform move the bytes out of the App Group container and into the
+      // app's own, so both platform calls exist to reach exactly this state and
+      // neither is implemented on the platform this branch runs on.
+      final file = jpegFile('holiday.jpg');
+
+      final resolved = await intents().resolveSharedFiles(
+        SharedPayload(
+          mimeType: 'image/jpeg',
+          uris: [Uri.file(file.path).toString()],
+        ),
+      );
+
+      expect(resolved.problems, isEmpty);
+      expect(host.calls, isEmpty, reason: 'nothing to ask the platform');
+      final source = resolved.sources.single;
+      expect(source.filename, file.path);
+      expect(source.basename, 'holiday.jpg');
+      expect(source.sizeBytes, 96000);
+      expect(sniffMimeType(source), 'image/jpeg');
+    });
+
+    test('a file:// URI with a space in its name round-trips', () async {
+      // `Uri.file` percent-encodes, and a path that reaches the upload path
+      // still holding `%20` is a file that does not exist.
+      final file = jpegFile('holiday snap.jpg');
+
+      final resolved = await intents().resolveSharedFiles(
+        SharedPayload(uris: [Uri.file(file.path).toString()]),
+      );
+
+      expect(resolved.sources.single.basename, 'holiday snap.jpg');
+    });
+
+    test('a staged file that vanished is a sentence, not a crash', () async {
+      // The window is real: the ingest cache is swept on a day's TTL, and a
+      // share left open in the sheet across that is a share whose files went.
+      final resolved = await intents().resolveSharedFiles(
+        SharedPayload(uris: [Uri.file('${sandbox.path}/gone.jpg').toString()]),
+      );
+
+      expect(resolved.sources, isEmpty);
+      expect(resolved.problems.single, 'gone.jpg could not be read.');
+    });
+
+    test('the cap applies to a staged file too', () async {
+      // The third look at the same number — the extension checks it twice
+      // before writing anything — and the only one in a process whose source
+      // this repository can see.
+      final file = jpegFile('holiday.jpg', size: 96000);
+
+      final resolved = await intents(
+        maxFileBytes: 1024,
+      ).resolveSharedFiles(
+        SharedPayload(uris: [Uri.file(file.path).toString()]),
+      );
+
+      expect(resolved.sources, isEmpty);
+      expect(resolved.problems.single, contains('too large'));
+      expect(
+        file.existsSync(),
+        isTrue,
+        reason:
+            'unlike a content:// copy, this file is not this call'
+            's to throw away',
+      );
+    });
+
     test('a text-only share resolves to nothing at all', () async {
       final resolved = await intents().resolveSharedFiles(
         const SharedPayload(text: 'hello'),

@@ -46,6 +46,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     _intents = ref.read(weftIntentsProvider)
       ..onLink = _handleLink
       ..onShare = _handleShare;
+    // The iOS Share Extension's shares arrive through a container rather than an
+    // intent, but they arrive at the same place: a share captured while Weft was
+    // closed is the same sheet, the same resolver and the same send as one
+    // shared into it while it was open.
+    ref.read(stagedShareReaderProvider).onShare = _handleShare;
     // Resume is the one refresh the chat stream cannot provide. A phone that
     // sat in a pocket overnight comes back with a ranking whose recency terms
     // have all decayed, and nothing has to have arrived for the order to be
@@ -68,7 +73,12 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshShareTargets();
+    if (state != AppLifecycleState.resumed) return;
+    _refreshShareTargets();
+    // The resume that matters most: the Share Extension runs while Weft is
+    // backgrounded, so the share is already staged by the time the user comes
+    // back to it — often by tapping Weft immediately afterwards.
+    unawaited(_drainStagedShares());
   }
 
   /// The inbox subscription that keeps the launcher's share targets current.
@@ -92,7 +102,12 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       final chats = next.value;
       if (chats == null) return;
       unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
+      // A launch drain almost always arrives before the first chat list does,
+      // and a share sheet with no conversations in it is not worth spending a
+      // staged share on. This is where the inbox finally exists.
+      if (_drainPending) unawaited(_drainStagedShares());
     }, fireImmediately: true);
+    unawaited(_drainStagedShares());
   }
 
   /// Stops following the inbox and takes the names back off the launcher.
@@ -116,6 +131,29 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     final chats = ref.read(chatsProvider).value;
     if (chats == null) return;
     unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
+  }
+
+  /// A drain was asked for before there was anywhere to put its result.
+  ///
+  /// The two gates below are not the same gate. `_shareTargets` says the session
+  /// is ready; `chatsProvider.value` says the inbox has actually arrived, which
+  /// is a frame or several later and is what [_handleShare] requires. A drain in
+  /// between would delete the blob and hand the payload to a sheet that refuses
+  /// to open — the share would be gone, silently.
+  bool _drainPending = false;
+
+  /// Reads whatever the iOS Share Extension staged while Weft was not running.
+  ///
+  /// Cheap on every other platform and on an empty container alike: one channel
+  /// call that answers with an empty list, or a [MissingPluginException] that
+  /// [WeftStagedShares] reads as the same thing. Never throws.
+  Future<void> _drainStagedShares() async {
+    if (_shareTargets == null || ref.read(chatsProvider).value == null) {
+      _drainPending = true;
+      return;
+    }
+    _drainPending = false;
+    await ref.read(stagedShareReaderProvider).drain();
   }
 
   /// Whether the notification service has been started for this session.

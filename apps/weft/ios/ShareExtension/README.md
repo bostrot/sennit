@@ -10,7 +10,8 @@ and only that.
 | `Info.plist` | `com.apple.share-services`, and the activation rule that decides when iOS offers Weft |
 | `ShareExtension.entitlements` | The App Group, `group.com.bostrot.weft` |
 | `ShareExtension-{Debug,Release}.xcconfig` | Optional CocoaPods include + the Flutter version pair |
-| `../Shared/ShareContainer.swift` | Container layout, compiled into **both** this target and Runner |
+| `../Shared/ShareContainer.swift` | Container layout and the filename sanitiser, compiled into **both** this target and Runner |
+| `../Runner/ShareChannel.swift` | The other side: the host app's drain, over `com.bostrot.weft/share` |
 
 ## What it does, and the one thing it does not
 
@@ -53,6 +54,28 @@ The system can kill an extension between any two writes. Two rules cover it:
   weakened by this, it is simply not the case that is left to it. What is left to
   it is the kill *between* the two steps: an orphaned `<id>/` directory with no
   blob, invisible to the decoder and swept by the drain.
+
+## The drain
+
+`Runner/ShareChannel.swift` is the reading side, driven by
+`lib/services/share/staged_share_reader.dart` on launch and on every resume. It
+hands the blobs over **unparsed**: `ShareStagingCodec` is the only decoder,
+it is total by construction and exhaustively tested, and a second hand-written
+parse in Swift would be a second thing to keep in step with a format neither
+language checks.
+
+Ingesting a share moves its files out of the container and into the app's own
+caches (`weft-share/<id>/`, matching Android's `SHARE_CACHE_DIR`) under the
+names the blob gave them — a same-volume move is a rename, so a shared video
+costs nothing to take ownership of, and the `<index>-` prefix the container
+needed for uniqueness does not reach the room as a filename.
+
+**The blob is deleted before anything moves.** That ordering is what makes the
+drain idempotent: once the app has committed to a share, a resume racing a
+launch must not find it again. A kill in between leaves an orphaned `<id>/`
+directory, which the next drain's sweep collects once it is past the 24-hour
+TTL — and only past it, because a capture happening *right now* while the app
+is being resumed looks identical from the reading side.
 
 ## Signing
 

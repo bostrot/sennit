@@ -701,7 +701,8 @@ struct ShareCapturer {
     let declaredSize = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     if declaredSize > maxFileBytes { return .oversize }
 
-    let name = Self.sanitise(suggestedName ?? source.lastPathComponent, fallbackFrom: source)
+    let name = WeftShareContainer.sanitisedFileName(
+      suggestedName ?? source.lastPathComponent, fallbackExtension: source.pathExtension)
     // Prefixed with the index so two attachments called `IMG_0001.HEIC` — a
     // multi-select from Photos routinely produces them — do not overwrite one
     // another, and so the container order matches the share order.
@@ -746,22 +747,6 @@ struct ShareCapturer {
     }
     if let string = item as? String { return URL(string: string) }
     return nil
-  }
-
-  /// A filename safe to spell as one path component.
-  private static func sanitise(_ name: String, fallbackFrom source: URL) -> String {
-    let stripped = name
-      .components(separatedBy: CharacterSet(charactersIn: "/\\:\0"))
-      .joined(separator: "_")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    let candidate = stripped.isEmpty || stripped == "." || stripped == ".." ? "" : stripped
-    if candidate.isEmpty {
-      let extensionPart = source.pathExtension
-      return extensionPart.isEmpty ? "attachment" : "attachment.\(extensionPart)"
-    }
-    // The name is also a display name in the compose sheet; a 400-character one
-    // is both a bad label and a path component some filesystems refuse.
-    return String(candidate.prefix(120))
   }
 
   /// A *hint*. `StagedFile.mimeType` is documented as one and the host app
