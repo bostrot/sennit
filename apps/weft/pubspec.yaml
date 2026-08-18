@@ -43,6 +43,10 @@ dependencies:
   scrollable_positioned_list: ^0.3.8
   riverpod_annotation: ^4.0.3
   share_plus: ^13.1.0
+  # Opening a link a message carried. Already resolved in the lock as a
+  # transitive dependency of the plugins below, so promoting it to a direct one
+  # is a declaration rather than a new package.
+  url_launcher: ^6.3.2
   video_player: ^2.11.1
 
   whisper_ggml: ^2.6.0

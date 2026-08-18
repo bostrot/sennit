@@ -117,11 +117,14 @@ class DemoChatRepository implements ChatRepository {
     return MergedTimeline(
       sources: [
         for (final source in chat.sources)
-          InMemoryTimelineSource(
+          _RelationsTimelineSource(
             roomId: source.roomId,
             network: source.network,
             pageSize: 12,
             history: _historyFor(source, chat.title),
+            fold: _withRelations,
+            sessionMessages: (roomId) =>
+                _localMessages[roomId] ?? const <WeftMessage>[],
           ),
       ],
     );
@@ -280,6 +283,9 @@ class DemoChatRepository implements ChatRepository {
   ///
   /// Fixtures are regenerated per call, so this asks the same builder the
   /// timeline does rather than keeping a second index that could disagree.
+  /// Relations are deliberately *not* folded in here: the callers want the
+  /// event's room and its original sender, and neither of those is something an
+  /// edit or a reaction can change.
   WeftMessage? _messageIn(String chatId, String eventId) {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return null;
@@ -885,7 +891,7 @@ class DemoChatRepository implements ChatRepository {
           isOwn: i.isOdd,
           delivery: i.isOdd ? DeliveryState.read : null,
         ),
-    ].map(_withRelations).toList(growable: false);
+    ];
   }
 
   static const Map<ChatNetwork, List<String>> _sampleLines = {
@@ -978,4 +984,48 @@ class _DemoUploadTransport implements AttachmentTransport {
 
   @override
   void dispose() => _cancelled.clear();
+}
+
+/// An [InMemoryTimelineSource] that reads the session back in on every access.
+///
+/// The base class snapshots its history at construction, which is right for a
+/// fixture and wrong for everything the user does to one. The demo repository
+/// keeps relations beside the messages rather than inside them, so a reaction
+/// sent while the chat is open is in the map and — with a snapshot — never on
+/// the screen; a reply sent while it is open is in `_localMessages` and equally
+/// invisible until the chat is closed and opened again.
+///
+/// Both are resolved on read instead. [fold] applies the relations and
+/// [sessionMessages] supplies what this session has sent, deduplicated against
+/// what the snapshot already holds. That is the behaviour a real timeline gets
+/// for free: a Matrix reaction, edit, redaction and reply are all themselves
+/// events, and every one of them moves the timeline the Matrix source wraps.
+class _RelationsTimelineSource extends InMemoryTimelineSource {
+  _RelationsTimelineSource({
+    required super.roomId,
+    required super.network,
+    required super.history,
+    required this.fold,
+    required this.sessionMessages,
+    super.pageSize,
+  });
+
+  final WeftMessage Function(WeftMessage message) fold;
+
+  /// What this session has sent into [roomId], oldest first.
+  final List<WeftMessage> Function(String roomId) sessionMessages;
+
+  @override
+  List<WeftMessage> get loaded {
+    final settled = super.loaded;
+    // A message sent before the timeline was opened is already in the snapshot
+    // and paginates in normally; only the ones sent since need prepending, and
+    // only until pagination reaches them.
+    final known = {for (final message in settled) message.eventId};
+    return [
+      for (final message in sessionMessages(roomId).reversed)
+        if (!known.contains(message.eventId)) fold(message),
+      ...settled.map(fold),
+    ];
+  }
 }
