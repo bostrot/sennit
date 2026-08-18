@@ -1,8 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/intents.dart';
+import 'package:weft/app/share_providers.dart';
 import 'package:weft/services/notifications/notification_presentation.dart';
 import 'package:weft/services/share/shortcut_service.dart';
+import 'package:weft/services/share/staged_share_reader.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_share/weft_share.dart';
 
@@ -479,4 +484,57 @@ void main() {
       expect(publisher.last.single['chatId'], 'merged:contact_1');
     });
   });
+
+  group('where the ranked list actually goes', () {
+    /// [shareTargetSurfaceProvider] resolved as [platform].
+    ///
+    /// Both ends are overridden with recorders, so the assertion is purely
+    /// about which of them the ranked list is handed to — everything above the
+    /// seam is one implementation and is covered by the groups above.
+    ShareTargetPublisher surfaceOn(TargetPlatform platform) {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      final container = ProviderContainer(
+        overrides: [
+          shareTargetPublisherProvider.overrideWithValue(_LauncherSurface()),
+          stagedSharesProvider.overrideWithValue(_ContainerSurface()),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container.read(shareTargetSurfaceProvider);
+    }
+
+    test('iOS writes the App Group container, not the launcher', () {
+      // There is no launcher to publish conversation shortcuts to, and the
+      // surface that reads this list is the Share Extension's own picker in
+      // another process. Getting the branch backwards is silent on both
+      // platforms: one publishes over a channel with no handler, the other
+      // writes a file nothing reads.
+      expect(surfaceOn(TargetPlatform.iOS), isA<_ContainerSurface>());
+    });
+
+    test('Android publishes to the launcher', () {
+      expect(surfaceOn(TargetPlatform.android), isA<_LauncherSurface>());
+    });
+
+    test('a desktop build takes the launcher branch and no-ops there', () {
+      // macOS, Linux and Windows have neither surface. They resolve to the
+      // `/intents` channel, which has no handler off Android — a
+      // `MissingPluginException` `WeftIntents` swallows — rather than to a
+      // container that does not exist.
+      expect(surfaceOn(TargetPlatform.macOS), isA<_LauncherSurface>());
+    });
+  });
+}
+
+/// Android's end of [shareTargetSurfaceProvider].
+class _LauncherSurface extends RecordingShareTargetPublisher {}
+
+/// iOS's end of it. Stands in for [WeftStagedShares], whose own behaviour is
+/// covered over a fake method channel in `staged_share_reader_test.dart`.
+class _ContainerSurface extends RecordingShareTargetPublisher
+    implements WeftStagedShares {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

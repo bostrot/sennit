@@ -34,6 +34,10 @@ class _FakeContainer implements StagedShareGateway {
   /// one whose blob named a path outside the container.
   final Set<String> unmovable = {};
 
+  /// Ids whose deletion fails: a container the app has momentarily lost its
+  /// entitlement to, or a file another process still holds open.
+  final Set<String> undeletable = {};
+
   /// The TTL the reader passed down, which the platform sweep needs.
   Duration? sweptWith;
 
@@ -81,6 +85,9 @@ class _FakeContainer implements StagedShareGateway {
   @override
   Future<void> removeStagedShare(String id) async {
     removed.add(id);
+    if (undeletable.contains(id)) {
+      throw PlatformException(code: 'remove_failed', message: id);
+    }
     blobs.remove(id);
   }
 
@@ -511,6 +518,47 @@ void main() {
 
       await expectLater(drain(harness.reader), completes);
       expect(harness.delivered, isEmpty);
+    });
+
+    test('a blob that will not delete does not abandon the rest', () async {
+      // The removal is the one call in the drain with nothing riding on its
+      // success: a blob that stays is a blob re-read on the next resume, which
+      // is a wasted read. Letting it out of `_remove` would instead cost the
+      // shares queued behind it — a corrupt capture the user has forgotten
+      // about silently eating the photo they shared a second ago.
+      final container = _FakeContainer()
+        ..blobs['stuck'] = '{"id": "stuck", "capt'
+        ..blobs['good'] = blob('good', text: 'hello')
+        ..undeletable.add('stuck');
+      final harness = readerOver(container);
+
+      await expectLater(drain(harness.reader), completes);
+
+      expect(harness.delivered.single.text, 'hello');
+      expect(container.removed, contains('stuck'));
+      expect(
+        container.blobs.keys,
+        ['stuck'],
+        reason: 'the good share was ingested; the stuck one is still there to '
+            'be tried again',
+      );
+    });
+
+    test('a blob that will not delete is retried, not delivered', () async {
+      // The other half of the same choice. `_handled` records the id before the
+      // ingest, but this share was never decodable and so never reached it —
+      // the next drain has to be free to try the delete again without the blob
+      // becoming a share on the way past.
+      final container = _FakeContainer()
+        ..blobs['stuck'] = '{"id": "stuck", "capt'
+        ..undeletable.add('stuck');
+      final harness = readerOver(container);
+
+      await drain(harness.reader);
+      await drain(harness.reader);
+
+      expect(harness.delivered, isEmpty);
+      expect(container.removed, ['stuck', 'stuck']);
     });
   });
 

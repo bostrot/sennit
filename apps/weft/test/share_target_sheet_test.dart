@@ -8,6 +8,7 @@ import 'package:weft/app/intents.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/share_providers.dart';
 import 'package:weft/data/chat_repository.dart';
+import 'package:weft/features/chat/attachment_preview_sheet.dart';
 import 'package:weft/features/chat/send_network_chip.dart';
 import 'package:weft/features/share/share_target_sheet.dart';
 import 'package:weft/services/share/shortcut_service.dart';
@@ -754,6 +755,220 @@ void main() {
         ]);
       });
     });
+
+    testWidgets('a stale shortcut onto an incapable chat says so', (
+      tester,
+    ) async {
+      // A launcher holds a long-lived shortcut for weeks, so the chat behind
+      // one can be reached with a file no leg of it will take — the list would
+      // have shown that chat under "Cannot carry this share", but the shortcut
+      // went straight past the list. The confirmation is the only place left to
+      // say it, and it says it instead of naming a network it does not have.
+      await withClock(Clock.fixed(shareNow), () async {
+        await pumpSheet(
+          tester,
+          chats: [
+            shareChat(
+              id: 'bluesky',
+              title: 'Bluesky Mutual',
+              networks: const [ChatNetwork.bluesky],
+              lastMessageAt: shareAgo(const Duration(minutes: 1)),
+            ),
+          ],
+          payload: const SharedPayload(
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1'],
+            targetChatId: 'bluesky',
+          ),
+          resolved: ResolvedShare(sources: [photo(size: 8 * 1024 * 1024)]),
+        );
+
+        expect(find.text('Send to Bluesky Mutual'), findsWidgets);
+        expect(find.text('No network here takes this file'), findsOneWidget);
+        expect(
+          find.byType(SendNetworkChip),
+          findsNothing,
+          reason: 'there is no leg to offer, and a chip with nothing in it '
+              'reads as a choice that has not been made yet',
+        );
+      });
+    });
+  });
+
+  group('what the share is, above the list', () {
+    testWidgets('several files summarise as a count, not a name', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(shareNow), () async {
+        await pumpSheet(
+          tester,
+          chats: [
+            shareChat(
+              id: 'recent',
+              title: 'Recent Contact',
+              lastMessageAt: shareAgo(const Duration(minutes: 5)),
+            ),
+          ],
+          payload: const SharedPayload(
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1', 'content://media/2'],
+          ),
+          resolved: ResolvedShare(
+            sources: [
+              photo(name: 'one.jpg', size: 100000),
+              photo(name: 'two.jpg', size: 100000),
+            ],
+          ),
+        );
+
+        expect(find.textContaining('2 files · '), findsOneWidget);
+        expect(
+          find.text('one.jpg · 98 KB'),
+          findsNothing,
+          reason: 'the first of several files is not what is being shared',
+        );
+        // Both thumbnails, so the strip is the preview for a batch and not
+        // just for the file that happened to be first.
+        expect(find.byType(AttachmentSourceThumbnail), findsNWidgets(2));
+      });
+    });
+
+    testWidgets('a file rejected before the tap is named with its reason', (
+      tester,
+    ) async {
+      // `ResolvedShare.problems` is written during resolution — a file over
+      // `kMaxSharedFileBytes`, or one the platform would not hand over. It
+      // belongs above the list rather than in a snackbar after the send: it is
+      // a fact about the share, and knowing it before choosing a conversation
+      // is what lets the user back out and send the other one instead.
+      await withClock(Clock.fixed(shareNow), () async {
+        await pumpSheet(
+          tester,
+          chats: [
+            shareChat(
+              id: 'recent',
+              title: 'Recent Contact',
+              lastMessageAt: shareAgo(const Duration(minutes: 5)),
+            ),
+          ],
+          payload: const SharedPayload(
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1', 'content://media/2'],
+          ),
+          resolved: ResolvedShare(
+            sources: [photo()],
+            problems: const ['huge.mov is larger than 100 MB.'],
+          ),
+        );
+
+        expect(find.text('huge.mov is larger than 100 MB.'), findsOneWidget);
+        expect(
+          listedTitles(tester),
+          ['Recent Contact'],
+          reason: 'one file refused is not the whole share refused',
+        );
+      });
+    });
+  });
+
+  group('a send that does not entirely arrive', () {
+    testWidgets('a forward counts who it reached', (tester) async {
+      await withClock(Clock.fixed(shareNow), () async {
+        final shortcuts = ShareShortcutService(
+          publisher: RecordingShareTargetPublisher(),
+        );
+        final repository = await pumpSheet(
+          tester,
+          chats: [
+            shareChat(
+              id: 'a',
+              title: 'Ada Lovelace',
+              lastMessageAt: shareAgo(const Duration(minutes: 1)),
+            ),
+            shareChat(
+              id: 'b',
+              title: 'Grace Hopper',
+              lastMessageAt: shareAgo(const Duration(minutes: 2)),
+            ),
+          ],
+          payload: const SharedPayload(text: 'hello', mimeType: 'text/plain'),
+          shortcuts: shortcuts,
+        );
+        repository.failing.add('b');
+
+        for (final title in ['Ada Lovelace', 'Grace Hopper']) {
+          await tapRow(
+            tester,
+            find.descendant(
+              of: find.widgetWithText(ListTile, title),
+              matching: find.byType(Checkbox),
+            ),
+          );
+        }
+        await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Send to 2 chats'));
+        await tester.pumpAndSettle();
+
+        expect(repository.sent, ['a/matrix: hello']);
+        // The count and the name, because with two targets "the message could
+        // not be sent" alone does not say which of them is missing it.
+        expect(
+          find.text(
+            'Sent to 1 of 2 chats.\nGrace Hopper: The message could not be '
+            'sent.',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          shortcuts.activity.keys,
+          ['a'],
+          reason: 'a share is the strongest signal the ranker gets, and a '
+              'conversation the share never reached did not send that signal',
+        );
+      });
+    });
+
+    testWidgets('a single target reports the failure without a headline', (
+      tester,
+    ) async {
+      // Nothing arrived, so there is no "sent to" to put in front of it —
+      // and with one target the name is already the title of the sheet.
+      await withClock(Clock.fixed(shareNow), () async {
+        final repository = await pumpSheet(
+          tester,
+          chats: [
+            shareChat(
+              id: 'recent',
+              title: 'Recent Contact',
+              lastMessageAt: shareAgo(const Duration(minutes: 5)),
+            ),
+          ],
+          payload: const SharedPayload(
+            text: 'look at this',
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1'],
+            targetChatId: 'recent',
+          ),
+          resolved: ResolvedShare(sources: [photo()]),
+        );
+        repository.failing.add('recent');
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, 'Send to Recent Contact'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(repository.sent, isEmpty);
+        expect(
+          find.text(
+            'The message could not be sent.\nholiday.jpg could not be sent.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Sent to'), findsNothing);
+      });
+    });
   });
 }
 
@@ -764,8 +979,12 @@ void main() {
 class _RecordingRepository implements ChatRepository {
   final List<String> sent = [];
 
+  /// Chat ids whose sends throw, as a homeserver that has gone away does.
+  final Set<String> failing = {};
+
   @override
   Future<void> send(String chatId, String body, {ChatNetwork? via}) async {
+    if (failing.contains(chatId)) throw StateError('no route to $chatId');
     sent.add('$chatId/${via?.id ?? 'default'}: $body');
   }
 
@@ -776,6 +995,7 @@ class _RecordingRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
   }) async {
+    if (failing.contains(chatId)) throw StateError('no route to $chatId');
     sent.add('$chatId/${via?.id ?? 'default'}: file ${source.basename}');
   }
 
