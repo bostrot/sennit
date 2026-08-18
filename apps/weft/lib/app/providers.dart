@@ -87,6 +87,44 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
   return ref.watch(chatRepositoryProvider).watchChats();
 });
 
+/// Whether one conversation's encrypted rooms hold any unverified device.
+///
+/// A family over the chat id rather than a field on [Chat], because it is the
+/// one fact about a chat that comes from the key store instead of the timeline
+/// and would otherwise drag E2EE state through every repository that builds a
+/// chat, including the demo one. Watching [chatsProvider] is what recomputes it
+/// when a merge changes which rooms the conversation covers.
+///
+/// Failures resolve to [RoomTrust.none]. The banner is an advisory, and a
+/// key-store hiccup must not put a red bar over a chat that is fine.
+final chatTrustProvider = FutureProvider.family<RoomTrust, String>((
+  ref,
+  chatId,
+) async {
+  if (kDemoMode) return RoomTrust.none;
+
+  final session = ref.watch(matrixSessionProvider);
+  if (!session.isInitialized || !session.encryptionEnabled) {
+    return RoomTrust.none;
+  }
+
+  final chat = ref
+      .watch(chatsProvider)
+      .value
+      ?.where((c) => c.id == chatId)
+      .firstOrNull;
+  if (chat == null) return RoomTrust.none;
+
+  try {
+    return await trustOfRooms([
+      for (final source in chat.sources)
+        ?session.client.getRoomById(source.roomId),
+    ]);
+  } catch (_) {
+    return RoomTrust.none;
+  }
+});
+
 /// Uploads in flight for one chat, keyed by chat id.
 ///
 /// Separate from the timeline because an upload is not a message yet — see

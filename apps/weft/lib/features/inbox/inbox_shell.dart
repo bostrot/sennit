@@ -10,6 +10,7 @@ import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
+import '../settings/devices_screen.dart';
 import '../settings/endpoints_screen.dart';
 import '../settings/link_previews_screen.dart';
 import '../settings/mcp_screen.dart';
@@ -357,6 +358,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const McpScreen(),
                         ),
                       );
+                    case 'devices':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DevicesScreen(),
+                        ),
+                      );
                   }
                 },
                 itemBuilder: (_) => [
@@ -386,6 +393,7 @@ class _InboxHeader extends ConsumerWidget {
                     child: Text('Link previews'),
                   ),
                   const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
+                  const PopupMenuItem(value: 'devices', child: Text('Devices')),
                 ],
               ),
             ],

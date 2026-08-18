@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
@@ -18,6 +19,7 @@ import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
+import '../auth/verification_screen.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
 import 'attachment_bubble.dart';
@@ -33,6 +35,7 @@ import 'reply_chip.dart';
 import 'rich_text_view.dart';
 import 'send_network_chip.dart';
 import 'sms_composer_bar.dart';
+import 'unverified_devices_banner.dart';
 
 /// One conversation — merged across networks or not.
 ///
@@ -484,6 +487,22 @@ class _ChatViewState extends ConsumerState<ChatView> {
     }
   }
 
+  /// Opens the existing verification flow from the banner.
+  ///
+  /// No device id: the banner fires when *this* account has an unverified
+  /// device, and asking every other device is what lets whichever one the user
+  /// can reach answer. The trust is recomputed on return rather than assumed —
+  /// the user may well have pressed "Not now".
+  Future<void> _verifyOwnDevice() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            VerificationScreen(onContinue: () => Navigator.of(context).pop()),
+      ),
+    );
+    if (mounted) ref.invalidate(chatTrustProvider(widget.chatId));
+  }
+
   @override
   Widget build(BuildContext context) {
     final unavailable = _unavailable;
@@ -508,6 +527,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
       appBar: _ChatAppBar(chat: chat),
       body: Column(
         children: [
+          UnverifiedDevicesBanner(
+            // Absent while the key store is being read, which is the honest
+            // default: a warning that flashes in and out on every open would
+            // be trained away within a day.
+            trust:
+                ref.watch(chatTrustProvider(widget.chatId)).value ??
+                RoomTrust.none,
+            onVerify: _verifyOwnDevice,
+          ),
           Expanded(
             child: NotificationListener<ScrollNotification>(
               onNotification: (n) {

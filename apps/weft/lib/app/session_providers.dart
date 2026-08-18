@@ -21,6 +21,16 @@ final sessionBootstrapProvider = FutureProvider<WeftSessionState>((ref) async {
   return ref.watch(matrixSessionProvider).initialize();
 });
 
+/// This account's other logins, for the devices screen.
+///
+/// Built lazily, and deliberately not guarded against an uninitialised session:
+/// reading it before login is a programming error, and the screen that reads it
+/// reports the failure it gets rather than rendering an empty list that would
+/// read as "you have no other devices".
+final deviceManagerProvider = Provider<DeviceManager>(
+  (ref) => MatrixDeviceManager(ref.watch(matrixSessionProvider).client),
+);
+
 /// Live session state. Seeded from the bootstrap result so there is no gap
 /// between "restored" and "first state event".
 final sessionStateProvider = StreamProvider<WeftSessionState>((ref) async* {

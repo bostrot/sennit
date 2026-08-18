@@ -14,6 +14,7 @@ export 'package:matrix/matrix.dart' show LoginFlow;
 export 'src/api_session.dart';
 export 'src/bridge_discovery.dart';
 export 'src/database.dart';
+export 'src/devices.dart';
 export 'src/homeserver.dart';
 export 'src/link_preview.dart';
 export 'src/mapping.dart';

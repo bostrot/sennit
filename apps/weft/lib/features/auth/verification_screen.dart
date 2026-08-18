@@ -12,10 +12,22 @@ import '../../app/session_providers.dart';
 /// who skips past a notice will conclude that Weft "lost" their history. Saying
 /// so plainly here is cheaper than the support conversation later.
 class VerificationScreen extends ConsumerStatefulWidget {
-  const VerificationScreen({super.key, required this.onContinue});
+  const VerificationScreen({
+    super.key,
+    required this.onContinue,
+    this.deviceId,
+  });
 
   /// Invoked when the user proceeds, verified or not.
   final VoidCallback onContinue;
+
+  /// Which device to verify against, or null to ask *every* other device —
+  /// which is what a fresh login wants, since whichever one the user is holding
+  /// can answer.
+  ///
+  /// Set from the devices screen, where the user has already picked the session
+  /// they mean. Same flow, same machinery; only the addressee differs.
+  final String? deviceId;
 
   @override
   ConsumerState<VerificationScreen> createState() => _VerificationScreenState();
@@ -40,9 +52,14 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     try {
       final verification = await ref
           .read(matrixSessionProvider)
-          .startVerification();
+          .startVerification(deviceId: widget.deviceId);
       if (verification == null) {
-        setState(() => _error = 'No other device is available to verify with.');
+        setState(
+          () => _error = widget.deviceId == null
+              ? 'No other device is available to verify with.'
+              : 'That device has not published any encryption keys, so there '
+                    'is nothing to verify against.',
+        );
         return;
       }
       verification.onUpdate = () {
@@ -78,7 +95,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 ),
                 const SizedBox(height: WeftSpace.lg),
                 Text(
-                  'Verify this device',
+                  widget.deviceId == null
+                      ? 'Verify this device'
+                      : 'Verify ${widget.deviceId}',
                   textAlign: TextAlign.center,
                   style: context.text.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -86,7 +105,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 ),
                 const SizedBox(height: WeftSpace.sm),
                 Text(
-                  session.crossSigningExists
+                  widget.deviceId != null
+                      ? 'Compare the emoji below on both devices. Once they '
+                            'match, each trusts the other and your encrypted '
+                            'chats stop warning about it.'
+                      : session.crossSigningExists
                       ? 'Confirm it is really you from a device you already '
                             'use. Until you do, Weft cannot read messages sent '
                             'before this device signed in.'
@@ -133,13 +156,21 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                    label: const Text('Verify with another device'),
+                    label: Text(
+                      widget.deviceId == null
+                          ? 'Verify with another device'
+                          : 'Start verification',
+                    ),
                   ),
 
                 const SizedBox(height: WeftSpace.sm),
                 TextButton(
                   onPressed: widget.onContinue,
-                  child: const Text('Continue without verifying'),
+                  child: Text(
+                    widget.deviceId == null
+                        ? 'Continue without verifying'
+                        : 'Not now',
+                  ),
                 ),
                 Text(
                   'You can verify later from Settings.',
