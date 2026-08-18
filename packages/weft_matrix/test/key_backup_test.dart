@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/encryption.dart' as enc;
+import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_matrix/weft_matrix.dart';
 
 /// The SDK's bootstrap machine, without a homeserver behind it.
@@ -391,6 +392,61 @@ void main() {
     test('the empty value is an account with nothing set up', () {
       expect(KeyBackupStatus.none.state, KeyBackupState.absent);
       expect(KeyBackupStatus.none.crossSigningEnabled, isFalse);
+    });
+  });
+
+  group('MatrixKeyBackup on a session without encryption', () {
+    // A client that never logged in, so `client.encryption` is null — the same
+    // shape a session has when the crypto libraries failed to load on the
+    // device. Everything past this point in the class needs a homeserver, but
+    // this is the branch a user can actually reach by accident, and each of the
+    // three entry points has to refuse in words rather than throw on a null.
+    late MatrixKeyBackup backup;
+
+    setUpAll(() async {
+      backup = MatrixKeyBackup(
+        sdk.Client(
+          'weft-key-backup-test',
+          database: await sdk.MatrixSdkDatabase.init(
+            'weft-key-backup-test',
+            database: await openWeftSqfliteDatabase(inMemoryDatabasePath),
+          ),
+        ),
+      );
+    });
+
+    /// `Future.sync` because `createRecovery` is not `async` and so throws
+    /// *synchronously* where the other two return a failed future. Both are
+    /// caught by the `try`/`await` at every call site, but a matcher that only
+    /// understood one of them would pass for the wrong reason.
+    Future<void> refuses(Object? Function() call, String fragment) =>
+        expectLater(
+          Future.sync(call),
+          throwsA(
+            isA<KeyBackupException>().having(
+              (e) => e.message,
+              'message',
+              contains(fragment),
+            ),
+          ),
+        );
+
+    test('reading the status says so rather than reporting "no backup"', () {
+      // Not KeyBackupStatus.none: an unreadable session and an account that
+      // never set up a backup need opposite actions, and the status row cannot
+      // tell them apart if this one answers with the other's value.
+      return refuses(backup.status, 'Encryption is not available');
+    });
+
+    test('setting recovery up refuses before the machine starts', () {
+      return refuses(backup.createRecovery, 'nothing to back up');
+    });
+
+    test('restoring refuses with the same sentence', () {
+      return refuses(
+        () => backup.restore('Es${'A' * 46}'),
+        'nothing to back up',
+      );
     });
   });
 }
