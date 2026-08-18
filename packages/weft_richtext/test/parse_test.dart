@@ -1,4 +1,5 @@
 import 'package:test/test.dart';
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
 /// Everything a renderer would show, as one string, so a test can assert on
@@ -694,6 +695,113 @@ void main() {
       );
       expect(visible(doc), 'Alice is here');
       expect(visible(doc), isNot(contains('example.org')));
+    });
+  });
+
+  group('the message projection', () {
+    test('a formatted body projects to its words', () {
+      expect(
+        plainMessageText(
+          body: 'the roof is on fire',
+          formattedBody: '<p>the roof is <b>on fire</b></p>',
+        ),
+        'the roof is on fire',
+      );
+    });
+
+    test('markup never survives into the projection', () {
+      // What the index and the shade must never contain: tag names, an href
+      // the reader was not shown, or the contents of a dropped subtree.
+      final text = plainMessageText(
+        body: 'look at this',
+        formattedBody:
+            '<p>look <a href="https://tracker.test/x">at</a> this</p>'
+            '<style>.a{}</style><script>alert(1)</script>',
+      );
+      expect(text, 'look at this');
+      expect(text, isNot(contains('alert')));
+      expect(text, isNot(contains('tracker.test')));
+      expect(text, isNot(contains('href')));
+    });
+
+    test('the reply fallback is stripped from both sides at once', () {
+      expect(
+        plainMessageText(
+          body: '> <@grace:example.org> six?\n\nyes',
+          formattedBody:
+              '<mx-reply><blockquote>six?</blockquote></mx-reply>yes',
+        ),
+        'yes',
+      );
+    });
+
+    test('a plain body carrying only a fallback is stripped too', () {
+      expect(
+        plainMessageText(body: '> <@grace:example.org> six?\n\nyes'),
+        'yes',
+      );
+    });
+
+    test('a body that merely opens with a quotation is untouched', () {
+      expect(
+        plainMessageText(body: '> to be or not to be'),
+        '> to be or not to be',
+      );
+    });
+
+    test('the document form is what the renderer parses', () {
+      final doc = parseMessageDocument(
+        body: 'six?',
+        formattedBody: '<blockquote>six?</blockquote>',
+      );
+      expect(
+        flatten(doc.children).whereType<RichBlock>().map((b) => b.kind),
+        contains(RichBlockKind.blockquote),
+      );
+      expect(
+        doc.plainText,
+        plainMessageText(
+          body: 'six?',
+          formattedBody: '<blockquote>six?</blockquote>',
+        ),
+      );
+    });
+
+    test('a whole message projects its body and its transcript', () {
+      // The shape `WeftMessage.searchableText` uses, so a voice note stays
+      // findable by what was said in it — but with the body projected.
+      final message = WeftMessage(
+        eventId: r'$e1',
+        roomId: '!room:example.org',
+        network: ChatNetwork.whatsapp,
+        senderId: '@grace:example.org',
+        senderName: 'Grace',
+        timestamp: DateTime.utc(2026, 8, 18),
+        kind: MessageKind.text,
+        isOwn: false,
+        body: 'the roof is on fire',
+        formattedBody: '<p>the roof is <b>on fire</b></p>',
+        transcript: 'spoken words',
+      );
+      expect(plainTextOf(message), 'the roof is on fire\nspoken words');
+    });
+
+    test('a message that is nothing but markup projects to nothing', () {
+      // The emptiness an indexer asks about: this message says nothing to a
+      // reader, so it must not become a row findable by its own payload.
+      final message = WeftMessage(
+        eventId: r'$e2',
+        roomId: '!room:example.org',
+        network: ChatNetwork.whatsapp,
+        senderId: '@grace:example.org',
+        senderName: 'Grace',
+        timestamp: DateTime.utc(2026, 8, 18),
+        kind: MessageKind.text,
+        isOwn: false,
+        body: '',
+        formattedBody: '<script>alert(1)</script>',
+      );
+      expect(plainTextOf(message), isEmpty);
     });
   });
 

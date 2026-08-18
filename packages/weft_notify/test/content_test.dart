@@ -140,6 +140,52 @@ void main() {
       expect(render(message: msg(body: 'on my way')).body, 'on my way');
     });
 
+    test('a formatted body notifies as its words, not its tags', () {
+      final content = render(
+        message: msg(
+          body: 'the roof is on fire',
+          formattedBody: '<p>the roof is <b>on fire</b></p>',
+        ),
+      );
+      expect(content.body, 'the roof is on fire');
+    });
+
+    test('markup the sender only meant as markup never reaches the shade', () {
+      // The plain body is the sender's own fallback and could say anything;
+      // what must not happen is the shade reading out tag names, urls the
+      // reader never saw, or the contents of a dropped subtree — a notification
+      // body is spoken aloud by TalkBack and VoiceOver.
+      final content = render(
+        message: msg(
+          body: 'look at this',
+          formattedBody:
+              '<p>look <a href="https://tracker.test/x">at</a> this'
+              '<style>.a{}</style><script>alert(1)</script></p>',
+        ),
+      );
+      expect(content.body, 'look at this');
+    });
+
+    test('a reply notifies as the answer, not the message answered', () {
+      // The fallback is in the body of every rich reply. Left in, the shade
+      // announces the message being replied to — often the reader's own — and
+      // the actual answer falls off the end of a 240-character body.
+      final content = render(
+        message: msg(
+          body:
+              '> <@grace:example.org> are we still on for six\n'
+              '\n'
+              'yes, see you there',
+        ),
+      );
+      expect(content.body, 'yes, see you there');
+    });
+
+    test('a body that merely opens with a quotation is left alone', () {
+      final content = render(message: msg(body: '> to be or not to be'));
+      expect(content.body, '> to be or not to be');
+    });
+
     test('a voice note uses the transcript when one exists', () {
       final content = render(
         message: msg(

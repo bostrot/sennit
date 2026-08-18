@@ -19,6 +19,7 @@ WeftMessage msg({
   MessageKind kind = MessageKind.text,
   bool isOwn = false,
   String body = 'hello',
+  String? formattedBody,
   String? transcript,
   bool redacted = false,
 }) {
@@ -32,6 +33,7 @@ WeftMessage msg({
     kind: kind,
     isOwn: isOwn,
     body: body,
+    formattedBody: formattedBody,
     transcript: transcript,
     redacted: redacted,
   );

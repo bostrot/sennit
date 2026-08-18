@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 import 'rules.dart';
 
@@ -441,7 +442,16 @@ String renderNotificationBody(
 }
 
 String _bodyForKind(WeftMessage message) {
-  final body = message.body.trim();
+  // The projected body, not the raw one. A formatted message must reach the
+  // shade as what it says — `<b>fire</b>` notifies as "fire", never as its
+  // tags, which is also what stops a `<script>` the reader was never shown from
+  // being read out by TalkBack. And a reply's quoted-context fallback goes with
+  // it: a notification that opened with `> <@alice:example.org> …` would
+  // announce the message being answered instead of the answer.
+  final body = plainMessageText(
+    body: message.body,
+    formattedBody: message.formattedBody,
+  ).trim();
   return switch (message.kind) {
     // Media bodies are the filename for most senders and the caption for the
     // ones that follow MSC2530. Either way it is the text the sender attached

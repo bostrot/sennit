@@ -11,6 +11,7 @@ related:
   - '[[Attachment-Pipeline]]'
   - '[[Merged-Timeline]]'
   - '[[Notification-Decision-Layer]]'
+  - '[[Rich-Content]]'
 ---
 
 # Notifications

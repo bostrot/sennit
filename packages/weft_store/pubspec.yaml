@@ -24,6 +24,9 @@ dependencies:
   # codegen step from every build.
   sqlite3: ^3.0.0
   weft_domain: ^0.1.0
+  # For the plain-text projection of formatted bodies. The index stores what a
+  # message says, and only `weft_richtext` knows how to answer that.
+  weft_richtext: ^0.1.0
   weft_search: ^0.1.0
 
 dev_dependencies:

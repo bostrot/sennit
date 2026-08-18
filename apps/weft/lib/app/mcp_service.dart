@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_mcp/weft_mcp.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
 
@@ -150,7 +151,10 @@ class AppMcpDataSource implements WeftMcpDataSource {
     network: m.network.id,
     sender: m.senderName,
     timestamp: m.timestamp,
-    body: m.searchableText,
+    // The projection, not the raw body: an MCP client is a program reading
+    // messages on the user's behalf, and handing it markup makes it either
+    // render tags to whoever asked or parse untrusted HTML itself.
+    body: plainTextOf(m),
     isOwn: m.isOwn,
     kind: m.kind.name,
   );

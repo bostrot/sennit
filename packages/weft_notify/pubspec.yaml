@@ -15,6 +15,9 @@ dependencies:
   collection: ^1.19.0
   meta: ^1.17.0
   weft_domain: ^0.1.0
+  # For the plain-text projection of formatted bodies: a notification says what
+  # the message says, never the tags it was written in.
+  weft_richtext: ^0.1.0
 
 dev_dependencies:
   lints: ^6.0.0

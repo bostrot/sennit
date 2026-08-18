@@ -817,6 +817,15 @@ NotificationDecision evaluateNotification({
 /// does not fire on "Also". Names shorter than two characters are ignored
 /// outright: a one-letter display name matches half the language, and the cost
 /// of a false mention is a notification that broke through a mute.
+///
+/// Deliberately the *raw* [WeftMessage.searchableText] and not the projection
+/// [renderNotificationBody] uses, even though the two now differ. The
+/// projection strips a reply's `> <@alice:example.org>` fallback, and that
+/// fallback is the only trace a reply to *you* leaves in a body Weft can read —
+/// `m.mentions` is dropped at mapping time and a bridged reply never had it. A
+/// notification should not repeat the message being answered, which is why the
+/// body is projected; but someone replying to you is someone addressing you,
+/// and losing that would silence replies inside a muted conversation.
 bool mentionsUser(
   WeftMessage message, {
   required Set<String> ownUserIds,

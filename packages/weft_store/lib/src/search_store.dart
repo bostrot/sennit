@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:sqlite3/sqlite3.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_search/weft_search.dart';
 
 import 'weft_database.dart';
@@ -20,12 +21,25 @@ class SearchStore implements SearchBackend {
   ///
   /// Returns the index row id. Idempotent per (eventId, roomId): re-indexing an
   /// edited message replaces the old text rather than duplicating the row.
+  ///
+  /// What is stored is the message's *visible* text, not the markup it was
+  /// written in: [plainTextOf] runs the body through the same allowlist the
+  /// bubble renders. Indexing a formatted body raw is wrong twice over — it
+  /// makes `<b>fire</b>` unfindable by "fire" while making every formatted
+  /// message findable by "strong" and "href", and it puts the contents of a
+  /// `<script>` the reader was never shown into the column the search screen
+  /// prints back as a snippet.
+  ///
+  /// The projection happens here rather than at the call sites because this is
+  /// the one door into the index: the FTS row and the embedding queued below
+  /// both come off this column, so a writer that forgot to project would poison
+  /// keyword and semantic search together.
   int indexMessage(
     WeftMessage message, {
     required String chatId,
     String chatTitle = '',
   }) {
-    final text = message.searchableText;
+    final text = plainTextOf(message);
 
     _raw.execute(
       '''

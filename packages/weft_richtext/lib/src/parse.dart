@@ -1,7 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
+import 'package:weft_domain/weft_domain.dart';
 
+import 'fallback.dart';
 import 'mentions.dart';
 import 'span.dart';
 import 'url_policy.dart';
@@ -123,6 +125,55 @@ RichDocument parsePlainBody(String plainBody) {
       RichBlock(kind: RichBlockKind.paragraph, children: children),
     ]),
   );
+}
+
+/// The document a Matrix message renders as, from the two fields it arrives in.
+///
+/// This is the composition every consumer needs and none should re-derive: the
+/// formatted body when there is one, the plain body when there is not, and the
+/// reply fallback stripped from the plain side either way — the strip is on the
+/// plain body only because [parseFormattedBody] already drops `<mx-reply>` with
+/// its contents.
+///
+/// Three consumers take it and only one of them draws anything: the chat bubble
+/// renders the tree, and the search index and the notification layer take
+/// [RichDocument.plainText] off it through [plainMessageText]. Having them share
+/// one function is the point — a second "turn a body into text" path would be a
+/// second allowlist to keep in step, and the one that skipped
+/// [parseFormattedBody] would be the one that put `<script>` into the index.
+RichDocument parseMessageDocument({
+  required String body,
+  String? formattedBody,
+}) => parseFormattedBody(formattedBody, stripReplyFallback(body));
+
+/// What a message says, with markup, `<mx-reply>` and the quoted-context
+/// fallback all removed.
+///
+/// The projection the search index and notification bodies take, so that a
+/// message written as `<p>meet at <b>six</b></p>` is findable by "six" and
+/// notifies as "meet at six" rather than as its tags. A reply notifies as what
+/// the sender just said, not as the message they said it about.
+String plainMessageText({required String body, String? formattedBody}) =>
+    parseMessageDocument(body: body, formattedBody: formattedBody).plainText;
+
+/// Everything [message] says as plain text: its projected body, plus any
+/// transcript, joined the way [WeftMessage.searchableText] joins them.
+///
+/// The whole-message form of [plainMessageText], for the two consumers that
+/// want a voice note's transcript to count as words the message contains — the
+/// search index, so a voice note is findable by what was said in it, and the
+/// mention rules, so a voice note that says your name breaks through a mute.
+/// `searchableText` itself cannot do this: `weft_domain` is below this package
+/// and cannot parse HTML, which is why the projection has to be asked for here.
+String plainTextOf(WeftMessage message) {
+  final body = plainMessageText(
+    body: message.body,
+    formattedBody: message.formattedBody,
+  );
+  final transcript = message.transcript;
+  if (transcript == null || transcript.isEmpty) return body;
+  if (body.isEmpty) return transcript;
+  return '$body\n$transcript';
 }
 
 List<RichSpan> _walkNodes(List<dom.Node> nodes, RichStyle style) {

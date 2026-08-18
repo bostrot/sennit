@@ -7,6 +7,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_merge/weft_merge.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_store/weft_store.dart';
 
 import 'chat_repository.dart';
@@ -697,7 +698,10 @@ class MatrixChatRepository implements ChatRepository {
       store.removeMessage(eventId: m.eventId, roomId: m.roomId);
     }
     store.indexMessages(
-      messages.where((m) => !m.redacted && m.searchableText.isNotEmpty),
+      // Emptiness is asked of the projection, not of the raw body: a message
+      // whose whole body was a dropped subtree says nothing to a reader and
+      // would otherwise be indexed as a blank row.
+      messages.where((m) => !m.redacted && plainTextOf(m).isNotEmpty),
       chatId: chatId,
       chatTitle: title,
     );

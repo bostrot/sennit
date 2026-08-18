@@ -248,6 +248,7 @@ packages/
   weft_transcribe/          pluggable STT adapters
   weft_notify/              notification rules, content, dedupe ledger
   weft_share/               share-target ranking, network capability, App Group staging
+  weft_richtext/            formatted-body allowlist, reply fallbacks, reactions, edits
   weft_matrix/              Matrix SDK wrapper: session, E2EE, verification
   weft_store/               SQLite: identity graph, settings, FTS5 + vectors
   weft_mcp/                 MCP server + cloudflared supervisor
@@ -258,8 +259,8 @@ tooling/docker/             disposable Synapse for tests
 ```
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
-`weft_transcribe`, `weft_notify`, `weft_share` and `weft_mcp` are **pure Dart** — no Flutter, no
-I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
+`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext` and `weft_mcp` are **pure Dart** —
+no Flutter, no I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
 second, with no device and no homeserver.
 
 Longer-form design notes live in `docs/architecture/` —
@@ -270,7 +271,10 @@ sniff-first detection, the plain-vs-encrypted event shapes, and why the upload
 queue bounds concurrency, and
 [share surfaces](docs/architecture/share-surfaces.md) covers Android Direct
 Share, the iOS Share Extension's App Group contract, and the publish diff that
-keeps the launcher from thrashing.
+keeps the launcher from thrashing, and
+[rich content](docs/architecture/rich-content.md) covers the formatted-body
+allowlist as a security boundary, cross-network reaction dedupe, and why link
+previews are fetched by the homeserver rather than by the app.
 
 Decisions that need something this repository cannot hold live in
 `docs/decisions/` —
