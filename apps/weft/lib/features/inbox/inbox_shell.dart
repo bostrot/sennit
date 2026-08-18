@@ -11,6 +11,7 @@ import '../merge/merge_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/devices_screen.dart';
+import '../settings/security_screen.dart';
 import '../settings/endpoints_screen.dart';
 import '../settings/link_previews_screen.dart';
 import '../settings/mcp_screen.dart';
@@ -364,6 +365,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const DevicesScreen(),
                         ),
                       );
+                    case 'security':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SecurityScreen(),
+                        ),
+                      );
                   }
                 },
                 itemBuilder: (_) => [
@@ -394,6 +401,10 @@ class _InboxHeader extends ConsumerWidget {
                   ),
                   const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
                   const PopupMenuItem(value: 'devices', child: Text('Devices')),
+                  const PopupMenuItem(
+                    value: 'security',
+                    child: Text('Encryption'),
+                  ),
                 ],
               ),
             ],

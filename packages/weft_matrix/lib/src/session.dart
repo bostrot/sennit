@@ -258,20 +258,10 @@ class WeftMatrixSession {
     return keys.startVerification();
   }
 
-  /// Sets up cross-signing and online key backup for a brand-new account.
-  ///
-  /// [recoveryKey] is the user's security key or passphrase; without it, the
-  /// keys cannot be recovered if every device is lost, so the UI must not let
-  /// this be skipped silently.
-  Future<void> bootstrapEncryption({
-    required void Function(enc.Bootstrap bootstrap) onUpdate,
-  }) async {
-    final encryption = client.encryption;
-    if (encryption == null) {
-      throw StateError('Encryption is unavailable on this client');
-    }
-    encryption.bootstrap(onUpdate: onUpdate);
-  }
+  // Cross-signing and key-backup setup lives in `key_backup.dart`, behind the
+  // `KeyBackup` interface. It was a method here once and could not be used: it
+  // started the SDK's bootstrap machine without awaiting it and returned
+  // nothing, so a caller had no key to show and no way to know it had finished.
 
   Future<void> logout() async {
     try {

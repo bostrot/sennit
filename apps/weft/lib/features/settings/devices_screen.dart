@@ -99,7 +99,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   Future<String?> _askPassword() {
     return showDialog<String>(
       context: context,
-      builder: (_) => const _TextPrompt(
+      builder: (_) => const TextPromptDialog(
         title: 'Confirm it is you',
         message:
             'Your homeserver asks for your account password before it will '
@@ -114,7 +114,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   Future<void> _rename(WeftDevice device) async {
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => _TextPrompt(
+      builder: (_) => TextPromptDialog(
         title: 'Rename device',
         message:
             'The name is visible to anyone you share an encrypted room with, '
@@ -252,7 +252,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     List<WeftDevice> others,
   ) {
     if (_error case final message?) {
-      return _Message(message: message, onRetry: _busy ? null : _load);
+      return SettingsMessage(message: message, onRetry: _busy ? null : _load);
     }
     if (devices == null) {
       return const Center(child: CircularProgressIndicator());
@@ -293,78 +293,6 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
             ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-/// A dialog that asks for one line of text and pops it, or pops null.
-///
-/// Stateful, and owning its controller, because the alternative — building the
-/// controller at the call site and disposing it when `showDialog` returns —
-/// disposes it while the dialog's exit animation is still rebuilding the field
-/// it belongs to. That is a "used after being disposed" assertion in the frame
-/// after every dialog, which is exactly what this replaced.
-class _TextPrompt extends StatefulWidget {
-  const _TextPrompt({
-    required this.title,
-    required this.message,
-    required this.fieldLabel,
-    required this.confirmLabel,
-    this.initialValue = '',
-    this.obscure = false,
-  });
-
-  final String title;
-  final String message;
-  final String fieldLabel;
-  final String confirmLabel;
-  final String initialValue;
-  final bool obscure;
-
-  @override
-  State<_TextPrompt> createState() => _TextPromptState();
-}
-
-class _TextPromptState extends State<_TextPrompt> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialValue,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.message),
-          const SizedBox(height: WeftSpace.md),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            obscureText: widget.obscure,
-            decoration: InputDecoration(labelText: widget.fieldLabel),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: Text(widget.confirmLabel),
-        ),
       ],
     );
   }
@@ -527,30 +455,6 @@ class _Chip extends StatelessWidget {
         style: context.text.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(WeftSpace.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: WeftSpace.lg),
-            OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
-          ],
         ),
       ),
     );

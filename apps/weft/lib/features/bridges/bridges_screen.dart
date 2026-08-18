@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_bridges/weft_bridges.dart';
 import 'package:weft_design/weft_design.dart';
@@ -12,6 +11,7 @@ import 'package:weft_store/weft_store.dart';
 
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
+import '../components/qr_card.dart';
 
 /// One configured bridge, as stored in settings.
 typedef _StoredBridge = ({String id, String url, String networkId});
@@ -595,21 +595,7 @@ class _BridgeLoginScreenState extends State<BridgeLoginScreen> {
         ],
         if (step.displayData != null) ...[
           if (step.displayType == 'qr') ...[
-            // Rendered on a white card regardless of theme: scanner apps
-            // assume dark modules on a light ground, and an inverted QR is
-            // routinely unscannable.
-            Container(
-              padding: const EdgeInsets.all(WeftSpace.md),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: WeftRadius.allMd,
-              ),
-              child: QrImageView(
-                data: step.displayData!,
-                size: 220,
-                version: QrVersions.auto,
-              ),
-            ),
+            QrCard.data(step.displayData!),
             const SizedBox(height: WeftSpace.md),
           ],
           // The raw payload stays available under the image: some networks

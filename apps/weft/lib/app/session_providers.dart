@@ -31,6 +31,15 @@ final deviceManagerProvider = Provider<DeviceManager>(
   (ref) => MatrixDeviceManager(ref.watch(matrixSessionProvider).client),
 );
 
+/// Cross-signing, the online key backup and the recovery key behind them.
+///
+/// Same shape and same reasoning as [deviceManagerProvider]: an interface so
+/// the security screen can be built against a fake, and unguarded so reading it
+/// before login fails loudly instead of reporting a healthy empty account.
+final keyBackupProvider = Provider<KeyBackup>(
+  (ref) => MatrixKeyBackup(ref.watch(matrixSessionProvider).client),
+);
+
 /// Live session state. Seeded from the bootstrap result so there is no gap
 /// between "restored" and "first state event".
 final sessionStateProvider = StreamProvider<WeftSessionState>((ref) async* {

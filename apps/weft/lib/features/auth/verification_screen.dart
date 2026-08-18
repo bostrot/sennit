@@ -4,6 +4,8 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/session_providers.dart';
+import '../components/qr_card.dart';
+import '../components/qr_scanner.dart';
 
 /// Verifies this device against one the user already trusts.
 ///
@@ -73,6 +75,27 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     }
   }
 
+  /// Reads the other device's code and hands its bytes to the SDK.
+  ///
+  /// The scan is the whole of this side's contribution: `verifyQrData` checks
+  /// the keys inside the payload against what we already hold, so a code from
+  /// the wrong device fails here rather than after a user has confirmed
+  /// something.
+  Future<void> _scan(KeyVerification verification) async {
+    final bytes = await ref.read(qrScannerProvider).scan(context);
+    // Null is a cancelled scan, not a failure — nothing has been sent.
+    if (bytes == null || !mounted) return;
+    try {
+      await chooseVerification(
+        verification,
+        VerificationChoice.scanQr,
+        qrBytes: bytes,
+      );
+    } on Exception catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.read(matrixSessionProvider);
@@ -127,6 +150,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   _VerificationBody(
                     verification: verification,
                     onDone: widget.onContinue,
+                    canScan: ref.read(qrScannerProvider).available,
+                    onScan: () => _scan(verification),
                   ),
 
                 if (_error case final message?) ...[
@@ -190,10 +215,19 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
 /// Renders whichever step the verification is currently at.
 class _VerificationBody extends StatelessWidget {
-  const _VerificationBody({required this.verification, required this.onDone});
+  const _VerificationBody({
+    required this.verification,
+    required this.onDone,
+    required this.canScan,
+    required this.onScan,
+  });
 
   final KeyVerification verification;
   final VoidCallback onDone;
+
+  /// Whether this build can read a code off another screen.
+  final bool canScan;
+  final VoidCallback onScan;
 
   @override
   Widget build(BuildContext context) {
@@ -207,8 +241,36 @@ class _VerificationBody extends StatelessWidget {
         onConfirm: verification.acceptVerification,
         onReject: verification.rejectVerification,
       ),
+      KeyVerificationState.askChoice => _Choice(
+        verification: verification,
+        canScan: canScan,
+        onScan: onScan,
+      ),
+      // Cross-signing exists but its secrets are not on this device, so there
+      // is nothing here to sign the other device *with* until the recovery key
+      // unlocks them.
+      KeyVerificationState.askSSSS => _UnlockPrompt(verification: verification),
       KeyVerificationState.askSas || KeyVerificationState.waitingSas =>
         _EmojiCompare(verification: verification),
+      // We scanned their code and it checked out. They still have to confirm
+      // they can see that, which is what stops a code photographed over
+      // somebody's shoulder from verifying itself.
+      KeyVerificationState.showQRSuccess => const _Waiting(
+        message:
+            'That code checked out. Tell your other device you scanned it '
+            'successfully.',
+        icon: Icons.verified_rounded,
+      ),
+      // They scanned ours. Confirming is a statement about the physical world,
+      // so the question names what to look at rather than asking for a yes.
+      KeyVerificationState.confirmQRScan => _Prompt(
+        message:
+            'Your other device says it scanned this code. Is it now showing '
+            'that this device is verified?',
+        confirmLabel: 'Yes, it is',
+        onConfirm: verification.acceptQRScanConfirmation,
+        onReject: verification.rejectVerification,
+      ),
       KeyVerificationState.done => _Result(
         icon: Icons.check_circle_rounded,
         message: 'This device is verified. Your history is unlocking now.',
@@ -221,8 +283,170 @@ class _VerificationBody extends StatelessWidget {
         onDone: onDone,
         success: false,
       ),
-      _ => const _Waiting(message: 'Working…'),
     };
+  }
+}
+
+/// Both sides are ready and the user picks how to prove it is them.
+///
+/// The QR code is rendered rather than offered behind a button: showing it
+/// sends nothing, costs nothing, and is the option that works when only one of
+/// the two devices has a camera — which is the usual case, since one of them is
+/// generally a laptop.
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.verification,
+    required this.canScan,
+    required this.onScan,
+  });
+
+  final KeyVerification verification;
+  final bool canScan;
+  final VoidCallback onScan;
+
+  @override
+  Widget build(BuildContext context) {
+    final choices = verificationChoices(verification.possibleMethods);
+    final qrBytes = verificationQrBytes(verification);
+    final showQr = choices.contains(VerificationChoice.showQr);
+
+    return Column(
+      children: [
+        if (showQr && qrBytes != null) ...[
+          Text(
+            'Scan this from your other device.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium,
+          ),
+          const SizedBox(height: WeftSpace.md),
+          QrCard.bytes(qrBytes),
+          const SizedBox(height: WeftSpace.lg),
+        ],
+        if (choices.contains(VerificationChoice.scanQr)) ...[
+          if (canScan)
+            FilledButton.icon(
+              onPressed: onScan,
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+              label: const Text("Scan the other device's code"),
+            )
+          else
+            Text(
+              'This build of Weft cannot open a camera to read a code. Show '
+              'the code above on whichever device has one, or compare emoji '
+              'instead — both end up in the same place.',
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+          const SizedBox(height: WeftSpace.md),
+        ],
+        if (choices.contains(VerificationChoice.emoji))
+          OutlinedButton(
+            onPressed: () =>
+                chooseVerification(verification, VerificationChoice.emoji),
+            child: Text(showQr ? 'Compare emoji instead' : 'Compare emoji'),
+          ),
+        const SizedBox(height: WeftSpace.lg),
+      ],
+    );
+  }
+}
+
+/// Asks for the recovery key so cross-signing can be used at all.
+///
+/// Stateful and owning its controller for the same reason the settings dialogs
+/// are: a controller built at the call site is disposed while the widget that
+/// reads it is still being rebuilt.
+class _UnlockPrompt extends StatefulWidget {
+  const _UnlockPrompt({required this.verification});
+
+  final KeyVerification verification;
+
+  @override
+  State<_UnlockPrompt> createState() => _UnlockPromptState();
+}
+
+class _UnlockPromptState extends State<_UnlockPrompt> {
+  final TextEditingController _controller = TextEditingController();
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _unlock() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.verification.openSSSS(
+        keyOrPassphrase: _controller.text.trim(),
+      );
+    } catch (_) {
+      // The SDK throws several unrelated types for a key that does not work,
+      // and none of their messages is fit to show.
+      if (mounted) {
+        setState(
+          () => _error =
+              'That is not the recovery key or passphrase for this account.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          'Enter your recovery key to unlock this account\'s signing keys. '
+          'Without them this device can be checked but not vouched for.',
+          textAlign: TextAlign.center,
+          style: context.text.bodyMedium,
+        ),
+        const SizedBox(height: WeftSpace.md),
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          enabled: !_busy,
+          decoration: const InputDecoration(
+            labelText: 'Recovery key or passphrase',
+          ),
+        ),
+        if (_error case final message?) ...[
+          const SizedBox(height: WeftSpace.sm),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.colors.error,
+            ),
+          ),
+        ],
+        const SizedBox(height: WeftSpace.lg),
+        FilledButton(
+          onPressed: _busy ? null : _unlock,
+          child: const Text('Unlock'),
+        ),
+        const SizedBox(height: WeftSpace.sm),
+        TextButton(
+          // Skipping still verifies the two devices against each other; what it
+          // gives up is signing them into the account's chain of trust.
+          onPressed: _busy
+              ? null
+              : () => widget.verification.openSSSS(skip: true),
+          child: const Text('Continue without it'),
+        ),
+        const SizedBox(height: WeftSpace.lg),
+      ],
+    );
   }
 }
 
@@ -301,9 +525,14 @@ class _EmojiCompare extends StatelessWidget {
 }
 
 class _Waiting extends StatelessWidget {
-  const _Waiting({required this.message});
+  const _Waiting({required this.message, this.icon});
 
   final String message;
+
+  /// Shown instead of the spinner when the wait is for the *other* device to
+  /// act and this side has already succeeded — a spinner there reads as
+  /// "something might still go wrong here", which is no longer true.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -311,13 +540,20 @@ class _Waiting extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: WeftSpace.lg),
       child: Column(
         children: [
-          const SizedBox(
-            height: 22,
-            width: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          if (icon case final icon?)
+            Icon(icon, size: 32, color: context.palette.online)
+          else
+            const SizedBox(
+              height: 22,
+              width: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           const SizedBox(height: WeftSpace.md),
-          Text(message, style: context.text.bodySmall),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall,
+          ),
         ],
       ),
     );

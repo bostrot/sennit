@@ -6,63 +6,7 @@ import 'package:weft/features/settings/devices_screen.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
-/// A [DeviceManager] with no homeserver behind it.
-///
-/// The whole reason [DeviceManager] is an interface: every method on the real
-/// one is a round trip, and a screen that can only be exercised against a live
-/// Synapse is a screen that stops being exercised.
-class FakeDeviceManager implements DeviceManager {
-  FakeDeviceManager(this._devices);
-
-  List<WeftDevice> _devices;
-
-  /// Thrown by the next call instead of answering it.
-  Object? failure;
-
-  /// Whether [signOut] demands a password before it does anything, the way a
-  /// homeserver does for any request that invalidates a token.
-  bool demandsReauth = false;
-
-  final List<({String deviceId, String name})> renames = [];
-  final List<List<String>> signOuts = [];
-  final List<String?> passwordsGiven = [];
-
-  @override
-  Future<List<WeftDevice>> devices() async {
-    if (failure case final error?) throw error;
-    return sortDevices(_devices);
-  }
-
-  @override
-  Future<void> rename(String deviceId, String displayName) async {
-    if (failure case final error?) throw error;
-    renames.add((deviceId: deviceId, name: displayName));
-    _devices = [
-      for (final device in _devices)
-        device.deviceId == deviceId
-            ? device.copyWith(displayName: displayName)
-            : device,
-    ];
-  }
-
-  @override
-  Future<void> signOut(
-    List<String> deviceIds, {
-    required ReauthPrompt reauth,
-  }) async {
-    if (failure case final error?) throw error;
-    if (demandsReauth) {
-      final password = await reauth();
-      passwordsGiven.add(password);
-      if (password == null) throw const ReauthCancelled();
-    }
-    signOuts.add(deviceIds);
-    _devices = [
-      for (final device in _devices)
-        if (!deviceIds.contains(device.deviceId)) device,
-    ];
-  }
-}
+import 'support/session_fakes.dart';
 
 void main() {
   final seen = DateTime.utc(2026, 8, 18, 9);
