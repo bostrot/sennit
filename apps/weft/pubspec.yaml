@@ -32,6 +32,17 @@ dependencies:
   # which is what lets the desktop foreground path post without a gateway.
   flutter_local_notifications: ^22.3.0
   flutter_riverpod: ^3.3.2
+  # WebRTC, and the only place in Weft that talks to it. Everything a call
+  # *decides* is in `weft_call`, behind its `MediaEngine` interface; this plugin
+  # sits underneath that interface in `services/call/webrtc_media_engine.dart`
+  # and nowhere else, which is what keeps glare, candidate ordering and
+  # renegotiation testable without a microphone.
+  #
+  # It pins nothing awkward: its transitive closure is `dart_webrtc`,
+  # `webrtc_interface`, `synchronized`, `logging`, `js` and `web` — no
+  # `analyzer`, and `webrtc_interface` is a constraint the `matrix` SDK already
+  # carries, so the resolution is unchanged for every other package.
+  flutter_webrtc: ^1.6.0
   go_router: ^17.5.0
   http: ^1.6.0
   image_picker: ^1.2.3
@@ -53,6 +64,7 @@ dependencies:
 
   weft_attachments: ^0.1.0
   weft_bridges: ^0.1.0
+  weft_call: ^0.1.0
   weft_design: ^0.1.0
   weft_domain: ^0.1.0
   weft_matrix: ^0.1.0
