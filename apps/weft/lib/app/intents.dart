@@ -22,11 +22,18 @@ sealed class WeftLink {
   ///   `/user/{matrixUserId}`   → open or create a DM
   ///   `/search?q={query}`      → open search pre-filled
   ///
+  /// Plus the four telephony schemes — `sms:`, `smsto:`, `mms:`, `mmsto:` —
+  /// which are not Weft's own links at all: they are what the dialer, the
+  /// contacts app and a `sms:` link on a web page send, and handling them is
+  /// required of the default SMS app.
+  ///
   /// Returns null for anything unrecognised — an unknown link must not crash
   /// the router, because links arrive from outside the app's control.
   static WeftLink? parse(String url) {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return null;
+
+    if (_smsSchemes.contains(uri.scheme)) return ComposeSmsLink.fromUri(uri);
 
     final isCustomScheme = uri.scheme == 'weft';
     final isAppLink =
@@ -84,6 +91,74 @@ class OpenSearchLink extends WeftLink {
   const OpenSearchLink(this.query);
 
   final String query;
+}
+
+/// The four schemes an "message this number" intent arrives under.
+///
+/// Not synonyms to the intent resolver, and callers are inconsistent about
+/// which they pick: `sms:`/`mms:` mean "the conversation with", `smsto:`/
+/// `mmsto:` mean "compose to". Weft treats all four the same — the distinction
+/// only matters to an app that keeps SMS and MMS in separate places, which no
+/// user has ever wanted.
+const Set<String> _smsSchemes = {'sms', 'smsto', 'mms', 'mmsto'};
+
+/// "Send a message to this number", from outside Weft.
+///
+/// Produced by an `ACTION_SENDTO` intent — the dialer's message button, a
+/// contact card, a `sms:` link in a browser. Declaring the filter is one of the
+/// conditions Android checks before offering an app the default-SMS role, and
+/// an app that is handed the intent and does nothing with it is worse than one
+/// that never claimed it.
+class ComposeSmsLink extends WeftLink {
+  const ComposeSmsLink({this.addresses = const [], this.body});
+
+  /// Recipients, exactly as the caller wrote them — national format, spaces,
+  /// short code and all.
+  ///
+  /// Deliberately not normalised here. `PhoneNumberParser` needs the device's
+  /// region to read `01234 567890`, this parser has no business knowing it, and
+  /// a number that fails to normalise is still the number the user typed and
+  /// still what the composer should show.
+  ///
+  /// Usually one. `sms:+441234567890,+441234567891` is a group MMS, and empty
+  /// is legal: `sms:` with no recipient means "start a new message".
+  final List<String> addresses;
+
+  /// Prefilled text from the URI's `body` parameter, when the caller set one.
+  final String? body;
+
+  /// Reads a `sms:`/`smsto:`/`mms:`/`mmsto:` URI.
+  ///
+  /// The number can be in either of two places, because both spellings occur in
+  /// the wild: `sms:+44…` puts it in the path, `sms://+44…` in the authority.
+  /// `Uri.path` keeps its percent-encoding — `mmsto:%2B44…` is a real intent
+  /// from at least one dialer — so it is decoded here, once.
+  static ComposeSmsLink fromUri(Uri uri) {
+    final raw = uri.path.isNotEmpty ? uri.path : uri.host;
+    final addresses = <String>[];
+    for (final part in raw.split(RegExp('[,;]'))) {
+      final address = _decode(part).trim();
+      if (address.isNotEmpty) addresses.add(address);
+    }
+    final body = uri.queryParameters['body']?.trim();
+    return ComposeSmsLink(
+      addresses: addresses,
+      body: body == null || body.isEmpty ? null : body,
+    );
+  }
+
+  /// Percent-decoding that cannot throw.
+  ///
+  /// The same trap `WeftLink.parse` already documents one layer up: a URI from
+  /// another app can contain a bare `%`, and `Uri.decodeComponent` answers that
+  /// with an `ArgumentError` out of a method whose contract is not to crash.
+  static String _decode(String value) {
+    try {
+      return Uri.decodeComponent(value);
+    } on ArgumentError {
+      return value;
+    }
+  }
 }
 
 /// Content another app shared into Weft.

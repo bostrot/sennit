@@ -4,6 +4,19 @@
          is spent deliberately, behind the rationale sheet, because the system
          gives an app exactly one. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- The default-SMS-app role. All four are declared together deliberately:
+         Android decides whether Weft is even *eligible* for the role by looking
+         for the whole set — the two receivers, the service and these
+         permissions — and an app missing one of them simply never appears in
+         the "Default SMS app" picker. There is no error, no log line and no
+         failed call to debug; the entry is absent. Declaring them does not
+         grant them: holding ROLE_SMS is what grants the SMS group at runtime,
+         which is why `SmsRole.hasPermissions` is reported to Dart separately
+         from `isDefault`. -->
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.RECEIVE_MMS"/>
     <application
         android:label="weft"
         android:name="${applicationName}"
@@ -47,6 +60,27 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="weft.bostrot.com"/>
             </intent-filter>
+            <!-- "Send a message to this number", from the dialer, contacts, a
+                 web page's `sms:` link or another app's `Intent.ACTION_SENDTO`.
+                 Required of the default SMS app — an app that cannot be handed
+                 a recipient this way is not eligible for the role — and useful
+                 long before Weft holds it: the same filter is how a tel-adjacent
+                 link opens a Weft composer at all.
+
+                 All four schemes, because callers are inconsistent about which
+                 they use and the pairs are not synonyms to the intent resolver:
+                 `sms:`/`mms:` are "the conversation with", `smsto:`/`mmsto:`
+                 are "compose to". BROWSABLE is what lets a link in a browser
+                 reach it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="sms"/>
+                <data android:scheme="smsto"/>
+                <data android:scheme="mms"/>
+                <data android:scheme="mmsto"/>
+            </intent-filter>
             <!-- Share-in: Weft appears in every app's share sheet for the
                  content types a messenger can forward. -->
             <intent-filter>
@@ -83,6 +117,62 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts"/>
         </activity>
+        <!-- SMS delivery. `SMS_DELIVER` is broadcast to exactly one app on the
+             device — the default one — and it is the *only* way that app is
+             told about a message. `SMS_RECEIVED`, the one every tutorial shows,
+             is the read-only broadcast every other app gets, and it does not
+             carry the obligation that comes with the role: the default app owns
+             writing the message into the system provider, and no other app on
+             the device will do it. A default SMS app that skips that write is
+             not merely impolite — the user's messages simply cease to exist for
+             every other app, backup and future default.
+
+             `android:permission` on the receiver is the other half of the
+             contract: it declares that only a sender holding BROADCAST_SMS —
+             i.e. the system — may deliver this intent, which is what stops any
+             installed app from forging an inbound message. -->
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER"/>
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".sms.MmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER"/>
+                <data android:mimeType="application/vnd.wap.mms-message"/>
+            </intent-filter>
+        </receiver>
+        <!-- Delivery reports and send outcomes come back as broadcasts, not as
+             a callback on the send call: `SmsManager.sendTextMessage` takes two
+             PendingIntents and returns void. Not exported — the only sender is
+             this app's own PendingIntent. -->
+        <receiver
+            android:name=".sms.SmsStatusReceiver"
+            android:exported="false"/>
+        <!-- "Respond via message" from the incoming-call screen. The dialer
+             starts this while Weft is not running and often while the screen is
+             locked, so it sends in Kotlin and never wakes Flutter: an engine
+             start would take longer than the call rings. -->
+        <service
+            android:name=".sms.HeadlessSmsSendService"
+            android:exported="true"
+            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="sms"/>
+                <data android:scheme="smsto"/>
+                <data android:scheme="mms"/>
+                <data android:scheme="mmsto"/>
+            </intent-filter>
+        </service>
+
         <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
              declared by the firebase_messaging plugin and merged in from its
              own manifest — redeclaring it here would be a second entry for one

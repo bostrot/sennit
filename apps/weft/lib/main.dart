@@ -251,6 +251,14 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // DM creation from a user link needs the start-chat flow; until then
         // the inbox is the honest landing place.
         debugPrint('weft: user link for $userId — start-chat flow pending');
+      case ComposeSmsLink(:final addresses):
+        // The filter is declared — it is one of the conditions for the
+        // default-SMS role — and the intent is parsed and routed here, but the
+        // SMS composer it should open belongs to the repository task that
+        // follows. Landing on the inbox is the honest placeholder: the same
+        // choice `OpenUserLink` above makes, for the same reason.
+        debugPrint('weft: sms compose for $addresses — SMS composer pending');
+        navigator.popUntil((route) => route.isFirst);
       case OpenInboxLink():
         navigator.popUntil((route) => route.isFirst);
     }

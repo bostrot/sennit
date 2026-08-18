@@ -111,6 +111,80 @@ void main() {
     });
   });
 
+  group('ComposeSmsLink', () {
+    test('all four telephony schemes reach the same place', () {
+      // `sms:`/`mms:` mean "the conversation with" and `smsto:`/`mmsto:` mean
+      // "compose to". The resolver does not treat them as synonyms, callers
+      // are inconsistent about which they send, and no user has ever wanted
+      // the distinction.
+      for (final scheme in const ['sms', 'smsto', 'mms', 'mmsto']) {
+        final link = WeftLink.parse('$scheme:+441234567890');
+        expect(link, isA<ComposeSmsLink>(), reason: scheme);
+        expect((link! as ComposeSmsLink).addresses, ['+441234567890']);
+      }
+    });
+
+    test('the number is read from either spelling', () {
+      // `sms:+44…` is an opaque URI and puts the number in the path;
+      // `sms://+44…` makes it the authority. Both are sent in the wild.
+      expect(
+        (WeftLink.parse('sms://+441234567890')! as ComposeSmsLink).addresses,
+        ['+441234567890'],
+      );
+    });
+
+    test('percent-encoded and multi-recipient forms decode', () {
+      expect(
+        (WeftLink.parse('mmsto:%2B441234567890')! as ComposeSmsLink).addresses,
+        ['+441234567890'],
+      );
+      expect(
+        (WeftLink.parse('sms:+441234567890,+441234567891')! as ComposeSmsLink)
+            .addresses,
+        ['+441234567890', '+441234567891'],
+      );
+      expect(
+        (WeftLink.parse('sms:+441234567890;+441234567891')! as ComposeSmsLink)
+            .addresses,
+        hasLength(2),
+      );
+    });
+
+    test('a body parameter is carried through', () {
+      final link =
+          WeftLink.parse('smsto:+441234567890?body=on%20my%20way')!
+              as ComposeSmsLink;
+
+      expect(link.addresses, ['+441234567890']);
+      expect(link.body, 'on my way');
+    });
+
+    test('the number is not normalised here', () {
+      // Normalising needs the device's region, which this parser has no
+      // business knowing — and a number that fails to normalise is still the
+      // one the user typed and still what the composer should show.
+      final link = WeftLink.parse('sms:01234 567890')! as ComposeSmsLink;
+
+      expect(link.addresses, ['01234 567890']);
+    });
+
+    test('no recipient is a new message, not a rejected link', () {
+      final link = WeftLink.parse('sms:')! as ComposeSmsLink;
+
+      expect(link.addresses, isEmpty);
+      expect(link.body, isNull);
+    });
+
+    test('a malformed escape does not throw', () {
+      // Same trap the weft:// parser documents: a URI from another app can
+      // carry a bare `%`, and `Uri.decodeComponent` answers that with an
+      // ArgumentError out of a method contracted not to crash.
+      final link = WeftLink.parse('sms:100%25%20done');
+      expect(link, isA<ComposeSmsLink>());
+      expect(WeftLink.parse('sms:%zz'), isA<ComposeSmsLink>());
+    });
+  });
+
   group('SharedPayload', () {
     test('parses a platform payload', () {
       final payload = SharedPayload.fromMap(const {

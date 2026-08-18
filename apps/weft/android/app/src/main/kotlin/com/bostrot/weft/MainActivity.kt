@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.bostrot.weft.sms.SmsBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -114,7 +115,32 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // SMS gets its own channel rather than another `when` arm here,
+        // because the traffic on it does not start at an activity: a received
+        // message arrives at a `BroadcastReceiver` that may have started the
+        // process. `SmsBridge` is the singleton that outlives this class; all
+        // the activity contributes is somewhere to show the role dialog.
+        SmsBridge.attach(this, flutterEngine)
+
         intent?.let { handleIntent(it, replay = true) }
+    }
+
+    override fun onDestroy() {
+        SmsBridge.detach()
+        super.onDestroy()
+    }
+
+    /// The default-SMS-app dialog's answer.
+    ///
+    /// The role is the only thing here that asks the system a question and
+    /// waits — everything else is a channel call — so an unrecognised request
+    /// code goes straight back to the plugins, which is what
+    /// `super.onActivityResult` does.
+    @Deprecated("Flutter's FlutterActivity has not migrated to the Activity Result APIs")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (SmsBridge.onRoleResult(requestCode)) return
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -148,6 +174,22 @@ class MainActivity : FlutterActivity() {
             Intent.ACTION_VIEW -> intent.data?.let {
                 mapOf("type" to "link", "url" to it.toString())
             }
+            // "Message this number", from the dialer, a contact card or an
+            // `sms:` link on a web page. Sent as a link rather than as a share
+            // because that is what it is: `WeftLink.parse` reads the four
+            // telephony schemes into a `ComposeSmsLink`, so this arrives at the
+            // same router as every other way of opening a conversation.
+            Intent.ACTION_SENDTO -> intent.data?.let {
+                mapOf(
+                    "type" to "link",
+                    // The body an ACTION_SENDTO carries lives in EXTRA_TEXT,
+                    // not in the URI's `body` parameter, and the two spellings
+                    // are both in use. Folding it into the URI here means one
+                    // parser on the Dart side rather than two paths that have
+                    // to agree.
+                    "url" to withBody(it, intent.getStringExtra(Intent.EXTRA_TEXT)),
+                )
+            }
             else -> null
         } ?: return
 
@@ -157,6 +199,21 @@ class MainActivity : FlutterActivity() {
         } else {
             channel?.invokeMethod("onIntent", payload) ?: run { pendingIntent = payload }
         }
+    }
+
+    /// [uri] with [body] as its `body` query parameter, when there is one.
+    ///
+    /// Returns the URI untouched when the intent carried no text or already
+    /// spelled it that way — appending an empty parameter would turn a URI the
+    /// Dart side round-trips cleanly into one it has to special-case.
+    /// Appended as text rather than through `buildUpon`, which is not a
+    /// shortcut: `sms:+441234567890` is an *opaque* URI, and
+    /// `appendQueryParameter` on an opaque URI throws rather than returning the
+    /// obvious thing. The obvious thing is what the Dart side parses.
+    private fun withBody(uri: Uri, body: String?): String {
+        val text = uri.toString()
+        if (body.isNullOrEmpty() || text.contains('?')) return text
+        return "$text?body=${Uri.encode(body)}"
     }
 
     /// The chat a Direct Share intent was aimed at, or null for a plain share.

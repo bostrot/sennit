@@ -18,7 +18,15 @@ enum ChatNetwork {
   gmessages('gmessages', 'Google Messages', 0xFF1B72E8),
   twitter('twitter', 'X', 0xFF1D9BF0),
   bluesky('bluesky', 'Bluesky', 0xFF0085FF),
-  sms('sms', 'SMS', 0xFF7C8794),
+  // SMS has no brand to borrow a colour from, so this one is chosen rather
+  // than copied. It used to be the same grey as [unknown], which made a chat
+  // whose network could not be resolved and a chat that is genuinely SMS the
+  // same swatch — the one distinction a merged conversation's per-message
+  // glyphs exist to draw. Amber is the only free hue in the palette (green,
+  // blue, purple, pink and teal are all taken by real brands) and it reads as
+  // the caution the network deserves: SMS is the one leg of a merged chat that
+  // travels in plaintext.
+  sms('sms', 'SMS', 0xFFB0742A),
   email('email', 'Email', 0xFF8E8E93),
   unknown('unknown', 'Unknown', 0xFF7C8794);
 
