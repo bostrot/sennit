@@ -1,10 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_share/weft_share.dart';
 
 import '../services/notifications/push_registration.dart';
 import '../services/share/shortcut_service.dart';
 import '../services/share/staged_share_reader.dart';
 import 'intents.dart';
 import 'notification_providers.dart';
+
+/// The app's one [ShareTargetRanker], and the capability table inside it.
+///
+/// A provider for a `const` object, which is only worth it because two surfaces
+/// have to agree: the launcher shortcuts published from
+/// [shareShortcutServiceProvider], and the in-app share sheet's own list. Those
+/// are the same four faces twice — Android's share sheet row is a prefix of
+/// what the sheet shows — and two independently constructed rankers would drift
+/// the moment either grew a tuned weight or a network override.
+///
+/// The sheet also reads [ShareTargetRanker.capabilities] directly, to ask which
+/// legs of a merged chat can carry the file in hand. That is the same table the
+/// ranking filtered on, so a chat offered by the list cannot then be told every
+/// one of its networks refuses the share.
+final shareTargetRankerProvider = Provider<ShareTargetRanker>(
+  (ref) => const ShareTargetRanker(),
+);
 
 /// The app's one [ShareShortcutService].
 ///
@@ -20,6 +38,7 @@ import 'notification_providers.dart';
 final shareShortcutServiceProvider = Provider<ShareShortcutService>((ref) {
   return ShareShortcutService(
     publisher: ref.watch(shareTargetSurfaceProvider),
+    ranker: ref.watch(shareTargetRankerProvider),
     avatarLoader: (url) async {
       final loader = await ref.read(avatarFileLoaderProvider.future);
       return loader == null ? null : await loader(url);

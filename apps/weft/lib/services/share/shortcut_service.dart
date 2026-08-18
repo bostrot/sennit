@@ -92,6 +92,18 @@ class ShareShortcutService {
   @visibleForTesting
   List<ShareTargetSlot> get published => List.unmodifiable(_published);
 
+  /// This run's sends per conversation, for a surface that ranks the same chats
+  /// itself.
+  ///
+  /// The share sheet is that surface. It ranks the *whole* inbox rather than
+  /// the top eight and applies a capability filter the shortcut path has no
+  /// share to apply, so it cannot reuse [published] — but ranking it without
+  /// these counts would order the sheet's first rows differently from the
+  /// launcher faces above them, which are the same conversations chosen by the
+  /// same ranker moments earlier. Read-only: [noteSend] is the one way in, so
+  /// that recording a send and republishing stay a single step.
+  Map<String, ChatShareActivity> get activity => Map.unmodifiable(_activity);
+
   /// Ranks [chats] and publishes them, unless the result is what is already up.
   ///
   /// Safe to call on every inbox tick — that is what it is for. Overlapping

@@ -14,11 +14,20 @@ class SendNetworkChip extends StatelessWidget {
     required this.chat,
     required this.current,
     required this.onPick,
+    this.networks,
   });
 
   final Chat chat;
   final ChatNetwork current;
   final ValueChanged<ChatNetwork> onPick;
+
+  /// The legs actually offered, or null for all of [Chat.networks].
+  ///
+  /// Narrowed by the share sheet to the networks that can carry the file being
+  /// shared. A menu that lists Signal for a 200 MB video is a menu whose entries
+  /// are not all choices — picking that one is picking a send that fails — and
+  /// the WhatsApp leg beside it reaches the same person.
+  final List<ChatNetwork>? networks;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +37,7 @@ class SendNetworkChip extends StatelessWidget {
       tooltip: 'Send via…',
       onSelected: onPick,
       itemBuilder: (context) => [
-        for (final n in chat.networks)
+        for (final n in networks ?? chat.networks)
           PopupMenuItem(
             value: n,
             child: Row(

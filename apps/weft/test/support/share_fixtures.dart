@@ -26,6 +26,7 @@ Chat shareChat({
   bool archived = false,
   bool isGroup = false,
   String? avatarUrl,
+  ChatNetwork? preferredSendNetwork,
 }) {
   return Chat(
     id: id,
@@ -34,6 +35,10 @@ Chat shareChat({
     archived: archived,
     isGroup: isGroup,
     avatarUrl: avatarUrl,
+    // Only the sheet reads it — the shortcut publisher has no share in flight
+    // and so no network to choose — but it belongs on the one chat fixture
+    // rather than on a second one built beside it.
+    preferredSendNetwork: preferredSendNetwork,
     sources: [
       for (final network in networks)
         ChatSource(roomId: '$id/${network.id}', network: network),

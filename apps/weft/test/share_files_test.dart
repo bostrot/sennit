@@ -463,6 +463,26 @@ void main() {
       return repository;
     }
 
+    /// Choose a conversation from the list and confirm the send.
+    ///
+    /// Two taps rather than one since Phase 04 task 7. Choosing the target and
+    /// confirming are separate steps because three things live between them —
+    /// the caption, a merged chat's outgoing network, and ticking a second
+    /// conversation — and the pre-selected path from a Direct Share face has
+    /// landed on that same confirmation since task 4.
+    Future<void> shareTo(WidgetTester tester, String title) async {
+      // Scrolled to first: the header carries a thumbnail strip when files are
+      // shared, and the last row of a three-chat list falls just past the
+      // bottom of a 600px test viewport because of it. A real sheet is
+      // scrollable for the same reason.
+      await tester.ensureVisible(find.text(title));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send to $title'));
+      await tester.pumpAndSettle();
+    }
+
     /// The thread as the chat view would draw it: newest first.
     Future<List<WeftMessage>> messages(DemoChatRepository repository) async {
       final timeline = await repository.timelineFor(roomId);
@@ -485,8 +505,7 @@ void main() {
       expect(find.text('holiday.jpg · 94 kB'), findsOneWidget);
       expect(find.byType(AttachmentSourceThumbnail), findsOneWidget);
 
-      await tester.tap(find.text('Design Team'));
-      await tester.pumpAndSettle();
+      await shareTo(tester, 'Design Team');
 
       final sent = await lastMessage(repository);
       expect(sent!.kind, MessageKind.image);
@@ -512,8 +531,7 @@ void main() {
       expect(find.text('2 files · 188 kB'), findsOneWidget);
       expect(find.byType(AttachmentSourceThumbnail), findsNWidgets(2));
 
-      await tester.tap(find.text('Design Team'));
-      await tester.pumpAndSettle();
+      await shareTo(tester, 'Design Team');
 
       final history = await messages(repository);
       expect(
@@ -540,8 +558,7 @@ void main() {
 
       expect(find.text('"look at this" · holiday.jpg · 94 kB'), findsOneWidget);
 
-      await tester.tap(find.text('Design Team'));
-      await tester.pumpAndSettle();
+      await shareTo(tester, 'Design Team');
 
       expect(
         recorder.sent,
@@ -560,8 +577,7 @@ void main() {
       );
 
       expect(find.text('"hello"'), findsOneWidget);
-      await tester.tap(find.text('Design Team'));
-      await tester.pumpAndSettle();
+      await shareTo(tester, 'Design Team');
 
       expect((await lastMessage(repository))!.body, 'hello');
     });
@@ -652,8 +668,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Share to…'), findsOneWidget);
-        await tester.tap(find.text('Design Team'));
-        await tester.pumpAndSettle();
+        await shareTo(tester, 'Design Team');
 
         expect((await lastMessage(repository))!.body, 'hello');
       });

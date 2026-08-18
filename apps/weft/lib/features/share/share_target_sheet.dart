@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,12 +8,14 @@ import 'package:intl/intl.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_share/weft_share.dart';
 
 import '../../app/intents.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../chat/attachment_preview_sheet.dart';
+import '../chat/send_network_chip.dart';
 
 /// "Share to Weft": pick the conversation the shared content goes to.
 ///
@@ -23,6 +26,14 @@ import '../chat/attachment_preview_sheet.dart';
 /// why the sheet resolves them the moment it opens rather than at the tap: a
 /// 200 MB video has to be turned away *before* the user has chosen who to send
 /// it to, not after.
+///
+/// Two steps, not one. Choosing the conversation and confirming the send are
+/// separate because three things have to happen between them and none of them
+/// fits on a list row: the caption can be edited, a merged chat's outgoing
+/// network can be picked per target, and several conversations can be chosen at
+/// once. The Direct Share path has worked this way since Phase 04 task 4 — a
+/// pre-selected target lands on the confirmation rather than sending — and this
+/// is that same step, reached from the list as well as from a launcher face.
 Future<void> showShareTargetSheet(BuildContext context, SharedPayload payload) {
   return showModalBottomSheet<void>(
     context: context,
@@ -47,10 +58,26 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   /// nullable rather than an empty list that would read as "nothing shared".
   ResolvedShare? _resolved;
 
+  /// The share as the ranker and the capability table need to see it.
+  ///
+  /// Held rather than derived per build because [ShareItem.fromSource] sniffs
+  /// every file, and the list is re-ranked on each keystroke in the search
+  /// field. The caption being editable does not change it: capability reads
+  /// only the files, and every network carries text.
+  ShareContent _content = const ShareContent();
+
   /// A send in flight. The list stops taking taps: two conversations chosen in
   /// quick succession would send the batch twice, and the second tap is always
   /// a mis-tap on a sheet that is about to close.
   bool _sending = false;
+
+  /// Conversations ticked in the list. One is the ordinary case; several is a
+  /// forward.
+  final Set<String> _chosen = {};
+
+  /// The confirmation step was reached from the list. Distinct from [_chosen]
+  /// being non-empty, which is also true while the user is still ticking rows.
+  bool _composing = false;
 
   /// The user asked for the list back after arriving with a target already
   /// chosen. A Direct Share row is four small faces and a mis-tap on it is
@@ -58,14 +85,35 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   /// again in the other app.
   bool _pickingAnother = false;
 
+  /// What was typed in the search field, lower-cased and trimmed.
+  String _query = '';
+
+  /// Per-target outgoing network, for the merged chats where the answer is not
+  /// forced. Absent means "whatever [_defaultNetworkFor] says", which is the
+  /// chat's own stored send network whenever that network can carry the share.
+  final Map<String, ChatNetwork> _networks = {};
+
+  late final TextEditingController _caption = TextEditingController(
+    text: widget.payload.text ?? '',
+  );
+  final TextEditingController _search = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     if (widget.payload.uris.isEmpty) {
       _resolved = const ResolvedShare();
+      _content = ShareContent(text: widget.payload.text);
     } else {
       _resolve();
     }
+  }
+
+  @override
+  void dispose() {
+    _caption.dispose();
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _resolve() async {
@@ -73,52 +121,82 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
         .read(sharedFileResolverProvider)
         .resolveSharedFiles(widget.payload);
     if (!mounted) return;
-    setState(() => _resolved = resolved);
+    setState(() {
+      _resolved = resolved;
+      _content = ShareContent(
+        text: widget.payload.text,
+        items: [
+          for (final source in resolved.sources) ShareItem.fromSource(source),
+        ],
+      );
+    });
   }
 
-  Future<void> _sendTo(String chatId, String title) async {
+  Future<void> _send(List<Chat> targets) async {
     final resolved = _resolved;
-    if (_sending || resolved == null) return;
+    if (_sending || resolved == null || targets.isEmpty) return;
     setState(() => _sending = true);
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final repository = ref.read(chatRepositoryProvider);
-    final text = widget.payload.text?.trim() ?? '';
+    final text = _caption.text.trim();
     final problems = <String>[];
+    var delivered = 0;
 
-    // Text first: a photo shared with a caption reads the wrong way round when
-    // the sentence lands after the picture.
-    if (text.isNotEmpty) {
-      try {
-        await repository.send(chatId, text);
-      } on Object catch (error) {
-        debugPrint('weft: shared text failed to send: $error');
-        problems.add('The message could not be sent.');
+    for (final chat in targets) {
+      // Not persisted through `setSendNetwork`: the composer's chip is a
+      // standing preference for a conversation the user is *in*, and a share is
+      // one gesture aimed at a conversation they may not have opened in weeks.
+      // Quietly moving where their next typed message goes is not part of what
+      // they asked for.
+      final via = _networkFor(chat);
+      final failures = <String>[];
+
+      // Text first: a photo shared with a caption reads the wrong way round when
+      // the sentence lands after the picture.
+      if (text.isNotEmpty) {
+        try {
+          await repository.send(chat.id, text, via: via);
+        } on Object catch (error) {
+          debugPrint('weft: shared text failed to send: $error');
+          failures.add('The message could not be sent.');
+        }
       }
+
+      failures.addAll(
+        await sendAttachments(repository, chat.id, resolved.sources, via: via),
+      );
+
+      final attempted = (text.isNotEmpty ? 1 : 0) + resolved.sources.length;
+      // A share is the strongest signal the ranker gets: the user picked this
+      // conversation out of every conversation, for this content, on purpose.
+      // Only when something actually went — a share that failed entirely should
+      // not promote the chat it failed to reach.
+      if (attempted > failures.length) {
+        delivered++;
+        unawaited(ref.read(shareShortcutServiceProvider).noteSend(chat.id));
+      }
+      // The name is only worth carrying when there is more than one target; on
+      // a single share it is already the headline of the sentence above.
+      problems.addAll(
+        targets.length == 1
+            ? failures
+            : failures.map((problem) => '${chat.title}: $problem'),
+      );
     }
 
-    problems.addAll(
-      await sendAttachments(repository, chatId, resolved.sources),
-    );
-
-    final sent = (text.isNotEmpty ? 1 : 0) + resolved.sources.length;
-    // A share is the strongest signal the ranker gets: the user picked this
-    // conversation out of every conversation, for this content, on purpose.
-    // Only when something actually went — a share that failed entirely should
-    // not promote the chat it failed to reach.
-    if (sent > problems.length) {
-      unawaited(ref.read(shareShortcutServiceProvider).noteSend(chatId));
-    }
+    final headline = switch (targets.length) {
+      1 => 'Sent to ${targets.single.title}',
+      _ when delivered == targets.length => 'Sent to ${targets.length} chats',
+      _ => 'Sent to $delivered of ${targets.length} chats',
+    };
     messenger.showSnackBar(
       SnackBar(
         content: Text(
           problems.isEmpty
-              ? 'Sent to $title'
-              : [
-                  if (sent > problems.length) 'Sent to $title.',
-                  ...problems,
-                ].join('\n'),
+              ? headline
+              : [if (delivered > 0) '$headline.', ...problems].join('\n'),
         ),
       ),
     );
@@ -127,8 +205,8 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
 
   /// The chat the share was already aimed at, or null to ask.
   ///
-  /// Resolved against the visible chats rather than trusted: the id comes from
-  /// a shortcut the launcher may have been holding for weeks, and the chat
+  /// Resolved against the chats on this device rather than trusted: the id comes
+  /// from a shortcut the launcher may have been holding for weeks, and the chat
   /// behind it can have been archived, left or unmerged since. A stale target
   /// falls back to the picker, which is what a plain share does — the one thing
   /// that must not happen is sending to an id nothing on screen accounts for.
@@ -138,9 +216,74 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     return chats.firstWhereOrNull((chat) => chat.id == id);
   }
 
+  /// The networks of [chat] that can carry this share, in [Chat.networks] order.
+  ///
+  /// Empty only when every leg of a merged chat has refused the file, which the
+  /// ranker treats as a reason to drop the target entirely — so this is empty
+  /// here only for a chat the user reached past the list, through a launcher
+  /// shortcut published before the file existed.
+  List<ChatNetwork> _capableNetworks(Chat chat) => ref
+      .read(shareTargetRankerProvider)
+      .capabilities
+      .capableNetworks(chat, _content);
+
+  /// Which network this target's share rides.
+  ///
+  /// The user's pick if they made one and it is still a leg of the chat, else
+  /// the default. Null hands the decision back to `sendSourceFor`, which is the
+  /// right answer for a chat whose networks all refused the file: the send then
+  /// fails with a sentence rather than being routed somewhere arbitrary.
+  ChatNetwork? _networkFor(Chat chat) {
+    final chosen = _networks[chat.id];
+    if (chosen != null && chat.sources.any((s) => s.network == chosen)) {
+      return chosen;
+    }
+    return _defaultNetworkFor(chat);
+  }
+
+  /// The chat's stored send network when it can carry the share, else the first
+  /// leg that can.
+  ///
+  /// The stored network is a standing answer to "which app does this person
+  /// actually read", so it wins whenever it is usable — but a 200 MB video
+  /// aimed at the Signal leg of a merged chat is a send that will fail, and the
+  /// WhatsApp leg beside it is the same conversation.
+  ChatNetwork? _defaultNetworkFor(Chat chat) {
+    final capable = _capableNetworks(chat);
+    if (capable.isEmpty) return null;
+    final stored = chat.sendNetwork;
+    if (stored != null && capable.contains(stored)) return stored;
+    return capable.first;
+  }
+
+  void _toggle(String chatId) {
+    setState(() {
+      if (!_chosen.remove(chatId)) _chosen.add(chatId);
+    });
+  }
+
+  /// One row tapped with nothing ticked: the ordinary share, straight to the
+  /// confirmation.
+  void _chooseOnly(Chat chat) {
+    setState(() {
+      _chosen
+        ..clear()
+        ..add(chat.id);
+      _composing = true;
+    });
+  }
+
+  bool _matches(Chat chat) =>
+      _query.isEmpty || chat.title.toLowerCase().contains(_query);
+
   @override
   Widget build(BuildContext context) {
-    final chats = ref.watch(visibleChatsProvider);
+    // The whole inbox, not `visibleChatsProvider`: the rail's network filter and
+    // its archived toggle describe what the user is *browsing*, and a share
+    // arriving from another app has nothing to do with either. The ranker drops
+    // archived and source-less chats itself, so the eligible set is the same
+    // one Direct Share publishes from.
+    final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
     final resolved = _resolved;
     final text = widget.payload.text?.trim() ?? '';
     // Nothing left to send — every shared file failed to resolve and there was
@@ -148,9 +291,42 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     // list would be a row of taps that do nothing.
     final hasContent =
         resolved != null && (text.isNotEmpty || resolved.sources.isNotEmpty);
-    // Chosen outside the app — a Direct Share face, or the iOS extension's own
-    // picker. The list below is then not a question that still needs asking.
-    final target = _preselected(chats);
+
+    // The same ranker the launcher shortcuts are published from, including this
+    // run's send counts, so the four faces in Android's share sheet and the top
+    // of this list are the same list twice rather than two orderings of it. No
+    // cap: the shortcut surfaces have a handful of slots, this one has a scroll
+    // bar and a search field.
+    final ranked = ref
+        .read(shareTargetRankerProvider)
+        .rank(
+          chats,
+          now: clock.now(),
+          content: _content,
+          activity: ref.read(shareShortcutServiceProvider).activity,
+          maxSlots: chats.length,
+        );
+    final byId = {for (final chat in chats) chat.id: chat};
+    final targets = [
+      for (final slot in ranked) ?byId[slot.chatId],
+    ];
+    final rankedIds = {for (final chat in targets) chat.id};
+    // Dropped by the capability filter — every network in the chat refused the
+    // file. Shown, disabled, rather than omitted: a conversation missing from a
+    // share sheet with no explanation is the failure mode the capability table
+    // is written to avoid, and the user searching for it deserves the reason.
+    final blocked = [
+      for (final chat in chats)
+        if (!chat.archived &&
+            chat.sources.isNotEmpty &&
+            !rankedIds.contains(chat.id))
+          chat,
+    ];
+
+    final chosen = _chosenTargets(targets, byId);
+    final preselected = chosen.isEmpty ? _preselected(targets + blocked) : null;
+    final confirming = chosen.isNotEmpty ? _composing : preselected != null;
+    final confirmTargets = chosen.isNotEmpty ? chosen : [?preselected];
 
     return DraggableScrollableSheet(
       expand: false,
@@ -167,7 +343,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  target == null ? 'Share to…' : 'Send to ${target.title}',
+                  _title(confirming, confirmTargets),
                   style: context.text.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -199,44 +375,124 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
               ],
             ),
           ),
-          Expanded(
-            child: target != null
-                ? _PreselectedTarget(
-                    chat: target,
-                    enabled: hasContent && !_sending,
-                    onSend: () => _sendTo(target.id, target.title),
-                    onChooseAnother: _sending
-                        ? null
-                        : () => setState(() => _pickingAnother = true),
-                  )
-                : ListView.builder(
-                    controller: controller,
-                    itemCount: chats.length,
-                    itemBuilder: (context, i) {
-                      final chat = chats[i];
-                      return ListTile(
-                        enabled: hasContent && !_sending,
-                        leading: WeftAvatar(
-                          label: chat.title,
-                          networks: chat.networks,
-                          size: 40,
+          if (confirming)
+            Expanded(
+              child: _ConfirmStep(
+                targets: confirmTargets,
+                caption: _caption,
+                textOnly: _content.isTextOnly,
+                enabled: hasContent && !_sending,
+                networkFor: _networkFor,
+                capableNetworks: _capableNetworks,
+                onPickNetwork: (chat, network) =>
+                    setState(() => _networks[chat.id] = network),
+                onSend: () => _send(confirmTargets),
+                onChooseAnother: _sending
+                    ? null
+                    : () => setState(() {
+                        _composing = false;
+                        _pickingAnother = true;
+                        // "Another" replaces when one chat was chosen and adds
+                        // when several were, which is why the button says two
+                        // different things. A single tap picked the wrong name
+                        // and the list has to come back clean — returning to it
+                        // with that name still ticked means the next tap adds a
+                        // second target instead of choosing the right one. A
+                        // forward built out of five ticks must not lose four of
+                        // them to a sixth.
+                        if (_chosen.length == 1) _chosen.clear();
+                      }),
+                controller: controller,
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                WeftSpace.xl,
+                0,
+                WeftSpace.xl,
+                WeftSpace.sm,
+              ),
+              child: TextField(
+                controller: _search,
+                onChanged: (value) =>
+                    setState(() => _query = value.trim().toLowerCase()),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search chats',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () {
+                            _search.clear();
+                            setState(() => _query = '');
+                          },
                         ),
-                        title: Text(chat.title),
-                        subtitle: chat.lastMessage == null
-                            ? null
-                            : Text(
-                                DateFormat.yMMMd().format(
-                                  chat.lastMessage!.timestamp,
-                                ),
-                              ),
-                        onTap: () => _sendTo(chat.id, chat.title),
-                      );
-                    },
+                  border: const OutlineInputBorder(
+                    borderRadius: WeftRadius.pill,
                   ),
-          ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _TargetList(
+                controller: controller,
+                targets: [
+                  for (final chat in targets)
+                    if (_matches(chat)) chat,
+                ],
+                blocked: [
+                  for (final chat in blocked)
+                    if (_matches(chat)) chat,
+                ],
+                chosen: _chosen,
+                enabled: hasContent && !_sending,
+                query: _query,
+                onTap: (chat) =>
+                    _chosen.isEmpty ? _chooseOnly(chat) : _toggle(chat.id),
+                onToggle: (chat) => _toggle(chat.id),
+              ),
+            ),
+            if (_chosen.isNotEmpty)
+              _MultiSelectBar(
+                count: _chosen.length,
+                enabled: hasContent && !_sending,
+                onClear: () => setState(_chosen.clear),
+                onContinue: () => setState(() => _composing = true),
+              ),
+          ],
         ],
       ),
     );
+  }
+
+  /// The ticked chats, in ranked order.
+  ///
+  /// Anything ticked that has since fallen out of the ranking — a chat archived
+  /// while the sheet was open — keeps its place at the end rather than
+  /// disappearing from a confirmation the user is looking at.
+  List<Chat> _chosenTargets(List<Chat> ranked, Map<String, Chat> byId) {
+    if (_chosen.isEmpty) return const [];
+    final order = {
+      for (var i = 0; i < ranked.length; i++) ranked[i].id: i,
+    };
+    return [for (final id in _chosen) byId[id]].nonNulls.toList()
+      ..sort(
+        (a, b) => (order[a.id] ?? ranked.length).compareTo(
+          order[b.id] ?? ranked.length,
+        ),
+      );
+  }
+
+  String _title(bool confirming, List<Chat> targets) {
+    if (!confirming) return 'Share to…';
+    return targets.length == 1
+        ? 'Send to ${targets.single.title}'
+        : 'Send to ${targets.length} chats';
   }
 
   /// What is about to be sent, in one line.
@@ -263,67 +519,395 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
       text.length > 120 ? '${text.substring(0, 120)}…' : text;
 }
 
-/// The conversation the share was already aimed at, and a way out of it.
+/// The conversations, ranked, with the ones that cannot take this share below.
+class _TargetList extends ConsumerWidget {
+  const _TargetList({
+    required this.controller,
+    required this.targets,
+    required this.blocked,
+    required this.chosen,
+    required this.enabled,
+    required this.query,
+    required this.onTap,
+    required this.onToggle,
+  });
+
+  final ScrollController controller;
+
+  /// Ranked and capable, in the order [ShareTargetRanker] put them.
+  final List<Chat> targets;
+
+  /// Filtered out by the capability table — drawn, disabled, with the reason.
+  final List<Chat> blocked;
+
+  final Set<String> chosen;
+  final bool enabled;
+  final String query;
+  final ValueChanged<Chat> onTap;
+  final ValueChanged<Chat> onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (targets.isEmpty && blocked.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(WeftSpace.xl),
+          child: Text(
+            query.isEmpty
+                ? 'No conversations to share to yet.'
+                : 'No conversations match that search.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium?.copyWith(
+              color: context.colors.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final headers = blocked.isEmpty ? 0 : 1;
+    return ListView.builder(
+      controller: controller,
+      itemCount: targets.length + headers + blocked.length,
+      itemBuilder: (context, i) {
+        if (i < targets.length) {
+          final chat = targets[i];
+          return _TargetTile(
+            chat: chat,
+            enabled: enabled,
+            selected: chosen.contains(chat.id),
+            selecting: chosen.isNotEmpty,
+            onTap: () => onTap(chat),
+            onToggle: () => onToggle(chat),
+          );
+        }
+        if (i == targets.length) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(
+              WeftSpace.xl,
+              WeftSpace.md,
+              WeftSpace.xl,
+              WeftSpace.xs,
+            ),
+            child: Text(
+              'Cannot carry this share',
+              style: context.text.labelMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+          );
+        }
+        return _TargetTile(
+          chat: blocked[i - targets.length - headers],
+          enabled: false,
+          selected: false,
+          selecting: false,
+          reason: 'No network here takes this file',
+          onTap: () {},
+          onToggle: () {},
+        );
+      },
+    );
+  }
+}
+
+/// One conversation as a share target.
 ///
-/// Shown instead of the target list when the intent carried a `targetChatId` —
-/// an Android Direct Share face or the iOS extension's picker. The user has
-/// already answered "who", so asking again is the sheet arguing with the
-/// choice they just made in another app.
+/// The avatar is the inbox's own [WeftAvatar], picture and all: a share sheet
+/// that draws initials where the app draws faces reads as a different app's
+/// list of the same people.
+class _TargetTile extends ConsumerWidget {
+  const _TargetTile({
+    required this.chat,
+    required this.enabled,
+    required this.selected,
+    required this.selecting,
+    required this.onTap,
+    required this.onToggle,
+    this.reason,
+  });
+
+  final Chat chat;
+  final bool enabled;
+  final bool selected;
+
+  /// At least one row is ticked, so a tap toggles rather than confirms.
+  final bool selecting;
+
+  /// Why this row cannot be chosen, when it cannot.
+  final String? reason;
+
+  final VoidCallback onTap;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subtitle = reason ?? _lastActivity(chat);
+    return ListTile(
+      enabled: enabled,
+      selected: selected,
+      leading: WeftAvatar(
+        label: chat.title,
+        imageUrl: chat.avatarUrl,
+        imageHeaders: ref.watch(mediaHeadersProvider),
+        networks: chat.networks,
+        size: 40,
+      ),
+      title: Text(chat.title),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle,
+              style: reason == null
+                  ? null
+                  : context.text.bodySmall?.copyWith(
+                      color: context.colors.error,
+                    ),
+            ),
+      // A checkbox rather than a long-press alone: forwarding to several people
+      // is the reason the multi-select exists, and a gesture nothing on screen
+      // mentions is a feature only its author finds.
+      trailing: reason != null
+          ? null
+          : Checkbox(
+              value: selected,
+              onChanged: enabled ? (_) => onToggle() : null,
+            ),
+      onTap: enabled ? onTap : null,
+      onLongPress: enabled && !selecting ? onToggle : null,
+    );
+  }
+
+  static String? _lastActivity(Chat chat) {
+    final at = chat.lastMessage?.timestamp;
+    return at == null ? null : DateFormat.yMMMd().format(at);
+  }
+}
+
+/// "3 selected", and the way on.
+class _MultiSelectBar extends StatelessWidget {
+  const _MultiSelectBar({
+    required this.count,
+    required this.enabled,
+    required this.onClear,
+    required this.onContinue,
+  });
+
+  final int count;
+  final bool enabled;
+  final VoidCallback onClear;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        WeftSpace.lg,
+        WeftSpace.sm,
+        WeftSpace.lg,
+        WeftSpace.md,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.palette.divider)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                count == 1 ? '1 chat selected' : '$count chats selected',
+                style: context.text.labelLarge,
+              ),
+            ),
+            TextButton(onPressed: onClear, child: const Text('Clear')),
+            const SizedBox(width: WeftSpace.sm),
+            FilledButton(
+              onPressed: enabled ? onContinue : null,
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The last step: what is going, where it is going, and on which network.
+///
+/// Reached two ways and identical in both — from the list, and straight away
+/// when the intent already carried a `targetChatId` (an Android Direct Share
+/// face, or the iOS extension's own picker). The user has already answered
+/// "who" in that case, so asking again is the sheet arguing with the choice they
+/// just made in another app.
 ///
 /// It is still a confirmation and not an immediate send. The strip above shows
 /// *what* is about to go, which is the half a share sheet's four small faces
 /// cannot show, and a share is unrecallable in a way that earns one tap.
-class _PreselectedTarget extends StatelessWidget {
-  const _PreselectedTarget({
-    required this.chat,
+class _ConfirmStep extends StatelessWidget {
+  const _ConfirmStep({
+    required this.targets,
+    required this.caption,
+    required this.textOnly,
     required this.enabled,
+    required this.networkFor,
+    required this.capableNetworks,
+    required this.onPickNetwork,
     required this.onSend,
     required this.onChooseAnother,
+    required this.controller,
   });
 
-  final Chat chat;
+  final List<Chat> targets;
+  final TextEditingController caption;
+
+  /// Nothing but text is being shared, so the field below is the message rather
+  /// than a caption on a picture.
+  final bool textOnly;
 
   /// False while the files are still being read, and after the send has begun.
   final bool enabled;
+
+  final ChatNetwork? Function(Chat chat) networkFor;
+  final List<ChatNetwork> Function(Chat chat) capableNetworks;
+  final void Function(Chat chat, ChatNetwork network) onPickNetwork;
 
   final VoidCallback onSend;
 
   /// Null once a send is in flight — there is no longer another chat to choose.
   final VoidCallback? onChooseAnother;
 
+  final ScrollController controller;
+
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        ListTile(
-          leading: WeftAvatar(
-            label: chat.title,
-            networks: chat.networks,
-            size: 40,
-          ),
-          title: Text(chat.title),
-          subtitle: const Text('Chosen from the share sheet'),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: WeftSpace.xl),
-          child: Row(
+        Expanded(
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.symmetric(horizontal: WeftSpace.xl),
             children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: enabled ? onSend : null,
-                  icon: const Icon(Icons.send),
-                  label: Text('Send to ${chat.title}'),
+              TextField(
+                controller: caption,
+                enabled: enabled,
+                minLines: 1,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  isDense: true,
+                  labelText: textOnly ? 'Message' : 'Caption',
+                  hintText: textOnly
+                      ? 'Message'
+                      : 'Say something about this (optional)',
                 ),
               ),
+              const SizedBox(height: WeftSpace.sm),
+              for (final chat in targets)
+                _ConfirmTargetTile(
+                  chat: chat,
+                  network: networkFor(chat),
+                  capable: capableNetworks(chat),
+                  onPickNetwork: (network) => onPickNetwork(chat, network),
+                ),
             ],
           ),
         ),
-        TextButton(
-          onPressed: onChooseAnother,
-          child: const Text('Choose another chat'),
+        Container(
+          padding: const EdgeInsets.fromLTRB(
+            WeftSpace.lg,
+            WeftSpace.sm,
+            WeftSpace.lg,
+            WeftSpace.md,
+          ),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: context.palette.divider)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: enabled ? onSend : null,
+                    icon: const Icon(Icons.send),
+                    label: Text(
+                      targets.length == 1
+                          ? 'Send to ${targets.single.title}'
+                          : 'Send to ${targets.length} chats',
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onChooseAnother,
+                  child: Text(
+                    targets.length == 1
+                        ? 'Choose another chat'
+                        : 'Change selection',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// One chosen conversation, and the network its copy of the share rides.
+class _ConfirmTargetTile extends ConsumerWidget {
+  const _ConfirmTargetTile({
+    required this.chat,
+    required this.network,
+    required this.capable,
+    required this.onPickNetwork,
+  });
+
+  final Chat chat;
+
+  /// Resolved answer for this target, or null when nothing here can carry it.
+  final ChatNetwork? network;
+
+  /// The legs of [chat] that can take this share. One is not a choice; none is
+  /// a problem worth saying out loud.
+  final List<ChatNetwork> capable;
+
+  final ValueChanged<ChatNetwork> onPickNetwork;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: WeftAvatar(
+        label: chat.title,
+        imageUrl: chat.avatarUrl,
+        imageHeaders: ref.watch(mediaHeadersProvider),
+        networks: chat.networks,
+        size: 40,
+      ),
+      title: Text(chat.title),
+      subtitle: Text(
+        switch (network) {
+          null => 'No network here takes this file',
+          final n => 'via ${n.label}',
+        },
+        style: network == null
+            ? context.text.bodySmall?.copyWith(color: context.colors.error)
+            : null,
+      ),
+      // The composer's own chip, narrowed to the legs that can carry this
+      // share: offering Signal for a 200 MB video is offering a send that
+      // fails, and the WhatsApp leg beside it is the same conversation.
+      trailing: capable.length > 1 && network != null
+          ? SendNetworkChip(
+              chat: chat,
+              current: network!,
+              networks: capable,
+              onPick: onPickNetwork,
+            )
+          : null,
     );
   }
 }
@@ -333,7 +917,17 @@ class _PreselectedTarget extends StatelessWidget {
 /// A share sheet is opened from another app, so the user has already lost sight
 /// of what they picked; "3 files" is not enough to catch having shared the wrong
 /// screenshot. The tiles are the composer's own — [AttachmentSourceThumbnail] —
-/// so a photo looks the same on the way in as it does on the way out.
+/// so a photo looks the same on the way in as it does on the way out, and the
+/// name under each is what a tooltip cannot be on a touchscreen.
+///
+/// Deliberately *not* `AttachmentBubble`, despite the phase asking for it: that
+/// widget dispatches on `WeftMessage.kind` and fetches its pixels through
+/// `ChatRepository.attachmentBytes(roomId, eventId)`. A staged share has no
+/// event, no room and no bytes on the homeserver, so every photo would draw the
+/// broken-attachment placeholder — and reaching it at all would mean inventing
+/// a `WeftMessage` with a fabricated event id. The rule behind the instruction
+/// is "no second preview implementation", and this is the first one: the same
+/// tile the attachment preview sheet shows before a send from the composer.
 class _SharedFileStrip extends StatelessWidget {
   const _SharedFileStrip({required this.sources});
 
@@ -344,21 +938,36 @@ class _SharedFileStrip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: WeftSpace.sm),
       child: SizedBox(
-        height: 64,
+        height: 88,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: sources.length,
           separatorBuilder: (_, _) => const SizedBox(width: WeftSpace.xs),
           itemBuilder: (context, i) {
             final source = sources[i];
-            return Tooltip(
-              message: source.basename,
-              child: AttachmentSourceThumbnail(
-                source: source,
-                // The same sniff the plan will run, so the icon here and the
-                // bubble that follows cannot disagree about what this is.
-                kind: messageKindFor(sniffMimeType(source)),
-                size: 64,
+            return SizedBox(
+              width: 64,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AttachmentSourceThumbnail(
+                    source: source,
+                    // The same sniff the plan will run, so the icon here and the
+                    // bubble that follows cannot disagree about what this is.
+                    kind: messageKindFor(sniffMimeType(source)),
+                    size: 64,
+                  ),
+                  const SizedBox(height: WeftSpace.xxs),
+                  Text(
+                    source.basename,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             );
           },
