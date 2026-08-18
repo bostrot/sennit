@@ -252,6 +252,25 @@ class SmsChatRepository {
     return granted;
   }
 
+  /// Re-reads the role without ever subscribing twice.
+  ///
+  /// The role can change while Weft is running and without Weft asking: the
+  /// system's own settings hand it to another app, and a user who declined the
+  /// dialog can walk into Settings and grant it there. [start] is the only path
+  /// that subscribes, so it is taken only when nothing is subscribed yet —
+  /// which is precisely the state a status screen finds this repository in
+  /// after a decline. Once subscriptions exist there is nothing to set up and
+  /// the status field is simply brought up to date.
+  Future<SmsPlatformStatus> refreshStatus() async {
+    if (_incomingSub == null) {
+      await start();
+    } else {
+      _status = await _gateway.status();
+      _emit();
+    }
+    return _status;
+  }
+
   /// Re-reads every thread from the provider.
   Future<void> refresh() async {
     if (!_status.isReady) return;

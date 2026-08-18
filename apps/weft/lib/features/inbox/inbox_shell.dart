@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
+import '../../app/session_providers.dart';
 import '../bridges/bridges_screen.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
@@ -16,6 +18,7 @@ import '../settings/endpoints_screen.dart';
 import '../settings/link_previews_screen.dart';
 import '../settings/mcp_screen.dart';
 import '../settings/notifications_screen.dart';
+import '../settings/sms_screen.dart';
 
 /// Width at which the inbox and the open conversation sit side by side.
 const double _twoPaneBreakpoint = 900;
@@ -371,6 +374,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const SecurityScreen(),
                         ),
                       );
+                    case 'sms':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SmsScreen(),
+                        ),
+                      );
                   }
                 },
                 itemBuilder: (_) => [
@@ -400,6 +409,14 @@ class _InboxHeader extends ConsumerWidget {
                     child: Text('Link previews'),
                   ),
                   const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
+                  // The same condition `smsRepositoryProvider` is built under,
+                  // stated rather than read: an entry that could only ever
+                  // explain its own absence is worse than no entry, and asking
+                  // the provider here would construct a method channel — and
+                  // read the settings store — for a menu that may never open.
+                  if (!kDemoMode &&
+                      defaultTargetPlatform == TargetPlatform.android)
+                    const PopupMenuItem(value: 'sms', child: Text('SMS')),
                   const PopupMenuItem(value: 'devices', child: Text('Devices')),
                   const PopupMenuItem(
                     value: 'security',

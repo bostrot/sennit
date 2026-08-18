@@ -9,9 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_matrix/weft_matrix.dart' show DeviceManager, KeyBackup;
 import 'package:weft_richtext/weft_richtext.dart' show LinkPreviewFetch;
 
 import 'package:weft/app/providers.dart';
+import 'package:weft/app/session_providers.dart';
 import 'package:weft/app/settings.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/data/chat_repository.dart';
@@ -155,6 +157,13 @@ String? _flutterRoot() {
 /// only when non-null — a scene that passes neither is a scene where the
 /// preview path is off, which is the app's default and the right background for
 /// every other image here.
+///
+/// [deviceManager] and [keyBackup] are the same idea for the two settings
+/// screens that draw the *account* rather than a room. Both providers reach for
+/// a live Matrix session and throw without one, so a golden of either screen has
+/// to state what the homeserver would have said — which is also the only way to
+/// pin a scene the account cannot be put into on demand, like "no backup and
+/// nowhere else signed in".
 Future<void> pumpWeft(
   WidgetTester tester,
   Widget child, {
@@ -165,6 +174,8 @@ Future<void> pumpWeft(
   AttachmentBytesLoader? fileReader,
   WeftStores? stores,
   LinkPreviewFetch? linkPreviewFetch,
+  DeviceManager? deviceManager,
+  KeyBackup? keyBackup,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -189,6 +200,9 @@ Future<void> pumpWeft(
         // the real one be read.
         if (linkPreviewFetch != null)
           linkPreviewFetchProvider.overrideWithValue(linkPreviewFetch),
+        if (deviceManager != null)
+          deviceManagerProvider.overrideWithValue(deviceManager),
+        if (keyBackup != null) keyBackupProvider.overrideWithValue(keyBackup),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
