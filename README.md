@@ -278,7 +278,14 @@ Share, the iOS Share Extension's App Group contract, and the publish diff that
 keeps the launcher from thrashing, and
 [rich content](docs/architecture/rich-content.md) covers the formatted-body
 allowlist as a security boundary, cross-network reaction dedupe, and why link
-previews are fetched by the homeserver rather than by the app.
+previews are fetched by the homeserver rather than by the app, and
+[SMS integration](docs/architecture/sms-integration.md) covers why the
+default-SMS role obliges Weft to write to the system provider, phone-number
+normalisation as merge evidence, GSM-7 segment counting, and the explicit
+no-encryption indicator, and
+[multi-device](docs/architecture/multi-device.md) covers the recovery-key flow,
+what is lost with no backup and no second device, and how the session-transfer
+QR reuses the bridge login's card.
 
 Decisions that need something this repository cannot hold live in
 `docs/decisions/` —
