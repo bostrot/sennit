@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 import 'chat_repository.dart';
 
@@ -62,7 +63,23 @@ class DemoChatRepository implements ChatRepository {
   final Map<String, Uint8List> _pendingBytes = {};
   final Map<String, Uint8List> _sentBytes = {};
 
+  /// Relations applied to the fixtures, keyed by the event they are about.
+  ///
+  /// The fixtures are rebuilt from scratch on every [timelineFor], so a
+  /// reaction cannot be written into a message the way a real timeline holds
+  /// one — it is kept beside them and folded back in by [_withRelations] each
+  /// time the history is asked for. That is also what makes the demo path worth
+  /// having here: react, edit, delete and reply all run the *real* aggregation
+  /// out of `weft_richtext`, so what a bubble does with no homeserver is what
+  /// it does with one.
+  final Map<String, List<ReactionEvent>> _reactions = {};
+  final Map<String, List<EditEvent>> _edits = {};
+  final Set<String> _redacted = {};
+
   static final DateTime _now = DateTime(2026, 8, 15, 16, 42);
+
+  /// The local user, as every demo fixture spells them.
+  static const String _localUserId = '@me:example.org';
 
   @override
   IdentityGraph get identityGraph => _graph;
@@ -135,6 +152,176 @@ class DemoChatRepository implements ChatRepository {
         unreadCount: 0,
       );
     _controller.add(_chats);
+  }
+
+  @override
+  Future<void> sendReply(
+    String chatId,
+    String body, {
+    required String replyToEventId,
+    ChatNetwork? via,
+  }) async {
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    if (index < 0) return;
+    final chat = _chats[index];
+
+    // The leg the target lives on, exactly as the Matrix repository resolves
+    // it: a reply is an answer to one event, and the event is in one room.
+    final target = _messageIn(chatId, replyToEventId);
+    final roomId = target?.roomId ?? sendSourceFor(chat, via: via).roomId;
+    final network = chat.sources
+        .firstWhere(
+          (s) => s.roomId == roomId,
+          orElse: () => sendSourceFor(chat, via: via),
+        )
+        .network;
+
+    final message = WeftMessage(
+      eventId: '\$local_${DateTime.now().microsecondsSinceEpoch}',
+      roomId: roomId,
+      network: network,
+      senderId: _localUserId,
+      senderName: 'You',
+      timestamp: DateTime.now(),
+      kind: MessageKind.text,
+      isOwn: true,
+      body: body,
+      replyToEventId: replyToEventId,
+      deliveryState: DeliveryState.sent,
+    );
+
+    // Unlike [send], which only moves the inbox preview, a reply is appended to
+    // the room's own history: a reply chip with nothing above it to point at is
+    // the one thing this path exists to demonstrate.
+    _localMessages.putIfAbsent(roomId, () => []).add(message);
+    _chats = [..._chats]
+      ..[index] = chat.copyWith(lastMessage: message, unreadCount: 0);
+    _controller.add(_chats);
+  }
+
+  @override
+  Future<void> react(String chatId, String eventId, String key) async {
+    final target = _messageIn(chatId, eventId);
+    if (target == null) {
+      throw StateError('Cannot react to $eventId: it is not in $chatId');
+    }
+    final annotations = _reactions.putIfAbsent(eventId, () => []);
+    // A second annotation with the same key would be one the tally dedupes
+    // away and `unreact` cannot reach: one redaction, and the chip comes
+    // straight back looking like the tap did nothing.
+    final normalised = normaliseReactionKey(key);
+    final already = annotations.any(
+      (r) =>
+          r.senderId == _localUserId &&
+          normaliseReactionKey(r.key) == normalised,
+    );
+    if (already) return;
+
+    annotations.add(
+      ReactionEvent(
+        eventId: '\$demo_reaction_${_nextRelationId++}',
+        // The target's room, never the chat's send network — the rule the
+        // Matrix path is written around, kept here so a test can see it
+        // without a homeserver.
+        roomId: target.roomId,
+        senderId: _localUserId,
+        targetEventId: eventId,
+        key: key,
+        timestamp: DateTime.now(),
+      ),
+    );
+    _controller.add(_chats);
+  }
+
+  @override
+  Future<void> unreact(String chatId, String reactionEventId) async {
+    for (final annotations in _reactions.values) {
+      annotations.removeWhere((r) => r.eventId == reactionEventId);
+    }
+    _reactions.removeWhere((_, annotations) => annotations.isEmpty);
+    _controller.add(_chats);
+  }
+
+  @override
+  Future<void> editMessage(
+    String chatId,
+    String eventId,
+    String newBody,
+  ) async {
+    final target = _messageIn(chatId, eventId);
+    if (target == null) {
+      throw StateError('Cannot edit $eventId: it is not in $chatId');
+    }
+    _edits
+        .putIfAbsent(eventId, () => [])
+        .add(
+          EditEvent(
+            eventId: '\$demo_edit_${_nextRelationId++}',
+            roomId: target.roomId,
+            // The original sender, because `applyEdits` rejects an edit from
+            // anyone else — and demo mode should not be the one place where
+            // that rule appears not to hold.
+            senderId: target.senderId,
+            targetEventId: eventId,
+            body: newBody,
+            timestamp: DateTime.now(),
+          ),
+        );
+    _controller.add(_chats);
+  }
+
+  @override
+  Future<void> redact(String chatId, String eventId) async {
+    _redacted.add(eventId);
+    _controller.add(_chats);
+  }
+
+  /// The message [eventId] names, if it is in one of [chatId]'s rooms.
+  ///
+  /// Fixtures are regenerated per call, so this asks the same builder the
+  /// timeline does rather than keeping a second index that could disagree.
+  WeftMessage? _messageIn(String chatId, String eventId) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return null;
+    for (final source in chat.sources) {
+      for (final message in _historyFor(source, chat.title)) {
+        if (message.eventId == eventId) return message;
+      }
+    }
+    return null;
+  }
+
+  int _nextRelationId = 0;
+
+  /// Folds the session's relations back onto a fixture message.
+  ///
+  /// Order matters: a redacted message has no history and no tally, and an
+  /// edit's own timestamp is what an "edited 14:02" indicator reads.
+  WeftMessage _withRelations(WeftMessage message) {
+    if (_redacted.contains(message.eventId)) {
+      return message.copyWith(redacted: true, body: '');
+    }
+
+    var out = message;
+    final edits = _edits[message.eventId];
+    if (edits != null && edits.isNotEmpty) {
+      final resolution = applyEdits(edits, out);
+      out = resolution.message.copyWith(editHistory: resolution.history);
+    }
+
+    final annotations = _reactions[message.eventId];
+    if (annotations != null && annotations.isNotEmpty) {
+      out = out.copyWith(
+        reactions: aggregateReactions(
+          events: annotations,
+          // Nothing in demo mode reacts from two handles at once, so identity
+          // is identity — the dedupe itself is tested where it lives.
+          resolveSender: senderIsIdentity,
+          localUserId: _localUserId,
+        ),
+      );
+    }
+    return out;
   }
 
   @override
@@ -698,7 +885,7 @@ class DemoChatRepository implements ChatRepository {
           isOwn: i.isOdd,
           delivery: i.isOdd ? DeliveryState.read : null,
         ),
-    ];
+    ].map(_withRelations).toList(growable: false);
   }
 
   static const Map<ChatNetwork, List<String>> _sampleLines = {

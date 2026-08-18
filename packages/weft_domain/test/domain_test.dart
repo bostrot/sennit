@@ -178,6 +178,79 @@ void main() {
     });
   });
 
+  group('WeftMessage relations', () {
+    final reacted = ReactionTally(
+      key: '👍',
+      senderIds: const ['@anna:hs'],
+      firstReactedAt: DateTime.utc(2026, 8, 16, 10),
+    );
+
+    test('copyWith carries the relation fields it is not given', () {
+      // The failure this guards is silent: `copyWith` re-lists every field by
+      // hand, so a field left out of the constructor call disappears on the
+      // first copy — and the copies are ordinary, a finished transcription
+      // being one of them.
+      final message = msg().copyWith(
+        reactions: [reacted],
+        editHistory: [
+          EditRecord(
+            eventId: r'$e',
+            body: 'x',
+            timestamp: DateTime.utc(2026, 8, 16),
+          ),
+        ],
+        replyPreview: const ReplyPreview.stub(r'$question'),
+        formattedBody: '<b>x</b>',
+      );
+
+      final copied = message.copyWith(transcript: 'spoken');
+      expect(copied.reactions, [reacted]);
+      expect(copied.editHistory, hasLength(1));
+      expect(copied.replyPreview?.eventId, r'$question');
+      expect(copied.formattedBody, '<b>x</b>');
+    });
+
+    test('copyWith can clear a formatted body, and does not by accident', () {
+      final rich = msg().copyWith(formattedBody: '<b>x</b>');
+
+      // An edit that drops formatting has to clear the old HTML, or the bubble
+      // renders the previous version's markup around the new words.
+      expect(
+        rich.copyWith(body: 'plain', formattedBody: null).formattedBody,
+        isNull,
+      );
+      // Not passing it at all leaves it alone, which is the common case.
+      expect(rich.copyWith(body: 'plain').formattedBody, '<b>x</b>');
+    });
+
+    test('a message that gained a reaction is not the message without it', () {
+      // Identity is still (eventId, roomId) — but a list diff or a `select`
+      // that saw these two as equal would leave the reaction in the model and
+      // off the screen, which looks like nothing is wrong at all.
+      final before = msg();
+      expect(before.copyWith(reactions: [reacted]) == before, isFalse);
+      expect(before.copyWith(body: 'edited') == before, isFalse);
+      expect(before.copyWith(transcript: 'spoken') == before, isFalse);
+      expect(before.copyWith(body: 'x') == before, isTrue);
+    });
+
+    test('two different events never compare equal on content alone', () {
+      final a = msg(body: 'same');
+      final b = WeftMessage(
+        eventId: r'$other',
+        roomId: '!r',
+        network: ChatNetwork.whatsapp,
+        senderId: '@p:hs',
+        senderName: 'P',
+        timestamp: DateTime.utc(2026, 8, 16),
+        kind: MessageKind.text,
+        isOwn: false,
+        body: 'same',
+      );
+      expect(a == b, isFalse);
+    });
+  });
+
   group('UnifiedContact', () {
     test('handleFor and roomIds resolve per network', () {
       const contact = UnifiedContact(

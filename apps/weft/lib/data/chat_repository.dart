@@ -61,6 +61,50 @@ abstract class ChatRepository {
 
   Future<void> send(String chatId, String body, {ChatNetwork? via});
 
+  /// Sends [body] as a rich reply to [replyToEventId].
+  ///
+  /// The reply rides the leg its *target* lives on, not the chat's send
+  /// network: `m.in_reply_to` names an event id, and an event id that is not in
+  /// the room the reply lands in is a quote every client in that room — Weft
+  /// included — renders as a dangling reference to nothing. [via] therefore
+  /// chooses the room only when the target cannot be located at all, which is
+  /// the case a fallback exists for rather than the normal path.
+  Future<void> sendReply(
+    String chatId,
+    String body, {
+    required String replyToEventId,
+    ChatNetwork? via,
+  });
+
+  /// Adds the local user's [key] reaction to [eventId].
+  ///
+  /// Routed to the source room the target event actually lives in, for the same
+  /// reason as [sendReply] and more sharply: an annotation sent to a merged
+  /// chat's default send network points at an event that room has never heard
+  /// of, so the homeserver accepts it and nobody — including the sender — ever
+  /// sees a chip.
+  Future<void> react(String chatId, String eventId, String key);
+
+  /// Removes the local user's reaction by redacting their own annotation.
+  ///
+  /// Takes the *annotation's* event id, not the message's: un-reacting is a
+  /// redaction of the event the reaction is, and `ReactionTally.localEventId`
+  /// carries it for exactly this call. Asking the server for "my reaction with
+  /// this key" instead would be a round trip racing the user's second tap.
+  Future<void> unreact(String chatId, String reactionEventId);
+
+  /// Replaces [eventId]'s body with [newBody] via `m.replace`.
+  ///
+  /// Only the original sender's own messages can be edited — the homeserver
+  /// will accept a replacement of someone else's event and every well-behaved
+  /// client will then ignore it, so the caller checks `isOwn` before offering
+  /// the action.
+  Future<void> editMessage(String chatId, String eventId, String newBody);
+
+  /// Redacts [eventId]: deletes it for everyone, as far as the server is
+  /// concerned. Irreversible, which is why the caller confirms first.
+  Future<void> redact(String chatId, String eventId);
+
   /// Records the network the user picked for outgoing messages in this chat.
   Future<void> setSendNetwork(String chatId, ChatNetwork network);
 

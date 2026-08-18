@@ -122,8 +122,7 @@ class EditRecord {
   int get hashCode => Object.hash(eventId, body, formattedBody, timestamp);
 
   @override
-  String toString() =>
-      'EditRecord($eventId @ ${timestamp.toIso8601String()})';
+  String toString() => 'EditRecord($eventId @ ${timestamp.toIso8601String()})';
 }
 
 /// What a reply chip needs to render, resolved or not.

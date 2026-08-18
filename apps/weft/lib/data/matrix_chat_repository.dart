@@ -198,8 +198,20 @@ class MatrixChatRepository implements ChatRepository {
       timeline: await room.getTimeline(),
       network: source.network,
       ownUserId: _client.userID,
+      resolveSender: _identityOf,
     );
   }
+
+  /// The person behind a sender id, for reaction dedupe.
+  ///
+  /// Recorded merge decisions only: `_graph` answers from handles the user has
+  /// actually merged, and an unknown ghost stays itself. The heuristics next
+  /// door in `networkFromUserId` guess a network from the shape of a localpart,
+  /// which is fine for deciding a glyph and disqualifying here — collapsing two
+  /// people who merely look alike does not show a bad suggestion, it deletes
+  /// one of their reactions from the tally.
+  String _identityOf(String senderId) =>
+      _graph.contactIdForUser(senderId) ?? senderId;
 
   /// Releases an open chat's timelines when the user navigates away.
   void closeTimeline(String chatId) {
@@ -213,6 +225,101 @@ class MatrixChatRepository implements ChatRepository {
   @override
   Future<void> send(String chatId, String body, {ChatNetwork? via}) async {
     await _sendRoom(chatId, via: via).sendTextEvent(body);
+  }
+
+  @override
+  Future<void> sendReply(
+    String chatId,
+    String body, {
+    required String replyToEventId,
+    ChatNetwork? via,
+  }) async {
+    final target = await _findEvent(chatId, replyToEventId);
+    if (target == null) {
+      // The target has scrolled out of every loaded timeline and the server no
+      // longer serves it — a redacted event in a room with limited history, or
+      // a leg the account has left. Sending a plain message is better than
+      // losing what the user typed, and the composer has already shown them the
+      // quote they were answering.
+      await _sendRoom(chatId, via: via).sendTextEvent(body);
+      return;
+    }
+    // `inReplyTo` is what puts the `m.in_reply_to` block *and* the quoted
+    // fallback into the event, so every client that does not render rich
+    // replies still shows what this answers.
+    await target.room.sendTextEvent(body, inReplyTo: target.event);
+  }
+
+  @override
+  Future<void> react(String chatId, String eventId, String key) async {
+    final target = await _findEvent(chatId, eventId);
+    if (target == null) {
+      throw StateError('Cannot react to $eventId: it is not in $chatId');
+    }
+    await target.room.sendReaction(eventId, key);
+  }
+
+  @override
+  Future<void> unreact(String chatId, String reactionEventId) async {
+    final annotation = await _findEvent(chatId, reactionEventId);
+    if (annotation == null) {
+      throw StateError('Cannot remove reaction $reactionEventId in $chatId');
+    }
+    await annotation.room.redactEvent(reactionEventId);
+  }
+
+  @override
+  Future<void> editMessage(
+    String chatId,
+    String eventId,
+    String newBody,
+  ) async {
+    final target = await _findEvent(chatId, eventId);
+    if (target == null) {
+      throw StateError('Cannot edit $eventId: it is not in $chatId');
+    }
+    await target.room.sendTextEvent(newBody, editEventId: eventId);
+  }
+
+  @override
+  Future<void> redact(String chatId, String eventId) async {
+    final target = await _findEvent(chatId, eventId);
+    if (target == null) {
+      throw StateError('Cannot delete $eventId: it is not in $chatId');
+    }
+    // Edits are separate events carrying the same words; redacting only the
+    // original would leave every version of a deleted message readable to
+    // anyone who looks at the relations.
+    await target.room.redactEvent(eventId, redactAllEdits: true);
+  }
+
+  /// Finds which of [chatId]'s rooms holds [eventId], and the event itself.
+  ///
+  /// The counterpart to [_sendRoom], and deliberately not a variation of it:
+  /// sending picks a leg, whereas reacting to, editing, redacting or replying
+  /// to an existing event has no choice at all — the event lives in exactly one
+  /// room, and that is the only room the relation can be sent to. A merged chat
+  /// is where this stops being pedantry: the default send network is whichever
+  /// leg last spoke, and reacting to a message on the *other* leg through it
+  /// produces an annotation the homeserver stores and nobody can see.
+  ///
+  /// Returns null rather than throwing when nothing holds the event, so each
+  /// caller decides: a reply degrades to a plain message, the rest refuse.
+  Future<({sdk.Room room, sdk.Event event})?> _findEvent(
+    String chatId,
+    String eventId,
+  ) async {
+    for (final room in _roomsOf(chatId)) {
+      try {
+        final event = await room.getEventById(eventId);
+        if (event != null) return (room: room, event: event);
+      } on Exception {
+        // A room the account has left, or one whose history the server will not
+        // serve. Neither says anything about the other legs.
+        continue;
+      }
+    }
+    return null;
   }
 
   /// The room an outgoing message or attachment for [chatId] goes to.

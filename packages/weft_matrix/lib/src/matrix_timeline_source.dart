@@ -1,6 +1,7 @@
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 import 'mapping.dart';
 
@@ -16,13 +17,19 @@ class MatrixTimelineSource extends TimelineSource {
     required this.network,
     required String? ownUserId,
     Duration clockOffset = Duration.zero,
+    MergedIdentityResolver resolveSender = senderIsIdentity,
   }) : _timeline = timeline,
        _ownUserId = ownUserId,
-       _clockOffset = clockOffset;
+       _clockOffset = clockOffset,
+       _resolveSender = resolveSender;
 
   final sdk.Timeline _timeline;
   final String? _ownUserId;
   final Duration _clockOffset;
+
+  /// Which annotation senders are the same person. Injected because the answer
+  /// lives in the identity graph, which this package deliberately does not own.
+  final MergedIdentityResolver _resolveSender;
 
   @override
   final ChatNetwork network;
@@ -36,7 +43,8 @@ class MatrixTimelineSource extends TimelineSource {
   /// Mapping every event on each access would be O(n) per rebuild, and the
   /// timeline is read on every frame while scrolling. The cache is keyed on the
   /// timeline's own length and newest event, which together change whenever the
-  /// SDK mutates it.
+  /// SDK mutates it — including for relations, since a reaction, an edit and
+  /// the redaction of either are all themselves timeline events.
   List<WeftMessage>? _cache;
   int _cacheLength = -1;
   String? _cacheNewestId;
@@ -59,14 +67,45 @@ class MatrixTimelineSource extends TimelineSource {
         network: network,
         ownUserId: _ownUserId,
         timeline: _timeline,
+        resolveSender: _resolveSender,
       );
       if (message != null) mapped.add(message);
     }
 
-    _cache = List.unmodifiable(mapped);
+    _cache = List.unmodifiable(_withReplyPreviews(mapped));
     _cacheLength = events.length;
     _cacheNewestId = newestId;
     return _cache!;
+  }
+
+  /// Fills in the reply previews this room can answer for itself.
+  ///
+  /// Deliberately partial: a reply whose target is not in this room is left
+  /// with a null preview rather than a stub, because in a merged conversation
+  /// the target may well be loaded on another leg, and a stub here would render
+  /// "message not loaded" over a message that is two bubbles up. Resolving
+  /// across legs is the merged layer's job — see `resolveReplyTarget`, which
+  /// takes the whole candidate set — and this is the part that does not need
+  /// it: the overwhelming majority of replies answer their own room.
+  List<WeftMessage> _withReplyPreviews(List<WeftMessage> mapped) {
+    // One pass to index, rather than a scan of the whole list per reply: a
+    // thread of a thousand messages where most are replies is otherwise
+    // quadratic on every timeline change.
+    final byId = <String, WeftMessage>{
+      for (final message in mapped) message.eventId: message,
+    };
+
+    for (var i = 0; i < mapped.length; i++) {
+      final targetId = mapped[i].replyToEventId;
+      if (targetId == null || !byId.containsKey(targetId)) continue;
+      mapped[i] = mapped[i].copyWith(
+        replyPreview: resolveReplyTarget(
+          replyToEventId: targetId,
+          loaded: [byId[targetId]!],
+        ),
+      );
+    }
+    return mapped;
   }
 
   @override

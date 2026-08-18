@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 void main() {
   group('networkFromUserId', () {
@@ -422,6 +423,528 @@ void main() {
 
     test('a state change is not conversation content', () {
       expect(map(const {'membership': 'join'}, type: 'm.room.member'), isNull);
+    });
+
+    test('a formatted body is surfaced, guarded on the format key', () {
+      final rich = map({
+        'msgtype': 'm.text',
+        'body': 'the summary is ready',
+        'format': 'org.matrix.custom.html',
+        'formatted_body': 'the <b>summary</b> is ready',
+      })!;
+      expect(rich.formattedBody, 'the <b>summary</b> is ready');
+
+      // A formatted body in some other format is a document in a language
+      // nobody claimed it was written in; handing it to an HTML parser is how
+      // a renderer ends up trusting markup it was never promised.
+      final foreign = map({
+        'msgtype': 'm.text',
+        'body': 'the summary is ready',
+        'format': 'org.example.markdown',
+        'formatted_body': 'the **summary** is ready',
+      })!;
+      expect(foreign.formattedBody, isNull);
+
+      expect(
+        map({'msgtype': 'm.text', 'body': 'plain'})!.formattedBody,
+        isNull,
+      );
+    });
+
+    test('a replacement is a relation, not a second bubble', () {
+      // The regression this pins: an `m.replace` is an `m.room.message` with a
+      // body of `* the new text`, so a mapper that only filters on type renders
+      // every edit twice — once corrected in place, once as a bubble starting
+      // with a star.
+      expect(
+        map({
+          'msgtype': 'm.text',
+          'body': '* corrected',
+          'm.new_content': {'msgtype': 'm.text', 'body': 'corrected'},
+          'm.relates_to': {
+            'rel_type': 'm.replace',
+            'event_id': r'$original:example.org',
+          },
+        }),
+        isNull,
+      );
+    });
+
+    test('a reply is still a bubble, relation and all', () {
+      final reply = map({
+        'msgtype': 'm.text',
+        'body': '> <@sam:example.org> question\n\nanswer',
+        'm.relates_to': {
+          'm.in_reply_to': {'event_id': r'$question:example.org'},
+        },
+      })!;
+
+      expect(reply.replyToEventId, r'$question:example.org');
+      // Nothing resolved it yet, and null is how that is told apart from "not
+      // a reply" — which is `replyToEventId` being null.
+      expect(reply.replyPreview, isNull);
+    });
+  });
+
+  group('relation extraction', () {
+    late sdk.Room room;
+
+    setUpAll(() async {
+      final client = sdk.Client(
+        'weft-relations-test',
+        database: await sdk.MatrixSdkDatabase.init(
+          'weft-relations-test',
+          database: await openWeftSqfliteDatabase(inMemoryDatabasePath),
+        ),
+      );
+      room = sdk.Room(id: '!room:example.org', client: client);
+    });
+
+    sdk.Event event({
+      required String type,
+      required Map<String, Object?> content,
+      required String eventId,
+      String senderId = '@sam:example.org',
+      DateTime? at,
+    }) {
+      return sdk.Event(
+        type: type,
+        content: content,
+        eventId: eventId,
+        senderId: senderId,
+        originServerTs: at ?? DateTime(2026, 8, 17, 9, 30),
+        room: room,
+      );
+    }
+
+    test('an annotation carries its target, key, room and sender', () {
+      final mapped = mapReaction(
+        event(
+          type: sdk.EventTypes.Reaction,
+          eventId: r'$reaction:example.org',
+          senderId: '@whatsapp_49151:example.org',
+          content: {
+            'm.relates_to': {
+              'rel_type': 'm.annotation',
+              'event_id': r'$target:example.org',
+              'key': '👍',
+            },
+          },
+        ),
+      )!;
+
+      expect(mapped.eventId, r'$reaction:example.org');
+      expect(mapped.targetEventId, r'$target:example.org');
+      expect(mapped.key, '👍');
+      // The room is not decoration: a redaction of this annotation has to be
+      // sent to the room it lives in, which in a merged chat is not the chat's
+      // send network.
+      expect(mapped.roomId, '!room:example.org');
+      expect(mapped.senderId, '@whatsapp_49151:example.org');
+    });
+
+    test('an annotation with nothing to annotate maps to nothing', () {
+      // A redacted reaction is exactly this shape: redaction strips
+      // `m.relates_to`, which is why no explicit redaction check is needed.
+      expect(
+        mapReaction(
+          event(
+            type: sdk.EventTypes.Reaction,
+            eventId: r'$reaction:example.org',
+            content: const {},
+          ),
+        ),
+        isNull,
+      );
+
+      // A relation with no key, and a plain message that is not one at all.
+      expect(
+        mapReaction(
+          event(
+            type: sdk.EventTypes.Reaction,
+            eventId: r'$reaction:example.org',
+            content: {
+              'm.relates_to': {
+                'rel_type': 'm.annotation',
+                'event_id': r'$target:example.org',
+              },
+            },
+          ),
+        ),
+        isNull,
+      );
+      expect(
+        mapReaction(
+          event(
+            type: sdk.EventTypes.Message,
+            eventId: r'$msg:example.org',
+            content: const {'msgtype': 'm.text', 'body': 'hello'},
+          ),
+        ),
+        isNull,
+      );
+    });
+
+    test('an edit prefers m.new_content over the starred fallback', () {
+      final mapped = mapEdit(
+        event(
+          type: sdk.EventTypes.Message,
+          eventId: r'$edit:example.org',
+          at: DateTime(2026, 8, 17, 14, 2),
+          content: {
+            'msgtype': 'm.text',
+            'body': '* Thursday at 14:00',
+            'm.new_content': {
+              'msgtype': 'm.text',
+              'body': 'Thursday at 14:00',
+              'format': 'org.matrix.custom.html',
+              'formatted_body': 'Thursday at <b>14:00</b>',
+            },
+            'm.relates_to': {
+              'rel_type': 'm.replace',
+              'event_id': r'$original:example.org',
+            },
+          },
+        ),
+      )!;
+
+      expect(mapped.body, 'Thursday at 14:00');
+      expect(mapped.formattedBody, 'Thursday at <b>14:00</b>');
+      expect(mapped.targetEventId, r'$original:example.org');
+      // The *replacement's* timestamp, which is what an "edited 14:02"
+      // indicator shows. The original's would name when the message was first
+      // sent, and be wrong by however long the sender took to notice.
+      expect(mapped.timestamp, DateTime(2026, 8, 17, 14, 2));
+    });
+
+    test('an edit without new content falls back and drops the star', () {
+      final mapped = mapEdit(
+        event(
+          type: sdk.EventTypes.Message,
+          eventId: r'$edit:example.org',
+          content: {
+            'msgtype': 'm.text',
+            'body': '* Thursday at 14:00',
+            'm.relates_to': {
+              'rel_type': 'm.replace',
+              'event_id': r'$original:example.org',
+            },
+          },
+        ),
+      )!;
+
+      // Without the strip, every version in the history sheet reads as a
+      // bullet list.
+      expect(mapped.body, 'Thursday at 14:00');
+      expect(mapped.formattedBody, isNull);
+    });
+
+    test('a body that is only a star is a message about a bullet', () {
+      final mapped = mapEdit(
+        event(
+          type: sdk.EventTypes.Message,
+          eventId: r'$edit:example.org',
+          content: {
+            'msgtype': 'm.text',
+            'body': '* ',
+            'm.relates_to': {
+              'rel_type': 'm.replace',
+              'event_id': r'$original:example.org',
+            },
+          },
+        ),
+      )!;
+      expect(mapped.body, '* ');
+    });
+
+    test('a reply relation is not an edit relation', () {
+      // Both live under `m.relates_to`, and confusing them turns a quote into a
+      // rewrite of the message being quoted.
+      const replyContent = {
+        'm.relates_to': {
+          'm.in_reply_to': {'event_id': r'$question:example.org'},
+        },
+      };
+      expect(editTargetEventId(replyContent), isNull);
+      expect(replyTargetEventId(replyContent), r'$question:example.org');
+
+      const editContent = {
+        'm.relates_to': {
+          'rel_type': 'm.replace',
+          'event_id': r'$original:example.org',
+        },
+      };
+      expect(editTargetEventId(editContent), r'$original:example.org');
+      expect(replyTargetEventId(editContent), isNull);
+    });
+  });
+
+  group('mapEvent with a timeline', () {
+    late sdk.Room room;
+
+    setUpAll(() async {
+      final client = sdk.Client(
+        'weft-aggregation-test',
+        database: await sdk.MatrixSdkDatabase.init(
+          'weft-aggregation-test',
+          database: await openWeftSqfliteDatabase(inMemoryDatabasePath),
+        ),
+      );
+      room = sdk.Room(id: '!room:example.org', client: client);
+    });
+
+    final original = DateTime(2026, 8, 17, 9, 30);
+
+    sdk.Event message({
+      String eventId = r'$original:example.org',
+      String senderId = '@sam:example.org',
+      String body = 'Thursday at 13:00',
+      DateTime? at,
+    }) => sdk.Event(
+      type: sdk.EventTypes.Message,
+      content: {'msgtype': 'm.text', 'body': body},
+      eventId: eventId,
+      senderId: senderId,
+      originServerTs: at ?? original,
+      room: room,
+    );
+
+    sdk.Event replacement({
+      required String eventId,
+      required String body,
+      required DateTime at,
+      String senderId = '@sam:example.org',
+      String target = r'$original:example.org',
+      String? formattedBody,
+    }) => sdk.Event(
+      type: sdk.EventTypes.Message,
+      content: {
+        'msgtype': 'm.text',
+        'body': '* $body',
+        'm.new_content': {
+          'msgtype': 'm.text',
+          'body': body,
+          if (formattedBody != null) ...{
+            'format': 'org.matrix.custom.html',
+            'formatted_body': formattedBody,
+          },
+        },
+        'm.relates_to': {'rel_type': 'm.replace', 'event_id': target},
+      },
+      eventId: eventId,
+      senderId: senderId,
+      originServerTs: at,
+      room: room,
+    );
+
+    sdk.Event annotation({
+      required String eventId,
+      required String senderId,
+      String key = '👍',
+      String target = r'$original:example.org',
+      DateTime? at,
+    }) => sdk.Event(
+      type: sdk.EventTypes.Reaction,
+      content: {
+        'm.relates_to': {
+          'rel_type': 'm.annotation',
+          'event_id': target,
+          'key': key,
+        },
+      },
+      eventId: eventId,
+      senderId: senderId,
+      originServerTs: at ?? DateTime(2026, 8, 17, 10),
+      room: room,
+    );
+
+    /// A timeline holding [events], with the aggregation tree the SDK builds
+    /// for them — which is where relations live, and the only reason mapping a
+    /// bubble needs a timeline at all.
+    Future<sdk.Timeline> timelineOf(List<sdk.Event> events) async {
+      final timeline = await room.getTimeline();
+      for (final event in events) {
+        timeline.events.add(event);
+        timeline.addAggregatedEvent(event);
+      }
+      return timeline;
+    }
+
+    Future<WeftMessage> mapWith(
+      sdk.Event event,
+      List<sdk.Event> timelineEvents, {
+      String? ownUserId = '@me:example.org',
+      MergedIdentityResolver resolveSender = senderIsIdentity,
+    }) async {
+      return mapEvent(
+        event,
+        network: ChatNetwork.matrix,
+        ownUserId: ownUserId,
+        timeline: await timelineOf([event, ...timelineEvents]),
+        resolveSender: resolveSender,
+      )!;
+    }
+
+    test('an edited message reads as the newest version', () async {
+      final event = message();
+      final mapped = await mapWith(event, [
+        replacement(
+          eventId: r'$edit1:example.org',
+          body: 'Thursday at 14:00',
+          at: DateTime(2026, 8, 17, 14, 2),
+        ),
+        replacement(
+          eventId: r'$edit2:example.org',
+          body: 'Friday at 14:00',
+          at: DateTime(2026, 8, 17, 14, 5),
+          formattedBody: 'Friday at <b>14:00</b>',
+        ),
+      ]);
+
+      expect(mapped.body, 'Friday at 14:00');
+      expect(mapped.formattedBody, 'Friday at <b>14:00</b>');
+      // The bug this fixes: `editedAt` used to be the *original's* timestamp,
+      // so a message sent at 09:30 and edited at 14:05 said "edited 09:30".
+      expect(mapped.editedAt, DateTime(2026, 8, 17, 14, 5));
+      expect(mapped.isEdited, isTrue);
+
+      // Oldest first, original included, ending with what the bubble shows.
+      expect(mapped.editHistory.map((e) => e.body), [
+        'Thursday at 13:00',
+        'Thursday at 14:00',
+        'Friday at 14:00',
+      ]);
+    });
+
+    test('an edit from anyone but the sender changes nothing', () async {
+      final event = message();
+      final mapped = await mapWith(event, [
+        replacement(
+          eventId: r'$edit:example.org',
+          senderId: '@mallory:example.org',
+          body: 'Thursday is cancelled',
+          at: DateTime(2026, 8, 17, 14, 2),
+        ),
+      ]);
+
+      // The homeserver does not enforce this, so the client must: a room where
+      // anyone can rewrite anyone's words is a room where a screenshot means
+      // nothing.
+      expect(mapped.body, 'Thursday at 13:00');
+      expect(mapped.editHistory, isEmpty);
+      expect(mapped.isEdited, isFalse);
+    });
+
+    test('an unedited message stays exactly as it arrived', () async {
+      final mapped = await mapWith(message(), [
+        // A replacement aimed at some other event must not follow this one.
+        replacement(
+          eventId: r'$edit:example.org',
+          body: 'not about this',
+          target: r'$elsewhere:example.org',
+          at: DateTime(2026, 8, 17, 14, 2),
+        ),
+      ]);
+
+      expect(mapped.body, 'Thursday at 13:00');
+      expect(mapped.editedAt, isNull);
+      expect(mapped.editHistory, isEmpty);
+    });
+
+    test('reactions arrive as tallies, in first-reaction order', () async {
+      final mapped = await mapWith(message(), [
+        annotation(
+          eventId: r'$r1:example.org',
+          senderId: '@anna:example.org',
+          at: DateTime(2026, 8, 17, 10),
+        ),
+        annotation(
+          eventId: r'$r2:example.org',
+          senderId: '@konrad:example.org',
+          key: '🎉',
+          at: DateTime(2026, 8, 17, 10, 1),
+        ),
+        annotation(
+          eventId: r'$r3:example.org',
+          senderId: '@me:example.org',
+          at: DateTime(2026, 8, 17, 10, 2),
+        ),
+      ]);
+
+      expect(mapped.reactions.map((r) => r.key), ['👍', '🎉']);
+      expect(mapped.reactions.first.count, 2);
+      expect(mapped.reactions.first.byLocalUser, isTrue);
+      // What `unreact` redacts — and the only place it exists.
+      expect(mapped.reactions.first.localEventId, r'$r3:example.org');
+      expect(mapped.reactions.last.byLocalUser, isFalse);
+    });
+
+    test('one person on two bridge legs is one reaction', () async {
+      // Anna reached this conversation down two bridges and pressed the same
+      // emoji on each. Counting events renders `👍 2` for one person pressing
+      // one button twice — and her single un-react then appears to do nothing.
+      String resolve(String senderId) => switch (senderId) {
+        '@whatsapp_49151:example.org' || '@signal_abc:example.org' => 'anna',
+        _ => senderId,
+      };
+
+      final mapped = await mapWith(message(), [
+        annotation(
+          eventId: r'$r1:example.org',
+          senderId: '@whatsapp_49151:example.org',
+          at: DateTime(2026, 8, 17, 10),
+        ),
+        annotation(
+          eventId: r'$r2:example.org',
+          senderId: '@signal_abc:example.org',
+          at: DateTime(2026, 8, 17, 10, 1),
+        ),
+      ], resolveSender: resolve);
+
+      expect(mapped.reactions.single.count, 1);
+      expect(mapped.reactions.single.senderIds, [
+        '@whatsapp_49151:example.org',
+      ]);
+    });
+
+    test('a redacted message carries no tally and no history', () async {
+      final event = message();
+      event.setRedactionEvent(
+        sdk.Event(
+          type: sdk.EventTypes.Redaction,
+          content: const {},
+          eventId: r'$redaction:example.org',
+          senderId: '@sam:example.org',
+          originServerTs: DateTime(2026, 8, 17, 15),
+          room: room,
+          redacts: r'$original:example.org',
+        ),
+      );
+
+      final mapped = await mapWith(event, [
+        annotation(eventId: r'$r1:example.org', senderId: '@anna:example.org'),
+      ]);
+
+      // The versions and the annotations are gone from the server too; a count
+      // over "message deleted" would be a tally of something nobody can read.
+      expect(mapped.redacted, isTrue);
+      expect(mapped.body, '');
+      expect(mapped.reactions, isEmpty);
+      expect(mapped.editHistory, isEmpty);
+    });
+
+    test('with no timeline, relations are simply absent', () {
+      // Every call site that maps outside an open timeline — the inbox
+      // preview, a notification — gets the event as sent rather than a guess.
+      final mapped = mapEvent(
+        message(),
+        network: ChatNetwork.matrix,
+        ownUserId: '@me:example.org',
+      )!;
+
+      expect(mapped.editedAt, isNull);
+      expect(mapped.reactions, isEmpty);
+      expect(mapped.editHistory, isEmpty);
     });
   });
 }

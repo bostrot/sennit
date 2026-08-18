@@ -49,6 +49,7 @@ class IdentityGraph {
        _nextId = idFactory ?? _defaultIdFactory() {
     for (final h in handles) {
       _handles[h.id] = h;
+      _byMatrixUserId[h.matrixUserId] = h.id;
       _contactOf[h.id] = h.unifiedContactId ?? _nextId();
     }
     for (final d in decisions) {
@@ -69,6 +70,10 @@ class IdentityGraph {
   final Map<String, String> _contactOf = {};
   final Map<String, MergeDecision> _decisions = {};
 
+  /// Handle id by [NetworkHandle.matrixUserId], maintained alongside the
+  /// handles themselves. See [handleFor] for who asks.
+  final Map<String, String> _byMatrixUserId = {};
+
   static String Function() _defaultIdFactory() {
     var counter = 0;
     return () =>
@@ -82,6 +87,33 @@ class IdentityGraph {
 
   /// Contact id a handle currently belongs to.
   String? contactIdOf(String handleId) => _contactOf[handleId];
+
+  /// The handle a Matrix user id belongs to, or null when no handle claims it.
+  ///
+  /// The reverse of [NetworkHandle.matrixUserId], and the lookup reaction
+  /// dedupe is built on: an annotation arrives from a bridge ghost
+  /// (`@whatsapp_49…:example.org`), and the only honest way to ask whether that
+  /// ghost is a person already merged with another is to find its handle and
+  /// then its contact. Null for every ghost the graph has never seen — a group
+  /// member who has no DM, a bridgebot — and the caller's correct response is
+  /// to treat that sender as their own person rather than to guess from the
+  /// shape of the id.
+  NetworkHandle? handleFor(String matrixUserId) {
+    final id = _byMatrixUserId[matrixUserId];
+    return id == null ? null : _handles[id];
+  }
+
+  /// The contact behind a Matrix user id: [handleFor] then [contactIdOf].
+  ///
+  /// This is the whole of what a `MergedIdentityResolver` needs, which is why
+  /// it is one call — every caller that assembled it out of the two parts got
+  /// to choose a different answer for "unknown sender", and the wrong choice
+  /// there does not show a bad suggestion, it silently merges two people's
+  /// reactions into one.
+  String? contactIdForUser(String matrixUserId) {
+    final handle = handleFor(matrixUserId);
+    return handle == null ? null : contactIdOf(handle.id);
+  }
 
   /// All handles sharing a contact.
   List<NetworkHandle> handlesInContact(String contactId) => _contactOf.entries
@@ -226,6 +258,7 @@ class IdentityGraph {
   /// Adds or refreshes a handle, preserving its current contact assignment.
   void upsertHandle(NetworkHandle handle) {
     _handles[handle.id] = handle;
+    _byMatrixUserId[handle.matrixUserId] = handle.id;
     _contactOf.putIfAbsent(
       handle.id,
       () => handle.unifiedContactId ?? _nextId(),

@@ -287,6 +287,11 @@ class EditResolution {
 /// anyone can rewrite anyone's words is a room where a screenshot means
 /// nothing — the homeserver does not enforce this for us, so the client must.
 ///
+/// The winning version's `formatted_body` replaces the original's, null
+/// included — an edit is a whole new content block, not a patch, so a
+/// replacement sent as plain text leaves a message with no formatting rather
+/// than one wearing its previous markup.
+///
 /// This does not double-apply. When the SDK has already resolved edits into
 /// `event.body` the winning body simply equals the body already there; what is
 /// gained is the [EditResolution.history] the sheet needs and a correct
@@ -339,7 +344,14 @@ EditResolution applyEdits(List<EditEvent> edits, WeftMessage original) {
   ];
 
   return EditResolution(
-    message: original.copyWith(body: winner.body, editedAt: winner.timestamp),
+    message: original.copyWith(
+      body: winner.body,
+      // Explicitly the winner's, null included: an edit that drops formatting
+      // has to clear the old HTML, or the bubble renders the previous version's
+      // markup wrapped around the new words.
+      formattedBody: winner.formattedBody,
+      editedAt: winner.timestamp,
+    ),
     history: List.unmodifiable(history),
     rejected: List.unmodifiable(rejected),
   );

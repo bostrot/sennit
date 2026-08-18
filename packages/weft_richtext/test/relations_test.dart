@@ -615,6 +615,26 @@ void main() {
       ], _message());
 
       expect(resolved.history.last.formattedBody, 'meet at <b>six</b>');
+      // And onto the message itself, or the bubble shows the new words with no
+      // formatting while the history sheet shows them with it.
+      expect(resolved.message.formattedBody, 'meet at <b>six</b>');
+    });
+
+    test('an edit to plain text clears the formatting it replaced', () {
+      // An edit is a whole new content block, not a patch. Leaving the old
+      // `formatted_body` in place renders the previous version's markup
+      // wrapped around the new text — bold that was never asked for, and, for
+      // a message edited from a link to a word, a live link to somewhere the
+      // sender has since thought better of.
+      final formatted = _message(
+        body: 'meet at six',
+      ).copyWith(formattedBody: 'meet at <b>six</b>');
+      final resolved = applyEdits([
+        _edit(id: r'$e1', body: 'meet at seven', at: 60),
+      ], formatted);
+
+      expect(resolved.message.body, 'meet at seven');
+      expect(resolved.message.formattedBody, isNull);
     });
 
     test('the history is not writable by a sheet', () {

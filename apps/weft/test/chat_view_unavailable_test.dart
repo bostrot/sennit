@@ -86,6 +86,26 @@ class _NoRoomsRepository implements ChatRepository {
   Future<void> retryUpload(String taskId) => _inner.retryUpload(taskId);
   @override
   Future<void> cancelUpload(String taskId) => _inner.cancelUpload(taskId);
+  @override
+  Future<void> sendReply(
+    String chatId,
+    String body, {
+    required String replyToEventId,
+    ChatNetwork? via,
+  }) =>
+      _inner.sendReply(chatId, body, replyToEventId: replyToEventId, via: via);
+  @override
+  Future<void> react(String chatId, String eventId, String key) =>
+      _inner.react(chatId, eventId, key);
+  @override
+  Future<void> unreact(String chatId, String reactionEventId) =>
+      _inner.unreact(chatId, reactionEventId);
+  @override
+  Future<void> editMessage(String chatId, String eventId, String newBody) =>
+      _inner.editMessage(chatId, eventId, newBody);
+  @override
+  Future<void> redact(String chatId, String eventId) =>
+      _inner.redact(chatId, eventId);
 }
 
 void main() {

@@ -35,6 +35,10 @@ dependencies:
   # supplies what it cannot know: a decrypted event, a read receipt, and the
   # homeserver to register a pusher with.
   weft_notify: ^0.1.0
+  # Relations as values: the aggregation that turns a room's annotations and
+  # replacements into a tally and an edit history is pure Dart and tested
+  # without a homeserver. This package only supplies the events.
+  weft_richtext: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0

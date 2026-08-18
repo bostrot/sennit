@@ -1,5 +1,6 @@
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 /// State event types bridges use to announce themselves.
 const List<String> bridgeStateEventTypes = ['m.bridge', 'uk.half-shot.bridge'];
@@ -118,12 +119,25 @@ bool isVoiceMessage(Map<String, Object?> content) {
 /// Converts a Matrix event into Weft's message model.
 ///
 /// Returns null for events that are not conversation content — state changes,
-/// reactions, and anything the timeline should not render as a bubble.
+/// reactions, replacements, and anything else the timeline should not render as
+/// a bubble of its own.
+///
+/// Relations are folded *in* rather than rendered beside: a message carries the
+/// reactions annotating it, the versions replacing it, and the id it answers.
+/// All three need [timeline], because the SDK holds relations in the timeline's
+/// aggregation tree rather than on the event — with no timeline this maps the
+/// event exactly as it arrived, which is right for the inbox preview and wrong
+/// for a bubble.
+///
+/// [resolveSender] decides which annotations are the same person; see
+/// [MergedIdentityResolver]. The default treats every sender as their own
+/// person, which is correct for an unmerged chat and for the inbox.
 WeftMessage? mapEvent(
   sdk.Event event, {
   required ChatNetwork network,
   required String? ownUserId,
   sdk.Timeline? timeline,
+  MergedIdentityResolver resolveSender = senderIsIdentity,
 }) {
   if (event.type != sdk.EventTypes.Message &&
       event.type != sdk.EventTypes.Sticker &&
@@ -132,10 +146,17 @@ WeftMessage? mapEvent(
   }
 
   final content = event.content;
+
+  // A replacement is a relation wearing a message's clothes: same type, same
+  // msgtype, a body of `* the new text` for clients that do not understand
+  // edits. Rendering it is how an edited message becomes two bubbles, the
+  // second one starting with a star.
+  if (editTargetEventId(content) != null) return null;
+
   final msgtype = content['msgtype'] as String?;
   final voice = isVoiceMessage(content);
 
-  return WeftMessage(
+  final message = WeftMessage(
     eventId: event.eventId,
     roomId: event.roomId ?? '',
     network: network,
@@ -146,17 +167,12 @@ WeftMessage? mapEvent(
         ? MessageKind.sticker
         : messageKindFromMsgtype(msgtype, isVoice: voice),
     isOwn: event.senderId == ownUserId,
-    // `body` already resolves edits and falls back sensibly for media.
+    // The event as sent. Edits are applied below, from the replacement chain,
+    // rather than trusted from here: `event.body` is the *original* text until
+    // someone asks the timeline for the display event.
     body: event.redacted ? '' : event.body,
+    formattedBody: event.redacted ? null : formattedBodyOf(content),
     replyToEventId: replyTargetEventId(content),
-    // The SDK exposes edits as aggregated replacements, which requires the
-    // timeline that holds the aggregations. Without one, report no edit rather
-    // than guessing.
-    editedAt:
-        timeline != null &&
-            event.hasAggregatedEvents(timeline, sdk.RelationshipTypes.edit)
-        ? event.originServerTs
-        : null,
     redacted: event.redacted,
     deliveryState: _deliveryFor(event),
     // Marks the message as carrying a file. The value is not a fetchable URL
@@ -168,6 +184,37 @@ WeftMessage? mapEvent(
     mediaHeight: _positiveInfoInt(content, 'h'),
     mediaSizeBytes: _positiveInfoInt(content, 'size'),
   );
+
+  // A redacted event has no content left to relate to. Its edits and its
+  // reactions are gone from the server too, and showing a tally over "message
+  // deleted" would be showing a count of something nobody can read.
+  if (timeline == null || event.redacted) return message;
+
+  final resolution = applyEdits(editsFor(event, timeline), message);
+  final reactions = aggregateReactions(
+    events: reactionsFor(event, timeline),
+    resolveSender: resolveSender,
+    localUserId: ownUserId,
+  );
+  if (resolution.history.isEmpty && reactions.isEmpty) return message;
+
+  return resolution.message.copyWith(
+    editHistory: resolution.history,
+    reactions: reactions,
+  );
+}
+
+/// The sender's HTML body, when they sent one in the format Matrix defines.
+///
+/// Guarded on `format` rather than on the key's presence: `formatted_body`
+/// without `org.matrix.custom.html` beside it is a body in some *other* format,
+/// and handing it to an HTML parser would be reading a document in a language
+/// nobody claimed it was written in. Empty is treated as absent, since a sender
+/// that set the key to `""` meant no formatting.
+String? formattedBodyOf(Map<String, Object?> content) {
+  if (content['format'] != 'org.matrix.custom.html') return null;
+  final formatted = content['formatted_body'];
+  return formatted is String && formatted.isNotEmpty ? formatted : null;
 }
 
 /// Extracts a rich reply's target.
@@ -185,6 +232,119 @@ String? replyTargetEventId(Map<String, Object?> content) {
   final eventId = inReplyTo['event_id'];
   return eventId is String && eventId.isNotEmpty ? eventId : null;
 }
+
+/// The event an `m.replace` replaces, or null when this is not a replacement.
+///
+/// The mirror of [replyTargetEventId], and the two must not be confused: a
+/// reply quotes another message, a replacement *becomes* one. The rel_type is
+/// what tells them apart, and both can be absent from the same relation block.
+String? editTargetEventId(Map<String, Object?> content) {
+  final relatesTo = content['m.relates_to'];
+  if (relatesTo is! Map) return null;
+  if (relatesTo['rel_type'] != sdk.RelationshipTypes.edit) return null;
+
+  final eventId = relatesTo['event_id'];
+  return eventId is String && eventId.isNotEmpty ? eventId : null;
+}
+
+/// The annotation key an `m.reaction` carries, or null when it carries none.
+String? annotationKey(Map<String, Object?> content) {
+  final relatesTo = content['m.relates_to'];
+  if (relatesTo is! Map) return null;
+  if (relatesTo['rel_type'] != sdk.RelationshipTypes.reaction) return null;
+
+  final key = relatesTo['key'];
+  return key is String && key.isNotEmpty ? key : null;
+}
+
+/// Maps an `m.reaction` event, or null for anything that is not one.
+///
+/// Null for a redacted annotation too, and by construction rather than by a
+/// check: redaction strips `m.relates_to`, so an un-reacted reaction has no
+/// target and no key left to read. That is the behaviour the tally wants —
+/// counting it would leave a chip standing for a reaction the sender withdrew.
+ReactionEvent? mapReaction(sdk.Event event) {
+  if (event.type != sdk.EventTypes.Reaction) return null;
+
+  final content = event.content;
+  final relatesTo = content['m.relates_to'];
+  if (relatesTo is! Map) return null;
+
+  final targetId = relatesTo['event_id'];
+  final key = annotationKey(content);
+  if (targetId is! String || targetId.isEmpty || key == null) return null;
+
+  return ReactionEvent(
+    eventId: event.eventId,
+    roomId: event.roomId ?? '',
+    senderId: event.senderId,
+    targetEventId: targetId,
+    key: key,
+    timestamp: event.originServerTs,
+  );
+}
+
+/// Maps an `m.replace` event, or null for anything that is not one.
+///
+/// The replacement text comes from `m.new_content`, which is the authoritative
+/// copy; the top-level `body` is the fallback the spec has senders prepend `* `
+/// to so that clients which ignore edits still show something readable. Falling
+/// back to it means stripping that star, or every edit in the history sheet
+/// reads as a bullet list.
+EditEvent? mapEdit(sdk.Event event) {
+  if (event.type != sdk.EventTypes.Message) return null;
+
+  final content = event.content;
+  final targetId = editTargetEventId(content);
+  if (targetId == null) return null;
+
+  final newContent = content['m.new_content'];
+  final replacement = newContent is Map<String, Object?> ? newContent : null;
+
+  final body = replacement?['body'];
+  return EditEvent(
+    eventId: event.eventId,
+    roomId: event.roomId ?? '',
+    senderId: event.senderId,
+    targetEventId: targetId,
+    body: body is String ? body : _withoutEditFallback(event.body),
+    formattedBody: replacement == null
+        ? null
+        : formattedBodyOf(replacement.cast<String, Object?>()),
+    timestamp: event.originServerTs,
+  );
+}
+
+/// Removes the `* ` a sender prepends to an edit's fallback body.
+///
+/// Only the first one, and only when it is followed by something: a message
+/// that genuinely reads `* ` is a message about a bullet.
+String _withoutEditFallback(String body) =>
+    body.length > 2 && body.startsWith('* ') ? body.substring(2) : body;
+
+/// The annotations [timeline] has aggregated against [event].
+///
+/// Read off the aggregation tree rather than by scanning the timeline, because
+/// that tree is where the SDK removes a redacted annotation — a scan would keep
+/// counting reactions their senders have taken back.
+List<ReactionEvent> reactionsFor(sdk.Event event, sdk.Timeline timeline) =>
+    event
+        .aggregatedEvents(timeline, sdk.RelationshipTypes.reaction)
+        .map(mapReaction)
+        .whereType<ReactionEvent>()
+        .toList(growable: false);
+
+/// The replacements [timeline] has aggregated against [event].
+///
+/// Unfiltered by sender: `applyEdits` is what rejects an edit from anyone other
+/// than the original author, and it reports what it rejected rather than
+/// swallowing it, which is how a bridge attributing edits wrongly becomes
+/// visible instead of silent.
+List<EditEvent> editsFor(sdk.Event event, sdk.Timeline timeline) => event
+    .aggregatedEvents(timeline, sdk.RelationshipTypes.edit)
+    .map(mapEdit)
+    .whereType<EditEvent>()
+    .toList(growable: false);
 
 DeliveryState? _deliveryFor(sdk.Event event) {
   // Matrix has no delivery receipts, only read receipts; `synced` means the

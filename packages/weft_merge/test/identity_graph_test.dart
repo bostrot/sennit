@@ -86,6 +86,82 @@ void main() {
     });
   });
 
+  group('handleFor', () {
+    test('resolves a bridge ghost back to its handle and contact', () {
+      // The lookup reaction dedupe runs on: an annotation arrives from
+      // `@whatsapp_a:example.org`, and the only way to ask whether that ghost
+      // is a person already merged with another is to find its handle first.
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp),
+          handle('b', ChatNetwork.signal),
+        ],
+        idFactory: counterIds(),
+      );
+      graph.merge('a', 'b');
+
+      expect(graph.handleFor('@whatsapp_a:example.org')?.id, 'a');
+      expect(
+        graph.contactIdForUser('@whatsapp_a:example.org'),
+        graph.contactIdForUser('@signal_b:example.org'),
+        reason: 'one merged person, one identity, one thumbs-up',
+      );
+    });
+
+    test('two unmerged handles stay two people', () {
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp),
+          handle('b', ChatNetwork.signal),
+        ],
+        idFactory: counterIds(),
+      );
+
+      expect(
+        graph.contactIdForUser('@whatsapp_a:example.org'),
+        isNot(graph.contactIdForUser('@signal_b:example.org')),
+      );
+    });
+
+    test('an unknown ghost resolves to nothing rather than to a guess', () {
+      // A bridgebot, a group member with no DM, a ghost from a room the graph
+      // has never folded. The caller treats null as "their own person": a
+      // wrong merge here does not show a bad suggestion, it deletes someone's
+      // reaction from the tally.
+      final graph = IdentityGraph(
+        handles: [handle('a', ChatNetwork.whatsapp)],
+        idFactory: counterIds(),
+      );
+
+      expect(graph.handleFor('@whatsapp_stranger:example.org'), isNull);
+      expect(graph.contactIdForUser('@whatsapp_stranger:example.org'), isNull);
+    });
+
+    test('a handle added after construction is findable', () {
+      final graph = IdentityGraph(handles: const [], idFactory: counterIds());
+      graph.upsertHandle(handle('a', ChatNetwork.whatsapp));
+
+      expect(graph.handleFor('@whatsapp_a:example.org')?.id, 'a');
+    });
+
+    test('an unmerge is reflected in the identity, not just the partition', () {
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp),
+          handle('b', ChatNetwork.signal),
+        ],
+        idFactory: counterIds(),
+      );
+      graph.merge('a', 'b');
+      graph.unmerge('b');
+
+      expect(
+        graph.contactIdForUser('@whatsapp_a:example.org'),
+        isNot(graph.contactIdForUser('@signal_b:example.org')),
+      );
+    });
+  });
+
   group('unmerge', () {
     test('splits a handle back out into its own contact', () {
       final graph = IdentityGraph(
