@@ -9,12 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_richtext/weft_richtext.dart' show LinkPreviewFetch;
+
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/settings.dart';
+import 'package:weft/app/stores.dart';
 import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/data/matrix_chat_repository.dart'
     show AttachmentBytesLoader;
+import 'package:weft/services/links/link_preview_service.dart';
 
 bool _fontsLoaded = false;
 
@@ -45,6 +49,14 @@ Future<void> loadGoldenFonts() async {
     '${fonts.path}/Roboto-Bold.ttf',
   ]);
   await _load('MaterialIcons', ['${fonts.path}/MaterialIcons-Regular.otf']);
+  // The SDK cache ships no monospace face, and `monospace` is the first family
+  // of the stack `rich_text_view.dart` asks for — so without this every inline
+  // code run and every code block in a golden is a row of placeholder boxes,
+  // which is the failure this whole function exists to prevent. Roboto
+  // Condensed stands in: the glyphs are not the ones a device draws, but the
+  // ink, the padding and the wrapping around them are the app's own, and those
+  // are what the image is for.
+  await _load('monospace', ['${fonts.path}/RobotoCondensed-Regular.ttf']);
   // Registered under the package-qualified family: an IconData carrying
   // `fontPackage` resolves to `packages/<pkg>/<family>`, so registering the
   // bare family name loads the font but never matches the glyphs.
@@ -132,9 +144,17 @@ String? _flutterRoot() {
 /// [repository] and [fileReader] are named rather than a general overrides list
 /// because Riverpod's `Override` is not exported from either barrel, so a typed
 /// `List<Override>` parameter cannot be written at all — the scope's own list
-/// only type-checks by inference. Two named seams cover everything the golden
-/// suites need to state: what is in the rooms, and what a picked file's bytes
-/// are.
+/// only type-checks by inference. Four named seams now cover everything the
+/// golden suites need to state: what is in the rooms, what a picked file's
+/// bytes are, what the settings say, and what the homeserver answers when it is
+/// asked about a link.
+///
+/// [stores] and [linkPreviewFetch] are what make a link-preview card drawable
+/// at all: the card is off until a setting says otherwise and silent until a
+/// homeserver answers, so a golden of one has to state both. They are applied
+/// only when non-null — a scene that passes neither is a scene where the
+/// preview path is off, which is the app's default and the right background for
+/// every other image here.
 Future<void> pumpWeft(
   WidgetTester tester,
   Widget child, {
@@ -143,6 +163,8 @@ Future<void> pumpWeft(
   Color seed = WeftTheme.defaultSeed,
   ChatRepository? repository,
   AttachmentBytesLoader? fileReader,
+  WeftStores? stores,
+  LinkPreviewFetch? linkPreviewFetch,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -160,6 +182,13 @@ Future<void> pumpWeft(
         ),
         if (fileReader != null)
           attachmentFileReaderProvider.overrideWithValue(fileReader),
+        if (stores != null)
+          storesBootstrapProvider.overrideWith((ref) async => stores),
+        // The provider this replaces reaches for a live Matrix session, so a
+        // scene that wants a card has to bring its own answers rather than let
+        // the real one be read.
+        if (linkPreviewFetch != null)
+          linkPreviewFetchProvider.overrideWithValue(linkPreviewFetch),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
