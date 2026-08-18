@@ -1,0 +1,33 @@
+name: weft_call
+description: >-
+  1:1 voice and video calling: the call state machine, glare resolution, ICE
+  candidate buffering and the injected media engine boundary. Pure Dart on
+  purpose — every rule a call depends on is decided here, and none of them need
+  WebRTC, a microphone or a second phone to test.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  collection: ^1.19.0
+  meta: ^1.17.0
+  weft_domain: ^0.1.0
+
+# Deliberately NOT depended on: `matrix`. The orientation for this phase
+# (Working/phase-07-orientation.md §1) established that the SDK ships a
+# complete 1:1 VoIP stack and recommended wrapping it. This package
+# reimplements instead, and the reasons are recorded in `lib/weft_call.dart`
+# so the choice is visible from the code rather than only from a playbook.
+# The practical consequence for this file: no `matrix` dependency, so
+# weft_call stays in the pure-Dart CI group and `dart test` runs it.
+#
+# Also deliberately absent: `flutter_webrtc`. The media engine is an interface
+# here (`MediaEngine`) and implemented in the app, which is what keeps the
+# whole state machine testable with no media at all.
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0

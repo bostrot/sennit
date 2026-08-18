@@ -42,13 +42,14 @@ jobs:
       # These packages carry the algorithmic core — merge scoring, the merged
       # timeline watermark, hybrid search ranking, attachment planning, the
       # notification decision rules, the share target ranking, the formatted
-      # -body allowlist, SMS segment counting and phone-number identity — and
-      # need no device. A package absent from this list is silently untested, so
-      # adding one to the workspace means adding it here too.
-      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp, weft_attachments, weft_notify, weft_share, weft_richtext, weft_sms
+      # -body allowlist, SMS segment counting and phone-number identity, call
+      # glare resolution and ICE candidate ordering — and need no device. A
+      # package absent from this list is silently untested, so adding one to the
+      # workspace means adding it here too.
+      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp, weft_attachments, weft_notify, weft_share, weft_richtext, weft_sms, weft_call
         run: |
           set -e
-          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share weft_richtext weft_sms; do
+          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share weft_richtext weft_sms weft_call; do
             if [ -d "packages/$pkg/test" ]; then
               echo "::group::$pkg"
               (cd "packages/$pkg" && dart test --reporter expanded)
