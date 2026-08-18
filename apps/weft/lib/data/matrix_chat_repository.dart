@@ -11,6 +11,7 @@ import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_store/weft_store.dart';
 
 import 'chat_repository.dart';
+import 'sms_chat_repository.dart';
 
 /// Reads the whole of a picked file.
 ///
@@ -43,10 +44,12 @@ class MatrixChatRepository implements ChatRepository {
     SearchStore? searchStore,
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
+    SmsChatRepository? sms,
   }) : _store = store,
        _searchStore = searchStore,
        _transportOverride = transport,
-       _readBytes = readBytes {
+       _readBytes = readBytes,
+       _sms = sms {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     _graph = IdentityGraph(
@@ -70,6 +73,27 @@ class MatrixChatRepository implements ChatRepository {
     _resolveMediaSupport();
     _rebuild();
     _syncSub = _session.client.onSync.stream.listen((_) => _rebuild());
+
+    final sms = _sms;
+    if (sms != null) {
+      // SMS text goes through *this* repository's indexer rather than through a
+      // second one, so a hybrid query covers it without knowing SMS exists. The
+      // room id is resolved to a chat id at index time: a thread that has since
+      // been merged must file its rows under the merged conversation, or the
+      // search result opens a chat the inbox no longer shows.
+      sms.indexer = (roomId, messages, {String chatTitle = ''}) =>
+          indexMessages(
+            chatForRoom(roomId)?.id ?? roomId,
+            messages,
+            chatTitle: chatTitle,
+          );
+      _smsSub = sms.updates.listen((_) => _rebuild());
+      // Not awaited, and it must not be: reading the provider is a method
+      // channel round trip, and the inbox has four other networks to draw
+      // meanwhile. A phone where Weft is not the default SMS app settles
+      // immediately on "no threads" and nothing here ever fires again.
+      unawaited(sms.start());
+    }
   }
 
   final WeftMatrixSession _session;
@@ -77,8 +101,13 @@ class MatrixChatRepository implements ChatRepository {
   final SearchStore? _searchStore;
   final AttachmentBytesLoader _readBytes;
 
+  /// SMS, when this device has it and Weft holds the role. Null everywhere
+  /// else, which is the state every path below has to work in anyway.
+  final SmsChatRepository? _sms;
+
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
+  StreamSubscription<void>? _smsSub;
 
   final _chatsController = StreamController<List<Chat>>.broadcast();
   List<Chat> _chats = const [];
@@ -129,7 +158,7 @@ class MatrixChatRepository implements ChatRepository {
   /// Timelines are expensive to build and hold subscriptions, so an open chat
   /// reuses its sources instead of rebuilding them on every sync.
   final Map<String, MergedTimeline> _timelines = {};
-  final Map<String, List<MatrixTimelineSource>> _sources = {};
+  final Map<String, List<TimelineSource>> _sources = {};
 
   static String Function() _idFactory() {
     var n = 0;
@@ -149,6 +178,9 @@ class MatrixChatRepository implements ChatRepository {
     for (final room in _client.rooms) {
       seen.add(networkForRoom(room));
     }
+    // SMS earns its place in the rail the same way: by there being threads on
+    // it. A phone where the role was declined has none and is offered none.
+    if (_sms?.chats.isNotEmpty ?? false) seen.add(ChatNetwork.sms);
     return ChatNetwork.values.where(seen.contains).toList(growable: false);
   }
 
@@ -180,7 +212,7 @@ class MatrixChatRepository implements ChatRepository {
         _openTimeline(source).catchError((_) => null),
     ]);
 
-    final sources = opened.whereType<MatrixTimelineSource>().toList();
+    final sources = opened.whereType<TimelineSource>().toList();
     if (sources.isEmpty) {
       throw StateError('Chat $chatId has no reachable rooms');
     }
@@ -191,7 +223,14 @@ class MatrixChatRepository implements ChatRepository {
     return merged;
   }
 
-  Future<MatrixTimelineSource?> _openTimeline(ChatSource source) async {
+  Future<TimelineSource?> _openTimeline(ChatSource source) async {
+    // An SMS leg is opened from the provider, not the homeserver, and is
+    // otherwise an ordinary source: the watermark rule interleaves it with a
+    // WhatsApp leg exactly as it interleaves two bridged ones.
+    if (source.network == ChatNetwork.sms) {
+      return _sms?.openTimeline(source.roomId);
+    }
+
     final room = _client.getRoomById(source.roomId);
     if (room == null) return null;
 
@@ -216,16 +255,27 @@ class MatrixChatRepository implements ChatRepository {
 
   /// Releases an open chat's timelines when the user navigates away.
   void closeTimeline(String chatId) {
-    for (final source
-        in _sources.remove(chatId) ?? const <MatrixTimelineSource>[]) {
-      source.dispose();
+    for (final source in _sources.remove(chatId) ?? const <TimelineSource>[]) {
+      switch (source) {
+        case MatrixTimelineSource():
+          source.dispose();
+        default:
+          // An SMS leg holds no subscription of its own; the repository that
+          // built it drops its cache so a reopen re-reads the provider.
+          _sms?.closeTimeline(source.roomId);
+      }
     }
     _timelines.remove(chatId);
   }
 
   @override
   Future<void> send(String chatId, String body, {ChatNetwork? via}) async {
-    await _sendRoom(chatId, via: via).sendTextEvent(body);
+    final source = _sendSource(chatId, via: via);
+    if (source.network == ChatNetwork.sms) {
+      await _requireSms().send(source.roomId, body);
+      return;
+    }
+    await _roomFor(source).sendTextEvent(body);
   }
 
   @override
@@ -241,8 +291,10 @@ class MatrixChatRepository implements ChatRepository {
       // longer serves it — a redacted event in a room with limited history, or
       // a leg the account has left. Sending a plain message is better than
       // losing what the user typed, and the composer has already shown them the
-      // quote they were answering.
-      await _sendRoom(chatId, via: via).sendTextEvent(body);
+      // quote they were answering. Routed through [send] rather than straight
+      // at a room, so a chat whose only leg is SMS — where no event can carry
+      // an `m.in_reply_to` at all — still delivers what was typed.
+      await send(chatId, body, via: via);
       return;
     }
     // `inReplyTo` is what puts the `m.in_reply_to` block *and* the quoted
@@ -296,7 +348,7 @@ class MatrixChatRepository implements ChatRepository {
 
   /// Finds which of [chatId]'s rooms holds [eventId], and the event itself.
   ///
-  /// The counterpart to [_sendRoom], and deliberately not a variation of it:
+  /// The counterpart to [_sendSource], and deliberately not a variation of it:
   /// sending picks a leg, whereas reacting to, editing, redacting or replying
   /// to an existing event has no choice at all — the event lives in exactly one
   /// room, and that is the only room the relation can be sent to. A merged chat
@@ -329,18 +381,36 @@ class MatrixChatRepository implements ChatRepository {
   /// muting or archiving applies to the whole conversation, whereas sending
   /// picks exactly one leg. Throws rather than returning null because a send
   /// with nowhere to go must surface to the composer, not fail silently.
-  sdk.Room _sendRoom(String chatId, {ChatNetwork? via}) {
+  ///
+  /// Split from [_roomFor] because the chosen leg is not always a room: an SMS
+  /// leg resolves to a thread in the system provider and has no homeserver to
+  /// look it up on.
+  ChatSource _sendSource(String chatId, {ChatNetwork? via}) {
     final chat = _chats.firstWhere(
       (c) => c.id == chatId,
       orElse: () => throw ArgumentError.value(chatId, 'chatId', 'Unknown chat'),
     );
-    final source = sendSourceFor(chat, via: via);
+    return sendSourceFor(chat, via: via);
+  }
 
+  sdk.Room _roomFor(ChatSource source) {
     final room = _client.getRoomById(source.roomId);
     if (room == null) {
       throw StateError('Room ${source.roomId} is no longer available');
     }
     return room;
+  }
+
+  /// The SMS source, or a refusal the composer can show.
+  ///
+  /// Reached only when a chat carries an SMS leg, which cannot happen without
+  /// one — but the role can be handed to another app while a chat is open, and
+  /// "SMS is not available on this device" is a better answer than a null
+  /// dereference under the send button.
+  SmsChatRepository _requireSms() {
+    final sms = _sms;
+    if (sms == null) throw StateError('SMS is not available on this device');
+    return sms;
   }
 
   @override
@@ -527,7 +597,15 @@ class MatrixChatRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
   }) async {
-    final room = _sendRoom(chatId, via: via);
+    final target = _sendSource(chatId, via: via);
+    // Refused rather than silently rerouted to another leg. Sending an MMS
+    // means encoding a PDU, which Android does not expose — the same gap that
+    // stops incoming MMS being retrieved — and a photo that quietly went out
+    // over WhatsApp instead is worse than one that did not go.
+    if (target.network == ChatNetwork.sms) {
+      throw StateError('Weft cannot send MMS attachments yet');
+    }
+    final room = _roomFor(target);
 
     // Every branch of the decision belongs to `weft_attachments`; this supplies
     // only the two things it cannot know — whether the destination room is
@@ -715,6 +793,10 @@ class MatrixChatRepository implements ChatRepository {
     // A merged chat marks every leg read: the user has seen the conversation,
     // regardless of which network each message arrived on.
     for (final source in chat.sources) {
+      if (source.network == ChatNetwork.sms) {
+        await _sms?.markRead(source.roomId);
+        continue;
+      }
       final room = _client.getRoomById(source.roomId);
       final lastEvent = room?.lastEvent;
       if (room == null || lastEvent == null) continue;
@@ -724,6 +806,7 @@ class MatrixChatRepository implements ChatRepository {
 
   Future<void> dispose() async {
     await _syncSub?.cancel();
+    await _smsSub?.cancel();
     await _uploadSub?.cancel();
     // Cancels everything outstanding: an upload with no repository left to send
     // its event would push bytes nobody will ever reference.
@@ -744,6 +827,13 @@ class MatrixChatRepository implements ChatRepository {
     for (final room in _client.rooms) {
       if (room.isSpace) continue;
       byRoom[room.id] = _chatFromRoom(room);
+    }
+    // Into the *same* map, not appended to the result: this is what makes an
+    // SMS thread a candidate for [_applyMerges] rather than a row that is only
+    // ever shown on its own. A number the user has merged with their WhatsApp
+    // handle folds into one conversation from here on.
+    for (final chat in _sms?.chats ?? const <Chat>[]) {
+      byRoom[chat.id] = chat;
     }
 
     _chats = _applyMerges(byRoom);
@@ -779,6 +869,18 @@ class MatrixChatRepository implements ChatRepository {
         // Signal account id or a Discord snowflake simply doesn't set it.
         phoneE164: normalizePhone(_remoteIdFor(peerId, network)),
       );
+      _graph.upsertHandle(handle);
+      _store?.upsertHandle(
+        handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
+      );
+    }
+
+    // SMS contributes handles in exactly the same shape, which is the whole
+    // reason no merge code changed for this network: `MergeScorer` normalises
+    // `phoneE164` on both sides and raises `phoneExact` at 0.95, so an SMS
+    // thread and a WhatsApp chat for one number become a suggestion in the
+    // existing merge screen, with the existing "Same phone number" evidence.
+    for (final handle in _sms?.handles ?? const <NetworkHandle>[]) {
       _graph.upsertHandle(handle);
       _store?.upsertHandle(
         handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),

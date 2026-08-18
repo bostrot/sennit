@@ -4,143 +4,18 @@ import 'package:weft/services/sms/sms_platform.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_sms/weft_sms.dart';
 
-/// Android's telephony stack, as a map.
-///
-/// There is no version of `flutter test` with a SIM in it, and none of what is
-/// worth testing here needs one. What the platform side does is read cursors;
-/// what *this* side does is decide what a row means — which rows are messages
-/// at all, which are unplaceable, what a type and a status say about delivery,
-/// and what happens when the role is handed to another app underneath a call.
-/// Every one of those is a decision, and each is wrong in a way that reaches
-/// the user as a missing or mislabelled message.
-class _FakeSmsChannel {
-  _FakeSmsChannel() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, _handle);
-  }
-
-  static const Map<String, Object?> _defaultStatus = {
-    'supported': true,
-    'isDefault': true,
-    'canRequestRole': false,
-    'hasPermissions': true,
-    'defaultPackage': 'com.bostrot.weft',
-  };
-
-  final MethodChannel channel = const MethodChannel('weft-test/sms');
-
-  /// What `getStatus` answers — the role held, by default.
-  Map<String, Object?>? status = _defaultStatus;
-
-  /// Rows `getThreads` answers with.
-  List<Map<String, Object?>> threads = const [];
-
-  /// Rows `getMessages` answers with.
-  List<Map<String, Object?>> messages = const [];
-
-  /// Events queued before Dart attached, as `SmsBridge` tags them.
-  List<Map<String, Object?>> pending = const [];
-
-  /// What `sendMessage` writes back, or null for a platform that refused.
-  Map<String, Object?>? sentRow;
-
-  /// The user's answer to the role dialog.
-  bool roleGranted = false;
-
-  /// Methods that fail, and the code they fail with — a role handed away
-  /// mid-call, a permission revoked in Settings.
-  Map<String, String> failures = const {};
-
-  /// Every method invoked, in order.
-  final List<String> calls = [];
-
-  /// Arguments of the last call to each method.
-  final Map<String, Object?> arguments = {};
-
-  Future<Object?> _handle(MethodCall call) async {
-    calls.add(call.method);
-    arguments[call.method] = call.arguments;
-
-    final failure = failures[call.method];
-    if (failure != null) {
-      throw PlatformException(code: failure, message: 'test failure');
-    }
-
-    switch (call.method) {
-      case 'getStatus':
-        return status;
-      case 'requestRole':
-        return roleGranted;
-      case 'getThreads':
-        return threads;
-      case 'getMessages':
-        return messages;
-      case 'getPending':
-        return pending;
-      case 'sendMessage':
-        return sentRow;
-      case 'markThreadRead':
-        return 3;
-      default:
-        throw MissingPluginException(call.method);
-    }
-  }
-
-  /// Pushes an event the way the platform does when Dart *is* listening.
-  Future<void> emit(String event, Map<String, Object?> payload) async {
-    await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .handlePlatformMessage(
-          channel.name,
-          const StandardMethodCodec().encodeMethodCall(
-            MethodCall(event, payload),
-          ),
-          (_) {},
-        );
-  }
-
-  void dispose() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null);
-  }
-}
-
-/// A provider row, with the fields a test cares about overridden.
-Map<String, Object?> row({
-  String id = '11',
-  String threadId = '7',
-  String address = '+441234567890',
-  String body = 'hello',
-  int timestamp = 1700000000000,
-  int type = SmsProviderType.inbox,
-  int status = SmsProviderStatus.none,
-  Object? subject,
-  Object? attachmentUri,
-  Object? attachmentMimeType,
-  Object? attachmentSizeBytes,
-}) => {
-  'id': id,
-  'threadId': threadId,
-  'address': address,
-  'body': body,
-  'timestamp': timestamp,
-  'type': type,
-  'status': status,
-  'subject': subject,
-  'attachmentUri': attachmentUri,
-  'attachmentMimeType': attachmentMimeType,
-  'attachmentSizeBytes': attachmentSizeBytes,
-};
+import 'support/sms_fixtures.dart';
 
 void main() {
   // The channel needs a binding: a mock handler is registered on the test
   // binary messenger, which does not exist until this call.
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late _FakeSmsChannel platform;
+  late FakeSmsChannel platform;
   late SmsPlatform sms;
 
   setUp(() {
-    platform = _FakeSmsChannel();
+    platform = FakeSmsChannel();
     sms = SmsPlatform(channel: platform.channel);
   });
 
@@ -273,7 +148,7 @@ void main() {
     });
 
     test('messages become WeftMessages on the SMS network', () async {
-      platform.messages = [row(body: 'hello')];
+      platform.messages = [smsRow(body: 'hello')];
 
       final message = (await sms.messages('7')).single.toWeftMessage();
 
@@ -300,10 +175,10 @@ void main() {
       // addressed, updated or merged. Minting an id would produce a bubble
       // that reappears on every single read.
       platform.messages = [
-        row(id: ''),
+        smsRow(id: ''),
         {'threadId': '7', 'body': 'orphan'},
-        row(threadId: ''),
-        row(id: '12'),
+        smsRow(threadId: ''),
+        smsRow(id: '12'),
       ];
 
       final messages = await sms.messages('7');
@@ -332,7 +207,7 @@ void main() {
 
   group('delivery state', () {
     test('an inbox row has none at all', () async {
-      platform.messages = [row(type: SmsProviderType.inbox)];
+      platform.messages = [smsRow(type: SmsProviderType.inbox)];
 
       // Not `sent`: ticks belong to messages the user sent, and painting them
       // on a received bubble is wrong in a way that looks deliberate.
@@ -341,14 +216,14 @@ void main() {
 
     test('the outbox is sending, and a report makes it delivered', () async {
       platform.messages = [
-        row(id: '1', type: SmsProviderType.outbox),
-        row(
+        smsRow(id: '1', type: SmsProviderType.outbox),
+        smsRow(
           id: '2',
           type: SmsProviderType.sent,
           status: SmsProviderStatus.complete,
         ),
-        row(id: '3', type: SmsProviderType.failed),
-        row(
+        smsRow(id: '3', type: SmsProviderType.failed),
+        smsRow(
           id: '4',
           type: SmsProviderType.sent,
           status: SmsProviderStatus.pending,
@@ -391,7 +266,7 @@ void main() {
 
   group('sending', () {
     test('a sent message comes back as the stored row', () async {
-      platform.sentRow = row(
+      platform.sentRow = smsRow(
         id: '30',
         type: SmsProviderType.outbox,
         body: 'on my way',
@@ -421,7 +296,7 @@ void main() {
       final subscription = sms.incoming.listen(received.add);
       addTearDown(subscription.cancel);
 
-      await platform.emit('onSmsReceived', row(id: '40', body: 'ping'));
+      await platform.emit('onSmsReceived', smsRow(id: '40', body: 'ping'));
       await pumpEventQueue();
 
       expect(received, hasLength(1));
@@ -445,7 +320,7 @@ void main() {
 
         await platform.emit(
           'onSmsStatus',
-          row(
+          smsRow(
             id: '41',
             type: SmsProviderType.sent,
             status: SmsProviderStatus.complete,
@@ -489,12 +364,18 @@ void main() {
         // The cold-start case: an SMS can *start* the process, arriving at a
         // broadcast receiver long before a Flutter engine exists.
         platform.pending = [
-          {'event': 'onSmsReceived', 'payload': row(id: '50', body: 'first')},
+          {
+            'event': 'onSmsReceived',
+            'payload': smsRow(id: '50', body: 'first'),
+          },
           {
             'event': 'onMmsPush',
             'payload': {'receivedAt': 1700000000001, 'sizeBytes': 12},
           },
-          {'event': 'onSmsReceived', 'payload': row(id: '51', body: 'second')},
+          {
+            'event': 'onSmsReceived',
+            'payload': smsRow(id: '51', body: 'second'),
+          },
         ];
 
         final received = <SmsMessage>[];
@@ -518,7 +399,7 @@ void main() {
       // An untagged entry cannot be told from an MMS push with no body, and
       // guessing turns a notification into a text message.
       platform.pending = [
-        {'payload': row(id: '60')},
+        {'payload': smsRow(id: '60')},
         {'event': 'onSmsReceived'},
       ];
 

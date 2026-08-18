@@ -15,7 +15,19 @@ import 'phone.dart';
 /// The `sms:` scheme is deliberately not a Matrix id: a real room id starts `!`
 /// and a real event id `$`, so anything that mixes the two namespaces up is
 /// visible on sight rather than after a failed federation call.
-String smsRoomId(String threadId) => 'sms:thread:$threadId';
+String smsRoomId(String threadId) => '$kSmsRoomIdPrefix$threadId';
+
+/// The prefix every [smsRoomId] carries.
+const String kSmsRoomIdPrefix = 'sms:thread:';
+
+/// Whether [roomId] names an SMS thread rather than a Matrix room.
+///
+/// A predicate on the string rather than a lookup in whatever holds the threads,
+/// because the question is asked at exactly the moments the answer is not yet
+/// known: routing a send before the provider has been read, or opening a
+/// timeline for a deep link into a thread that has not synced. A lookup would
+/// answer "no" for those and send an SMS to a homeserver.
+bool isSmsRoomId(String roomId) => roomId.startsWith(kSmsRoomIdPrefix);
 
 /// Synthetic event id for the SMS provider row [messageId].
 String smsEventId(String messageId) => 'sms:msg:$messageId';

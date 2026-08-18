@@ -41,6 +41,18 @@ void main() {
       expect(smsEventId('42'), isNot(startsWith(r'$')));
     });
 
+    test('an SMS room is recognisable without looking anything up', () {
+      // The routing question is asked at exactly the moments the answer is not
+      // yet known — sending before the provider has been read, opening a
+      // timeline for a deep link into a thread that has not synced — so it has
+      // to be answerable from the string alone. A lookup would say "no" for
+      // those and hand an SMS to a homeserver.
+      expect(isSmsRoomId(smsRoomId('7')), isTrue);
+      expect(isSmsRoomId('!room:example.org'), isFalse);
+      expect(isSmsRoomId(smsEventId('42')), isFalse);
+      expect(isSmsRoomId(''), isFalse);
+    });
+
     test('key the handle on the number, so re-syncing upserts', () {
       const parser = PhoneNumberParser(defaultCountryCode: '44');
       final national = parser.parse('01234 567890')!;

@@ -1,11 +1,16 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_sms/weft_sms.dart';
 
 import '../data/chat_repository.dart';
 import '../data/demo_repository.dart';
 import '../data/matrix_chat_repository.dart';
+import '../data/sms_chat_repository.dart';
+import '../services/sms/sms_platform.dart';
 import 'package:weft_store/weft_store.dart';
 
 import 'session_providers.dart';
@@ -24,10 +29,51 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
     ref.watch(matrixSessionProvider),
     store: stores.identity,
     searchStore: stores.search,
+    sms: ref.watch(smsRepositoryProvider),
   );
   ref.onDispose(repository.dispose);
   return repository;
 });
+
+/// SMS as one more source in the merged inbox, on the one platform that has it.
+///
+/// Null everywhere else — and null is not a degraded state. Weft is a Matrix
+/// client that can also carry SMS: on a desktop, on iOS, and on an Android
+/// phone where the user declined the default-app role, the SMS network is
+/// simply absent from the inbox and nothing else changes.
+final smsRepositoryProvider = Provider<SmsChatRepository?>((ref) {
+  if (kDemoMode || defaultTargetPlatform != TargetPlatform.android) return null;
+
+  final platform = SmsPlatform();
+  final repository = SmsChatRepository(
+    gateway: platform,
+    // The region a national-format number is read against. Unset by default,
+    // and deliberately not guessed from the locale: a wrong country code does
+    // not fail to merge, it merges two different people. With no region,
+    // `01234 567890` parses to nothing and only international-format numbers
+    // become merge evidence — the conservative half of the trade.
+    parser: PhoneNumberParser(defaultCountryCode: _defaultCountryCode(ref)),
+  );
+  ref.onDispose(() async {
+    await repository.dispose();
+    await platform.dispose();
+  });
+  return repository;
+});
+
+/// The stored country calling code, or null when there isn't one.
+///
+/// An empty setting has to read as "no region", not as the empty country code:
+/// the parser's contract is that null means *do not guess*, and a blank string
+/// prefixing a national number would produce a plausible-looking E.164 that
+/// belongs to nobody.
+String? _defaultCountryCode(Ref ref) {
+  final stored = ref
+      .watch(storesProvider)
+      .settings
+      .getString(WeftSettings.defaultCountryCode);
+  return stored == null || stored.trim().isEmpty ? null : stored.trim();
+}
 
 /// Auth headers for avatar/media fetches, or null in demo mode.
 final mediaHeadersProvider = Provider<Map<String, String>?>((ref) {

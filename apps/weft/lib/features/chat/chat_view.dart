@@ -32,6 +32,7 @@ import 'reaction_bar.dart';
 import 'reply_chip.dart';
 import 'rich_text_view.dart';
 import 'send_network_chip.dart';
+import 'sms_composer_bar.dart';
 
 /// One conversation — merged across networks or not.
 ///
@@ -1548,6 +1549,15 @@ class _Composer extends StatelessWidget {
               _ComposerContextBar(
                 composing: composing!,
                 onCancel: onCancelContext,
+              ),
+            // Rebuilt per keystroke rather than with the whole view: the
+            // segment count is a live number, and the encryption warning has to
+            // be on screen before the first character is typed, not after.
+            if (sendNetwork == ChatNetwork.sms)
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, _) =>
+                    SmsComposerBar(body: value.text),
               ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
