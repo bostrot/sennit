@@ -11,8 +11,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
+import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/link_preview_card.dart';
+import 'package:weft/features/settings/link_previews_screen.dart';
+import 'package:weft/features/settings/settings_section.dart';
 import 'package:weft/services/links/link_preview_service.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -20,6 +24,7 @@ import 'package:weft_richtext/weft_richtext.dart';
 
 WeftMessage _message({
   String body = 'look at https://example.org/a',
+  String? formattedBody,
   ChatNetwork network = ChatNetwork.signal,
   bool redacted = false,
 }) => WeftMessage(
@@ -29,6 +34,7 @@ WeftMessage _message({
   senderId: '@anna:example.org',
   senderName: 'Anna',
   body: body,
+  formattedBody: formattedBody,
   timestamp: DateTime.utc(2026, 8, 18, 14),
   isOwn: false,
   kind: MessageKind.text,
@@ -192,6 +198,70 @@ void main() {
     expect(asked, 0);
   });
 
+  testWidgets('a url quoted in a code block is not a link the reader shared', (
+    tester,
+  ) async {
+    // Pasting a snippet is not sharing what is in it, and turning a line of
+    // someone else's config into a homeserver request is a disclosure the
+    // reader never made. `links_test.dart` pins the extraction; this pins that
+    // the card asks the same question the extractor answers.
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(enabled: true),
+      message: _message(
+        body: 'curl https://internal.example/health',
+        formattedBody:
+            '<pre><code>curl https://internal.example/health</code></pre>',
+      ),
+      answer: _found,
+    );
+
+    expect(asked, 0);
+  });
+
+  testWidgets('a link under a spoiler is not asked about', (tester) async {
+    // Found while auditing this file: the extractor skipped code and not
+    // spoilers, so a covered link was fetched and its title, description and
+    // host were printed on a card under the very bubble that was hiding it —
+    // before the reader touched anything. The card is where the failure is
+    // visible, which is why the assertion lives here as well as in
+    // `links_test.dart`.
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(enabled: true),
+      message: _message(
+        body: 'the ending: https://example.org/twist',
+        formattedBody:
+            'the ending: <span data-mx-spoiler="">'
+            '<a href="https://example.org/twist">here</a></span>',
+      ),
+      answer: _found,
+    );
+
+    expect(asked, 0);
+    expect(find.byType(LinkPreviewCardBody), findsNothing);
+  });
+
+  testWidgets('a message full of links asks about the first one only', (
+    tester,
+  ) async {
+    // Five cards under a message of five links bury the words the sender wrote,
+    // and each one is its own request.
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(enabled: true),
+      message: _message(
+        body:
+            'https://example.org/one https://example.org/two '
+            'https://example.org/three',
+      ),
+      answer: _found,
+    );
+
+    expect(asked, 1);
+    expect(find.byType(LinkPreviewCardBody), findsOneWidget);
+  });
+
   group('the card body', () {
     Future<void> pumpBody(
       WidgetTester tester,
@@ -272,6 +342,120 @@ void main() {
 
       await pumpBody(tester, preview);
       expect(find.byType(Image), findsNothing);
+    });
+  });
+
+  /// The switch itself. Everything above assumes a setting that got there
+  /// somehow, and this is the screen that puts it there — the one place in the
+  /// feature where the user is told what they are agreeing to.
+  group('the opt-in', () {
+    late DemoChatRepository demo;
+    late WeftStores stores;
+
+    setUp(() {
+      demo = DemoChatRepository(uploadTick: Duration.zero);
+      stores = WeftStores.inMemory();
+    });
+    tearDown(() {
+      demo.dispose();
+      stores.dispose();
+    });
+
+    Future<void> pumpScreen(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            storesBootstrapProvider.overrideWith((ref) async => stores),
+            chatRepositoryProvider.overrideWithValue(demo),
+          ],
+          child: MaterialApp(
+            theme: WeftTheme.build(),
+            home: const LinkPreviewsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('says what the homeserver learns before it can be turned on', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+
+      // The cost, in the words the user would use, next to the switch rather
+      // than behind a link — the same shape as the endpoints screen's notices.
+      expect(find.byType(PrivacyNotice), findsOneWidget);
+      expect(
+        find.textContaining('your homeserver learns every link'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile).first).value,
+        isFalse,
+        reason: 'a gate that starts open is not a gate',
+      );
+    });
+
+    testWidgets('turning it on is what writes the setting', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.text('Show link previews'));
+      await tester.pumpAndSettle();
+
+      expect(LinkPreviewSettings.fromStore(stores.settings).enabled, isTrue);
+      // The per-network escape hatch only exists once there is something to
+      // escape from.
+      expect(find.text('Networks'), findsOneWidget);
+    });
+
+    testWidgets('excluding a network keeps the rest previewable', (
+      tester,
+    ) async {
+      const LinkPreviewSettings(enabled: true).writeTo(stores.settings);
+      await pumpScreen(tester);
+
+      await tester.tap(find.text(ChatNetwork.signal.label));
+      await tester.pumpAndSettle();
+
+      final settings = LinkPreviewSettings.fromStore(stores.settings);
+      expect(settings.allows(ChatNetwork.signal), isFalse);
+      expect(settings.allows(ChatNetwork.telegram), isTrue);
+    });
+
+    testWidgets('turning it off forgets the answers already given', (
+      tester,
+    ) async {
+      // Rows left behind would keep drawing cards from lookups the user has
+      // this moment withdrawn their consent for — the card cannot tell a cached
+      // answer from a fresh one, and should not have to.
+      const LinkPreviewSettings(enabled: true).writeTo(stores.settings);
+      stores.linkPreviews.write('https://example.org/a', {'title': 'A title'});
+      await pumpScreen(tester);
+
+      await tester.tap(find.text('Show link previews'));
+      await tester.pumpAndSettle();
+
+      expect(LinkPreviewSettings.fromStore(stores.settings).enabled, isFalse);
+      expect(stores.linkPreviews.count, 0);
+    });
+
+    testWidgets('clearing the cache says how much it forgot', (tester) async {
+      const LinkPreviewSettings(enabled: true).writeTo(stores.settings);
+      stores.linkPreviews.write('https://example.org/a', {'title': 'A title'});
+      await pumpScreen(tester);
+
+      // Below the fold on a short screen, which is fine for a button on a
+      // scrolling settings page — unlike the action sheet, there is a whole
+      // list above it saying more is there.
+      await tester.scrollUntilVisible(
+        find.text('Clear cached previews'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Clear cached previews'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Forgot 1 preview.'), findsOneWidget);
+      expect(stores.linkPreviews.count, 0);
     });
   });
 }

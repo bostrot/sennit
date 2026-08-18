@@ -1,10 +1,17 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/providers.dart';
+import 'package:weft/data/demo_repository.dart';
+import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
+
+import 'support/seeded_repository.dart';
 
 /// The renderer half of rich content: what a formatted body turns into on
 /// screen, and — the part that matters most — what a hostile one does not.
@@ -53,6 +60,19 @@ void main() {
       });
     }
     return found;
+  }
+
+  /// Fires the recogniser on the span carrying exactly [text].
+  ///
+  /// Going through the recogniser rather than `tester.tap` is what makes the
+  /// assertion about *that* span: a bubble is a paragraph of runs sitting on top
+  /// of each other, and a tap at a widget's centre lands wherever the layout put
+  /// it.
+  Future<void> tapLink(WidgetTester tester, String text) async {
+    final recognizer = spansFor(tester, text).single.recognizer;
+    expect(recognizer, isA<TapGestureRecognizer>());
+    (recognizer! as TapGestureRecognizer).onTap!();
+    await tester.pumpAndSettle();
   }
 
   /// Whether anything on screen would respond to a tap as a link.
@@ -132,6 +152,43 @@ void main() {
       expect(find.text('4.'), findsOneWidget);
     });
 
+    testWidgets('a quote inside a quote renders as two levels', (tester) async {
+      // Bridged mail-style bodies nest quotes several deep, and a renderer that
+      // flattened them would attribute the inner sentence to whoever wrote the
+      // outer one.
+      await pump(
+        tester,
+        html(
+          '<blockquote>she said <blockquote>he said</blockquote></blockquote>',
+        ),
+      );
+
+      expect(find.textContaining('she said'), findsWidgets);
+      expect(find.textContaining('he said'), findsWidgets);
+      // Two rules down the left, one per level: two indents read as a margin,
+      // where two rules read as two levels.
+      final rules = tester.widgetList<Container>(find.byType(Container)).where((
+        c,
+      ) {
+        final decoration = c.decoration;
+        return decoration is BoxDecoration &&
+            decoration.border is Border &&
+            (decoration.border! as Border).left.width == 3;
+      });
+      expect(rules, hasLength(2));
+    });
+
+    testWidgets('an empty body draws nothing rather than a blank line', (
+      tester,
+    ) async {
+      // Reachable: a body that was nothing but a dropped subtree, and a sticker
+      // whose fallback text is empty. A stray paragraph would open a gap above
+      // the timestamp row that nothing explains.
+      await pump(tester, parseMessageBody(body: '', formattedBody: ''));
+
+      expect(find.byType(RichText), findsNothing);
+    });
+
     testWidgets('headings are larger than body text and bold', (tester) async {
       await pump(tester, html('<h1>Notice</h1>'));
 
@@ -177,6 +234,41 @@ void main() {
 
       expect(find.text('@room'), findsOneWidget);
     });
+
+    testWidgets('tapping @room reports the room-wide kind', (tester) async {
+      // The one mention with no id behind it: a handler that read `targetId`
+      // to decide where to go would send the reader to a user page for a
+      // person called `@room`.
+      RichMention? tapped;
+      await pump(
+        tester,
+        parseMessageBody(body: 'heads up @room'),
+        onTapMention: (mention) => tapped = mention,
+      );
+
+      await tester.tap(find.text('@room'));
+      await tester.pump();
+
+      expect(tapped?.kind, MentionKind.roomWide);
+    });
+
+    testWidgets('a room permalink reports the alias it names', (tester) async {
+      // The one mention kind the chat view can act on by itself: it looks the
+      // alias up in the inbox and opens that conversation, so the *kind* is
+      // what decides whether a tap navigates or merely names someone.
+      RichMention? tapped;
+      await pump(
+        tester,
+        html('see <a href="https://matrix.to/#/%23weft:example.org">#weft</a>'),
+        onTapMention: (mention) => tapped = mention,
+      );
+
+      await tester.tap(find.text('#weft'));
+      await tester.pump();
+
+      expect(tapped?.kind, MentionKind.roomAlias);
+      expect(tapped?.targetId, '#weft:example.org');
+    });
   });
 
   group('links', () {
@@ -212,6 +304,84 @@ void main() {
       );
 
       expect(spansFor(tester, 'press').single.recognizer, isNotNull);
+    });
+  });
+
+  group('spoilers', () {
+    /// Fires whatever recogniser the span carrying [text] was given, which is
+    /// what a tap on those exact words does. Going through the recogniser
+    /// rather than `tester.tap` is the only way to be sure which span was hit:
+    /// a covered link and the reveal sit on top of each other by design.
+    Future<void> tapSpan(WidgetTester tester, String text) async {
+      final recognizer = spansFor(tester, text).single.recognizer;
+      expect(recognizer, isA<TapGestureRecognizer>());
+      (recognizer! as TapGestureRecognizer).onTap!();
+      await tester.pump();
+    }
+
+    testWidgets('spoiler text is covered until it is asked for', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        html('the ending: <span data-mx-spoiler="">she leaves</span>'),
+      );
+
+      final covered = spansFor(tester, 'she leaves').single;
+      expect(covered.style?.color, Colors.transparent);
+      expect(covered.style?.backgroundColor, isNotNull);
+
+      await tapSpan(tester, 'she leaves');
+
+      expect(
+        spansFor(tester, 'she leaves').single.style?.color,
+        isNot(Colors.transparent),
+      );
+    });
+
+    testWidgets('a link under a spoiler opens nothing until it is revealed', (
+      tester,
+    ) async {
+      // The reason the reveal takes the tap rather than sharing it: a covered
+      // link that opened on the first tap would send the reader to a
+      // destination they were deliberately not shown.
+      String? opened;
+      await pump(
+        tester,
+        html(
+          '<span data-mx-spoiler="">'
+          '<a href="https://example.org/twist">the twist</a></span>',
+        ),
+        onTapLink: (url, _) => opened = url,
+      );
+
+      await tapSpan(tester, 'the twist');
+      expect(opened, isNull);
+
+      // Revealed, the same words are the link they always were.
+      await tapSpan(tester, 'the twist');
+      expect(opened, 'https://example.org/twist');
+    });
+
+    testWidgets('one tap reveals the whole message, not one fragment', (
+      tester,
+    ) async {
+      // A sender who marks two halves of a sentence meant one secret, and
+      // making the reader tap each fragment reads as the first tap failing.
+      await pump(
+        tester,
+        html(
+          '<span data-mx-spoiler="">she</span> and '
+          '<span data-mx-spoiler="">him</span>',
+        ),
+      );
+
+      await tapSpan(tester, 'she');
+
+      expect(
+        spansFor(tester, 'him').single.style?.color,
+        isNot(Colors.transparent),
+      );
     });
   });
 
@@ -407,6 +577,272 @@ void main() {
       );
 
       expect(messageDocument(message).plainText, 'the usual place');
+    });
+
+    testWidgets('an edit that only drops the markup still re-parses', (
+      tester,
+    ) async {
+      // The half of the validation the body cannot cover: an edit whose plain
+      // text is unchanged and whose formatting is gone is a real edit, and a
+      // cache keyed on the body alone would keep rendering the bold.
+      final formatted = WeftMessage(
+        eventId: r'$three',
+        roomId: '!room:example.org',
+        network: ChatNetwork.matrix,
+        senderId: '@a:example.org',
+        senderName: 'A',
+        timestamp: DateTime(2026, 8, 18, 9),
+        kind: MessageKind.text,
+        isOwn: false,
+        body: 'six',
+        formattedBody: '<b>six</b>',
+      );
+
+      await pump(tester, messageDocument(formatted));
+      expect(spansFor(tester, 'six').single.style?.fontWeight, FontWeight.w700);
+
+      await pump(
+        tester,
+        messageDocument(formatted.copyWith(formattedBody: null)),
+      );
+      expect(
+        spansFor(tester, 'six').single.style?.fontWeight,
+        isNot(FontWeight.w700),
+      );
+    });
+
+    test('the same event id in two rooms is two documents', () {
+      // Matrix event ids are globally unique in practice, but the cache key is
+      // not a place to rely on that: a bridge that reuses an id across the two
+      // legs of a merged chat would otherwise render one leg's words twice.
+      final base = WeftMessage(
+        eventId: r'$shared',
+        roomId: '!one:example.org',
+        network: ChatNetwork.matrix,
+        senderId: '@a:example.org',
+        senderName: 'A',
+        timestamp: DateTime(2026, 8, 18, 9),
+        kind: MessageKind.text,
+        isOwn: false,
+        body: 'from the first room',
+      );
+
+      expect(messageDocument(base).plainText, 'from the first room');
+      expect(
+        messageDocument(
+          WeftMessage(
+            eventId: r'$shared',
+            roomId: '!two:example.org',
+            network: ChatNetwork.matrix,
+            senderId: '@a:example.org',
+            senderName: 'A',
+            timestamp: DateTime(2026, 8, 18, 9),
+            kind: MessageKind.text,
+            isOwn: false,
+            body: 'from the second room',
+          ),
+        ).plainText,
+        'from the second room',
+      );
+    });
+  });
+
+  /// The same assertions, one layer out: not what [RichTextView] does with a
+  /// document, but what the *chat view* does with a message somebody sent it.
+  ///
+  /// Worth having separately because the parse is the security boundary and the
+  /// bubble is the only caller in the app that reaches it from untrusted input.
+  /// A regression that swapped `RichTextView.message` for a `Text(message.body)`
+  /// would leave every test above passing.
+  group('in a real bubble', () {
+    late DemoChatRepository demo;
+
+    /// Every url the app actually asked the platform to open.
+    ///
+    /// A mock handler rather than a fake `UrlLauncherPlatform`, and it is not
+    /// optional: with nothing answering the channel, `launchUrl` never
+    /// completes under `flutter test` — the launch neither succeeds nor throws,
+    /// so "no snackbar" would be a passing assertion about a hung future rather
+    /// than about a refusal.
+    late List<String> launched;
+
+    setUp(() {
+      demo = DemoChatRepository(uploadTick: Duration.zero);
+      launched = [];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/url_launcher'),
+            (call) async {
+              if (call.method == 'launch') {
+                launched.add((call.arguments as Map)['url']! as String);
+              }
+              return true;
+            },
+          );
+    });
+
+    tearDown(() {
+      demo.dispose();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/url_launcher'),
+            null,
+          );
+    });
+
+    Future<SeededChatRepository> pumpChat(
+      WidgetTester tester, {
+      required String body,
+      String? formattedBody,
+    }) async {
+      final repository = SeededChatRepository(
+        demo,
+        messages: [
+          seededMessage(
+            eventId: r'$seeded1',
+            body: body,
+            formattedBody: formattedBody,
+            minutesAgo: 2,
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [chatRepositoryProvider.overrideWithValue(repository)],
+          child: MaterialApp(
+            theme: WeftTheme.build(),
+            home: ChatView(chatId: repository.chatId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    testWidgets('a formatted body arrives as text, not as markup', (
+      tester,
+    ) async {
+      await pumpChat(
+        tester,
+        body: 'meet at six',
+        formattedBody: 'meet at <b>six</b>',
+      );
+
+      expect(find.textContaining('meet at', findRichText: true), findsWidgets);
+      expect(find.textContaining('<b>', findRichText: true), findsNothing);
+    });
+
+    testWidgets('copying a formatted message copies the words', (tester) async {
+      // The clipboard gets the same projection the search index and the
+      // notification bodies take. `<p>meet at <b>six</b></p>` pasted into
+      // anything is not what the reader was looking at.
+      String? copied;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              copied = (call.arguments as Map)['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await pumpChat(
+        tester,
+        body: 'meet at six',
+        formattedBody: '<p>meet at <b>six</b></p>',
+      );
+
+      await tester.longPress(
+        find.textContaining('meet at', findRichText: true).first,
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy text'));
+      await tester.pumpAndSettle();
+
+      expect(copied, 'meet at six');
+    });
+
+    testWidgets('a hostile formatted body is inert everywhere on the screen', (
+      tester,
+    ) async {
+      await pumpChat(
+        tester,
+        body: 'Look at this click here',
+        formattedBody:
+            'Look at this <a href="javascript:alert(1)">click here</a>'
+            '<script>alert(2)</script>',
+      );
+
+      // The words the sender wrote survive; the payload does not, and nothing
+      // anywhere in the chat view would answer a tap as a link.
+      expect(
+        find.textContaining('click here', findRichText: true),
+        findsWidgets,
+      );
+      expect(find.textContaining('alert', findRichText: true), findsNothing);
+      expect(hasTappableSpan(tester), isFalse);
+    });
+
+    testWidgets('a link pretending to be another host asks before opening', (
+      tester,
+    ) async {
+      // Well-formed HTML with a permitted scheme: the parser cannot refuse it
+      // and is not supposed to. The confirmation is where a reader who was
+      // shown one host and sent to another finds out.
+      await pumpChat(
+        tester,
+        body: 'bank.example',
+        formattedBody:
+            '<a href="https://bank.example.evil.test/login">bank.example</a>',
+      );
+
+      await tapLink(tester, 'bank.example');
+      expect(find.text('Open this link?'), findsOneWidget);
+      expect(
+        find.textContaining('bank.example.evil.test'),
+        findsOneWidget,
+        reason: 'the dialog has to show where the link actually goes',
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(launched, isEmpty);
+    });
+
+    testWidgets('confirming the same link does open it', (tester) async {
+      // The other half of the question: a dialog that opened nothing whatever
+      // the reader answered would pass the test above by doing nothing at all.
+      await pumpChat(
+        tester,
+        body: 'bank.example',
+        formattedBody:
+            '<a href="https://bank.example.evil.test/login">bank.example</a>',
+      );
+
+      await tapLink(tester, 'bank.example');
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(launched, ['https://bank.example.evil.test/login']);
+    });
+
+    testWidgets('an honest link opens without a question', (tester) async {
+      // Asking about every link is how a confirmation stops working.
+      await pumpChat(
+        tester,
+        body: 'the notes',
+        formattedBody: '<a href="https://example.org/notes">the notes</a>',
+      );
+
+      await tapLink(tester, 'the notes');
+
+      expect(find.text('Open this link?'), findsNothing);
+      expect(launched, ['https://example.org/notes']);
     });
   });
 }

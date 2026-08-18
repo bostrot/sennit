@@ -39,12 +39,16 @@ const String _trailingPunctuation = '.,;:!?\'"\u00bb\u203a)]}';
 /// bare url sitting in the text — which is all a bridge ever sends, since
 /// WhatsApp and Signal have no anchors to bridge.
 ///
-/// **Two things are deliberately skipped.** Code — inline `<code>` and whole
+/// **Three things are deliberately skipped.** Code — inline `<code>` and whole
 /// `<pre>` blocks — because a url inside a code sample is being *quoted*, not
 /// shared, and asking the homeserver to fetch it turns a snippet the sender
-/// pasted into a request the reader never made. And a link's own anchor text,
-/// which is usually the url again: scanning it would find the same address
-/// twice by two routes, and the anchor's `href` is the honest one of the pair.
+/// pasted into a request the reader never made. Anything under a spoiler, for a
+/// sharper version of the same reason: the sender covered it, so fetching it is
+/// a disclosure of something nobody has asked to see, and the card that came
+/// back would print the title of the page under the bubble that is hiding it.
+/// And a link's own anchor text, which is usually the url again: scanning it
+/// would find the same address twice by two routes, and the anchor's `href` is
+/// the honest one of the pair.
 ///
 /// Mentions never appear here at all — the parser has already turned
 /// `matrix.to` permalinks into [RichMention], which carries no url.
@@ -62,10 +66,11 @@ List<String> extractLinkUrls(RichDocument document) {
     for (final span in spans) {
       switch (span) {
         case RichLink():
+          if (_underSpoiler(span.children)) break;
           add(span.url);
         // Children deliberately not visited: see the doc comment.
         case RichTextRun():
-          if (span.style.code) break;
+          if (span.style.code || span.style.spoiler) break;
           for (final match in _bareUrl.allMatches(span.text)) {
             add(_trimTrailingPunctuation(match.group(0)!));
           }
@@ -81,6 +86,16 @@ List<String> extractLinkUrls(RichDocument document) {
   visit(document.children);
   return found;
 }
+
+/// Whether a link's own text is covered by a spoiler.
+///
+/// Asked of the children rather than of the link, because that is where the
+/// flag is: the parser carries `data-mx-spoiler` down into the runs a spoiler
+/// contains, and a [RichLink] has no style of its own. An anchor wrapping
+/// nothing but an image has no runs to ask and is treated as uncovered — there
+/// is no text for a spoiler to be hiding.
+bool _underSpoiler(List<RichSpan> children) =>
+    children.any((s) => s is RichTextRun && s.style.spoiler);
 
 /// The one url a bubble shows a card for, or null when it has none.
 ///

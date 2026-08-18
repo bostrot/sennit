@@ -57,6 +57,39 @@ void main() {
       expect(urls, isEmpty);
     });
 
+    test('skips a link the sender put under a spoiler', () {
+      // The card is drawn under the bubble and says the page's title, its
+      // description and its host — so previewing a covered link publishes the
+      // thing the cover exists to withhold, in the frame the message arrives,
+      // without the reader tapping anything.
+      final urls = extractLinkUrls(
+        _doc(
+          'the ending: <span data-mx-spoiler="">'
+          '<a href="https://example.org/twist">here</a></span>',
+        ),
+      );
+      expect(urls, isEmpty);
+    });
+
+    test('skips a bare url under a spoiler too', () {
+      // A bridge sends no anchors, so this is the spelling that actually
+      // arrives from one.
+      final urls = extractLinkUrls(
+        _doc('<span data-mx-spoiler="">read https://example.org/twist</span>'),
+      );
+      expect(urls, isEmpty);
+    });
+
+    test('a spoiler covers itself, not the rest of the message', () {
+      final urls = extractLinkUrls(
+        _doc(
+          'the review is at https://example.org/review and the ending is '
+          '<span data-mx-spoiler="">https://example.org/twist</span>',
+        ),
+      );
+      expect(urls, ['https://example.org/review']);
+    });
+
     test('still finds prose links in a message that also has code', () {
       final urls = extractLinkUrls(
         _doc(

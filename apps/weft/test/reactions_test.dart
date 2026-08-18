@@ -8,8 +8,10 @@ import 'package:weft/features/chat/reaction_bar.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 import 'support/recording_repository.dart';
+import 'support/seeded_repository.dart';
 
 /// Reactions as the reader meets them: a long-press, a chip, and a second tap
 /// that takes it back.
@@ -199,6 +201,52 @@ void main() {
     );
   });
 
+  testWidgets('the plus chip adds a second key beside the first', (
+    tester,
+  ) async {
+    await pump(tester);
+    await reactTo(tester, telegramLine, '👍');
+
+    // The "+" on the bar, which is the only way to a second key once a bubble
+    // already has one — the action sheet is a long-press away, and a reader who
+    // can see a chip is looking at the bar.
+    await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: find.byType(BottomSheet), matching: find.text('🎉')),
+    );
+    await tester.pumpAndSettle();
+
+    // First-reaction order, never by count: a bar that re-sorted itself would
+    // move the chip out from under a thumb already travelling towards it.
+    expect(
+      tester
+          .widgetList<ReactionChip>(find.byType(ReactionChip))
+          .map((c) => c.tally.key),
+      ['👍', '🎉'],
+    );
+  });
+
+  testWidgets('a key with a variation selector toggles its plain twin', (
+    tester,
+  ) async {
+    // `❤️` and `❤` are the same reaction wearing different bytes, and the quick
+    // row sends the first spelling. If the toggle compared raw keys, the second
+    // tap would add a reaction rather than take one back — and the tally, which
+    // normalises, would show one chip that no tap could ever remove.
+    await pump(tester);
+    await reactTo(tester, telegramLine, '❤️');
+
+    final chip = tester.widget<ReactionChip>(find.byType(ReactionChip));
+    expect(chip.tally.key, normaliseReactionKey('❤️'));
+    expect(chip.tally.byLocalUser, isTrue);
+
+    await reactTo(tester, telegramLine, '❤️');
+
+    expect(repository.lastCallTo('unreact'), isNotNull);
+    expect(find.byType(ReactionChip), findsNothing);
+  });
+
   testWidgets('a key the reader has used shows up in the picker recents', (
     tester,
   ) async {
@@ -216,5 +264,101 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Recent'), findsOneWidget);
+  });
+
+  /// Somebody else's reaction, which the fixtures cannot produce: demo mode has
+  /// one user and everything they touch comes back marked as theirs. The branch
+  /// that is only reachable this way is joining a tally that already exists —
+  /// the common case in a group, and the one where a chip that behaved like the
+  /// reader's own would take a reaction away that was never theirs.
+  group('a reaction that is not the reader own', () {
+    const peerId = '@anna:example.org';
+
+    late SeededChatRepository seeded;
+
+    Future<void> pumpSeeded(WidgetTester tester) async {
+      seeded = SeededChatRepository(
+        demo,
+        messages: [
+          seededMessage(
+            eventId: r'$reacted',
+            body: 'Are we still meeting Thursday?',
+            minutesAgo: 3,
+            reactions: [
+              ReactionTally(
+                key: '👍',
+                senderIds: const [peerId, '@bo:example.org'],
+                firstReactedAt: DateTime(2026, 8, 18, 13, 55),
+              ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [chatRepositoryProvider.overrideWithValue(seeded)],
+          child: MaterialApp(
+            theme: WeftTheme.build(),
+            home: ChatView(chatId: seeded.chatId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('renders the count without claiming the reader sent it', (
+      tester,
+    ) async {
+      await pumpSeeded(tester);
+
+      final chip = tester.widget<ReactionChip>(find.byType(ReactionChip));
+      expect(chip.tally.count, 2);
+      expect(chip.tally.byLocalUser, isFalse);
+      // Selected is the accessible half of "this one is mine", which the tint
+      // and the outline say visually. Saying it wrongly is worse than the chip
+      // being plain: it is an admission the reader never made.
+      expect(
+        tester
+            .widget<Semantics>(
+              find
+                  .descendant(
+                    of: find.byType(ReactionChip),
+                    matching: find.byType(Semantics),
+                  )
+                  .first,
+            )
+            .properties
+            .selected,
+        isFalse,
+      );
+    });
+
+    testWidgets('tapping it joins the tally rather than redacting it', (
+      tester,
+    ) async {
+      await pumpSeeded(tester);
+      await tester.tap(find.byType(ReactionChip));
+      await tester.pumpAndSettle();
+
+      final call = seeded.lastCallTo('react');
+      expect(call?.key, '👍');
+      expect(call?.eventId, r'$reacted');
+      // Nothing was taken back: there is no annotation of the reader's to
+      // redact, and `unreact` on somebody else's would be refused by the
+      // homeserver — after asking it to delete a stranger's event.
+      expect(seeded.lastCallTo('unreact'), isNull);
+    });
+
+    testWidgets('the sender list names everyone who reacted', (tester) async {
+      await pumpSeeded(tester);
+      await tester.longPress(find.byType(ReactionChip));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 people'), findsOneWidget);
+      // Resolved from whoever has spoken on screen; an id nobody has spoken
+      // under is shown as itself rather than as an invented name.
+      expect(find.text('Anna Maven'), findsWidgets);
+      expect(find.text('@bo:example.org'), findsWidgets);
+    });
   });
 }
