@@ -18,6 +18,7 @@ workspace:
   - packages/weft_mcp
   - packages/weft_merge
   - packages/weft_notify
+  - packages/weft_richtext
   - packages/weft_search
   - packages/weft_share
   - packages/weft_store

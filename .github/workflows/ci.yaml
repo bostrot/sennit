@@ -41,13 +41,14 @@ jobs:
       - run: flutter pub get
       # These packages carry the algorithmic core — merge scoring, the merged
       # timeline watermark, hybrid search ranking, attachment planning, the
-      # notification decision rules, the share target ranking — and need no
-      # device. A package absent from this list is silently untested, so adding
-      # one to the workspace means adding it here too.
-      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp, weft_attachments, weft_notify, weft_share
+      # notification decision rules, the share target ranking, the formatted
+      # -body allowlist — and need no device. A package absent from this list is
+      # silently untested, so adding one to the workspace means adding it here
+      # too.
+      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp, weft_attachments, weft_notify, weft_share, weft_richtext
         run: |
           set -e
-          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share; do
+          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share weft_richtext; do
             if [ -d "packages/$pkg/test" ]; then
               echo "::group::$pkg"
               (cd "packages/$pkg" && dart test --reporter expanded)

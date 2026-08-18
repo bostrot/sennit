@@ -1,0 +1,25 @@
+name: weft_richtext
+description: >-
+  Matrix's rich content, turned into values. Parses the `org.matrix.custom.html`
+  formatted-body subset into a platform-free document tree behind a strict
+  allowlist, strips reply fallbacks, and resolves mentions. Pure Dart, because
+  the sharp edges here — untrusted HTML from bridged networks, nested quote
+  fallbacks, permalink shapes — deserve exhaustive tests with no widget tree in
+  the way, and because the renderer is not the only consumer: the MCP server and
+  notification bodies need the same plain-text projection.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  collection: ^1.19.0
+  html: ^0.15.6
+  meta: ^1.17.0
+  weft_domain: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0
