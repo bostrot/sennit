@@ -60,8 +60,7 @@ class NetworkShareCapability {
   ///
   /// A share is one gesture; offering a target that takes four of five files
   /// and then fails on the fifth is worse than not offering it.
-  bool acceptsAll(ShareContent content) =>
-      content.items.every(accepts);
+  bool acceptsAll(ShareContent content) => content.items.every(accepts);
 
   @override
   String toString() =>
@@ -111,8 +110,12 @@ class NetworkShareCapabilities {
     // Instagram DMs take media and nothing else — there is no attach-a-PDF.
     ChatNetwork.instagram: NetworkShareCapability(
       network: ChatNetwork.instagram,
-      kinds: {MessageKind.image, MessageKind.video, MessageKind.audio,
-        MessageKind.voice},
+      kinds: {
+        MessageKind.image,
+        MessageKind.video,
+        MessageKind.audio,
+        MessageKind.voice,
+      },
       maxAttachmentBytes: 100 * 1024 * 1024,
     ),
     ChatNetwork.messenger: NetworkShareCapability(
@@ -162,8 +165,12 @@ class NetworkShareCapabilities {
     // by anyone the user can appeal to.
     ChatNetwork.sms: NetworkShareCapability(
       network: ChatNetwork.sms,
-      kinds: {MessageKind.image, MessageKind.video, MessageKind.audio,
-        MessageKind.voice},
+      kinds: {
+        MessageKind.image,
+        MessageKind.video,
+        MessageKind.audio,
+        MessageKind.voice,
+      },
       maxAttachmentBytes: 1024 * 1024,
     ),
     ChatNetwork.email: NetworkShareCapability(

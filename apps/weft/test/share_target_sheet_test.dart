@@ -69,9 +69,7 @@ void main() {
         overrides: [
           chatsProvider.overrideWith((ref) => Stream.value(chats)),
           chatRepositoryProvider.overrideWithValue(repository),
-          sharedFileResolverProvider.overrideWithValue(
-            _FakeResolver(resolved),
-          ),
+          sharedFileResolverProvider.overrideWithValue(_FakeResolver(resolved)),
           if (shortcuts != null)
             shareShortcutServiceProvider.overrideWithValue(shortcuts),
           // The thumbnails decode each shared file; these sources describe
@@ -189,7 +187,8 @@ void main() {
         expect(
           listedTitles(tester),
           isNot(contains('Archived Thread')),
-          reason: 'archiving a conversation is a statement about wanting it '
+          reason:
+              'archiving a conversation is a statement about wanting it '
               'out of the way, and a share sheet is somewhere it is in the way',
         );
       });
@@ -241,7 +240,8 @@ void main() {
         expect(
           listedTitles(tester),
           ['Old Colleague', 'Newer Acquaintance'],
-          reason: 'recency alone puts the acquaintance first; the sends this '
+          reason:
+              'recency alone puts the acquaintance first; the sends this '
               'run are what reverse it',
         );
       });
@@ -282,7 +282,8 @@ void main() {
         expect(
           listedTitles(tester),
           ['Matrix Friend', 'Bluesky Mutual'],
-          reason: 'the refusals sit below the targets, most recent first '
+          reason:
+              'the refusals sit below the targets, most recent first '
               'though the blocked chat is',
         );
 
@@ -293,7 +294,8 @@ void main() {
         expect(
           blocked.onTap,
           isNull,
-          reason: 'a row that explains why it cannot be chosen must not then '
+          reason:
+              'a row that explains why it cannot be chosen must not then '
               'be choosable',
         );
       });
@@ -341,7 +343,10 @@ void main() {
         await tester.enterText(find.byType(TextField), 'nobody');
         await tester.pumpAndSettle();
         expect(listedTitles(tester), isEmpty);
-        expect(find.text('No conversations match that search.'), findsOneWidget);
+        expect(
+          find.text('No conversations match that search.'),
+          findsOneWidget,
+        );
 
         await tester.tap(find.byTooltip('Clear search'));
         await tester.pumpAndSettle();
@@ -470,15 +475,10 @@ void main() {
         // and the user reads it the way they read the one they just left.
         expect(listedTitles(tester), ['Ada Lovelace', 'Katherine Johnson']);
 
-        await tester.tap(
-          find.widgetWithText(FilledButton, 'Send to 2 chats'),
-        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Send to 2 chats'));
         await tester.pumpAndSettle();
 
-        expect(repository.sent, [
-          'a/matrix: hello',
-          'c/matrix: hello',
-        ]);
+        expect(repository.sent, ['a/matrix: hello', 'c/matrix: hello']);
         expect(find.text('Sent to 2 chats'), findsOneWidget);
       });
     });
@@ -605,9 +605,7 @@ void main() {
             mimeType: 'image/jpeg',
             uris: ['content://media/1'],
           ),
-          resolved: ResolvedShare(
-            sources: [photo(size: 150 * 1024 * 1024)],
-          ),
+          resolved: ResolvedShare(sources: [photo(size: 150 * 1024 * 1024)]),
         );
 
         await tapRow(tester, find.widgetWithText(ListTile, 'Grace Hopper'));
@@ -615,7 +613,8 @@ void main() {
         expect(
           find.byType(SendNetworkChip),
           findsNothing,
-          reason: 'one capable leg is not a choice, and a menu with one entry '
+          reason:
+              'one capable leg is not a choice, and a menu with one entry '
               'is a menu that reads as though there were others',
         );
 
@@ -660,7 +659,8 @@ void main() {
         expect(
           find.text('SMS'),
           findsNothing,
-          reason: 'offering a leg that will refuse the file is offering a '
+          reason:
+              'offering a leg that will refuse the file is offering a '
               'send that fails',
         );
       });
@@ -788,7 +788,8 @@ void main() {
         expect(
           find.byType(SendNetworkChip),
           findsNothing,
-          reason: 'there is no leg to offer, and a chip with nothing in it '
+          reason:
+              'there is no leg to offer, and a chip with nothing in it '
               'reads as a choice that has not been made yet',
         );
       });
@@ -923,7 +924,8 @@ void main() {
         expect(
           shortcuts.activity.keys,
           ['a'],
-          reason: 'a share is the strongest signal the ranker gets, and a '
+          reason:
+              'a share is the strongest signal the ranker gets, and a '
               'conversation the share never reached did not send that signal',
         );
       });

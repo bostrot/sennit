@@ -61,31 +61,34 @@ void main() {
       // silently fails to build on that one.
       final publisher = RecordingShareTargetPublisher();
       await service(publisher).refresh([
-        shareChat(id: 'chat_0', lastMessageAt: shareAgo(const Duration(hours: 1))),
+        shareChat(
+          id: 'chat_0',
+          lastMessageAt: shareAgo(const Duration(hours: 1)),
+        ),
       ], now: shareNow);
 
       expect(publisher.last.single.keys, {
-        ...ShareTargetSlot.forChat(
-          shareChat(id: 'chat_0'),
-        ).toJson().keys,
+        ...ShareTargetSlot.forChat(shareChat(id: 'chat_0')).toJson().keys,
         'iconPath',
       });
     });
 
-    test('a second refresh with the same inbox does not call the launcher',
-        () async {
-      // The reason this class exists. `watchChats` emits on read receipts,
-      // typing and presence; the published set changes on almost none of them.
-      final publisher = RecordingShareTargetPublisher();
-      final shortcuts = service(publisher);
-      final chats = inbox(3);
+    test(
+      'a second refresh with the same inbox does not call the launcher',
+      () async {
+        // The reason this class exists. `watchChats` emits on read receipts,
+        // typing and presence; the published set changes on almost none of them.
+        final publisher = RecordingShareTargetPublisher();
+        final shortcuts = service(publisher);
+        final chats = inbox(3);
 
-      await shortcuts.refresh(chats, now: shareNow);
-      await shortcuts.refresh(chats, now: shareNow);
-      await shortcuts.refresh([...chats], now: shareNow);
+        await shortcuts.refresh(chats, now: shareNow);
+        await shortcuts.refresh(chats, now: shareNow);
+        await shortcuts.refresh([...chats], now: shareNow);
 
-      expect(publisher.publishes, hasLength(1));
-    });
+        expect(publisher.publishes, hasLength(1));
+      },
+    );
 
     test('an unread count changing is not a republish', () async {
       // The most common tick of all, and the one that would thrash the launcher
@@ -136,14 +139,18 @@ void main() {
       final shortcuts = service(publisher);
 
       await shortcuts.refresh([
-        shareChat(id: 'chat_0', title: 'Ada', lastMessageAt: shareAgo(
-          const Duration(minutes: 1),
-        )),
+        shareChat(
+          id: 'chat_0',
+          title: 'Ada',
+          lastMessageAt: shareAgo(const Duration(minutes: 1)),
+        ),
       ], now: shareNow);
       await shortcuts.refresh([
-        shareChat(id: 'chat_0', title: 'Ada Lovelace', lastMessageAt: shareAgo(
-          const Duration(minutes: 1),
-        )),
+        shareChat(
+          id: 'chat_0',
+          title: 'Ada Lovelace',
+          lastMessageAt: shareAgo(const Duration(minutes: 1)),
+        ),
       ], now: shareNow);
 
       expect(publisher.publishes, hasLength(2));
@@ -156,10 +163,7 @@ void main() {
       // would be the thrash this class exists to prevent, in slow motion.
       final publisher = RecordingShareTargetPublisher();
       final gate = Completer<String?>();
-      final shortcuts = service(
-        publisher,
-        avatarLoader: (_) => gate.future,
-      );
+      final shortcuts = service(publisher, avatarLoader: (_) => gate.future);
 
       final first = shortcuts.refresh([
         shareChat(
@@ -263,23 +267,25 @@ void main() {
       expect(publisher.last.single['iconPath'], isNull);
     });
 
-    test('a loader that fails falls back rather than losing the slot',
-        () async {
-      final publisher = RecordingShareTargetPublisher();
-      await service(
-        publisher,
-        avatarLoader: (_) async => throw StateError('no cache directory'),
-      ).refresh([
-        shareChat(
-          id: 'chat_0',
-          avatarUrl: 'https://example.org/ada.png',
-          lastMessageAt: shareAgo(const Duration(minutes: 1)),
-        ),
-      ], now: shareNow);
+    test(
+      'a loader that fails falls back rather than losing the slot',
+      () async {
+        final publisher = RecordingShareTargetPublisher();
+        await service(
+          publisher,
+          avatarLoader: (_) async => throw StateError('no cache directory'),
+        ).refresh([
+          shareChat(
+            id: 'chat_0',
+            avatarUrl: 'https://example.org/ada.png',
+            lastMessageAt: shareAgo(const Duration(minutes: 1)),
+          ),
+        ], now: shareNow);
 
-      expect(publisher.last, hasLength(1));
-      expect(publisher.last.single['iconPath'], isNull);
-    });
+        expect(publisher.last, hasLength(1));
+        expect(publisher.last.single['iconPath'], isNull);
+      },
+    );
 
     test('a loader that returns null falls back too', () async {
       final publisher = RecordingShareTargetPublisher();
@@ -294,33 +300,35 @@ void main() {
       expect(publisher.last.single['iconPath'], isNull);
     });
 
-    test('avatars are resolved only when something is being published',
-        () async {
-      // The diff runs first on purpose. Resolving eight faces on every read
-      // receipt would be eight cache lookups — and, the first time, eight
-      // authenticated downloads — for a publish that is then suppressed.
-      final publisher = RecordingShareTargetPublisher();
-      var loads = 0;
-      final shortcuts = service(
-        publisher,
-        avatarLoader: (_) async {
-          loads++;
-          return '/cache/face.png';
-        },
-      );
-      final chats = [
-        shareChat(
-          id: 'chat_0',
-          avatarUrl: 'https://example.org/ada.png',
-          lastMessageAt: shareAgo(const Duration(minutes: 1)),
-        ),
-      ];
+    test(
+      'avatars are resolved only when something is being published',
+      () async {
+        // The diff runs first on purpose. Resolving eight faces on every read
+        // receipt would be eight cache lookups — and, the first time, eight
+        // authenticated downloads — for a publish that is then suppressed.
+        final publisher = RecordingShareTargetPublisher();
+        var loads = 0;
+        final shortcuts = service(
+          publisher,
+          avatarLoader: (_) async {
+            loads++;
+            return '/cache/face.png';
+          },
+        );
+        final chats = [
+          shareChat(
+            id: 'chat_0',
+            avatarUrl: 'https://example.org/ada.png',
+            lastMessageAt: shareAgo(const Duration(minutes: 1)),
+          ),
+        ];
 
-      await shortcuts.refresh(chats, now: shareNow);
-      await shortcuts.refresh(chats, now: shareNow);
+        await shortcuts.refresh(chats, now: shareNow);
+        await shortcuts.refresh(chats, now: shareNow);
 
-      expect(loads, 1);
-    });
+        expect(loads, 1);
+      },
+    );
   });
 
   group('noteSend', () {
@@ -373,8 +381,7 @@ void main() {
       expect(shortcuts.published, isEmpty);
     });
 
-    test('a send after signing out does not republish the old inbox',
-        () async {
+    test('a send after signing out does not republish the old inbox', () async {
       // The leak this guards: a signed-out phone still offering contact names
       // in every app's share sheet.
       final publisher = RecordingShareTargetPublisher();

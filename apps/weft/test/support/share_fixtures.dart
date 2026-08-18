@@ -91,7 +91,9 @@ class RecordingShareTargetPublisher implements ShareTargetPublisher {
     publishes.add(slots);
     if (refuse) return 0;
     final cap = capacity;
-    return cap == null ? slots.length : (cap < slots.length ? cap : slots.length);
+    return cap == null
+        ? slots.length
+        : (cap < slots.length ? cap : slots.length);
   }
 
   @override

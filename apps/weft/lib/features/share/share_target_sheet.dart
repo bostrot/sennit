@@ -307,9 +307,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
           maxSlots: chats.length,
         );
     final byId = {for (final chat in chats) chat.id: chat};
-    final targets = [
-      for (final slot in ranked) ?byId[slot.chatId],
-    ];
+    final targets = [for (final slot in ranked) ?byId[slot.chatId]];
     final rankedIds = {for (final chat in targets) chat.id};
     // Dropped by the capability filter — every network in the chat refused the
     // file. Shown, disabled, rather than omitted: a conversation missing from a
@@ -477,15 +475,12 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   /// disappearing from a confirmation the user is looking at.
   List<Chat> _chosenTargets(List<Chat> ranked, Map<String, Chat> byId) {
     if (_chosen.isEmpty) return const [];
-    final order = {
-      for (var i = 0; i < ranked.length; i++) ranked[i].id: i,
-    };
-    return [for (final id in _chosen) byId[id]].nonNulls.toList()
-      ..sort(
-        (a, b) => (order[a.id] ?? ranked.length).compareTo(
-          order[b.id] ?? ranked.length,
-        ),
-      );
+    final order = {for (var i = 0; i < ranked.length; i++) ranked[i].id: i};
+    return [for (final id in _chosen) byId[id]].nonNulls.toList()..sort(
+      (a, b) => (order[a.id] ?? ranked.length).compareTo(
+        order[b.id] ?? ranked.length,
+      ),
+    );
   }
 
   String _title(bool confirming, List<Chat> targets) {

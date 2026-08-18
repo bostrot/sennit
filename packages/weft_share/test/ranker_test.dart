@@ -45,21 +45,24 @@ void main() {
       expect(chatIdsOf(slots), ['ancient', 'silent']);
     });
 
-    test('a timestamp in the future decays to 1 rather than being rejected', () {
-      // A bridged message carries the remote network's send time, and a phone
-      // a minute behind the homeserver produces one routinely.
-      const ranker = ShareTargetRanker();
-      final skewed = chat(
-        id: 'skewed',
-        lastMessageAt: now.add(const Duration(minutes: 1)),
-      );
-      final current = chat(id: 'current', lastMessageAt: now);
+    test(
+      'a timestamp in the future decays to 1 rather than being rejected',
+      () {
+        // A bridged message carries the remote network's send time, and a phone
+        // a minute behind the homeserver produces one routinely.
+        const ranker = ShareTargetRanker();
+        final skewed = chat(
+          id: 'skewed',
+          lastMessageAt: now.add(const Duration(minutes: 1)),
+        );
+        final current = chat(id: 'current', lastMessageAt: now);
 
-      expect(
-        ranker.scoreFor(skewed, now: now),
-        ranker.scoreFor(current, now: now),
-      );
-    });
+        expect(
+          ranker.scoreFor(skewed, now: now),
+          ranker.scoreFor(current, now: now),
+        );
+      },
+    );
 
     test('halfLife is what "how long ago" is measured in', () {
       const ranker = ShareTargetRanker(halfLife: Duration(days: 7));
@@ -77,9 +80,7 @@ void main() {
           chat(id: 'oneoff', lastMessageAt: ago(const Duration(days: 3))),
           chat(id: 'habit', lastMessageAt: ago(const Duration(days: 4))),
         ],
-        activity: {
-          'habit': sends(40, since: const Duration(days: 4)),
-        },
+        activity: {'habit': sends(40, since: const Duration(days: 4))},
       );
 
       expect(chatIdsOf(slots), ['habit', 'oneoff']);
@@ -91,12 +92,13 @@ void main() {
       // ago, forever.
       final slots = rank(
         [
-          chat(id: 'lastquarter', lastMessageAt: ago(const Duration(days: 120))),
+          chat(
+            id: 'lastquarter',
+            lastMessageAt: ago(const Duration(days: 120)),
+          ),
           chat(id: 'justnow', lastMessageAt: ago(const Duration(minutes: 5))),
         ],
-        activity: {
-          'lastquarter': sends(500, since: const Duration(days: 120)),
-        },
+        activity: {'lastquarter': sends(500, since: const Duration(days: 120))},
       );
 
       expect(chatIdsOf(slots), ['justnow', 'lastquarter']);
@@ -114,25 +116,29 @@ void main() {
         activity: ChatShareActivity(sendCount: 100000, lastSentAt: at),
       );
       expect(maxedFrequency, lessThan(0.6 + 0.4));
-      expect(maxedFrequency - ranker.scoreFor(quiet, now: now),
-          closeTo(0.4, 0.001));
+      expect(
+        maxedFrequency - ranker.scoreFor(quiet, now: now),
+        closeTo(0.4, 0.001),
+      );
     });
 
-    test('frequency saturates, so the first sends are the ones worth ranking',
-        () {
-      const ranker = ShareTargetRanker();
-      final target = chat(id: 'a', lastMessageAt: now);
-      double scoreAt(int count) => ranker.scoreFor(
-            target,
-            now: now,
-            activity: ChatShareActivity(sendCount: count, lastSentAt: now),
-          );
+    test(
+      'frequency saturates, so the first sends are the ones worth ranking',
+      () {
+        const ranker = ShareTargetRanker();
+        final target = chat(id: 'a', lastMessageAt: now);
+        double scoreAt(int count) => ranker.scoreFor(
+          target,
+          now: now,
+          activity: ChatShareActivity(sendCount: count, lastSentAt: now),
+        );
 
-      final earlyGap = scoreAt(5) - scoreAt(1);
-      final lateGap = scoreAt(500) - scoreAt(100);
+        final earlyGap = scoreAt(5) - scoreAt(1);
+        final lateGap = scoreAt(500) - scoreAt(100);
 
-      expect(earlyGap, greaterThan(lateGap * 5));
-    });
+        expect(earlyGap, greaterThan(lateGap * 5));
+      },
+    );
 
     test('a chat missing from the activity map ranks on recency alone', () {
       // The state of every chat the user has only ever read.
@@ -161,23 +167,27 @@ void main() {
   });
 
   group('pinned', () {
-    test('a pinned chat with no history beats the chat messaged seconds ago',
-        () {
-      final slots = rank([
-        chat(id: 'hot', lastMessageAt: ago(const Duration(seconds: 5))),
-        chat(id: 'pinned', pinned: true),
-      ]);
+    test(
+      'a pinned chat with no history beats the chat messaged seconds ago',
+      () {
+        final slots = rank([
+          chat(id: 'hot', lastMessageAt: ago(const Duration(seconds: 5))),
+          chat(id: 'pinned', pinned: true),
+        ]);
 
-      expect(chatIdsOf(slots), ['pinned', 'hot']);
-    });
+        expect(chatIdsOf(slots), ['pinned', 'hot']);
+      },
+    );
 
     test('pinning is a tier, not a bonus any score can climb past', () {
       final slots = rank(
         [
           chat(id: 'busiest', lastMessageAt: now),
-          chat(id: 'pinned', pinned: true, lastMessageAt: ago(
-            const Duration(days: 90),
-          )),
+          chat(
+            id: 'pinned',
+            pinned: true,
+            lastMessageAt: ago(const Duration(days: 90)),
+          ),
         ],
         activity: {'busiest': sends(10000)},
       );
@@ -187,12 +197,16 @@ void main() {
 
     test('pinned chats are ordered among themselves by score', () {
       final slots = rank([
-        chat(id: 'p_old', pinned: true, lastMessageAt: ago(
-          const Duration(days: 10),
-        )),
-        chat(id: 'p_new', pinned: true, lastMessageAt: ago(
-          const Duration(hours: 1),
-        )),
+        chat(
+          id: 'p_old',
+          pinned: true,
+          lastMessageAt: ago(const Duration(days: 10)),
+        ),
+        chat(
+          id: 'p_new',
+          pinned: true,
+          lastMessageAt: ago(const Duration(hours: 1)),
+        ),
         chat(id: 'unpinned', lastMessageAt: now),
       ]);
 
@@ -208,19 +222,18 @@ void main() {
 
   group('capability filter', () {
     test('a Signal-only chat is not offered a video Signal will refuse', () {
-      final slots = rank(
-        [
-          chat(id: 'signal', networks: [ChatNetwork.signal]),
-          chat(id: 'matrix', networks: [ChatNetwork.matrix]),
-        ],
-        content: fileShare('video/mp4', 200 * mib),
-      );
+      final slots = rank([
+        chat(id: 'signal', networks: [ChatNetwork.signal]),
+        chat(id: 'matrix', networks: [ChatNetwork.matrix]),
+      ], content: fileShare('video/mp4', 200 * mib));
 
       expect(chatIdsOf(slots), ['matrix']);
     });
 
     test('the cap is inclusive: exactly at the limit is still offered', () {
-      final signalOnly = [chat(id: 'signal', networks: [ChatNetwork.signal])];
+      final signalOnly = [
+        chat(id: 'signal', networks: [ChatNetwork.signal]),
+      ];
 
       expect(
         chatIdsOf(rank(signalOnly, content: fileShare('video/mp4', 100 * mib))),
@@ -235,13 +248,10 @@ void main() {
     test('a network that does not carry the kind at all is filtered', () {
       // Bluesky chat takes images and nothing else — a PDF is not a size
       // problem, it is a kind problem.
-      final slots = rank(
-        [
-          chat(id: 'bluesky', networks: [ChatNetwork.bluesky]),
-          chat(id: 'telegram', networks: [ChatNetwork.telegram]),
-        ],
-        content: fileShare('application/pdf', 12 * kib),
-      );
+      final slots = rank([
+        chat(id: 'bluesky', networks: [ChatNetwork.bluesky]),
+        chat(id: 'telegram', networks: [ChatNetwork.telegram]),
+      ], content: fileShare('application/pdf', 12 * kib));
 
       expect(chatIdsOf(slots), ['telegram']);
     });
@@ -249,15 +259,9 @@ void main() {
     test('one capable leg is enough to keep a merged chat', () {
       // canReach is an any(), not an every(): the sheet offers the chat and
       // then offers the network chip that can actually carry it.
-      final slots = rank(
-        [
-          chat(
-            id: 'merged',
-            networks: [ChatNetwork.signal, ChatNetwork.matrix],
-          ),
-        ],
-        content: fileShare('video/mp4', 500 * mib),
-      );
+      final slots = rank([
+        chat(id: 'merged', networks: [ChatNetwork.signal, ChatNetwork.matrix]),
+      ], content: fileShare('video/mp4', 500 * mib));
 
       expect(chatIdsOf(slots), ['merged']);
     });
@@ -266,7 +270,9 @@ void main() {
       // A share is one gesture. Taking four of five files and failing on the
       // fifth is worse than not offering the target.
       final slots = rank(
-        [chat(id: 'signal', networks: [ChatNetwork.signal])],
+        [
+          chat(id: 'signal', networks: [ChatNetwork.signal]),
+        ],
         content: ShareContent.files([
           item('image/jpeg', 2 * mib),
           item('video/mp4', 300 * mib),
@@ -279,13 +285,10 @@ void main() {
     test('a text-only share never narrows the target list', () {
       // Every network Weft surfaces carries text, including the ones whose
       // attachment table is nearly empty.
-      final slots = rank(
-        [
-          chat(id: 'bluesky', networks: [ChatNetwork.bluesky]),
-          chat(id: 'sms', networks: [ChatNetwork.sms]),
-        ],
-        content: const ShareContent.text('https://example.org'),
-      );
+      final slots = rank([
+        chat(id: 'bluesky', networks: [ChatNetwork.bluesky]),
+        chat(id: 'sms', networks: [ChatNetwork.sms]),
+      ], content: const ShareContent.text('https://example.org'));
 
       expect(chatIdsOf(slots), ['bluesky', 'sms']);
     });
@@ -302,10 +305,9 @@ void main() {
     });
 
     test('an unknown network is permissive rather than hidden', () {
-      final slots = rank(
-        [chat(id: 'mystery', networks: [ChatNetwork.unknown])],
-        content: fileShare('application/zip', 900 * mib),
-      );
+      final slots = rank([
+        chat(id: 'mystery', networks: [ChatNetwork.unknown]),
+      ], content: fileShare('application/zip', 900 * mib));
 
       expect(chatIdsOf(slots), ['mystery']);
     });
@@ -347,11 +349,13 @@ void main() {
         isEmpty,
       );
       expect(
-        chatIdsOf(rank(
-          [chat(id: 'matrix')],
-          content: fileShare('image/png', 512 * kib),
-          ranker: strict,
-        )),
+        chatIdsOf(
+          rank(
+            [chat(id: 'matrix')],
+            content: fileShare('image/png', 512 * kib),
+            ranker: strict,
+          ),
+        ),
         ['matrix'],
       );
     });
@@ -375,21 +379,22 @@ void main() {
       );
     });
 
-    test('an unresolvable type reads as a document, which is why bytes sniff',
-        () {
-      // With no bytes to hand, `application/octet-stream` is a file — so a
-      // mislabelled 90 MB video would be judged against the document row.
-      // ShareItem.fromSource exists to stop that happening where bytes exist;
-      // the ranker itself only ever sees the resolved answer.
-      expect(item('application/octet-stream', 1).kind, MessageKind.file);
-      expect(
-        rank(
-          [chat(id: 'twitter', networks: [ChatNetwork.twitter])],
-          content: fileShare('application/octet-stream', 1 * kib),
-        ),
-        isEmpty,
-      );
-    });
+    test(
+      'an unresolvable type reads as a document, which is why bytes sniff',
+      () {
+        // With no bytes to hand, `application/octet-stream` is a file — so a
+        // mislabelled 90 MB video would be judged against the document row.
+        // ShareItem.fromSource exists to stop that happening where bytes exist;
+        // the ranker itself only ever sees the resolved answer.
+        expect(item('application/octet-stream', 1).kind, MessageKind.file);
+        expect(
+          rank([
+            chat(id: 'twitter', networks: [ChatNetwork.twitter]),
+          ], content: fileShare('application/octet-stream', 1 * kib)),
+          isEmpty,
+        );
+      },
+    );
   });
 
   group('eligibility', () {
@@ -416,20 +421,22 @@ void main() {
   });
 
   group('tie-breaking', () {
-    test('a fresh install, where every chat scores exactly zero, is ordered',
-        () {
-      final slots = rank([
-        chat(id: '!c:example.org', title: 'Charlie'),
-        chat(id: '!a:example.org', title: 'alice'),
-        chat(id: '!b:example.org', title: 'Bob'),
-      ]);
+    test(
+      'a fresh install, where every chat scores exactly zero, is ordered',
+      () {
+        final slots = rank([
+          chat(id: '!c:example.org', title: 'Charlie'),
+          chat(id: '!a:example.org', title: 'alice'),
+          chat(id: '!b:example.org', title: 'Bob'),
+        ]);
 
-      expect(chatIdsOf(slots), [
-        '!a:example.org',
-        '!b:example.org',
-        '!c:example.org',
-      ]);
-    });
+        expect(chatIdsOf(slots), [
+          '!a:example.org',
+          '!b:example.org',
+          '!c:example.org',
+        ]);
+      },
+    );
 
     test('titles tie-break case-insensitively', () {
       final slots = rank([
@@ -446,10 +453,7 @@ void main() {
         chat(id: '!first:example.org', title: 'Support'),
       ]);
 
-      expect(chatIdsOf(slots), [
-        '!first:example.org',
-        '!second:example.org',
-      ]);
+      expect(chatIdsOf(slots), ['!first:example.org', '!second:example.org']);
     });
 
     test('input order does not change output order', () {
@@ -508,13 +512,13 @@ void main() {
     });
 
     test('the cap keeps the top of the order, not an arbitrary slice', () {
-      final slots = rank(
-        [
-          for (var i = 0; i < 10; i++)
-            chat(id: 'chat_$i', lastMessageAt: ago(Duration(days: 10 - i))),
-        ],
-        maxSlots: 3,
-      );
+      final slots = rank([
+        for (var i = 0; i < 10; i++)
+          chat(
+            id: 'chat_$i',
+            lastMessageAt: ago(Duration(days: 10 - i)),
+          ),
+      ], maxSlots: 3);
 
       expect(chatIdsOf(slots), ['chat_9', 'chat_8', 'chat_7']);
     });
@@ -542,7 +546,10 @@ void main() {
     test('rank is the position, numbered from zero and dense', () {
       final slots = rank([
         for (var i = 0; i < 5; i++)
-          chat(id: 'chat_$i', lastMessageAt: ago(Duration(days: i + 1))),
+          chat(
+            id: 'chat_$i',
+            lastMessageAt: ago(Duration(days: i + 1)),
+          ),
       ]);
 
       expect(slots.map((s) => s.rank), [0, 1, 2, 3, 4]);
@@ -595,6 +602,41 @@ void main() {
       expect(shortShareLabel('   '), kUnnamedShareTarget);
       expect(longShareLabel(''), kUnnamedShareTarget);
       expect(longShareLabel('x' * 60), '${'x' * 47}…');
+    });
+
+    test('a short first word keeps the words after it', () {
+      // Found on an emulator, not by reading: the launcher's Direct Share row
+      // showed two conversations captioned "Dr." and "Prof.". Cutting at the
+      // *first* word boundary is right for "Alexandra Kalinowska" and useless
+      // for a title, which is a word that names nobody — and every doctor in
+      // the inbox gets the identical face caption.
+      expect(shortShareLabel('Dr. James Anderson'), 'Dr. James');
+      expect(shortShareLabel('Prof. David Wilson'), 'Prof. David');
+      expect(shortShareLabel('Ada B. Lovelace'), 'Ada B.');
+    });
+
+    test('a word that does not fit stops the label, and does not skip', () {
+      // "Jo" fits in what is left, and appending it would read as a name the
+      // conversation does not have. The cut is a prefix of the title or it is
+      // not a name at all.
+      expect(shortShareLabel('Kristofferson Jo'), 'Kristoffers…');
+      expect(shortShareLabel('Anna Kalinowska Jo'), 'Anna');
+    });
+
+    test('the word-boundary cut never exceeds the cap', () {
+      for (final title in const [
+        'Dr. James Anderson',
+        'Prof. David Wilson',
+        'Alexandra Kalinowska',
+        'Ada B. Lovelace',
+        'a b c d e f g h i j k l m n',
+      ]) {
+        expect(
+          shortShareLabel(title).runes.length,
+          lessThanOrEqualTo(kMaxShortLabelLength),
+          reason: title,
+        );
+      }
     });
 
     test('a title of emoji is not split into a lone surrogate', () {

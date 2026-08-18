@@ -169,7 +169,9 @@ class StagedShareReader {
     final now = clock.now();
     final ready = <_PendingShare>[];
     for (final blob in blobs) {
-      final share = _handled.contains(blob.id) ? null : _codec.decode(blob.json);
+      final share = _handled.contains(blob.id)
+          ? null
+          : _codec.decode(blob.json);
       if (share == null || share.isExpiredAt(now, ttl: _ttl)) {
         await _remove(blob.id);
         continue;
@@ -228,7 +230,9 @@ class StagedShareReader {
   /// passes its type on and a mixed one says `*/*` rather than claiming the
   /// first file's type for all of them.
   static String? _batchMimeType(Set<String> types) {
-    final known = types.where((type) => type != kFallbackStagedMimeType).toSet();
+    final known = types
+        .where((type) => type != kFallbackStagedMimeType)
+        .toSet();
     if (known.isEmpty) return types.isEmpty ? null : kFallbackStagedMimeType;
     return known.length == 1 ? known.single : '*/*';
   }
@@ -279,7 +283,9 @@ class WeftStagedShares implements StagedShareGateway, ShareTargetPublisher {
     final raw = await _invoke<List<Object?>>('readStagedShares', {
       'ttlSeconds': ttl.inSeconds,
     });
-    return [for (final entry in raw ?? const []) ?StagedShareBlob.fromMap(entry)];
+    return [
+      for (final entry in raw ?? const []) ?StagedShareBlob.fromMap(entry),
+    ];
   }
 
   @override
@@ -357,7 +363,10 @@ class WeftStagedShares implements StagedShareGateway, ShareTargetPublisher {
   /// build is not entitled to reach, which is what an unsigned CI build and a
   /// stale provisioning profile both look like — and neither is a reason to
   /// throw out of a launch-path drain.
-  Future<T?> _invoke<T>(String method, [Map<String, Object?>? arguments]) async {
+  Future<T?> _invoke<T>(
+    String method, [
+    Map<String, Object?>? arguments,
+  ]) async {
     try {
       return await _channel.invokeMethod<T>(method, arguments);
     } on MissingPluginException {

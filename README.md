@@ -166,6 +166,65 @@ Scaffold, because a bubble's colour, corner and timestamp row live in
 `chat_view.dart`; and they pin an in-flight upload's clock with `withClock`, so
 the image does not disagree with itself a minute later.
 
+### Verifying Direct Share on a device
+
+Android's Direct Share row — Weft's conversations as faces in *another* app's
+share sheet — is the one part of the share surfaces no `flutter test` reaches.
+It needs a real launcher, a real `ShortcutManager` and a real share sheet. Demo
+mode supplies the conversations, so no account is needed:
+
+```bash
+cd apps/weft && flutter build apk --debug --dart-define=WEFT_DEMO=true
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+adb shell pm clear com.bostrot.weft   # shortcuts outlive an install; start empty
+adb shell am start -n com.bostrot.weft/.MainActivity
+```
+
+Give the app a moment to reach a ready session — publishing is driven by the
+first chat list, not by launch — then ask the system what it was told:
+
+```bash
+adb shell cmd shortcut get-shortcuts com.bostrot.weft
+```
+
+Each entry should carry **both** categories
+(`android.shortcut.conversation` and `com.bostrot.weft.category.SHARE_TARGET`),
+a `bitmapPath` for its avatar, and its ranker position in `rank`. A shortcut
+with only the conversation category bubbles notifications but is never offered
+as a share target, and that is a silent failure — the app still shares fine.
+
+Tapping a face sends an `ACTION_SEND` carrying the shortcut's id, which is the
+whole of Direct Share's return path. Fire one directly rather than hunting for
+a share sheet, and **quote the whole remote command** — `adb shell` re-splits on
+the device, so an unquoted `--es` value with a space silently becomes the next
+argument:
+
+```bash
+adb shell "am start -n com.bostrot.weft/.MainActivity \
+  -a android.intent.action.SEND -t text/plain \
+  --es android.intent.extra.TEXT 'Hello from adb' \
+  --es android.intent.extra.shortcut.ID chat_merged_anna"
+```
+
+That should land on the share sheet's *confirm* step with the conversation
+already chosen, not on the target list. The id → chat id map it resolves
+through lives in the app's own preferences and can be read back with
+`adb shell run-as com.bostrot.weft cat
+shared_prefs/weft.share.shortcuts.xml`.
+
+For the sheet itself, share a file from an app that raises one — the Files app
+needs nothing installed:
+
+```bash
+adb push some.png /sdcard/Download/
+adb shell am start -n com.google.android.documentsui/com.android.documentsui.ViewDownloadsActivity
+```
+
+Long-press the file, tap share, and the conversations appear above the app row.
+Give the sheet a second before screenshotting: the icons load asynchronously and
+arrive after the captions, so a screenshot taken immediately shows names with
+nothing above them and reads exactly like the icon bug it is not.
+
 The attachment pipeline also has a runnable prototype. It reads only the leading
 bytes of a real file and prints what Weft would send for it — sniffed mime type,
 `MessageKind`, dimensions, thumbnail decision, and the `m.room.message` content,

@@ -153,28 +153,31 @@ void main() {
       withClock(Clock.fixed(shareNow), reader.drain);
 
   group('draining into a share', () {
-    test('a staged share becomes the payload an Android intent would', () async {
-      final container = _FakeContainer()
-        ..blobs['abc'] = blob(
-          'abc',
-          text: 'look at this',
-          files: [file('holiday.jpg')],
-          targetChatId: '!design:example.org',
+    test(
+      'a staged share becomes the payload an Android intent would',
+      () async {
+        final container = _FakeContainer()
+          ..blobs['abc'] = blob(
+            'abc',
+            text: 'look at this',
+            files: [file('holiday.jpg')],
+            targetChatId: '!design:example.org',
+          );
+        final harness = readerOver(container);
+
+        await drain(harness.reader);
+
+        final payload = harness.delivered.single;
+        expect(payload.text, 'look at this');
+        expect(payload.targetChatId, '!design:example.org');
+        expect(payload.uris, ['file:///cache/weft-share/abc/holiday.jpg']);
+        expect(
+          payload.mimeType,
+          'image/jpeg',
+          reason: 'a single-type batch passes its type on as the fallback hint',
         );
-      final harness = readerOver(container);
-
-      await drain(harness.reader);
-
-      final payload = harness.delivered.single;
-      expect(payload.text, 'look at this');
-      expect(payload.targetChatId, '!design:example.org');
-      expect(payload.uris, ['file:///cache/weft-share/abc/holiday.jpg']);
-      expect(
-        payload.mimeType,
-        'image/jpeg',
-        reason: 'a single-type batch passes its type on as the fallback hint',
-      );
-    });
+      },
+    );
 
     test('the ingested path keeps the user'
         's filename, not the container'
@@ -186,16 +189,15 @@ void main() {
       final container = _FakeContainer()
         ..blobs['abc'] = blob(
           'abc',
-          files: [file('IMG_0001.HEIC', path: 'share/staged/abc/0-IMG_0001.HEIC')],
+          files: [
+            file('IMG_0001.HEIC', path: 'share/staged/abc/0-IMG_0001.HEIC'),
+          ],
         );
       final harness = readerOver(container);
 
       await drain(harness.reader);
 
-      expect(
-        harness.delivered.single.uris.single,
-        endsWith('/IMG_0001.HEIC'),
-      );
+      expect(harness.delivered.single.uris.single, endsWith('/IMG_0001.HEIC'));
     });
 
     test('a mixed batch declares */* rather than one file'
@@ -274,10 +276,11 @@ void main() {
 
       await drain(harness.reader);
 
-      expect(
-        harness.delivered.map((p) => p.text),
-        ['first', 'second', 'third'],
-      );
+      expect(harness.delivered.map((p) => p.text), [
+        'first',
+        'second',
+        'third',
+      ]);
     });
 
     test('a share with nothing left after ingestion opens no sheet', () async {
@@ -319,7 +322,8 @@ void main() {
       // The drain runs before the app has anywhere to put a share only if
       // something is misordered — but a share left behind because of it would be
       // re-offered on every resume for a day.
-      final container = _FakeContainer()..blobs['abc'] = blob('abc', text: 'hi');
+      final container = _FakeContainer()
+        ..blobs['abc'] = blob('abc', text: 'hi');
       final reader = StagedShareReader(gateway: container);
 
       await drain(reader);
@@ -341,27 +345,29 @@ void main() {
       expect(container.ingested, ['abc']);
     });
 
-    test('a drain that starts mid-ingest does not deliver the same share',
-        () async {
-      // The resume racing the launch. The blob is deleted before the files move,
-      // so the second reader cannot see it — and the id is recorded before the
-      // first `await`, so it could not act on it even if the platform were
-      // slower than that.
-      final container = _FakeContainer()
-        ..blobs['abc'] = blob('abc', text: 'hello');
-      final harness = readerOver(container);
-      final second = Completer<void>();
-      container.interleave = second.future;
+    test(
+      'a drain that starts mid-ingest does not deliver the same share',
+      () async {
+        // The resume racing the launch. The blob is deleted before the files move,
+        // so the second reader cannot see it — and the id is recorded before the
+        // first `await`, so it could not act on it even if the platform were
+        // slower than that.
+        final container = _FakeContainer()
+          ..blobs['abc'] = blob('abc', text: 'hello');
+        final harness = readerOver(container);
+        final second = Completer<void>();
+        container.interleave = second.future;
 
-      final first = drain(harness.reader);
-      // Runs while the first drain is inside `ingestStagedShare`.
-      await drain(harness.reader);
-      second.complete();
-      await first;
+        final first = drain(harness.reader);
+        // Runs while the first drain is inside `ingestStagedShare`.
+        await drain(harness.reader);
+        second.complete();
+        await first;
 
-      expect(harness.delivered, hasLength(1));
-      expect(container.ingested, ['abc']);
-    });
+        expect(harness.delivered, hasLength(1));
+        expect(container.ingested, ['abc']);
+      },
+    );
 
     test('an overlapping drain is dropped, not queued', () async {
       final container = _FakeContainer()
@@ -379,22 +385,24 @@ void main() {
       expect(harness.delivered, hasLength(1));
     });
 
-    test('a blob that reappears under a handled id is dropped, not resent',
-        () async {
-      // Belt and braces: the platform deletes the blob, so this needs the
-      // platform to have failed. The share was already offered once, and
-      // offering it again is the thing this run knows not to do.
-      final container = _FakeContainer()
-        ..blobs['abc'] = blob('abc', text: 'hello');
-      final harness = readerOver(container);
+    test(
+      'a blob that reappears under a handled id is dropped, not resent',
+      () async {
+        // Belt and braces: the platform deletes the blob, so this needs the
+        // platform to have failed. The share was already offered once, and
+        // offering it again is the thing this run knows not to do.
+        final container = _FakeContainer()
+          ..blobs['abc'] = blob('abc', text: 'hello');
+        final harness = readerOver(container);
 
-      await drain(harness.reader);
-      container.blobs['abc'] = blob('abc', text: 'hello');
-      await drain(harness.reader);
+        await drain(harness.reader);
+        container.blobs['abc'] = blob('abc', text: 'hello');
+        await drain(harness.reader);
 
-      expect(harness.delivered, hasLength(1));
-      expect(container.removed, ['abc']);
-    });
+        expect(harness.delivered, hasLength(1));
+        expect(container.removed, ['abc']);
+      },
+    );
   });
 
   group('expiry', () {
@@ -539,7 +547,8 @@ void main() {
       expect(
         container.blobs.keys,
         ['stuck'],
-        reason: 'the good share was ingested; the stuck one is still there to '
+        reason:
+            'the good share was ingested; the stuck one is still there to '
             'be tried again',
       );
     });
@@ -657,7 +666,9 @@ void main() {
       // called once it is somewhere the app owns. Sending the whole
       // `StagedFile` would send a size and a mime type the platform has no use
       // for and no way to check.
-      answer = (_) => {'share/staged/abc/0-a.jpg': '/cache/weft-share/abc/a.jpg'};
+      answer = (_) => {
+        'share/staged/abc/0-a.jpg': '/cache/weft-share/abc/a.jpg',
+      };
 
       final moved = await shares().ingestStagedShare('abc', [
         const StagedFile(
@@ -674,7 +685,9 @@ void main() {
       expect(arguments['files'], [
         {'path': 'share/staged/abc/0-a.jpg', 'name': 'a.jpg'},
       ]);
-      expect(moved, {'share/staged/abc/0-a.jpg': '/cache/weft-share/abc/a.jpg'});
+      expect(moved, {
+        'share/staged/abc/0-a.jpg': '/cache/weft-share/abc/a.jpg',
+      });
     });
 
     test('publishing writes the encoded target list', () async {
@@ -690,8 +703,7 @@ void main() {
       expect(codec.decodeTargets(json).single.chatId, 'chat_0');
     });
 
-    test('clearing writes an empty list rather than deleting the file',
-        () async {
+    test('clearing writes an empty list rather than deleting the file', () async {
       // The extension reads a missing file and an empty list as the same thing,
       // and writing is the operation that is atomic.
       answer = (_) => true;
@@ -702,17 +714,19 @@ void main() {
       expect(codec.decodeTargets(json), isEmpty);
     });
 
-    test('a container that refuses publishes nothing and does not throw',
-        () async {
-      answer = (_) => false;
-      expect(
-        await shares().publishShareTargets([
-          ShareTargetSlot.forChat(shareChat(id: 'chat_0')).toJson(),
-        ]),
-        0,
-        reason: 'read by the caller as a refusal to retry, not as a cap',
-      );
-    });
+    test(
+      'a container that refuses publishes nothing and does not throw',
+      () async {
+        answer = (_) => false;
+        expect(
+          await shares().publishShareTargets([
+            ShareTargetSlot.forChat(shareChat(id: 'chat_0')).toJson(),
+          ]),
+          0,
+          reason: 'read by the caller as a refusal to retry, not as a cap',
+        );
+      },
+    );
 
     test('a platform with no container at all is quiet', () async {
       // Every platform except iOS, and an iOS build signed without the App
@@ -734,7 +748,9 @@ void main() {
 /// A container behind a channel that is failing, rather than absent.
 class _ThrowingContainer implements StagedShareGateway {
   @override
-  Future<List<StagedShareBlob>> readStagedShares({required Duration ttl}) async {
+  Future<List<StagedShareBlob>> readStagedShares({
+    required Duration ttl,
+  }) async {
     throw StateError('the container went away mid-drain');
   }
 

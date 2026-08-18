@@ -83,8 +83,7 @@ class ShareContent {
   final String? text;
   final List<ShareItem> items;
 
-  bool get isEmpty =>
-      (text == null || text!.trim().isEmpty) && items.isEmpty;
+  bool get isEmpty => (text == null || text!.trim().isEmpty) && items.isEmpty;
 
   /// True when there is nothing to upload, so every target can take it.
   ///

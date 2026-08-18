@@ -53,11 +53,8 @@ class StagedFile {
 
   final int sizeBytes;
 
-  ShareItem toItem() => ShareItem(
-    mimeType: mimeType,
-    sizeBytes: sizeBytes,
-    filename: name,
-  );
+  ShareItem toItem() =>
+      ShareItem(mimeType: mimeType, sizeBytes: sizeBytes, filename: name);
 
   Map<String, Object?> toJson() => {
     'path': relativePath,
@@ -162,8 +159,7 @@ class StagedShare {
   final Map<String, Object?> extras;
 
   /// Nothing to send. A staged share that decodes to this is dropped.
-  bool get isEmpty =>
-      (text == null || text!.trim().isEmpty) && files.isEmpty;
+  bool get isEmpty => (text == null || text!.trim().isEmpty) && files.isEmpty;
 
   /// Whether this is past [ttl] as of [now].
   bool isExpiredAt(DateTime now, {Duration ttl = kStagedShareTtl}) =>

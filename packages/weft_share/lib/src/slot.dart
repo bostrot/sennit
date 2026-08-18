@@ -49,15 +49,35 @@ final RegExp _unsafeIdCharacters = RegExp(r'[^A-Za-z0-9_.-]');
 /// itself too long. Cuts on code points rather than UTF-16 units so a title
 /// ending in an emoji cannot be split into a lone surrogate, which some
 /// launchers render as a replacement glyph and some refuse outright.
+///
+/// Takes as many whole words as fit rather than just the first, which is a
+/// distinction the first draft did not draw and the emulator did: a title is a
+/// word too. "Dr. James Anderson" cut to its first word is "Dr.", which is not
+/// a name and is the *same* caption every doctor in the inbox gets — the
+/// launcher renders eight faces and two of them say the same thing. "Dr. James"
+/// fits in the same twelve.
 String shortShareLabel(String title, {int maxLength = kMaxShortLabelLength}) {
   final trimmed = title.trim();
   if (trimmed.isEmpty) return kUnnamedShareTarget;
   if (trimmed.runes.length <= maxLength) return trimmed;
 
-  final firstWord = trimmed.split(RegExp(r'\s+')).first;
-  if (firstWord.isNotEmpty && firstWord.runes.length <= maxLength) {
-    return firstWord;
+  final kept = StringBuffer();
+  var length = 0;
+  for (final word in trimmed.split(RegExp(r'\s+'))) {
+    // The separator counts, and only from the second word on.
+    final grown = length == 0
+        ? word.runes.length
+        : length + 1 + word.runes.length;
+    // Stop rather than skip: a later word that happens to fit is not the next
+    // part of the name, it is a word from further along it.
+    if (grown > maxLength) break;
+    if (length > 0) kept.write(' ');
+    kept.write(word);
+    length = grown;
   }
+  if (length > 0) return kept.toString();
+
+  // Not one whole word fits, so there is no boundary to cut at.
   return '${_truncateRunes(trimmed, maxLength - 1)}…';
 }
 

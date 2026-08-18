@@ -341,9 +341,7 @@ void main() {
       // this repository can see.
       final file = jpegFile('holiday.jpg', size: 96000);
 
-      final resolved = await intents(
-        maxFileBytes: 1024,
-      ).resolveSharedFiles(
+      final resolved = await intents(maxFileBytes: 1024).resolveSharedFiles(
         SharedPayload(uris: [Uri.file(file.path).toString()]),
       );
 
