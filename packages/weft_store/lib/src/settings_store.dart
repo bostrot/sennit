@@ -129,6 +129,22 @@ abstract final class WeftSettings {
   /// Networks excluded from any remote endpoint, as a JSON list of network ids.
   static const String remoteExcludedNetworks = 'privacy.remote_excluded';
 
+  /// Whether a link in a message may be previewed.
+  ///
+  /// Off unless set, like every other gate that sends something off the device.
+  /// A preview is fetched by the *homeserver*, so it never exposes the reader's
+  /// IP to the site — but it does tell the homeserver which links they were
+  /// sent and when, including links inside end-to-end encrypted rooms it would
+  /// otherwise never see. That is a trade only the user can make.
+  static const String linkPreviewEnabled = 'privacy.link_previews';
+
+  /// Networks whose messages are never previewed, as a JSON list of ids under
+  /// a `networks` key. The escape hatch the transcription gate already has:
+  /// previews for the group chat, nothing for the one conversation that must
+  /// leave no trace on the homeserver beyond its ciphertext.
+  static const String linkPreviewExcludedNetworks =
+      'privacy.link_preview_excluded';
+
   static const String mcpEnabled = 'mcp.enabled';
   static const String mcpPort = 'mcp.port';
   static const String mcpTunnelEnabled = 'mcp.tunnel_enabled';

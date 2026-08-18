@@ -25,6 +25,7 @@ import 'attachment_preview_sheet.dart';
 import 'attachment_source_sheet.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
+import 'link_preview_card.dart';
 import 'media_viewer.dart';
 import 'message_actions_sheet.dart';
 import 'reaction_bar.dart';
@@ -1314,6 +1315,13 @@ class _MessageBubble extends StatelessWidget {
               ),
             ],
           ),
+          // Under the bubble rather than inside it, for the same reason the
+          // reaction bar is: the card is *about* the message, not part of what
+          // the sender said. It draws nothing at all unless the reader has
+          // switched previews on and the homeserver had an answer — see
+          // [LinkPreviewCard].
+          if (content == null)
+            LinkPreviewCard(message: message, own: own, onTapUrl: onTapLink),
           // Outside the bubble's decoration, deliberately. A chip on the own
           // bubble's primary fill would have to fight it for contrast, and the
           // bar belongs to the message rather than being part of what it says.

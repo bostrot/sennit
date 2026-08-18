@@ -5,6 +5,7 @@ import 'package:weft_store/weft_store.dart';
 
 import '../../app/stores.dart';
 import 'models_screen.dart';
+import 'settings_section.dart';
 
 /// Configuration for the user's own transcription and embedding endpoints.
 ///
@@ -115,7 +116,13 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(WeftSpace.lg),
         children: [
-          const _PrivacyWarning(),
+          const PrivacyNotice(
+            message:
+                'These endpoints receive decrypted message text or audio. For '
+                'a remote endpoint, that undoes end-to-end encryption for '
+                'whatever is sent to it. Point them at software you run '
+                'yourself to keep everything local.',
+          ),
           const SizedBox(height: WeftSpace.lg),
           Card(
             margin: EdgeInsets.zero,
@@ -134,7 +141,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
           ),
           const SizedBox(height: WeftSpace.xl),
 
-          _SectionHeader(
+          SettingsSectionHeader(
             title: 'Semantic search embeddings',
             subtitle:
                 'Only needed if you are NOT using an on-device model. With a '
@@ -160,7 +167,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
           ],
           const SizedBox(height: WeftSpace.xl),
 
-          _SectionHeader(
+          SettingsSectionHeader(
             title: 'Voice transcription',
             subtitle:
                 'Only needed if you are NOT using an on-device model. A local '
@@ -212,75 +219,6 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
         autocorrect: false,
         keyboardType: number ? TextInputType.number : TextInputType.url,
         decoration: InputDecoration(labelText: label, hintText: hint),
-      ),
-    );
-  }
-}
-
-class _PrivacyWarning extends StatelessWidget {
-  const _PrivacyWarning();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(WeftSpace.md),
-      decoration: BoxDecoration(
-        color: context.colors.errorContainer.withValues(alpha: 0.5),
-        borderRadius: WeftRadius.allMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.privacy_tip_outlined,
-            size: 20,
-            color: context.colors.onErrorContainer,
-          ),
-          const SizedBox(width: WeftSpace.md),
-          Expanded(
-            child: Text(
-              'These endpoints receive decrypted message text or audio. For a '
-              'remote endpoint, that undoes end-to-end encryption for whatever '
-              'is sent to it. Point them at software you run yourself to keep '
-              'everything local.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onErrorContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
-            ),
-          ),
-        ],
       ),
     );
   }

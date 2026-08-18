@@ -161,6 +161,28 @@ const List<String> weftMigrations = [
   INSERT INTO search_fts(rowid, body, sender_name, chat_title)
   SELECT rowid, body, sender_name, chat_title FROM search_message;
   ''',
+
+  // ---------------------------------------------------------------- v4
+  '''
+  -- Link previews, as the homeserver answered them.
+  --
+  -- One JSON column rather than a column per OpenGraph field, for the same
+  -- reason the notification policy is one blob: the shape is the *server's*,
+  -- it is read and written as a unit, and `LinkPreview.fromJson` already
+  -- degrades field by field — so a row written by a newer build loses the
+  -- fields this one does not know about and keeps the rest.
+  --
+  -- A null `preview` is a real answer and not a missing row: it records that
+  -- the homeserver was asked and had nothing. Without it, every scroll past a
+  -- bare url re-asks a question already answered, which is both a request the
+  -- user did not make and a second chance to leak that they were sent it.
+  CREATE TABLE link_preview (
+    url        TEXT PRIMARY KEY,
+    preview    TEXT,
+    fetched_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_link_preview_fetched ON link_preview(fetched_at);
+  ''',
 ];
 
 /// Applies any migrations the database has not seen yet.

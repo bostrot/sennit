@@ -23,6 +23,7 @@ library;
 
 // Consumers import this barrel, never src/.
 export 'src/fallback.dart';
+export 'src/links.dart';
 export 'src/mentions.dart';
 export 'src/parse.dart';
 export 'src/relations.dart';

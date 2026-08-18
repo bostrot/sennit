@@ -6,6 +6,7 @@
 library;
 
 export 'src/identity_store.dart';
+export 'src/link_preview_store.dart';
 export 'src/migrations.dart';
 export 'src/search_store.dart';
 export 'src/settings_store.dart';

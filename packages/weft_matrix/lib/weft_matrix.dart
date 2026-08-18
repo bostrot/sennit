@@ -15,6 +15,7 @@ export 'src/api_session.dart';
 export 'src/bridge_discovery.dart';
 export 'src/database.dart';
 export 'src/homeserver.dart';
+export 'src/link_preview.dart';
 export 'src/mapping.dart';
 export 'src/media.dart';
 export 'src/matrix_timeline_source.dart';

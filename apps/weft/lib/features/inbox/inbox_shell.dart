@@ -11,6 +11,7 @@ import '../merge/merge_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/endpoints_screen.dart';
+import '../settings/link_previews_screen.dart';
 import '../settings/mcp_screen.dart';
 import '../settings/notifications_screen.dart';
 
@@ -344,6 +345,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const EndpointsScreen(),
                         ),
                       );
+                    case 'link_previews':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const LinkPreviewsScreen(),
+                        ),
+                      );
                     case 'mcp':
                       navigator.push(
                         MaterialPageRoute<void>(
@@ -373,6 +380,10 @@ class _InboxHeader extends ConsumerWidget {
                   const PopupMenuItem(
                     value: 'endpoints',
                     child: Text('Search & transcription'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'link_previews',
+                    child: Text('Link previews'),
                   ),
                   const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
                 ],

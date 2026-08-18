@@ -1,0 +1,260 @@
+/// The card under a bubble that says what is behind the link in it.
+///
+/// Everything here is built around one rule: **absence is the default and
+/// absence is not an error.** The gate being off, the network being excluded,
+/// no homeserver, a request the homeserver refused, a page with no OpenGraph
+/// tags, a fetch still in flight — the reader sees the same thing in all six
+/// cases, which is their message and nothing else. A card that announced its
+/// own failure would turn a privacy setting the user chose into a row of
+/// apologies down the conversation, and would leak which links the homeserver
+/// declined to look at.
+///
+/// The content is a stranger's, twice over: the sender chose the url and the
+/// page behind it chose the words. It is rendered as *text only* — never
+/// through [parseFormattedBody], never as markup — and clamped by
+/// [LinkPreview] on the way in and on the way out of the cache.
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
+
+import '../../services/links/link_preview_service.dart';
+import 'attachment_bubble.dart';
+import 'rich_text_view.dart';
+
+/// The preview for [message]'s first link, or nothing at all.
+///
+/// Takes the message rather than a url so the decision of *which* link is made
+/// in one place — [firstPreviewableUrl], which picks the first because a
+/// message carrying five links is a list and five cards under it bury the words
+/// the sender wrote.
+///
+/// Reuses [messageDocument], so the parse is the same one the bubble's text
+/// already paid for; a scroll past this widget costs a map lookup.
+class LinkPreviewCard extends ConsumerWidget {
+  const LinkPreviewCard({
+    super.key,
+    required this.message,
+    required this.own,
+    this.onTapUrl,
+  });
+
+  final WeftMessage message;
+
+  /// Which side of the conversation this bubble is on, which decides the ink
+  /// the card has to stay readable in.
+  final bool own;
+
+  /// Same signature as the bubble's link taps, so the card and a tap on the
+  /// url inside the message go through one confirmation path.
+  final void Function(String url, String label)? onTapUrl;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // A deleted message has no link left to be curious about, and an
+    // attachment's body is a filename.
+    if (message.redacted || rendersAsAttachment(message)) {
+      return const SizedBox.shrink();
+    }
+
+    // Asked before the document is even looked at: with the gate closed there
+    // is no reason to walk a tree looking for something that will not be
+    // fetched.
+    if (!ref.watch(linkPreviewServiceProvider).allows(message.network)) {
+      return const SizedBox.shrink();
+    }
+
+    final url = firstPreviewableUrl(messageDocument(message));
+    if (url == null) return const SizedBox.shrink();
+
+    final preview = ref
+        .watch(linkPreviewProvider(LinkPreviewRequest(url, message.network)))
+        .value;
+    if (preview == null || !preview.hasContent) {
+      return const SizedBox.shrink();
+    }
+
+    return LinkPreviewCardBody(
+      preview: preview,
+      own: own,
+      network: message.network,
+      onTap: onTapUrl == null
+          ? null
+          : () => onTapUrl!(preview.url, preview.title ?? preview.url),
+    );
+  }
+}
+
+/// The card itself, with no provider behind it.
+///
+/// Split out so a golden can be taken of a known preview without a homeserver,
+/// a cache or a settings row — and so the widget that decides *whether* to draw
+/// stays separate from the one that decides *how*.
+class LinkPreviewCardBody extends StatelessWidget {
+  const LinkPreviewCardBody({
+    super.key,
+    required this.preview,
+    required this.own,
+    required this.network,
+    this.onTap,
+    this.image,
+  });
+
+  final LinkPreview preview;
+  final bool own;
+  final ChatNetwork network;
+  final VoidCallback? onTap;
+
+  /// Overrides the image the card would resolve for itself.
+  ///
+  /// Tests and goldens only: the real one is an authenticated request to the
+  /// homeserver, which a widget test has no way to answer.
+  final ImageProvider? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final ink = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final accent = own ? ink : palette.networkColor(network);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: WeftSpace.xs),
+      child: Material(
+        color: own
+            ? palette.ownBubble.withValues(alpha: 0.55)
+            : palette.peerBubble,
+        borderRadius: WeftRadius.allSm,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: accent, width: 3)),
+            ),
+            padding: const EdgeInsets.fromLTRB(
+              WeftSpace.sm,
+              WeftSpace.sm,
+              WeftSpace.sm,
+              WeftSpace.sm,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (preview.imageUrl != null) ...[
+                  _Thumbnail(mxc: preview.imageUrl!, image: image),
+                  const SizedBox(width: WeftSpace.sm),
+                ],
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // The host first and always. It is the only line the
+                      // homeserver did not get from the page, so it is the one
+                      // the reader can trust — and a title reading "Sign in to
+                      // your bank" over a host reading `evil.test` is a
+                      // question answered before it is asked.
+                      Text(
+                        preview.siteName ?? preview.host ?? preview.url,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.labelSmall?.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                      if (preview.title != null) ...[
+                        const SizedBox(height: WeftSpace.xxs),
+                        Text(
+                          preview.title!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.bodySmall?.copyWith(
+                            color: ink,
+                            fontWeight: FontWeight.w600,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                      if (preview.description != null) ...[
+                        const SizedBox(height: WeftSpace.xxs),
+                        Text(
+                          preview.description!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.bodySmall?.copyWith(
+                            color: ink.withValues(alpha: 0.7),
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                      // Only when the site named itself, since otherwise the
+                      // line above already is the host.
+                      if (preview.siteName != null && preview.host != null) ...[
+                        const SizedBox(height: WeftSpace.xxs),
+                        Text(
+                          preview.host!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.labelSmall?.copyWith(
+                            color: ink.withValues(alpha: 0.55),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The preview image, or the space where one would have been.
+///
+/// The uri is `mxc://` — a copy the homeserver already fetched and is hosting —
+/// so loading it tells the site nothing. That is the property the whole feature
+/// rests on, and it is why this never accepts an `http` url: a card that
+/// resolved a remote `og:image` would quietly undo the proxying and load a
+/// tracking pixel from the reader's own address.
+///
+/// A failed load falls back to a blank tile rather than a broken-image glyph.
+/// The homeserver may not serve thumbnails, the media may have expired, the
+/// token may have rotated — none of which is something the reader can act on.
+class _Thumbnail extends ConsumerWidget {
+  const _Thumbnail({required this.mxc, this.image});
+
+  final String mxc;
+  final ImageProvider? image;
+
+  static const double _size = 56;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = image ?? ref.watch(linkPreviewImageProvider(mxc));
+    if (provider == null) return const SizedBox.shrink();
+
+    return ClipRRect(
+      borderRadius: WeftRadius.allXs,
+      child: SizedBox(
+        width: _size,
+        height: _size,
+        child: Image(
+          image: provider,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+}
