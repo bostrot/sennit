@@ -254,11 +254,41 @@ RichBlock _codeBlock(dom.Element element) {
     (child) => (child.localName ?? '').toLowerCase() == 'code',
   );
   final language = code == null ? null : _languageFromClass(code.className);
-  // `element.text` is the descendant text verbatim, which is exactly right for
-  // a code block: whitespace is content here, and any markup inside it is
-  // source the sender is quoting, not markup to honour.
-  final text = element.text.replaceAll(RegExp(r'\n+$'), '');
+  final text = _verbatimText(element.nodes).replaceAll(RegExp(r'\n+$'), '');
   return RichBlock.codeBlock(text, language: language);
+}
+
+/// The text inside a `<pre>`, kept exactly as it was written.
+///
+/// Whitespace is content in a code block, so unlike the prose walk this does
+/// not collapse it, and markup inside it is source the sender is quoting rather
+/// than formatting to honour — a `<b>` in here is unwrapped without becoming
+/// bold. What it does keep from the prose walk is [_droppedSubtrees]. The
+/// obvious implementation, `element.text`, concatenates *every* descendant's
+/// text and so would let `<pre><script>alert(1)</script></pre>` put the payload
+/// straight into the bubble and the search index — through the one branch that
+/// never asked the allowlist. A code block is where markup stops being honoured,
+/// not where the allowlist stops applying.
+String _verbatimText(List<dom.Node> nodes) {
+  final buffer = StringBuffer();
+  for (final node in nodes) {
+    if (node is dom.Text) {
+      buffer.write(node.data);
+      continue;
+    }
+    if (node is! dom.Element) continue;
+    final tag = (node.localName ?? '').toLowerCase();
+    if (_droppedSubtrees.contains(tag)) continue;
+    // Clients that build code blocks out of `<br>` rather than newlines are
+    // rarer than the ones that don't, but joining their lines into one would
+    // make the block unreadable.
+    if (tag == 'br') {
+      buffer.write('\n');
+      continue;
+    }
+    buffer.write(_verbatimText(node.nodes));
+  }
+  return buffer.toString();
 }
 
 List<RichSpan> _anchor(dom.Element element, RichStyle style) {

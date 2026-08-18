@@ -51,8 +51,10 @@ void main() {
       expect(styleOf('i'), const RichStyle(italic: true));
       expect(styleOf('em'), const RichStyle(italic: true));
       expect(styleOf('u'), const RichStyle(underline: true));
+      expect(styleOf('ins'), const RichStyle(underline: true));
       expect(styleOf('del'), const RichStyle(strikethrough: true));
       expect(styleOf('s'), const RichStyle(strikethrough: true));
+      expect(styleOf('strike'), const RichStyle(strikethrough: true));
       expect(styleOf('code'), const RichStyle(code: true));
     });
 
@@ -77,6 +79,16 @@ void main() {
       expect(block.kind, RichBlockKind.heading);
       expect(block.level, 3);
       expect(block.plainText, 'Title');
+    });
+
+    test('every heading level is recognised, h1 through h6', () {
+      for (var level = 1; level <= 6; level++) {
+        final block =
+            parseFormattedBody('<h$level>T</h$level>', 'T').children.single
+                as RichBlock;
+        expect(block.kind, RichBlockKind.heading, reason: 'h$level');
+        expect(block.level, level, reason: 'h$level');
+      }
     });
 
     test('paragraphs are separated in the plain-text projection', () {
@@ -117,6 +129,34 @@ void main() {
       expect(list.start, 1);
     });
 
+    test('a start that is not a positive number falls back to 1', () {
+      for (final start in const ['abc', '0', '-3', '']) {
+        final list =
+            parseFormattedBody(
+                  '<ol start="$start"><li>a</li></ol>',
+                  'a',
+                ).children.single
+                as RichBlock;
+        expect(list.start, 1, reason: 'start="$start"');
+      }
+    });
+
+    test('a nested list stays nested inside its item', () {
+      final outer =
+          parseFormattedBody(
+                '<ul><li>a<ul><li>b</li></ul></li></ul>',
+                'a b',
+              ).children.single
+              as RichBlock;
+      expect(outer.kind, RichBlockKind.bulletList);
+      final inner = flatten(outer.children)
+          .whereType<RichBlock>()
+          .where((b) => b.kind == RichBlockKind.bulletList)
+          .single;
+      expect(inner.plainText, 'b');
+      expect(visible(RichDocument([outer])), 'a\nb');
+    });
+
     test('pre keeps whitespace and reads its language off the code class', () {
       final doc = parseFormattedBody(
         '<pre><code class="language-dart">void main() {\n  a();\n}\n</code></pre>',
@@ -126,6 +166,45 @@ void main() {
       expect(block.kind, RichBlockKind.codeBlock);
       expect(block.language, 'dart');
       expect(block.plainText, 'void main() {\n  a();\n}');
+    });
+
+    test('a pre with no code child has no language', () {
+      final block =
+          parseFormattedBody(
+                '<pre>just code</pre>',
+                'just code',
+              ).children.single
+              as RichBlock;
+      expect(block.kind, RichBlockKind.codeBlock);
+      expect(block.language, isNull);
+      expect(block.plainText, 'just code');
+    });
+
+    test('a br inside a code block is a newline, not a join', () {
+      // Clients that build blocks out of `<br>` rather than newlines are rare,
+      // but running their lines together makes the block unreadable.
+      final block =
+          parseFormattedBody(
+                '<pre><code>first();<br>second();</code></pre>',
+                'first(); second();',
+              ).children.single
+              as RichBlock;
+      expect(block.plainText, 'first();\nsecond();');
+    });
+
+    test('markup inside a code block is quoted source, not formatting', () {
+      final doc = parseFormattedBody(
+        '<pre><code>if (a &lt; b) <b>go</b>()</code></pre>',
+        'x',
+      );
+      final block = doc.children.single as RichBlock;
+      expect(block.plainText, 'if (a < b) go()');
+      expect(
+        flatten(
+          doc.children,
+        ).whereType<RichTextRun>().every((run) => !run.style.bold),
+        isTrue,
+      );
     });
 
     test('br and hr become their own nodes', () {
@@ -144,6 +223,17 @@ void main() {
       expect(run.style.spoiler, isTrue);
     });
 
+    test('sender-chosen colours are ignored, not honoured', () {
+      // The one formatting instruction that can make text unreadable against
+      // the reader's own theme, so the text survives and the colour does not.
+      final doc = parseFormattedBody(
+        '<span data-mx-color="#ffffff" data-mx-bg-color="#ffffff">hi</span>',
+        'hi',
+      );
+      expect(visible(doc), 'hi');
+      expect(doc.toString(), isNot(contains('ffffff')));
+    });
+
     test('an mxc image survives with its alt and size', () {
       final doc = parseFormattedBody(
         '<img src="mxc://example.org/abc" alt="wave" width="32" height="32">',
@@ -154,6 +244,17 @@ void main() {
       expect(image.alt, 'wave');
       expect(image.width, 32);
       expect(image.height, 32);
+    });
+
+    test('a non-positive image dimension carries no size at all', () {
+      final image = flatten(
+        parseFormattedBody(
+          '<img src="mxc://example.org/abc" width="0" height="-4">',
+          '',
+        ).children,
+      ).whereType<RichImage>().single;
+      expect(image.width, isNull);
+      expect(image.height, isNull);
     });
 
     test('source indentation between tags is not rendered', () {
@@ -206,6 +307,26 @@ void main() {
       final doc = parseFormattedBody('<a href="https://example.org"></a>', '');
       final link = flatten(doc.children).whereType<RichLink>().single;
       expect(link.plainText, 'https://example.org');
+    });
+
+    test('an anchor with no href at all keeps its text', () {
+      final doc = parseFormattedBody('<a>bare</a>', 'bare');
+      expect(flatten(doc.children).whereType<RichLink>(), isEmpty);
+      expect(visible(doc), 'bare');
+    });
+
+    test('a colon in the path is not read as a scheme', () {
+      expect(sanitizeUrl('https://example.org/a:b'), 'https://example.org/a:b');
+    });
+
+    test('an anchor wrapping an image keeps both', () {
+      final doc = parseFormattedBody(
+        '<a href="https://example.org"><img src="mxc://example.org/a" alt="pic"></a>',
+        '',
+      );
+      final link = flatten(doc.children).whereType<RichLink>().single;
+      expect(link.children.single, isA<RichImage>());
+      expect(doc.linkUrls, ['https://example.org']);
     });
   });
 
@@ -342,6 +463,92 @@ void main() {
       );
       expect(visible(doc), 'ok');
     });
+
+    test('an entity-encoded javascript scheme is still refused', () {
+      // The parser decodes attribute entities before anyone sees the href, so
+      // the allowlist must be the thing that refuses it — not the spelling.
+      for (final href in const [
+        '&#106;avascript:alert(1)',
+        '&#x6A;avascript:alert(1)',
+        '&#106;&#97;vascript:alert(1)',
+      ]) {
+        final doc = parseFormattedBody('<a href="$href">click me</a>', 'click');
+        expect(doc.linkUrls, isEmpty, reason: href);
+        expect(visible(doc), 'click me', reason: href);
+      }
+    });
+
+    test('a script hidden in a code block does not reach the reader', () {
+      // `<pre>` is the one branch that reads descendant text wholesale, so it
+      // is the one branch where a dropped subtree could smuggle its payload
+      // into the bubble — and from there into the search index.
+      final doc = parseFormattedBody(
+        '<pre><code>safe();<script>alert(1)</script></code></pre>',
+        'safe();',
+      );
+      expect(visible(doc), 'safe();');
+      expect(visible(doc), isNot(contains('alert')));
+    });
+
+    test('a stylesheet hidden in a code block does not reach the reader', () {
+      final doc = parseFormattedBody(
+        '<pre><style>body{display:none}</style>real code</pre>',
+        'real code',
+      );
+      expect(visible(doc), 'real code');
+      expect(visible(doc), isNot(contains('display')));
+    });
+
+    test('document-level tags that redirect or restyle are dropped', () {
+      for (final markup in const [
+        '<base href="https://evil.example/">',
+        '<meta http-equiv="refresh" content="0;url=https://evil.example">',
+        '<link rel="stylesheet" href="https://evil.example/a.css">',
+        '<title>not a message</title>',
+      ]) {
+        final doc = parseFormattedBody('$markup<p>hi</p>', 'hi');
+        expect(visible(doc), 'hi', reason: markup);
+        expect(doc.toString(), isNot(contains('evil.example')), reason: markup);
+      }
+    });
+
+    test('content only other clients would show is dropped, not revealed', () {
+      // `<noscript>` and `<textarea>` hold text no ordinary renderer displays.
+      // Unwrapping them would let a sender put words in the bubble that every
+      // other Matrix client hides.
+      for (final markup in const [
+        '<noscript>hidden words</noscript>',
+        '<textarea>hidden words</textarea>',
+        '<object data="https://evil.example">hidden words</object>',
+      ]) {
+        final doc = parseFormattedBody('${markup}shown', 'shown');
+        expect(visible(doc), isNot(contains('hidden')), reason: markup);
+      }
+    });
+
+    test('a void embed leaves nothing behind but the text beside it', () {
+      // `<embed>` takes no children, so what follows it is a sibling and stays;
+      // what must not survive is the element and its src.
+      final doc = parseFormattedBody(
+        '<embed src="https://evil.example/x.swf">after',
+        'after',
+      );
+      expect(visible(doc), 'after');
+      expect(doc.toString(), isNot(contains('evil.example')));
+    });
+
+    test('deeply nested markup does not overflow the stack', () {
+      const depth = 400;
+      final doc = parseFormattedBody(
+        '${'<b>' * depth}deep${'</b>' * depth}',
+        'deep',
+      );
+      expect(visible(doc), 'deep');
+      expect(
+        flatten(doc.children).whereType<RichTextRun>().single.style.bold,
+        isTrue,
+      );
+    });
   });
 
   group('mentions', () {
@@ -462,6 +669,31 @@ void main() {
     test('runs of blank lines collapse to one', () {
       final doc = parseFormattedBody(null, 'a\n\n\n\nb');
       expect(visible(doc), 'a\n\nb');
+    });
+
+    test('a custom emoji contributes its alt text, so it is searchable', () {
+      final doc = parseFormattedBody(
+        'nice <img src="mxc://example.org/a" alt=":party:"> work',
+        'nice :party: work',
+      );
+      expect(visible(doc), 'nice :party: work');
+    });
+
+    test('a code block contributes its text — it is the sender words too', () {
+      final doc = parseFormattedBody(
+        '<p>try</p><pre><code>flutter test</code></pre>',
+        'try flutter test',
+      );
+      expect(visible(doc), 'try\nflutter test');
+    });
+
+    test('a mention contributes its display text, not its id', () {
+      final doc = parseFormattedBody(
+        '<a href="https://matrix.to/#/@alice:example.org">Alice</a> is here',
+        'Alice is here',
+      );
+      expect(visible(doc), 'Alice is here');
+      expect(visible(doc), isNot(contains('example.org')));
     });
   });
 

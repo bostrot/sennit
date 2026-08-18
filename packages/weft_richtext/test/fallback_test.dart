@@ -52,6 +52,22 @@ void main() {
       const body = '> <@alice:example.org> q\n\n> nested quoting of my own';
       expect(stripReplyFallback(body), '> nested quoting of my own');
     });
+
+    test('windows line endings do not save the fallback', () {
+      // Some bridges relay CRLF verbatim; splitting on \n leaves a stray \r on
+      // every line, and the blank separator becomes "\r" rather than "".
+      const body = '> <@alice:example.org> quoted\r\n\r\nthe reply';
+      expect(stripReplyFallback(body), 'the reply');
+    });
+
+    test('a user id carrying a port is still a fallback header', () {
+      const body = '> <@alice:example.org:8448> quoted\n\nthe reply';
+      expect(stripReplyFallback(body), 'the reply');
+    });
+
+    test('an emote fallback without the inner space is recognised', () {
+      expect(stripReplyFallback('> *<@alice:example.org> waves\n\nhi'), 'hi');
+    });
   });
 
   group('bodies that only look like fallbacks', () {
@@ -98,6 +114,29 @@ void main() {
       expect(stripReplyFallback(body), 'answer');
     });
 
+    test('every block goes, not just the first', () {
+      const body =
+          '<mx-reply><p>a</p></mx-reply>mid<mx-reply><p>b</p></mx-reply>end';
+      expect(stripReplyFallback(body), 'midend');
+    });
+
+    test('hostile content inside the block goes with it', () {
+      const body = '<mx-reply><script>alert(1)</script></mx-reply>my answer';
+      expect(stripReplyFallback(body), 'my answer');
+      expect(stripReplyFallback(body), isNot(contains('alert')));
+    });
+
+    test('both forms in one body are both removed', () {
+      // A rich reply carries the fallback twice, and a body that has had its
+      // formatted half spliced in carries both at once.
+      const body =
+          '<mx-reply><blockquote>q</blockquote></mx-reply>'
+          '> <@alice:example.org> q\n'
+          '\n'
+          'my answer';
+      expect(stripReplyFallback(body), 'my answer');
+    });
+
     test('the parser drops mx-reply too, so a quote is never shown twice', () {
       final doc = parseFormattedBody(
         '<mx-reply><blockquote>quoted context</blockquote></mx-reply>my answer',
@@ -117,6 +156,29 @@ void main() {
       );
       expect(hasReplyFallback('> just quoting'), isFalse);
       expect(hasReplyFallback('ordinary message'), isFalse);
+      expect(hasReplyFallback(''), isFalse);
+    });
+
+    test('it agrees with stripReplyFallback on every body in this file', () {
+      // The mapper uses it to skip the strip; the two disagreeing would mean
+      // either a quote shown twice or a body silently truncated.
+      const bodies = [
+        '> <@alice:example.org> q\n\nreply',
+        '> * <@alice:example.org> waves\n\nhi',
+        '<mx-reply><blockquote>q</blockquote></mx-reply>answer',
+        '> to be or not to be\n\nis the question',
+        '> <Alice> said something\n\nreply',
+        '>5 people showed up',
+        'ordinary message',
+        '',
+      ];
+      for (final body in bodies) {
+        expect(
+          hasReplyFallback(body),
+          stripReplyFallback(body) != body,
+          reason: body,
+        );
+      }
     });
   });
 }

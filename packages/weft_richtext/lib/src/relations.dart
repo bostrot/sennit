@@ -147,6 +147,11 @@ String normaliseReactionKey(String key) {
 /// [localUserId] is resolved through the same function, so the local user's
 /// reaction is recognised on whichever leg it was sent from.
 ///
+/// [events] are the annotations for *one* message. This function does not read
+/// [ReactionEvent.targetEventId] — the caller has already grouped by it, and a
+/// caller that hands over a whole room's annotations gets one bar carrying every
+/// reaction in the conversation.
+///
 /// Ordering is by first reaction — the earliest annotation carrying each key,
 /// with event id as tie-break — and never by count. A bar sorted by count
 /// reorders itself while the reader is looking at it, and moves the chip out
@@ -165,7 +170,8 @@ List<ReactionTally> aggregateReactions({
   // and the same input in a different order must produce the same bar.
   final ordered = [...events]
     ..sort(
-      (a, b) => _compareRelation(a.timestamp, a.eventId, b.timestamp, b.eventId),
+      (a, b) =>
+          _compareRelation(a.timestamp, a.eventId, b.timestamp, b.eventId),
     );
 
   final accumulators = <String, _TallyBuilder>{};
@@ -392,9 +398,9 @@ String replyPreviewText(
 }) {
   if (message.redacted) return '';
 
-  final collapsed = stripReplyFallback(message.body)
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
+  final collapsed = stripReplyFallback(
+    message.body,
+  ).replaceAll(RegExp(r'\s+'), ' ').trim();
   if (collapsed.length <= maxLength) return collapsed;
 
   // By runes, so truncating never lands inside a surrogate pair and leaves a

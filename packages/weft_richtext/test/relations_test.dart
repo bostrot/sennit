@@ -165,34 +165,31 @@ void main() {
       expect(tallies.single.key, '\u{1F44D}');
     });
 
-    test(
-      'one person reacting on two legs of a merged chat counts once',
-      () {
-        final tallies = aggregateReactions(
-          events: [
-            _reaction(
-              id: r'$r1',
-              sender: '@whatsapp_anna:example.org',
-              room: '!wa:example.org',
-              key: '👍',
-              at: 1,
-            ),
-            _reaction(
-              id: r'$r2',
-              sender: '@signal_anna:example.org',
-              room: '!sig:example.org',
-              key: '👍',
-              at: 2,
-            ),
-          ],
-          resolveSender: _annaMerged,
-        );
+    test('one person reacting on two legs of a merged chat counts once', () {
+      final tallies = aggregateReactions(
+        events: [
+          _reaction(
+            id: r'$r1',
+            sender: '@whatsapp_anna:example.org',
+            room: '!wa:example.org',
+            key: '👍',
+            at: 1,
+          ),
+          _reaction(
+            id: r'$r2',
+            sender: '@signal_anna:example.org',
+            room: '!sig:example.org',
+            key: '👍',
+            at: 2,
+          ),
+        ],
+        resolveSender: _annaMerged,
+      );
 
-        expect(tallies.single.count, 1);
-        // The leg she reacted on *first* is the one the sender list shows.
-        expect(tallies.single.senderIds, ['@whatsapp_anna:example.org']);
-      },
-    );
+      expect(tallies.single.count, 1);
+      // The leg she reacted on *first* is the one the sender list shows.
+      expect(tallies.single.senderIds, ['@whatsapp_anna:example.org']);
+    });
 
     test('two different people are still two, merged chat or not', () {
       final tallies = aggregateReactions(
@@ -335,6 +332,119 @@ void main() {
       );
 
       expect(tallies.map((t) => t.key), ['👍']);
+    });
+
+    test('it tallies exactly the events it is given', () {
+      // The contract the caller has to honour: annotations are grouped by
+      // target *before* they get here. Handing over a whole room's reactions
+      // produces one bar carrying the whole conversation, which is why the
+      // mapper filters first.
+      final tallies = aggregateReactions(
+        events: [
+          _reaction(id: r'$r1', sender: '@a:example.org', key: '👍', at: 1),
+          _reaction(
+            id: r'$r2',
+            sender: '@b:example.org',
+            key: '👍',
+            target: r'$someOtherMessage',
+            at: 2,
+          ),
+        ],
+        resolveSender: senderIsIdentity,
+      );
+
+      expect(tallies.single.count, 2);
+    });
+
+    test('the same person on three legs is still one', () {
+      String threeLegs(String senderId) =>
+          senderId.startsWith('@wa_') ||
+              senderId.startsWith('@sig_') ||
+              senderId.startsWith('@tg_')
+          ? 'contact_anna'
+          : senderId;
+
+      final tallies = aggregateReactions(
+        events: [
+          _reaction(
+            id: r'$r1',
+            sender: '@wa_anna:example.org',
+            key: '👍',
+            at: 1,
+          ),
+          _reaction(
+            id: r'$r2',
+            sender: '@sig_anna:example.org',
+            room: '!sig:example.org',
+            key: '👍',
+            at: 2,
+          ),
+          _reaction(
+            id: r'$r3',
+            sender: '@tg_anna:example.org',
+            room: '!tg:example.org',
+            key: '👍',
+            at: 3,
+          ),
+        ],
+        resolveSender: threeLegs,
+      );
+
+      expect(tallies.single.count, 1);
+    });
+
+    test('a merged local user keeps the id of the leg they reacted on', () {
+      // `unreact` redacts this annotation in the room it lives in, and there is
+      // no way back to it from the tally once it has been dropped.
+      final tallies = aggregateReactions(
+        events: [
+          _reaction(
+            id: r'$r1',
+            sender: '@whatsapp_anna:example.org',
+            room: '!wa:example.org',
+            key: '👍',
+            at: 1,
+          ),
+          _reaction(
+            id: r'$r2',
+            sender: '@signal_anna:example.org',
+            room: '!sig:example.org',
+            key: '👍',
+            at: 2,
+          ),
+        ],
+        resolveSender: _annaMerged,
+        localUserId: '@signal_anna:example.org',
+      );
+
+      expect(tallies.single.byLocalUser, isTrue);
+      // The first leg is the one that was counted, so it is the one whose
+      // annotation the redaction has to name.
+      expect(tallies.single.localEventId, r'$r1');
+    });
+
+    test('a merged reaction dedupes across keys independently', () {
+      final tallies = aggregateReactions(
+        events: [
+          _reaction(
+            id: r'$r1',
+            sender: '@whatsapp_anna:example.org',
+            key: '👍',
+            at: 1,
+          ),
+          _reaction(
+            id: r'$r2',
+            sender: '@signal_anna:example.org',
+            room: '!sig:example.org',
+            key: '🎉',
+            at: 2,
+          ),
+        ],
+        resolveSender: _annaMerged,
+      );
+
+      expect(tallies.map((t) => t.key), ['👍', '🎉']);
+      expect(tallies.every((t) => t.count == 1), isTrue);
     });
 
     test('the sender list is not writable by a renderer', () {
@@ -674,6 +784,42 @@ void main() {
       expect(preview.kind, MessageKind.image);
       expect(preview.body, isEmpty);
       expect(preview.isStub, isFalse);
+    });
+  });
+
+  group('replyPreviewText', () {
+    // Exported on its own for the composer's reply bar, which has a message in
+    // hand and no reply to resolve.
+    test('a one-line body comes back as it was written', () {
+      expect(
+        replyPreviewText(_message(body: 'are we still on for six?')),
+        'are we still on for six?',
+      );
+    });
+
+    test('a redacted message previews as nothing', () {
+      expect(
+        replyPreviewText(_message(body: 'something regretted', redacted: true)),
+        isEmpty,
+      );
+    });
+
+    test('it strips a fallback the target was itself carrying', () {
+      expect(
+        replyPreviewText(
+          _message(body: '> <@signal_bo:example.org> q\n\nmy answer'),
+        ),
+        'my answer',
+      );
+    });
+
+    test('the default length is the one the chip was designed around', () {
+      final long = _message(body: 'x' * (kReplyPreviewLength + 50));
+      expect(replyPreviewText(long), '${'x' * kReplyPreviewLength}…');
+      expect(
+        replyPreviewText(_message(body: 'x' * kReplyPreviewLength)),
+        'x' * kReplyPreviewLength,
+      );
     });
   });
 }
