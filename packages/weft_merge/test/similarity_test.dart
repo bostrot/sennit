@@ -84,6 +84,14 @@ void main() {
       expect(normalizePhone(null), isNull);
     });
 
+    test('never emits a leading zero, whatever the length', () {
+      // A national number long enough to clear the 11-digit floor used to fall
+      // through as `+01234567890` — not an E.164 number, and one that compares
+      // equal to the same digits dialled in a different country.
+      expect(normalizePhone('01234 567890'), isNull);
+      expect(normalizePhone('0123456789012'), isNull);
+    });
+
     test('rejects numbers outside E.164 length bounds', () {
       expect(normalizePhone('+123456'), isNull);
       expect(normalizePhone('+1234567890123456'), isNull);

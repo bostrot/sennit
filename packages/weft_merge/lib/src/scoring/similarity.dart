@@ -156,6 +156,14 @@ String? normalizePhone(String? raw, {String? defaultCountryCode}) {
     }
   }
 
+  // No country calling code begins with 0 — E.164 reserves it as the trunk and
+  // international escape prefix. A leading zero here therefore means a national
+  // number that reached the end with no region to anchor it (`01234 567890`
+  // with no [defaultCountryCode]), and `+01234567890` is not a number at all.
+  // Worse, it *compares*: the same national digits dialled in two countries
+  // would fold to one string and merge two strangers.
+  if (digits.startsWith('0')) return null;
+
   // E.164 allows at most 15 digits, and fewer than 7 is not a real number.
   if (digits.length < 7 || digits.length > 15) return null;
   return '+$digits';

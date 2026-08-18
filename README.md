@@ -111,8 +111,8 @@ Also valid: `-d linux`, `-d windows`, `-d ios`, `-d android`.
 
 ## Testing
 
-The runner depends on the package, not on the kind of test in it. The seven pure
-Dart packages take `dart test`:
+The runner depends on the package, not on the kind of test in it. The pure Dart
+packages take `dart test`:
 
 ```bash
 cd packages/weft_merge && dart test
@@ -249,6 +249,7 @@ packages/
   weft_notify/              notification rules, content, dedupe ledger
   weft_share/               share-target ranking, network capability, App Group staging
   weft_richtext/            formatted-body allowlist, reply fallbacks, reactions, edits
+  weft_sms/                 phone identity, GSM-7/UCS-2 segments, MMS part planning
   weft_matrix/              Matrix SDK wrapper: session, E2EE, verification
   weft_store/               SQLite: identity graph, settings, FTS5 + vectors
   weft_mcp/                 MCP server + cloudflared supervisor
@@ -259,7 +260,7 @@ tooling/docker/             disposable Synapse for tests
 ```
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
-`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext` and `weft_mcp` are **pure Dart** —
+`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext`, `weft_sms` and `weft_mcp` are **pure Dart** —
 no Flutter, no I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
 second, with no device and no homeserver.
 

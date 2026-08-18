@@ -21,5 +21,6 @@ workspace:
   - packages/weft_richtext
   - packages/weft_search
   - packages/weft_share
+  - packages/weft_sms
   - packages/weft_store
   - packages/weft_transcribe
