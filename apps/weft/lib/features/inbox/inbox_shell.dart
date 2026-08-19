@@ -107,6 +107,11 @@ class _InboxPane extends ConsumerWidget {
                           avatarHeaders: mediaHeaders,
                           selected:
                               picked || (wide && chat.id == selectedChatId),
+                          // The tick's state has to reach the row's merged
+                          // node: the `Checkbox` below is inside it and
+                          // therefore silent, which is an improvement on
+                          // announcing "checkbox" with no conversation name.
+                          checked: selecting ? picked : null,
                           leading: selecting
                               ? Checkbox(
                                   value: picked,
@@ -385,10 +390,18 @@ class _InboxHeader extends ConsumerWidget {
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'archived',
-                    child: Text(
-                      ref.watch(showArchivedProvider)
-                          ? 'Show active chats'
-                          : 'Show archived',
+                    // The one entry in this menu that is a *state* rather than
+                    // a destination. Its label changes between two sentences
+                    // and nothing said which of them was currently true, so a
+                    // reader could not tell "you are looking at archived chats"
+                    // from "you can look at archived chats".
+                    child: Semantics(
+                      checked: ref.watch(showArchivedProvider),
+                      child: Text(
+                        ref.watch(showArchivedProvider)
+                            ? 'Show active chats'
+                            : 'Show archived',
+                      ),
                     ),
                   ),
                   const PopupMenuItem(
@@ -452,17 +465,37 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     // A tap-through rather than an inline field: search deserves its own
     // screen, with filters and result provenance.
-    return InkWell(
-      borderRadius: WeftRadius.allMd,
-      onTap: () => Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const SearchScreen())),
-      child: InputDecorator(
-        decoration: const InputDecoration(
-          hintText: 'Search all conversations',
-          prefixIcon: Icon(Icons.search_rounded, size: 20),
+    //
+    // Which is exactly why it must not *announce* itself as a text field. An
+    // `InputDecorator` is a field's clothing with no field inside it, so a
+    // reader was told to type somewhere that cannot take typing. It is a
+    // button, and what it does is open a screen.
+    void open() => Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SearchScreen()));
+
+    return Semantics(
+      button: true,
+      // Excluding the subtree is what removes the phantom text field, and it
+      // takes the `InkWell`'s tap action with it — so the action is restated
+      // on the node that replaces it.
+      excludeSemantics: true,
+      onTap: open,
+      label: 'Search all conversations',
+      child: Tooltip(
+        message: 'Search all conversations',
+        excludeFromSemantics: true,
+        child: InkWell(
+          borderRadius: WeftRadius.allMd,
+          onTap: open,
+          child: InputDecorator(
+            decoration: const InputDecoration(
+              hintText: 'Search all conversations',
+              prefixIcon: Icon(Icons.search_rounded, size: 20),
+            ),
+            child: const SizedBox(height: 20),
+          ),
         ),
-        child: const SizedBox(height: 20),
       ),
     );
   }
@@ -500,32 +533,40 @@ class _EmptyInbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // One node, not three. An empty state is a single sentence — a heading, a
+    // reason and a way out — and reading it as an unlabelled glyph followed by
+    // two unrelated fragments is how "there is nothing here" becomes "there is
+    // something wrong here".
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(WeftSpace.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.filter_alt_off_rounded,
-              size: 40,
-              color: context.colors.onSurfaceVariant,
-            ),
-            const SizedBox(height: WeftSpace.md),
-            Text(
-              'Nothing on these networks',
-              style: context.text.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: WeftSpace.xs),
-            Text(
-              'Clear the rail filter to see every conversation.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
+        child: MergeSemantics(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.filter_alt_off_rounded,
+                  size: 40,
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: WeftSpace.md),
+              Text(
+                'Nothing on these networks',
+                style: context.text.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: WeftSpace.xs),
+              Text(
+                'Clear the rail filter to see every conversation.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -540,36 +581,42 @@ class _EmptyDetail extends StatelessWidget {
     return ColoredBox(
       color: context.colors.surfaceContainerLowest,
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: WeftRadius.allXl,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [context.colors.primary, context.colors.tertiary],
+        child: MergeSemantics(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The mark is decoration in the strictest sense: it repeats the
+              // words underneath it and adds nothing a reader could act on.
+              ExcludeSemantics(
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    borderRadius: WeftRadius.allXl,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [context.colors.primary, context.colors.tertiary],
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.forum_rounded,
+                    color: context.colors.onPrimary,
+                    size: 30,
+                  ),
                 ),
               ),
-              child: Icon(
-                Icons.forum_rounded,
-                color: context.colors.onPrimary,
-                size: 30,
+              const SizedBox(height: WeftSpace.lg),
+              Text('Pick a conversation', style: context.text.titleMedium),
+              const SizedBox(height: WeftSpace.xs),
+              Text(
+                'Every network, one thread.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: WeftSpace.lg),
-            Text('Pick a conversation', style: context.text.titleMedium),
-            const SizedBox(height: WeftSpace.xs),
-            Text(
-              'Every network, one thread.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

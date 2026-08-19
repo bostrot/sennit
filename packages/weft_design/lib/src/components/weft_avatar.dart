@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../semantics.dart';
 import '../theme.dart';
 import 'network_glyph.dart';
 
@@ -19,6 +20,7 @@ class WeftAvatar extends StatelessWidget {
     this.networks = const [],
     this.showNetworkBadge = true,
     this.online = false,
+    this.semanticsLabel,
   });
 
   final String label;
@@ -36,7 +38,31 @@ class WeftAvatar extends StatelessWidget {
   final bool showNetworkBadge;
   final bool online;
 
+  /// Overrides what a screen reader hears, or hides the avatar from one when
+  /// it is empty.
+  ///
+  /// An avatar inside a row that already names the person — an inbox tile, a
+  /// search result — is decoration, and the row's own merged node is the label.
+  /// Passing `''` there is what stops the same name being announced twice.
+  final String? semanticsLabel;
+
   bool get _isMerged => networks.length > 1;
+
+  /// The person, and everything the picture says about them that the row
+  /// around it may not.
+  ///
+  /// The merge is signalled three ways for a sighted user — the ring, the glyph
+  /// strip, the label — and was signalled zero ways for a reader, who heard the
+  /// *initials* instead, because the fallback `Text` was never excluded.
+  String get _label => semanticsSentence([
+    label,
+    if (_isMerged)
+      'merged across ${networks.length} networks: '
+          '${networks.map((n) => n.label).join(', ')}'
+    else if (showNetworkBadge && networks.length == 1)
+      'on ${networks.single.label}',
+    if (online) 'online',
+  ]);
 
   @override
   Widget build(BuildContext context) {
@@ -121,42 +147,52 @@ class WeftAvatar extends StatelessWidget {
       );
     }
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Center(child: avatar),
-          if (showNetworkBadge && networks.length == 1)
-            Positioned(
-              right: -1,
-              bottom: -1,
-              child: _Badged(
-                size: size,
-                child: NetworkGlyph(
-                  network: networks.single,
-                  size: size * 0.36,
-                ),
-              ),
-            ),
-          if (online)
-            Positioned(
-              right: 0,
-              top: 0,
-              child: _Badged(
-                size: size,
-                child: Container(
-                  width: size * 0.24,
-                  height: size * 0.24,
-                  decoration: BoxDecoration(
-                    color: palette.online,
-                    shape: BoxShape.circle,
+    final described = semanticsLabel ?? _label;
+
+    // `excludeSemantics` rather than a label beside the children: what a reader
+    // actually heard here was the initials — "AB" — because the fallback `Text`
+    // under the picture is a semantics node like any other.
+    return Semantics(
+      label: described,
+      image: imageUrl != null,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(child: avatar),
+            if (showNetworkBadge && networks.length == 1)
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: _Badged(
+                  size: size,
+                  child: NetworkGlyph(
+                    network: networks.single,
+                    size: size * 0.36,
                   ),
                 ),
               ),
-            ),
-        ],
+            if (online)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: _Badged(
+                  size: size,
+                  child: Container(
+                    width: size * 0.24,
+                    height: size * 0.24,
+                    decoration: BoxDecoration(
+                      color: palette.online,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

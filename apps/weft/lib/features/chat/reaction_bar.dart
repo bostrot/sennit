@@ -42,23 +42,33 @@ class ReactionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tallies.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(top: WeftSpace.xs),
-      child: Wrap(
-        spacing: WeftSpace.xs,
-        runSpacing: WeftSpace.xs,
-        alignment: own ? WrapAlignment.end : WrapAlignment.start,
-        children: [
-          for (final tally in tallies)
-            ReactionChip(
-              tally: tally,
-              onTap: () => onToggle(tally),
-              onLongPress: onShowSenders == null
-                  ? null
-                  : () => onShowSenders!(tally),
-            ),
-          if (onAdd != null) _AddReactionChip(onTap: onAdd!),
-        ],
+    final people = tallies.fold(0, (sum, t) => sum + t.count);
+
+    // A summary node over the chips, not instead of them: the chips are
+    // controls and have to stay individually reachable, but a reader arriving
+    // at a bubble should learn "3 reactions" in one breath rather than by
+    // stepping through them to count.
+    return Semantics(
+      container: true,
+      label: people == 1 ? '1 reaction' : '$people reactions',
+      child: Padding(
+        padding: const EdgeInsets.only(top: WeftSpace.xs),
+        child: Wrap(
+          spacing: WeftSpace.xs,
+          runSpacing: WeftSpace.xs,
+          alignment: own ? WrapAlignment.end : WrapAlignment.start,
+          children: [
+            for (final tally in tallies)
+              ReactionChip(
+                tally: tally,
+                onTap: () => onToggle(tally),
+                onLongPress: onShowSenders == null
+                    ? null
+                    : () => onShowSenders!(tally),
+              ),
+            if (onAdd != null) _AddReactionChip(onTap: onAdd!),
+          ],
+        ),
       ),
     );
   }
@@ -85,6 +95,10 @@ class ReactionChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: mine,
+      // The long-press — who reacted — was an action a screen reader had no way
+      // to discover. Naming it puts it in the actions rotor beside the tap.
+      onLongPress: onLongPress,
+      onLongPressHint: onLongPress == null ? null : 'see who reacted',
       label: '${tally.key} ${tally.count}',
       child: Material(
         color: mine
@@ -140,21 +154,33 @@ class _AddReactionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.colors.surfaceContainerHighest,
-      borderRadius: WeftRadius.pill,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: WeftSpace.sm,
-            vertical: 4,
-          ),
-          child: Icon(
-            Icons.add_reaction_outlined,
-            size: 14,
-            color: context.colors.onSurfaceVariant,
+    // The one chip in the bar with no text in it, and so the one that announced
+    // nothing: an unlabelled button sitting after a row of labelled ones.
+    return Semantics(
+      button: true,
+      label: 'Add reaction',
+      excludeSemantics: true,
+      onTap: onTap,
+      child: Tooltip(
+        message: 'Add reaction',
+        excludeFromSemantics: true,
+        child: Material(
+          color: context.colors.surfaceContainerHighest,
+          borderRadius: WeftRadius.pill,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: WeftSpace.sm,
+                vertical: 4,
+              ),
+              child: Icon(
+                Icons.add_reaction_outlined,
+                size: 14,
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
           ),
         ),
       ),
@@ -201,16 +227,25 @@ Future<void> showReactionSendersSheet(
             ),
           ),
           for (final senderId in tally.senderIds)
-            ListTile(
-              dense: true,
-              leading: WeftAvatar(label: nameFor(senderId), size: 32),
-              title: Text(nameFor(senderId)),
-              subtitle: Text(
-                senderId,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.labelSmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
+            // The handle stays on screen — in a merged chat it is what tells
+            // "Anna on WhatsApp" from "Anna on Signal" — but it is not read
+            // aloud. `@anna:matrix.example.org` announced character by
+            // character is thirty syllables of noise per row, and the name
+            // above it is the answer to the question the sheet asks.
+            Semantics(
+              label: nameFor(senderId),
+              excludeSemantics: true,
+              child: ListTile(
+                dense: true,
+                leading: WeftAvatar(label: nameFor(senderId), size: 32),
+                title: Text(nameFor(senderId)),
+                subtitle: Text(
+                  senderId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.labelSmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),

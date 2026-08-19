@@ -103,13 +103,18 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A header, so the groups are navigable rather than being one long run of
+    // several hundred emoji the reader has to step through in order.
     return Padding(
       padding: const EdgeInsets.only(bottom: WeftSpace.sm),
-      child: Text(
-        label,
-        style: context.text.labelMedium?.copyWith(
-          color: context.colors.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
+      child: Semantics(
+        header: true,
+        child: Text(
+          label,
+          style: context.text.labelMedium?.copyWith(
+            color: context.colors.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -129,12 +134,21 @@ class _EmojiWrap extends StatelessWidget {
       runSpacing: WeftSpace.xs,
       children: [
         for (final key in emoji)
-          InkWell(
+          // `button: true` is the whole of it: the cell was an `InkWell` over a
+          // glyph, which a reader meets as a character rather than as something
+          // it can press.
+          Semantics(
+            button: true,
+            label: key,
+            excludeSemantics: true,
             onTap: () => onPick(key),
-            borderRadius: WeftRadius.allSm,
-            child: Padding(
-              padding: const EdgeInsets.all(WeftSpace.xs),
-              child: Text(key, style: const TextStyle(fontSize: 26)),
+            child: InkWell(
+              onTap: () => onPick(key),
+              borderRadius: WeftRadius.allSm,
+              child: Padding(
+                padding: const EdgeInsets.all(WeftSpace.xs),
+                child: Text(key, style: const TextStyle(fontSize: 26)),
+              ),
             ),
           ),
       ],

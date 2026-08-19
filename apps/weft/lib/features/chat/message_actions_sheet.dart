@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_richtext/weft_richtext.dart';
 
 import 'emoji_picker_sheet.dart';
 
@@ -93,90 +94,113 @@ class _MessageActionsSheet extends StatelessWidget {
     // because "delete" still has to be reachable for a local tidy-up.
     final live = !message.redacted;
 
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (live) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: WeftSpace.md,
-                  vertical: WeftSpace.xs,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (final key in kQuickReactions)
-                      InkWell(
-                        onTap: () => choose(MessageAction.react, emoji: key),
-                        borderRadius: WeftRadius.pill,
-                        child: Padding(
-                          padding: const EdgeInsets.all(WeftSpace.sm),
-                          child: Text(
-                            key,
-                            style: const TextStyle(fontSize: 24),
+    // The sheet says which message it acts on. Every row in it — Reply, Edit,
+    // Delete — is a verb with no object, and the bubble it came from is behind
+    // a modal barrier the reader cannot navigate back to.
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: semanticsSentence([
+        'Actions for the message from',
+        message.isOwn ? 'you' : message.senderName,
+        message.redacted ? 'deleted' : replyPreviewText(message),
+      ]),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (live) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: WeftSpace.md,
+                    vertical: WeftSpace.xs,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // A bare emoji `Text` inside an `InkWell` is not a button
+                      // to a screen reader — it is a character, announced by
+                      // whatever name the platform has for that glyph, with no
+                      // hint that tapping it sends a reaction.
+                      for (final key in kQuickReactions)
+                        Semantics(
+                          button: true,
+                          label: 'React with $key',
+                          excludeSemantics: true,
+                          onTap: () => choose(MessageAction.react, emoji: key),
+                          child: InkWell(
+                            onTap: () =>
+                                choose(MessageAction.react, emoji: key),
+                            borderRadius: WeftRadius.pill,
+                            child: Padding(
+                              padding: const EdgeInsets.all(WeftSpace.sm),
+                              child: Text(
+                                key,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                            ),
                           ),
                         ),
+                      IconButton(
+                        tooltip: 'More reactions',
+                        icon: const Icon(Icons.add_reaction_outlined),
+                        onPressed: () => choose(MessageAction.moreReactions),
                       ),
-                    IconButton(
-                      tooltip: 'More reactions',
-                      icon: const Icon(Icons.add_reaction_outlined),
-                      onPressed: () => choose(MessageAction.moreReactions),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Divider(color: context.palette.divider, height: WeftSpace.lg),
-              ListTile(
-                leading: const Icon(Icons.reply_rounded),
-                title: const Text('Reply'),
-                onTap: () => choose(MessageAction.reply),
-              ),
-              if (message.isOwn && message.kind == MessageKind.text)
+                Divider(color: context.palette.divider, height: WeftSpace.lg),
                 ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: const Text('Edit'),
-                  onTap: () => choose(MessageAction.edit),
+                  leading: const Icon(Icons.reply_rounded),
+                  title: const Text('Reply'),
+                  onTap: () => choose(MessageAction.reply),
                 ),
-              if (message.body.trim().isNotEmpty)
+                if (message.isOwn && message.kind == MessageKind.text)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Edit'),
+                    onTap: () => choose(MessageAction.edit),
+                  ),
+                if (message.body.trim().isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.copy_rounded),
+                    title: const Text('Copy text'),
+                    onTap: () => choose(MessageAction.copy),
+                  ),
                 ListTile(
-                  leading: const Icon(Icons.copy_rounded),
-                  title: const Text('Copy text'),
-                  onTap: () => choose(MessageAction.copy),
+                  leading: const Icon(Icons.forward_rounded),
+                  title: const Text('Forward'),
+                  onTap: () => choose(MessageAction.forward),
                 ),
-              ListTile(
-                leading: const Icon(Icons.forward_rounded),
-                title: const Text('Forward'),
-                onTap: () => choose(MessageAction.forward),
-              ),
-              if (canTranscribe && !hasTranscript)
+                if (canTranscribe && !hasTranscript)
+                  ListTile(
+                    leading: const Icon(Icons.graphic_eq_rounded),
+                    title: const Text('Transcribe'),
+                    onTap: () => choose(MessageAction.transcribe),
+                  ),
+                if (canTranscribe && hasTranscript)
+                  ListTile(
+                    leading: const Icon(Icons.translate_rounded),
+                    title: const Text('Re-transcribe in…'),
+                    onTap: () => choose(MessageAction.retranscribe),
+                  ),
+              ],
+              if (message.isOwn)
                 ListTile(
-                  leading: const Icon(Icons.graphic_eq_rounded),
-                  title: const Text('Transcribe'),
-                  onTap: () => choose(MessageAction.transcribe),
-                ),
-              if (canTranscribe && hasTranscript)
-                ListTile(
-                  leading: const Icon(Icons.translate_rounded),
-                  title: const Text('Re-transcribe in…'),
-                  onTap: () => choose(MessageAction.retranscribe),
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: context.colors.error,
+                  ),
+                  title: Text(
+                    'Delete',
+                    style: TextStyle(color: context.colors.error),
+                  ),
+                  onTap: () => choose(MessageAction.delete),
                 ),
             ],
-            if (message.isOwn)
-              ListTile(
-                leading: Icon(
-                  Icons.delete_outline_rounded,
-                  color: context.colors.error,
-                ),
-                title: Text(
-                  'Delete',
-                  style: TextStyle(color: context.colors.error),
-                ),
-                onTap: () => choose(MessageAction.delete),
-              ),
-          ],
+          ),
         ),
       ),
     );

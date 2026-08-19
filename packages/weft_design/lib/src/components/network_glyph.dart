@@ -17,12 +17,20 @@ class NetworkGlyph extends StatelessWidget {
     this.size = 24,
     this.selected = false,
     this.showLabel = false,
+    this.semanticsLabel,
   });
 
   final ChatNetwork network;
   final double size;
   final bool selected;
   final bool showLabel;
+
+  /// Overrides what a reader hears, or silences the glyph when it is `''`.
+  ///
+  /// A glyph inside something that already names its network — a send chip
+  /// saying "Send via WhatsApp", a bubble whose merged node lists the leg — is
+  /// decoration, and repeating the name is noise rather than information.
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -70,19 +78,34 @@ class NetworkGlyph extends StatelessWidget {
           : Icon(_brandIcon, size: size * 0.58, color: ink),
     );
 
-    if (!showLabel) return chip;
+    // The lettermark is the visible version of the problem this fixes: with no
+    // semantics at all, a reader announced "Sm", "iM", "Gc" and "Mx" literally,
+    // one character at a time. The network's *name* has always existed on the
+    // enum — it was simply never reachable except through [showLabel], which
+    // nothing in the app passes.
+    if (!showLabel) {
+      return Semantics(
+        label: semanticsLabel ?? network.label,
+        excludeSemantics: true,
+        child: chip,
+      );
+    }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        chip,
-        const SizedBox(height: WeftSpace.xs),
-        Text(
-          network.label,
-          style: context.text.labelSmall,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+    return Semantics(
+      label: semanticsLabel ?? network.label,
+      excludeSemantics: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          chip,
+          const SizedBox(height: WeftSpace.xs),
+          Text(
+            network.label,
+            style: context.text.labelSmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 

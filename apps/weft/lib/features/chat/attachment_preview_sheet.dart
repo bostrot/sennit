@@ -203,8 +203,10 @@ class _PickedFileTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(formatAttachmentSize(source.sizeBytes)),
+      // Named: a preview of eight files is eight identical "Remove" buttons,
+      // and which one a reader is on is exactly what they cannot see.
       trailing: IconButton(
-        tooltip: 'Remove',
+        tooltip: 'Remove ${source.basename}',
         icon: const Icon(Icons.close_rounded),
         onPressed: onRemove,
       ),
@@ -270,38 +272,44 @@ class _PreviewThumbnailState extends ConsumerState<AttachmentSourceThumbnail> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     final iconSize = widget.size * 0.45;
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: ClipRRect(
-        borderRadius: WeftRadius.allSm,
-        child: bytes == null
-            ? Container(
-                color: context.colors.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: Icon(
-                  _iconFor(widget.kind),
-                  size: iconSize,
-                  color: context.colors.onSurfaceVariant,
-                ),
-              )
-            // `cacheWidth` decodes at thumbnail resolution: a row of eight
-            // 12 MP photos otherwise holds half a gigabyte of ARGB in the
-            // image cache for a 44pt square.
-            : Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                cacheWidth: (widget.size * 3).round(),
-                errorBuilder: (_, _, _) => Container(
+    // The row beside this tile already names the file and its size, and the
+    // thumbnail is that same file drawn small. Excluded rather than labelled:
+    // a second announcement of the same name is noise, and there is nothing
+    // here anyone can describe beyond it.
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: ClipRRect(
+          borderRadius: WeftRadius.allSm,
+          child: bytes == null
+              ? Container(
                   color: context.colors.surfaceContainerHighest,
                   alignment: Alignment.center,
                   child: Icon(
-                    Icons.broken_image_outlined,
+                    _iconFor(widget.kind),
                     size: iconSize,
                     color: context.colors.onSurfaceVariant,
                   ),
+                )
+              // `cacheWidth` decodes at thumbnail resolution: a row of eight
+              // 12 MP photos otherwise holds half a gigabyte of ARGB in the
+              // image cache for a 44pt square.
+              : Image.memory(
+                  bytes,
+                  fit: BoxFit.cover,
+                  cacheWidth: (widget.size * 3).round(),
+                  errorBuilder: (_, _, _) => Container(
+                    color: context.colors.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: iconSize,
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

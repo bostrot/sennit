@@ -42,40 +42,66 @@ class UnverifiedDevicesBanner extends StatelessWidget {
         : '$devices unverified devices across ${trust.unverifiedUsers} people '
               'can read what you send here.';
 
-    return Material(
-      color: context.colors.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: WeftSpace.lg,
-          vertical: WeftSpace.sm,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.gpp_maybe_rounded,
-              size: 20,
-              color: context.colors.onErrorContainer,
-            ),
-            const SizedBox(width: WeftSpace.md),
-            Expanded(
-              child: Text(
-                message,
-                style: context.text.bodySmall?.copyWith(
+    // A live region, because the strip *appearing* is the event. It arrives in
+    // response to a trust change — someone in the room signed in on a new
+    // phone — and a reader who is already in the composer gets no other sign
+    // that what they are about to send has grown a new audience.
+    //
+    // `explicitChildNodes` keeps the Verify button reachable underneath the
+    // announcement: the warning has to be read *before* the control, and the
+    // control still has to be a control.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      explicitChildNodes: true,
+      label: message,
+      child: Material(
+        color: context.colors.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: WeftSpace.lg,
+            vertical: WeftSpace.sm,
+          ),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.gpp_maybe_rounded,
+                  size: 20,
                   color: context.colors.onErrorContainer,
                 ),
               ),
-            ),
-            if (trust.includesOwnDevice) ...[
-              const SizedBox(width: WeftSpace.sm),
-              TextButton(
-                onPressed: onVerify,
-                style: TextButton.styleFrom(
-                  foregroundColor: context.colors.onErrorContainer,
+              const SizedBox(width: WeftSpace.md),
+              Expanded(
+                child: ExcludeSemantics(
+                  child: Text(
+                    message,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.onErrorContainer,
+                    ),
+                  ),
                 ),
-                child: const Text('Verify'),
               ),
+              if (trust.includesOwnDevice) ...[
+                const SizedBox(width: WeftSpace.sm),
+                // "Verify" alone is a verb with no object once it is read out
+                // of the strip it sits in.
+                Semantics(
+                  label: 'Verify your device',
+                  button: true,
+                  excludeSemantics: true,
+                  onTap: onVerify,
+                  child: TextButton(
+                    onPressed: onVerify,
+                    style: TextButton.styleFrom(
+                      foregroundColor: context.colors.onErrorContainer,
+                    ),
+                    child: const Text('Verify'),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

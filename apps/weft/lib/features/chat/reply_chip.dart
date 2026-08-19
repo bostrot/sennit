@@ -55,65 +55,85 @@ class ReplyChip extends StatelessWidget {
         ? ink
         : WeftContrast.ensure(palette.networkTextColor(preview.network!), fill);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.xs),
-      child: Material(
-        color: ink.withValues(alpha: 0.10),
-        borderRadius: WeftRadius.allSm,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: compact ? 640 : 496),
-            padding: const EdgeInsets.fromLTRB(
-              WeftSpace.sm,
-              WeftSpace.xs,
-              WeftSpace.sm,
-              WeftSpace.xs,
-            ),
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: accent, width: 3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (preview.network != null) ...[
-                      NetworkGlyph(network: preview.network!, size: 11),
-                      const SizedBox(width: WeftSpace.xs),
-                    ],
-                    Flexible(
-                      child: Text(
-                        _title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.labelSmall?.copyWith(
-                          color: preview.isStub
-                              ? palette.muted(ink, fill, alpha: 0.6)
-                              : titleInk,
-                          fontWeight: FontWeight.w700,
+    // One node, and a button only when there is somewhere to go. The chip's
+    // title and body were two separate announcements, and the stub — the state
+    // whose whole purpose is to say "tap me and I will go and find it" — had no
+    // way of saying so.
+    return Semantics(
+      button: onTap != null,
+      // Its own node. Inside the composer's context bar the chip would
+      // otherwise merge into the live region above it, and the bar would
+      // announce the quoted message twice — once as its own summary and once
+      // as the chip's.
+      container: true,
+      excludeSemantics: true,
+      onTap: onTap,
+      label: semanticsSentence([
+        preview.isStub ? 'Replying to a message' : 'Replying to $_title',
+        if (preview.network != null && !preview.isStub)
+          'on ${preview.network!.label}',
+        preview.isStub ? 'not loaded yet' : _body,
+      ]),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+        child: Material(
+          color: ink.withValues(alpha: 0.10),
+          borderRadius: WeftRadius.allSm,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              constraints: BoxConstraints(maxWidth: compact ? 640 : 496),
+              padding: const EdgeInsets.fromLTRB(
+                WeftSpace.sm,
+                WeftSpace.xs,
+                WeftSpace.sm,
+                WeftSpace.xs,
+              ),
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: accent, width: 3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (preview.network != null) ...[
+                        NetworkGlyph(network: preview.network!, size: 11),
+                        const SizedBox(width: WeftSpace.xs),
+                      ],
+                      Flexible(
+                        child: Text(
+                          _title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.labelSmall?.copyWith(
+                            color: preview.isStub
+                                ? palette.muted(ink, fill, alpha: 0.6)
+                                : titleInk,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                Text(
-                  _body,
-                  maxLines: compact ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodySmall?.copyWith(
-                    color: palette.muted(
-                      ink,
-                      fill,
-                      alpha: preview.isStub ? 0.55 : 0.8,
-                    ),
-                    fontStyle: _placeholder ? FontStyle.italic : null,
+                    ],
                   ),
-                ),
-              ],
+                  Text(
+                    _body,
+                    maxLines: compact ? 2 : 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.bodySmall?.copyWith(
+                      color: palette.muted(
+                        ink,
+                        fill,
+                        alpha: preview.isStub ? 0.55 : 0.8,
+                      ),
+                      fontStyle: _placeholder ? FontStyle.italic : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

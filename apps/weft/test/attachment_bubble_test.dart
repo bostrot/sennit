@@ -604,7 +604,10 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('holiday.jpg'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Cancel upload'));
+      // The tooltip names the file: a timeline can hold several uploads at
+      // once, and three identical "Cancel upload" buttons are three different
+      // consequences a screen-reader user cannot tell apart.
+      await tester.tap(find.byTooltip('Cancel upload of holiday.jpg'));
       await tester.pump();
 
       // Cancelling stops the upload without throwing the file away: the bubble
@@ -647,11 +650,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Send 2 files'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Remove').first);
+      // Each row's remove button names its own file, which is what makes the
+      // two of them distinguishable at all — by tooltip here, and by
+      // announcement for a reader.
+      await tester.tap(find.byTooltip('Remove holiday.jpg'));
       await tester.pumpAndSettle();
       expect(find.text('Send 1 file'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Remove').first);
+      await tester.tap(find.byTooltip('Remove second.jpg'));
       await tester.pumpAndSettle();
       // The sheet is gone, and it closed as a cancellation rather than sending
       // an empty batch.

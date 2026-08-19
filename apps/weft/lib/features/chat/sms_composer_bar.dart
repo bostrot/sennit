@@ -37,31 +37,40 @@ class SmsComposerBar extends StatelessWidget {
     final accent = context.palette.networkTextColor(ChatNetwork.sms);
     final muted = context.colors.onSurfaceVariant;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.xs),
-      child: Row(
-        children: [
-          Icon(Icons.lock_open_rounded, size: 14, color: accent),
-          const SizedBox(width: WeftSpace.xs),
-          Text(
-            'Not encrypted',
-            style: context.text.labelSmall?.copyWith(
-              color: accent,
-              fontWeight: FontWeight.w600,
+    // One node, above the field it describes and read before it. The warning
+    // and the cost were two separate announcements, neither attached to the
+    // composer they are about — so a reader could reach the field, type, and
+    // send without either fact having been said.
+    return Semantics(
+      container: true,
+      excludeSemantics: true,
+      label: 'Not encrypted. ${_cost(plan)}',
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+        child: Row(
+          children: [
+            Icon(Icons.lock_open_rounded, size: 14, color: accent),
+            const SizedBox(width: WeftSpace.xs),
+            Text(
+              'Not encrypted',
+              style: context.text.labelSmall?.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            _cost(plan),
-            style: context.text.labelSmall?.copyWith(
-              // The count only turns the network's colour once it has become a
-              // charge the user did not expect. Colouring it from the first
-              // character would make the warning invisible by being constant.
-              color: plan.isMultipart ? accent : muted,
-              fontWeight: plan.isMultipart ? FontWeight.w600 : null,
+            const Spacer(),
+            Text(
+              _cost(plan),
+              style: context.text.labelSmall?.copyWith(
+                // The count only turns the network's colour once it has become a
+                // charge the user did not expect. Colouring it from the first
+                // character would make the warning invisible by being constant.
+                color: plan.isMultipart ? accent : muted,
+                fontWeight: plan.isMultipart ? FontWeight.w600 : null,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

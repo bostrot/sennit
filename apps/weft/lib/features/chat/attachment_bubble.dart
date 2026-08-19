@@ -169,53 +169,68 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     final caption = attachmentCaption(widget.message);
     final isVideo = widget.message.kind == MessageKind.video;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: WeftRadius.allSm,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320, minWidth: 140),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                GestureDetector(
-                  onTap: _bytes == null ? null : widget.onOpen,
-                  // The flight the viewer lands: the same decoded bytes on both
-                  // ends, so the picture the user tapped is visibly the picture
-                  // that fills the screen. Only wrapped once there *are* bytes —
-                  // a hero whose source is a grey placeholder animates a grey
-                  // box into a photo, which reads as a glitch.
-                  child: switch ((_bytes, _failed)) {
-                    (final Uint8List bytes, _) => Hero(
-                      tag: mediaHeroTag(widget.message),
-                      child: Image.memory(
-                        bytes,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _placeholder(context, broken: true),
+    // One node for the whole picture: what it is, what the sender wrote under
+    // it, and whether there is anything there yet. A photo previously announced
+    // *nothing at all* — an `Image.memory` under a bare `GestureDetector` has
+    // no semantics of its own — and the caption was a second, unattached node.
+    return Semantics(
+      image: true,
+      button: _bytes != null && widget.onOpen != null,
+      excludeSemantics: true,
+      onTap: _bytes == null ? null : widget.onOpen,
+      label: semanticsSentence([
+        messageKindLabel(widget.message.kind),
+        caption,
+        if (_failed) 'could not be loaded' else if (_bytes == null) 'loading',
+      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: WeftRadius.allSm,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320, minWidth: 140),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: _bytes == null ? null : widget.onOpen,
+                    // The flight the viewer lands: the same decoded bytes on both
+                    // ends, so the picture the user tapped is visibly the picture
+                    // that fills the screen. Only wrapped once there *are* bytes —
+                    // a hero whose source is a grey placeholder animates a grey
+                    // box into a photo, which reads as a glitch.
+                    child: switch ((_bytes, _failed)) {
+                      (final Uint8List bytes, _) => Hero(
+                        tag: mediaHeroTag(widget.message),
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              _placeholder(context, broken: true),
+                        ),
                       ),
-                    ),
-                    (_, true) => _placeholder(context, broken: true),
-                    _ => _placeholder(context, broken: false),
-                  },
-                ),
-                // Over the picture rather than under it: a poster with a
-                // caption line reading "Video" is indistinguishable from a
-                // still at a glance, which is the one thing the badge exists to
-                // prevent.
-                if (isVideo) const _PlayBadge(),
-              ],
+                      (_, true) => _placeholder(context, broken: true),
+                      _ => _placeholder(context, broken: false),
+                    },
+                  ),
+                  // Over the picture rather than under it: a poster with a
+                  // caption line reading "Video" is indistinguishable from a
+                  // still at a glance, which is the one thing the badge exists to
+                  // prevent.
+                  if (isVideo) const _PlayBadge(),
+                ],
+              ),
             ),
           ),
-        ),
-        if (caption != null)
-          Padding(
-            padding: const EdgeInsets.only(top: WeftSpace.xs),
-            child: Text(caption, style: context.text.bodyMedium),
-          ),
-      ],
+          if (caption != null)
+            Padding(
+              padding: const EdgeInsets.only(top: WeftSpace.xs),
+              child: Text(caption, style: context.text.bodyMedium),
+            ),
+        ],
+      ),
     );
   }
 
@@ -308,40 +323,52 @@ class _AudioAttachment extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _AttachmentGlyph(
-              icon: Icons.audiotrack_rounded,
-              tint: onBubble,
-              bubble: bubble,
-            ),
-            const SizedBox(width: WeftSpace.sm),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    message.body.isEmpty ? 'Audio' : message.body,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: onBubble,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (duration != null)
+        // "Audio, Interview take 2, 4:31" as one clause. The name and the
+        // duration were two nodes and neither said what kind of thing this is
+        // — the only signal was a music glyph.
+        Semantics(
+          container: true,
+          excludeSemantics: true,
+          label: semanticsSentence([
+            'Audio',
+            message.body.isEmpty ? null : message.body,
+            duration,
+          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AttachmentGlyph(
+                icon: Icons.audiotrack_rounded,
+                tint: onBubble,
+                bubble: bubble,
+              ),
+              const SizedBox(width: WeftSpace.sm),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      duration,
-                      style: context.text.labelSmall?.copyWith(
-                        color: palette.muted(onBubble, bubble, alpha: 0.7),
+                      message.body.isEmpty ? 'Audio' : message.body,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: onBubble,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                ],
+                    if (duration != null)
+                      Text(
+                        duration,
+                        style: context.text.labelSmall?.copyWith(
+                          color: palette.muted(onBubble, bubble, alpha: 0.7),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         AttachmentTranscript(
           message: message,
@@ -375,69 +402,102 @@ class _FileAttachment extends StatelessWidget {
     final bytes = message.mediaSizeBytes;
     final size = bytes == null ? null : formatAttachmentSize(bytes);
 
-    return InkWell(
+    // The kind the glyph is picked from is stated in words. A reader was told
+    // "report.pdf, 2.3 MB" and never that it was a PDF — which is the one thing
+    // the icon exists to say, and the thing that decides whether the file is
+    // worth opening.
+    return Semantics(
+      button: onOpen != null,
+      excludeSemantics: true,
       onTap: onOpen,
-      borderRadius: WeftRadius.allSm,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _AttachmentGlyph(
-            icon: _iconFor(message.body),
-            tint: onBubble,
-            bubble: bubble,
-          ),
-          const SizedBox(width: WeftSpace.sm),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  message.body.isEmpty ? 'File' : message.body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodyMedium?.copyWith(
-                    color: onBubble,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                // No size line at all when the sender omitted `info.size`: an
-                // invented "0 B" reads as a broken file rather than as a
-                // missing field.
-                if (size != null)
+      label: semanticsSentence([
+        _kindLabelFor(message.body),
+        message.body.isEmpty ? 'File' : message.body,
+        size,
+      ]),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: WeftRadius.allSm,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _AttachmentGlyph(
+              icon: _iconFor(message.body),
+              tint: onBubble,
+              bubble: bubble,
+            ),
+            const SizedBox(width: WeftSpace.sm),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    size,
-                    style: context.text.labelSmall?.copyWith(
-                      color: palette.muted(onBubble, bubble, alpha: 0.7),
+                    message.body.isEmpty ? 'File' : message.body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.bodyMedium?.copyWith(
+                      color: onBubble,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-              ],
+                  // No size line at all when the sender omitted `info.size`: an
+                  // invented "0 B" reads as a broken file rather than as a
+                  // missing field.
+                  if (size != null)
+                    Text(
+                      size,
+                      style: context.text.labelSmall?.copyWith(
+                        color: palette.muted(onBubble, bubble, alpha: 0.7),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   /// Extension-driven glyph. Deliberately coarse — a handful of families the
   /// user recognises at a glance beats a long table nobody reads.
-  static IconData _iconFor(String filename) {
+  static IconData _iconFor(String filename) => switch (_extension(filename)) {
+    'pdf' => Icons.picture_as_pdf_rounded,
+    'zip' || 'gz' || 'tar' || '7z' || 'rar' => Icons.folder_zip_rounded,
+    'doc' ||
+    'docx' ||
+    'odt' ||
+    'rtf' ||
+    'txt' ||
+    'md' => Icons.description_rounded,
+    'xls' || 'xlsx' || 'ods' || 'csv' => Icons.table_chart_rounded,
+    'ppt' || 'pptx' || 'odp' => Icons.slideshow_rounded,
+    'apk' || 'exe' || 'dmg' || 'deb' => Icons.terminal_rounded,
+    _ => Icons.insert_drive_file_rounded,
+  };
+
+  /// The same families [_iconFor] draws, in words.
+  ///
+  /// One switch would be tidier than two, but they answer different questions
+  /// and only one of them has an honest fallback: an unrecognised extension
+  /// gets a generic glyph, and saying "File" twice — once as the kind and once
+  /// as the name — is noise, so it returns null and the sentence joiner drops
+  /// it.
+  static String? _kindLabelFor(String filename) =>
+      switch (_extension(filename)) {
+        'pdf' => 'PDF',
+        'zip' || 'gz' || 'tar' || '7z' || 'rar' => 'Archive',
+        'doc' || 'docx' || 'odt' || 'rtf' || 'txt' || 'md' => 'Document',
+        'xls' || 'xlsx' || 'ods' || 'csv' => 'Spreadsheet',
+        'ppt' || 'pptx' || 'odp' => 'Presentation',
+        'apk' || 'exe' || 'dmg' || 'deb' => 'Application',
+        _ => null,
+      };
+
+  static String _extension(String filename) {
     final dot = filename.lastIndexOf('.');
-    final extension = dot <= 0 ? '' : filename.substring(dot + 1).toLowerCase();
-    return switch (extension) {
-      'pdf' => Icons.picture_as_pdf_rounded,
-      'zip' || 'gz' || 'tar' || '7z' || 'rar' => Icons.folder_zip_rounded,
-      'doc' ||
-      'docx' ||
-      'odt' ||
-      'rtf' ||
-      'txt' ||
-      'md' => Icons.description_rounded,
-      'xls' || 'xlsx' || 'ods' || 'csv' => Icons.table_chart_rounded,
-      'ppt' || 'pptx' || 'odp' => Icons.slideshow_rounded,
-      'apk' || 'exe' || 'dmg' || 'deb' => Icons.terminal_rounded,
-      _ => Icons.insert_drive_file_rounded,
-    };
+    return dot <= 0 ? '' : filename.substring(dot + 1).toLowerCase();
   }
 }
 
@@ -569,40 +629,58 @@ class AttachmentTranscript extends StatelessWidget {
           ),
         if (transcript != null) ...[
           const SizedBox(height: WeftSpace.sm),
-          GestureDetector(
+          // Re-transcribing is long-press only, and a long-press on a
+          // `GestureDetector` with no semantics is an action that does not
+          // exist for a screen reader — it is not on any menu and there is no
+          // other way to reach it. Naming it on the node is what puts it in the
+          // rotor.
+          Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: 'Transcript: $transcript',
             onLongPress: onRetranscribe,
-            child: Container(
-              padding: const EdgeInsets.all(WeftSpace.sm),
-              decoration: BoxDecoration(
-                // A tint, not ink — it is the background the transcript is
-                // read against, so it stays exactly as faint as it was.
-                color: onBubble.withValues(alpha: 0.08),
-                borderRadius: WeftRadius.allSm,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.graphic_eq_rounded,
-                    size: 13,
-                    color: palette.muted(onBubble, transcriptFill, alpha: 0.7),
-                  ),
-                  const SizedBox(width: WeftSpace.xs),
-                  Flexible(
-                    child: Text(
-                      transcript,
-                      style: context.text.bodySmall?.copyWith(
-                        color: palette.muted(
-                          onBubble,
-                          transcriptFill,
-                          alpha: 0.9,
-                        ),
-                        fontStyle: FontStyle.italic,
+            onLongPressHint: onRetranscribe == null
+                ? null
+                : 'transcribe again in another language',
+            child: GestureDetector(
+              onLongPress: onRetranscribe,
+              child: Container(
+                padding: const EdgeInsets.all(WeftSpace.sm),
+                decoration: BoxDecoration(
+                  // A tint, not ink — it is the background the transcript is
+                  // read against, so it stays exactly as faint as it was.
+                  color: onBubble.withValues(alpha: 0.08),
+                  borderRadius: WeftRadius.allSm,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.graphic_eq_rounded,
+                      size: 13,
+                      color: palette.muted(
+                        onBubble,
+                        transcriptFill,
+                        alpha: 0.7,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: WeftSpace.xs),
+                    Flexible(
+                      child: Text(
+                        transcript,
+                        style: context.text.bodySmall?.copyWith(
+                          color: palette.muted(
+                            onBubble,
+                            transcriptFill,
+                            alpha: 0.9,
+                          ),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -676,12 +754,20 @@ class UploadProgressBubble extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    _statusLine(context, task),
-                    style: context.text.labelSmall?.copyWith(
-                      color: failed
-                          ? context.colors.error
-                          : palette.muted(onBubble, bubble, alpha: 0.75),
+                  // A live region only once the upload has settled. The status
+                  // line changes on every progress tick, and a region that
+                  // re-announced "31% of 12.4 MB" forty times would make the
+                  // conversation unusable — but a failure that is never
+                  // announced is a send the user believes went out.
+                  Semantics(
+                    liveRegion: task.state.isTerminal,
+                    child: Text(
+                      _statusLine(context, task),
+                      style: context.text.labelSmall?.copyWith(
+                        color: failed
+                            ? context.colors.error
+                            : palette.muted(onBubble, bubble, alpha: 0.75),
+                      ),
                     ),
                   ),
                 ],
@@ -692,7 +778,12 @@ class UploadProgressBubble extends StatelessWidget {
               onPressed: onCancel,
               visualDensity: VisualDensity.compact,
               iconSize: 18,
-              tooltip: failed ? 'Discard' : 'Cancel upload',
+              // Named, because a timeline can hold several uploads at once and
+              // "Cancel upload" three times over is three identical buttons
+              // with three different consequences.
+              tooltip: failed
+                  ? 'Discard ${plan.filename}'
+                  : 'Cancel upload of ${plan.filename}',
               icon: Icon(
                 Icons.close_rounded,
                 color: palette.muted(onBubble, bubble, alpha: 0.8),
@@ -705,14 +796,21 @@ class UploadProgressBubble extends StatelessWidget {
         // 200 MB video and a finished one look identical in.
         Padding(
           padding: const EdgeInsets.only(top: WeftSpace.xs),
-          child: ClipRRect(
-            borderRadius: WeftRadius.pill,
-            child: LinearProgressIndicator(
-              value: task.progress.clamp(0.0, 1.0),
-              minHeight: 4,
-              // The unfilled track behind the bar, not a foreground.
-              backgroundColor: onBubble.withValues(alpha: 0.15),
-              color: failed ? context.colors.error : context.colors.primary,
+          // A `LinearProgressIndicator` carries no semantics of its own, so the
+          // determinate bar this widget went out of its way to draw said
+          // nothing at all to a reader. `value` is the field a screen reader
+          // reads for exactly this.
+          child: Semantics(
+            value: '${(task.progress.clamp(0.0, 1.0) * 100).round()}%',
+            child: ClipRRect(
+              borderRadius: WeftRadius.pill,
+              child: LinearProgressIndicator(
+                value: task.progress.clamp(0.0, 1.0),
+                minHeight: 4,
+                // The unfilled track behind the bar, not a foreground.
+                backgroundColor: onBubble.withValues(alpha: 0.15),
+                color: failed ? context.colors.error : context.colors.primary,
+              ),
             ),
           ),
         ),

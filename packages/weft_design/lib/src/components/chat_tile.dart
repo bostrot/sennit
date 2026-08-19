@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../semantics.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'network_glyph.dart';
@@ -21,7 +22,17 @@ class ChatTile extends StatefulWidget {
     this.onLongPress,
     this.avatarHeaders,
     this.leading,
+    this.checked,
   });
+
+  /// The tick state while the inbox is in selection mode, or null when it is
+  /// not selecting.
+  ///
+  /// The [leading] checkbox is inside this tile's merged semantics node and is
+  /// therefore not announced on its own — which is the point, since on its own
+  /// it announced "checkbox" and never said which conversation. The state has
+  /// to arrive as a value so the one node can carry it.
+  final bool? checked;
 
   /// Replaces the avatar while the inbox is in selection mode.
   final Widget? leading;
@@ -49,15 +60,26 @@ class _ChatTileState extends State<ChatTile> {
   Widget build(BuildContext context) {
     final chat = widget.chat;
     final colors = context.colors;
-    final unread = chat.unreadCount > 0;
 
     return Semantics(
+      // Exclusive, and that is the whole fix. The label was right and the node
+      // was not a container, so the title, the pin, the mute glyph, the
+      // delivery tick, the preview, the time and the unread badge were *also*
+      // announced underneath it — the "five separate nodes read in isolation"
+      // failure, with the correct sentence sitting on top of them.
+      container: true,
+      excludeSemantics: true,
+      button: true,
       selected: widget.selected,
-      label: [
-        chat.title,
-        if (chat.isMerged) 'Merged across ${chat.networks.length} networks',
-        if (unread) '${chat.unreadCount} unread',
-      ].join(', '),
+      checked: widget.checked,
+      // Excluding the subtree also excludes the `GestureDetector`'s own tap and
+      // long-press actions, so both are restated here. Losing them would make
+      // the inbox unopenable by a screen reader, which is a far worse bug than
+      // the one being fixed.
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      onLongPressHint: widget.onLongPress == null ? null : 'select',
+      label: _semanticsLabel(),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -107,6 +129,34 @@ class _ChatTileState extends State<ChatTile> {
     );
   }
 
+  /// The whole row as one sentence, in reading order.
+  ///
+  /// Everything a sighted user gets from the row is in here, in the order they
+  /// scan it: who, on what, in what state, what they said, when, and how much
+  /// is unread. The three things the old label omitted are the ones that decide
+  /// whether the row is worth opening at all — the preview, the time and the
+  /// delivery state — and the network *names*, since "merged across 3 networks"
+  /// never said which three.
+  String _semanticsLabel() {
+    final chat = widget.chat;
+    final last = chat.lastMessage;
+    return semanticsSentence([
+      chat.title,
+      if (chat.isMerged)
+        'merged across ${chat.networks.length} networks: '
+            '${chat.networks.map((n) => n.label).join(', ')}'
+      else
+        chat.networks.firstOrNull?.label,
+      if (chat.pinned) 'pinned',
+      if (chat.muted) 'muted',
+      if (last != null && last.isOwn) deliveryStateLabel(last.deliveryState),
+      _preview(last),
+      widget.timeLabel,
+      if (chat.unreadCount > 0)
+        chat.unreadCount == 1 ? '1 unread' : '${chat.unreadCount} unread',
+    ]);
+  }
+
   Widget _body(BuildContext context) {
     final chat = widget.chat;
     final unread = chat.unreadCount > 0;
@@ -128,20 +178,30 @@ class _ChatTileState extends State<ChatTile> {
                 ),
               ),
             ),
+            // Tooltips on the state glyphs, not labels: the row's own merged
+            // node already says "pinned, muted" to a reader, and what these
+            // add is the answer for a *sighted* user who does not recognise a
+            // 13dp pictogram.
             if (chat.pinned) ...[
               const SizedBox(width: WeftSpace.xs),
-              Icon(
-                Icons.push_pin_rounded,
-                size: 13,
-                color: context.colors.onSurfaceVariant,
+              Tooltip(
+                message: 'Pinned',
+                child: Icon(
+                  Icons.push_pin_rounded,
+                  size: 13,
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ],
             if (chat.muted) ...[
               const SizedBox(width: WeftSpace.xs),
-              Icon(
-                Icons.notifications_off_rounded,
-                size: 13,
-                color: context.colors.onSurfaceVariant,
+              Tooltip(
+                message: 'Muted',
+                child: Icon(
+                  Icons.notifications_off_rounded,
+                  size: 13,
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -149,13 +209,22 @@ class _ChatTileState extends State<ChatTile> {
         const SizedBox(height: 3),
         Row(
           children: [
+            // `read` and `delivered` are the same double tick and differ only
+            // in colour — the one distinction a colour-blind reader cannot
+            // make. The tooltip is what names it for them; the row's merged
+            // node is what names it for a screen reader. A shape that told the
+            // two apart on sight would be a change to the mark itself, and
+            // that belongs to whoever owns the design, not to a semantics pass.
             if (last != null && last.isOwn) ...[
-              Icon(
-                _deliveryIcon(last.deliveryState),
-                size: 14,
-                color: last.deliveryState == DeliveryState.read
-                    ? context.colors.primary
-                    : context.colors.onSurfaceVariant,
+              Tooltip(
+                message: deliveryStateLabel(last.deliveryState),
+                child: Icon(
+                  _deliveryIcon(last.deliveryState),
+                  size: 14,
+                  color: last.deliveryState == DeliveryState.read
+                      ? context.colors.primary
+                      : context.colors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(width: WeftSpace.xs),
             ],

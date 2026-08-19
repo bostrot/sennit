@@ -9,5 +9,6 @@ export 'src/components/network_glyph.dart';
 export 'src/components/network_rail.dart';
 export 'src/components/weft_avatar.dart';
 export 'src/contrast.dart';
+export 'src/semantics.dart';
 export 'src/theme.dart';
 export 'src/tokens.dart';

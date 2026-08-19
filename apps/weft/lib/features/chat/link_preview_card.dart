@@ -134,98 +134,116 @@ class LinkPreviewCardBody extends StatelessWidget {
         ? ink
         : WeftContrast.ensure(palette.networkTextColor(network), card);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: WeftSpace.xs),
-      child: Material(
-        color: own
-            ? palette.ownBubble.withValues(alpha: 0.55)
-            : palette.peerBubble,
-        borderRadius: WeftRadius.allSm,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 520),
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: accent, width: 3)),
-            ),
-            padding: const EdgeInsets.fromLTRB(
-              WeftSpace.sm,
-              WeftSpace.sm,
-              WeftSpace.sm,
-              WeftSpace.sm,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (preview.imageUrl != null) ...[
-                  _Thumbnail(mxc: preview.imageUrl!, image: image),
-                  const SizedBox(width: WeftSpace.sm),
-                ],
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // The host first and always. It is the only line the
-                      // homeserver did not get from the page, so it is the one
-                      // the reader can trust — and a title reading "Sign in to
-                      // your bank" over a host reading `evil.test` is a
-                      // question answered before it is asked.
-                      Text(
-                        preview.siteName ?? preview.host ?? preview.url,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.labelSmall?.copyWith(
-                          color: hostInk,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 10,
-                        ),
-                      ),
-                      if (preview.title != null) ...[
-                        const SizedBox(height: WeftSpace.xxs),
+    // Four text nodes with no role between them — host, title, description and
+    // a second host line — announced as loose fragments after the message they
+    // belong to. One link node instead, with the host first, for the same
+    // reason it is drawn first: it is the line the reader can trust.
+    return Semantics(
+      link: true,
+      button: onTap != null,
+      excludeSemantics: true,
+      onTap: onTap,
+      label: semanticsSentence([
+        'Link',
+        preview.siteName ?? preview.host ?? preview.url,
+        preview.title,
+        preview.description,
+        if (preview.siteName != null && preview.host != null) preview.host,
+      ]),
+      child: Padding(
+        padding: const EdgeInsets.only(top: WeftSpace.xs),
+        child: Material(
+          color: own
+              ? palette.ownBubble.withValues(alpha: 0.55)
+              : palette.peerBubble,
+          borderRadius: WeftRadius.allSm,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 520),
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: accent, width: 3)),
+              ),
+              padding: const EdgeInsets.fromLTRB(
+                WeftSpace.sm,
+                WeftSpace.sm,
+                WeftSpace.sm,
+                WeftSpace.sm,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (preview.imageUrl != null) ...[
+                    _Thumbnail(mxc: preview.imageUrl!, image: image),
+                    const SizedBox(width: WeftSpace.sm),
+                  ],
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // The host first and always. It is the only line the
+                        // homeserver did not get from the page, so it is the one
+                        // the reader can trust — and a title reading "Sign in to
+                        // your bank" over a host reading `evil.test` is a
+                        // question answered before it is asked.
                         Text(
-                          preview.title!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.text.bodySmall?.copyWith(
-                            color: ink,
-                            fontWeight: FontWeight.w600,
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
-                      if (preview.description != null) ...[
-                        const SizedBox(height: WeftSpace.xxs),
-                        Text(
-                          preview.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.text.bodySmall?.copyWith(
-                            color: palette.muted(ink, card, alpha: 0.7),
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
-                      // Only when the site named itself, since otherwise the
-                      // line above already is the host.
-                      if (preview.siteName != null && preview.host != null) ...[
-                        const SizedBox(height: WeftSpace.xxs),
-                        Text(
-                          preview.host!,
+                          preview.siteName ?? preview.host ?? preview.url,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.text.labelSmall?.copyWith(
-                            color: palette.muted(ink, card, alpha: 0.55),
+                            color: hostInk,
+                            fontWeight: FontWeight.w700,
                             fontSize: 10,
                           ),
                         ),
+                        if (preview.title != null) ...[
+                          const SizedBox(height: WeftSpace.xxs),
+                          Text(
+                            preview.title!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.bodySmall?.copyWith(
+                              color: ink,
+                              fontWeight: FontWeight.w600,
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                        if (preview.description != null) ...[
+                          const SizedBox(height: WeftSpace.xxs),
+                          Text(
+                            preview.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.bodySmall?.copyWith(
+                              color: palette.muted(ink, card, alpha: 0.7),
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                        // Only when the site named itself, since otherwise the
+                        // line above already is the host.
+                        if (preview.siteName != null &&
+                            preview.host != null) ...[
+                          const SizedBox(height: WeftSpace.xxs),
+                          Text(
+                            preview.host!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.labelSmall?.copyWith(
+                              color: palette.muted(ink, card, alpha: 0.55),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -266,6 +284,10 @@ class _Thumbnail extends ConsumerWidget {
         child: Image(
           image: provider,
           fit: BoxFit.cover,
+          // The card's own node says everything there is to say about this
+          // link; the picture is the page's choice of illustration and has no
+          // description anyone here can vouch for.
+          excludeFromSemantics: true,
           errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
       ),

@@ -34,22 +34,33 @@ class SendNetworkChip extends StatelessWidget {
     final accent = context.palette.networkColor(current);
 
     return PopupMenuButton<ChatNetwork>(
-      tooltip: 'Send via…',
+      // The current leg, not just the verb. "Send via…" never said *what is
+      // selected right now*, and the only other indication is an 18dp logo —
+      // so the one fact this chip exists to state was the one it withheld.
+      tooltip: 'Send via ${current.label}',
       onSelected: onPick,
       itemBuilder: (context) => [
         for (final n in networks ?? chat.networks)
           PopupMenuItem(
             value: n,
-            child: Row(
-              children: [
-                NetworkGlyph(network: n, size: 20),
-                const SizedBox(width: WeftSpace.md),
-                Text(n.label),
-                if (n == current) ...[
-                  const Spacer(),
-                  Icon(Icons.check_rounded, size: 16, color: accent),
+            // The tick beside the current entry is purely visual; `selected`
+            // is how a reader is told which of the legs it is already on.
+            child: Semantics(
+              selected: n == current,
+              container: true,
+              excludeSemantics: true,
+              label: n.label,
+              child: Row(
+                children: [
+                  NetworkGlyph(network: n, size: 20),
+                  const SizedBox(width: WeftSpace.md),
+                  Text(n.label),
+                  if (n == current) ...[
+                    const Spacer(),
+                    Icon(Icons.check_rounded, size: 16, color: accent),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
       ],
@@ -68,7 +79,9 @@ class SendNetworkChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            NetworkGlyph(network: current, size: 18),
+            // The button's own label says the network; the glyph repeating it
+            // would announce "WhatsApp" twice in a row.
+            NetworkGlyph(network: current, size: 18, semanticsLabel: ''),
             const SizedBox(width: WeftSpace.xs),
             Icon(Icons.expand_more_rounded, size: 16, color: accent),
           ],

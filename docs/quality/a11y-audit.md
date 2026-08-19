@@ -389,6 +389,130 @@ Two things deliberately *not* changed, with reasons:
 
 ---
 
+## Semantics — resolved by task 3
+
+The inbox, the conversation and the composer now say out loud what they have
+always shown. Two new files carry the vocabulary and the plumbing:
+
+- `packages/weft_design/lib/src/semantics.dart` — `semanticsSentence`,
+  `deliveryStateLabel`, `messageKindLabel`. In the design system for the same
+  reason the colour tokens are: an inbox row and a message bubble describe the
+  *same* delivery state, and two call sites inventing their own wording is how
+  "Delivered" in one place becomes something else in another.
+- `apps/weft/lib/app/a11y.dart` — `announce` and `showWeftMessage`. This is
+  CROSS-8's app-wide answer: a `SnackBar` sets no live region and disappears on
+  a timer, so every report that used to reach `ScaffoldMessenger` directly now
+  goes through one helper that puts the words on the screen **and** into the
+  announcement queue. Task 4 should route the remaining nine call sites through
+  it rather than patching them one by one.
+
+Covered by `apps/weft/test/chat_semantics_test.dart` (15 tests) and
+`packages/weft_design/test/semantics_test.dart` (11 tests).
+
+### The rule these follow
+
+Not "wrap everything in one node". A merged node is right for a row that is one
+control — the inbox tile, a photo, a file — and wrong for a message bubble,
+whose body carries links and mention pills that have to stay individually
+reachable. So a bubble gets a **group label** ("Anna Maven, on Telegram") over a
+body that keeps its own nodes, and only the metadata row — time and delivery
+tick — is merged. Anything that is a control gets `container: true` so it is a
+node a reader can land on; anything that is chrome gets `ExcludeSemantics`.
+
+| ID | Resolution |
+|---|---|
+| A11Y-01 | `_SearchField` announces as a **button** labelled "Search all conversations", not as a text field the user cannot type into. `excludeSemantics` removes the phantom field and the tap action is restated on the node that replaces it |
+| A11Y-02 | Both empty states are one `MergeSemantics` node; the glyphs are `ExcludeSemantics` |
+| A11Y-03 | The archived toggle carries `Semantics(checked:)`, so "you are looking at archived chats" is distinguishable from "you can" |
+| A11Y-04 | `ChatTile` gained a `checked` parameter; the inbox passes `selecting ? picked : null` and the tick state lives on the node that has the conversation's name |
+| A11Y-05 | `container: true, excludeSemantics: true` on `ChatTile`. `tap` and `longPress` are restated on the node, because excluding the subtree also excludes the `GestureDetector`'s actions — losing them would have made the inbox unopenable |
+| A11Y-06 | The label is now name, networks *by name*, pinned, muted, delivery state, preview, time, unread count |
+| A11Y-07 | Pin and mute are in the row's sentence, and each glyph gained a `Tooltip` for the sighted user who does not recognise a 13dp pictogram |
+| A11Y-08 | **Half fixed, half deferred.** The state is named for a screen reader (in the row's label) and for a mouse user (a tooltip reading "Read" / "Delivered"). A *shape* difference between the two ticks is a change to the mark itself and belongs to whoever owns the design, not to a semantics pass — see the note below |
+| A11Y-09 | The rail's `Tooltip` takes `excludeFromSemantics: true` and the node takes `excludeSemantics: true`, so each filter is announced once rather than three times |
+| A11Y-10 | `_announceIncoming` announces the newest message when it changes and is not the reader's own. A live region on the list would have been wrong twice — its label is the whole timeline, and backfilling older history changes it as much as a new message does. The first populated frame is deliberately silent, per conversation: `_open` clears the marker, so clicking through chats on a two-pane desktop does not announce each one's newest message as new |
+| A11Y-11 | Group label per bubble: sender, and the leg when the chat is merged |
+| A11Y-12 | The no-op search button is **disabled** with the reason in its tooltip. `onPressed: () {}` announced as enabled, took a tap and did nothing, which a reader cannot tell from a tap that failed. Twenty goldens moved for this and only this |
+| A11Y-13 | `_EditedMarker` is a labelled button ("Edited at 14:35, show edit history") with its own node, and a tooltip |
+| A11Y-14 | `_VoiceContent` announces "Voice message", the duration, and whether a transcript exists or is being made |
+| A11Y-15 | `onLongPress` + `onLongPressHint: 'show actions'` on the bubble. The action existed — `GestureDetector` contributes it — but nothing said what it led to |
+| A11Y-16 | The composer's field carries a `Semantics(label:)` built from the same `_fieldLabel` the hint uses, so the mode survives the first keystroke |
+| A11Y-17 | `_ComposerContextBar` is a live region labelled "Replying to Anna" / "Editing your message" |
+| A11Y-18 | The day divider is a `header` node reading "Messages from Aug 18" |
+| A11Y-19 | The history spinner is a live region labelled "Loading older messages"; "Beginning of the conversation" is one too |
+| A11Y-20 | `MediaAttachment` is one node: kind, caption, and whether the bytes are there yet |
+| A11Y-21 | The play badge is inside that node, which says "Video" |
+| A11Y-22 | `_FileAttachment` names the family — "PDF", "Archive", "Spreadsheet" — from the same extension table the glyph comes from |
+| A11Y-23 | `_AudioAttachment` announces "Audio, <name>, <duration>" as one clause |
+| A11Y-24 | The transcript block exposes re-transcribe as a named long-press action |
+| A11Y-25 | `Semantics(value: '45%')` on the progress bar; the status line is a live region **only once the upload is terminal**, so a failure is announced and a progress tick is not announced forty times |
+| A11Y-26 | The cancel button names its file |
+| A11Y-27 | Already good; unchanged |
+| A11Y-28 | `_AddReactionChip` is a labelled button with a tooltip |
+| A11Y-29 | "Who reacted" is exposed as a named long-press on the chip |
+| A11Y-30 | The sender sheet announces the **name**; the handle stays on screen and out of the announcement — a full MXID read character by character is thirty syllables per row |
+| A11Y-31 | `ReplyChip` is one node, a button only when there is somewhere to go, and the stub finally says "not loaded yet" |
+| A11Y-32 | `LinkPreviewCardBody` is one `link` node: host first, then title and description |
+| A11Y-33 | The thumbnail takes `excludeFromSemantics` |
+| A11Y-34 | The six quick-reaction cells are buttons labelled "React with 👍" |
+| A11Y-35 | The action sheet names the message it acts on |
+| A11Y-36 | Emoji cells are buttons |
+| A11Y-37 | `_Heading` is a `header` node |
+| A11Y-38 | The remove button names its file — eight identical "Remove" buttons was the failure |
+| A11Y-39 | `AttachmentSourceThumbnail` is `ExcludeSemantics`; the row beside it already names the file |
+| A11Y-40 | "Attach" is a `header` node |
+| A11Y-41 | Each version is one `header` node: "Original, 3 Jun 2026 14:32" |
+| A11Y-42 | "Edit history" is a `header` node |
+| A11Y-43 | The chip's tooltip is "Send via WhatsApp" — the current leg, which is the one fact it existed to state and the one it withheld |
+| A11Y-44 | Popup items carry `selected:`, so the tick is not the only signal |
+| A11Y-45 | The SMS bar is one node — "Not encrypted. 2 messages · UCS-2" — read before the field it describes |
+| A11Y-46 | The banner is a live region |
+| A11Y-47 | "Verify" is labelled "Verify your device"; `explicitChildNodes` keeps it reachable under the warning |
+| A11Y-127 | Mention pills are buttons with their own node; `@room` announces "mentions everyone" |
+| A11Y-128 | The code block is labelled "Code block" |
+| A11Y-129 | Headings are `header` nodes |
+| A11Y-130 | The bullet is `ExcludeSemantics`; the ordered marker stays. Deliberately **not** a `MergeSemantics` over the row — that would read marker and body as one node and swallow every link and mention pill inside the item |
+| A11Y-131 | A hidden spoiler run carries `semanticsLabel: 'Spoiler: …'`. The text is still read out, which is the honest behaviour for a presentation hint; what it is no longer is a surprise |
+| A11Y-132 | Already good; unchanged |
+| A11Y-136 | `WeftAvatar` announces the person and excludes its children. What a reader actually heard before was the initials — "AM" |
+| A11Y-137 | The merge is in the label: "merged across 2 networks: WhatsApp, Signal" |
+| A11Y-138 | "online" is in the same sentence |
+| A11Y-139 | `NetworkGlyph` announces `network.label`. This is what stops "Sm", "iM", "Gc" and "Mx" being spelled out |
+| A11Y-140 | Same fix: the name was always on the enum, it was simply unreachable except through `showLabel`, which nothing passes |
+| CROSS-2 (chat half) | New-message, transcription-start and transcription-finish announcements; live regions on the composer context bar, the unverified-devices banner, the history footer and a terminal upload |
+| CROSS-8 | Answered app-wide by `showWeftMessage`, and adopted by `chat_view.dart`. The other eight call sites are task 4's |
+
+Four things later tasks should know:
+
+- **`excludeSemantics: true` drops the child's actions too.** Every place this
+  pass used it on an interactive widget had to restate `onTap` (and
+  `onLongPress`) on the `Semantics` node. A control that goes quiet *and*
+  unreachable is a worse bug than the one being fixed; `ChatTile`'s test asserts
+  both actions survive precisely because that is the easy mistake here.
+- **A control needs `container: true` to be its own node.** Without it a
+  `Semantics` merges into the nearest ancestor node — which is how the mention
+  pill's label ended up inside the paragraph's, and the reply chip's inside the
+  composer bar's live region. Task 5 depends on this: a pill that is not its own
+  node cannot be focused.
+- **Two live regions are deliberately conditional.** The upload status line is
+  live only when `task.state.isTerminal`, and the incoming-message announcement
+  is skipped on the first populated frame and for the reader's own sends. An
+  unconditional live region on either is worse than none.
+- **Twenty golden pairs moved, for one reason.** The only pixel change in this
+  task is the disabled search glyph in the chat app bar (A11Y-12) — 147 pixels,
+  the same 147 in every image. Everything else here is semantics, which does not
+  paint. Task 8 should expect the RTL and scale variants to be the first real
+  layout regeneration.
+
+**A11Y-08's remaining half, stated rather than buried.** Read and delivered are
+still the same double tick differing only in colour, which fails WCAG 1.4.1 for
+a sighted colour-blind user even though it now passes for a screen-reader user
+and a mouse user. Every messenger in the category does this, and the fix is a
+new mark rather than a code change. Recorded as **open, deferred to design**;
+task 9 should carry it forward rather than closing it.
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -902,7 +1026,7 @@ Findings mapped to the phase's remaining tasks, so nothing here is orphaned.
 | Task | Closes |
 |---|---|
 | 2 — tokens, contrast, typography | CROSS-4, CROSS-5, CROSS-6, CONTRAST-1…8, SCALE-1 |
-| 3 — inbox, chat, composer semantics | A11Y-01…31, 34…47, 127…132, 136…140, CROSS-2 (chat half) |
+| 3 — inbox, chat, composer semantics | A11Y-01…47, 127…132, 136…140, CROSS-2 (chat half), CROSS-8 |
 | 4 — remaining screens | A11Y-48…126, 133…135, CROSS-2 (rest), CROSS-8 |
 | 5 — keyboard | CROSS-3, KEY-01…05, A11Y-127 (mention pills must be focusable) |
 | 6 — direction-agnostic layout | CROSS-1, RTL-01…42 |
@@ -917,5 +1041,18 @@ findings**, **8 cross-cutting findings** — 234 in all.
 
 ## Status
 
-Every finding is **open**. Task 9 re-reads this file and marks each one fixed or
-deferred with a reason.
+Closed so far: the token layer (task 2 — see
+[Resolved by task 2](#resolved-by-task-2)) and the inbox, chat and composer
+semantics (task 3 — see
+[Semantics — resolved by task 3](#semantics--resolved-by-task-3)). One finding,
+**A11Y-08**, is closed for a screen reader and explicitly deferred to design for
+its visual half.
+
+Everything else is **open**. Task 9 re-reads this file and marks each remaining
+one fixed or deferred with a reason.
+
+The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
+A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task
+claiming it. They were fixed here and the row corrected. CROSS-8 moved to task 3
+too, since it asked for one app-wide answer and task 3 is where the first call
+site needed it.

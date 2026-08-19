@@ -54,7 +54,10 @@ class _EditHistorySheet extends StatelessWidget {
             WeftSpace.xl,
           ),
           children: [
-            Text('Edit history', style: context.text.titleMedium),
+            Semantics(
+              header: true,
+              child: Text('Edit history', style: context.text.titleMedium),
+            ),
             const SizedBox(height: WeftSpace.xs),
             Text(
               history.isEmpty
@@ -104,23 +107,34 @@ class _Version extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: context.text.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.colors.onSurfaceVariant,
+        // "Original, 3 Jun 2026 14:32" as one heading over the version it
+        // labels. Two nodes with nothing tying them to the body underneath
+        // leaves a reader stepping through a sheet of undated paragraphs.
+        Semantics(
+          header: true,
+          container: true,
+          excludeSemantics: true,
+          label:
+              '$label, '
+              '${DateFormat.yMMMd().add_Hm().format(record.timestamp)}',
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: context.text.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(width: WeftSpace.sm),
-            Text(
-              DateFormat.yMMMd().add_Hm().format(record.timestamp),
-              style: context.text.labelSmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
+              const SizedBox(width: WeftSpace.sm),
+              Text(
+                DateFormat.yMMMd().add_Hm().format(record.timestamp),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: WeftSpace.xs),
         Container(

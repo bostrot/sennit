@@ -233,9 +233,20 @@ class _RailButtonState extends State<_RailButton> {
       child: Tooltip(
         message: widget.tooltip,
         waitDuration: const Duration(milliseconds: 500),
+        // A `Tooltip` contributes its message to the semantics tree as well as
+        // to the screen, so the rail announced every item twice — once from the
+        // tooltip and once from the node below, which already says the same
+        // thing and more.
+        excludeFromSemantics: true,
         child: Semantics(
+          container: true,
+          // Without this the glyph's own label and the unread badge's digits
+          // are announced under the item, which is the same doubling the
+          // tooltip caused.
+          excludeSemantics: true,
           button: true,
           selected: widget.selected,
+          onTap: widget.onTap,
           label: widget.badge > 0
               ? '${widget.tooltip}, ${widget.badge} unread'
               : widget.tooltip,

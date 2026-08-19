@@ -12,6 +12,7 @@ import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
+import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
 import '../../app/intents.dart';
 import '../../app/providers.dart';
@@ -88,6 +89,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// and without this the button looked like it did nothing at all.
   final Set<String> _transcribing = {};
 
+  /// The newest message a screen reader has already been told about.
+  ///
+  /// Set without announcing on the first populated frame — the opening load is
+  /// the whole visible history, and announcing it would read the conversation
+  /// aloud from the top the moment it opens.
+  String? _announcedEventId;
+
   /// Already written to the search index this session.
   ///
   /// Backfill hands back the *whole* loaded list each time, so indexing it
@@ -120,6 +128,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // outside the app's control, and a link may be stale, be for an account
     // that has since left the room, or simply be wrong. Failing here must be a
     // rendered state, not an unhandled exception.
+    // Cleared per conversation, not per widget: on a two-pane desktop the same
+    // [State] serves every chat the user clicks through, and without this the
+    // newest message of the chat they just *opened* would be announced as one
+    // that had arrived.
+    _announcedEventId = null;
     try {
       final timeline = await ref
           .read(chatRepositoryProvider)
@@ -200,6 +213,37 @@ class _ChatViewState extends ConsumerState<ChatView> {
       _loading = false;
     });
     _indexNewMessages(next.messages);
+  }
+
+  /// Announces a message that arrived while the conversation was open.
+  ///
+  /// A live region on the list itself would be wrong twice over: the list's
+  /// label is the whole timeline, and backfilling older history changes it just
+  /// as much as a new message does. What a reader needs is the one sentence
+  /// that the sighted user got for free by watching a bubble appear, so this
+  /// announces only when the *newest* message changed and it is not the user's
+  /// own — a send the user just made is not news to them.
+  ///
+  /// `_view.messages` is newest-first, matching the reversed list.
+  void _announceIncoming(List<WeftMessage> messages, {required bool merged}) {
+    final newest = messages.firstOrNull;
+    if (newest == null) return;
+
+    final previous = _announcedEventId;
+    _announcedEventId = newest.eventId;
+    if (previous == null || previous == newest.eventId || newest.isOwn) return;
+
+    final body = newest.kind == MessageKind.text && !newest.redacted
+        ? messageDocument(newest).plainText
+        : messageKindLabel(newest.kind);
+    announce(
+      context,
+      semanticsSentence([
+        'New message from ${newest.senderName}',
+        if (merged) 'on ${newest.network.label}',
+        body,
+      ]),
+    );
   }
 
   /// Indexes only messages not seen before, and after the frame so the write
@@ -524,6 +568,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // After the frame rather than during it: an announcement is a platform call
+    // and a build is not the place to make one, and the message being announced
+    // has to be on screen by the time a reader goes looking for it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _announceIncoming(_view.messages, merged: chat.isMerged);
+    });
+
     return Scaffold(
       backgroundColor: context.colors.surfaceContainerLowest,
       appBar: _ChatAppBar(chat: chat),
@@ -682,13 +733,21 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   Widget _historyFooter() {
     if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.all(WeftSpace.lg),
+      // A live region: the spinner replaces the "Load older messages" button
+      // the reader just pressed, and without it the button simply disappears
+      // from under them with nothing said.
+      return Padding(
+        padding: const EdgeInsets.all(WeftSpace.lg),
         child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          child: Semantics(
+            liveRegion: true,
+            label: 'Loading older messages',
+            excludeSemantics: true,
+            child: const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
         ),
       );
@@ -708,10 +767,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
     return Padding(
       padding: const EdgeInsets.all(WeftSpace.lg),
       child: Center(
-        child: Text(
-          'Beginning of the conversation',
-          style: context.text.labelSmall?.copyWith(
-            color: context.colors.onSurfaceVariant,
+        child: Semantics(
+          liveRegion: true,
+          child: Text(
+            'Beginning of the conversation',
+            style: context.text.labelSmall?.copyWith(
+              color: context.colors.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -795,19 +857,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
   Future<void> _transcribe(WeftMessage message, {String? language}) async {
     if (_transcribing.contains(message.eventId)) return;
     setState(() => _transcribing.add(message.eventId));
+    // On-device whisper takes seconds, and the only sign it started is a
+    // spinner replacing a button inside a bubble the reader may not be on.
+    // Both ends are announced for the same reason the button exists at all.
+    announce(context, 'Transcribing…');
 
     final service = ref.read(transcriptionServiceProvider);
     try {
-      await service.transcribe(message, languageOverride: language);
-      if (mounted) setState(() {});
+      final transcript = await service.transcribe(
+        message,
+        languageOverride: language,
+      );
+      if (!mounted) return;
+      setState(() {});
+      announce(context, 'Transcript: ${transcript.text}');
     } on Object catch (e) {
       // Deliberately Object, not Exception: a native transcription backend can
       // fail with an Error, and swallowing that made the button look inert.
       debugPrint('weft: transcription failed for ${message.eventId}: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Transcription failed: $e')));
+      _showMessage('Transcription failed: $e');
     } finally {
       if (mounted) setState(() => _transcribing.remove(message.eventId));
     }
@@ -948,11 +1017,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (problems.isNotEmpty) _showMessage(problems.join('\n'));
   }
 
+  /// Reports something to the user, in both channels.
+  ///
+  /// [showWeftMessage] rather than a bare `SnackBar`: every string that reaches
+  /// here is the only report of an operation that failed, and a bar that sets
+  /// no live region and vanishes on a timer is not a report a screen-reader
+  /// user ever receives.
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showWeftMessage(context, message);
   }
 }
 
@@ -977,52 +1050,64 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       toolbarHeight: 64,
       backgroundColor: context.colors.surfaceContainerLowest,
-      title: Row(
-        children: [
-          Consumer(
-            builder: (context, ref, _) => WeftAvatar(
-              label: chat.title,
-              imageUrl: chat.avatarUrl,
-              imageHeaders: ref.watch(mediaHeadersProvider),
-              networks: chat.networks,
-              size: 38,
-            ),
-          ),
-          const SizedBox(width: WeftSpace.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  chat.title,
-                  style: context.text.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      // The title is one thing — who this conversation is with, and on what —
+      // so it is one node, marked as the screen's heading. Three nodes read in
+      // isolation ("Anna", "Merged · WhatsApp, Signal", and an avatar reading
+      // "AK") is the same failure the inbox row had.
+      title: MergeSemantics(
+        child: Semantics(
+          header: true,
+          child: Row(
+            children: [
+              Consumer(
+                builder: (context, ref, _) => WeftAvatar(
+                  label: chat.title,
+                  imageUrl: chat.avatarUrl,
+                  imageHeaders: ref.watch(mediaHeadersProvider),
+                  networks: chat.networks,
+                  size: 38,
+                  // The lines beside it already say all of this.
+                  semanticsLabel: '',
                 ),
-                if (chat.isMerged)
-                  Text(
-                    'Merged · ${chat.networks.map((n) => n.label).join(', ')}',
-                    style: context.text.labelSmall?.copyWith(
-                      color: context.palette.mergedAccent,
-                      fontWeight: FontWeight.w600,
+              ),
+              const SizedBox(width: WeftSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      chat.title,
+                      style: context.text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                else
-                  Text(
-                    chat.networks.firstOrNull?.label ?? '',
-                    style: context.text.labelSmall?.copyWith(
-                      color: context.colors.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
+                    if (chat.isMerged)
+                      Text(
+                        'Merged · '
+                        '${chat.networks.map((n) => n.label).join(', ')}',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.palette.mergedAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Text(
+                        chat.networks.firstOrNull?.label ?? '',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       actions: [
         // Disabled rather than hidden, with the reason in its tooltip: a
@@ -1049,10 +1134,15 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             context,
           ).push(MaterialPageRoute<void>(builder: (_) => const MergeScreen())),
         ),
+        // Disabled rather than inert. `onPressed: () {}` is a button that
+        // announces itself as enabled, takes a tap and does nothing — which a
+        // reader has no way to distinguish from a tap that failed. There is no
+        // in-conversation search yet; the tooltip says so and the button says
+        // so by being unavailable. Search across every chat is on the inbox.
         IconButton(
-          tooltip: 'Search in conversation',
+          tooltip: 'Search in conversation — not available yet',
           icon: const Icon(Icons.search_rounded),
-          onPressed: () {},
+          onPressed: null,
         ),
       ],
     );
@@ -1066,22 +1156,31 @@ class _DayDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: WeftSpace.lg),
-      child: Row(
-        children: [
-          Expanded(child: Divider(color: context.palette.divider)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: WeftSpace.md),
-            child: Text(
-              DateFormat.MMMd().format(date),
-              style: context.text.labelSmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
+    // A heading, which is what it is: the two rules either side are the visual
+    // form of "a new section starts here", and marking it as a header is what
+    // lets a reader jump between days instead of scrolling through them.
+    return Semantics(
+      header: true,
+      container: true,
+      excludeSemantics: true,
+      label: 'Messages from ${DateFormat.MMMd().format(date)}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: WeftSpace.lg),
+        child: Row(
+          children: [
+            Expanded(child: Divider(color: context.palette.divider)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: WeftSpace.md),
+              child: Text(
+                DateFormat.MMMd().format(date),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-          Expanded(child: Divider(color: context.palette.divider)),
-        ],
+            Expanded(child: Divider(color: context.palette.divider)),
+          ],
+        ),
       ),
     );
   }
@@ -1159,6 +1258,26 @@ class _MessageBubble extends StatelessWidget {
 
   final bool groupedWithPrevious;
 
+  /// Who said this, and on what — the two facts a reader cannot get from the
+  /// words, because the side of the screen a bubble sits on and the hairline
+  /// down its edge are both purely visual.
+  ///
+  /// Deliberately *not* the whole bubble as one node. The body carries links
+  /// and mention pills that have to stay reachable as controls, and merging
+  /// them into a sentence would trade six findings for a worse one.
+  String get _senderLabel => semanticsSentence([
+    message.isOwn ? 'You' : message.senderName,
+    if (showNetwork) 'on ${message.network.label}',
+  ]);
+
+  /// The metadata row as one clause: when it was sent, and — for the user's own
+  /// messages — how far it got. Currently three nodes, one of which is an
+  /// unlabelled 13dp tick.
+  String get _metaLabel => semanticsSentence([
+    'Sent ${DateFormat.Hm().format(message.timestamp)}',
+    if (message.isOwn) deliveryStateLabel(message.deliveryState),
+  ]);
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -1188,168 +1307,207 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Flexible(
-                child: GestureDetector(
-                  // Long-press rather than a visible affordance: a button per
-                  // bubble is six controls per screen the reader has to look
-                  // past to read the conversation.
+                child: Semantics(
+                  // The bubble is a group, not a control: it holds a body whose
+                  // links and mention pills must stay individually reachable.
+                  // What the group adds is the header a sighted user reads off
+                  // the bubble's position and colour — who, and on what leg.
+                  container: true,
+                  label: _senderLabel,
                   onLongPress: onActions,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: WeftSpace.md,
-                      vertical: WeftSpace.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: own ? palette.ownBubble : palette.peerBubble,
-                      borderRadius: BorderRadius.only(
-                        topLeft: WeftRadius.lg,
-                        topRight: WeftRadius.lg,
-                        bottomLeft: own ? WeftRadius.lg : WeftRadius.xs,
-                        bottomRight: own ? WeftRadius.xs : WeftRadius.lg,
+                  onLongPressHint: onActions == null ? null : 'show actions',
+                  child: GestureDetector(
+                    // Long-press rather than a visible affordance: a button per
+                    // bubble is six controls per screen the reader has to look
+                    // past to read the conversation.
+                    onLongPress: onActions,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: WeftSpace.md,
+                        vertical: WeftSpace.sm,
                       ),
-                      // A merged chat marks each bubble's origin with a
-                      // hairline in the network's colour — readable without
-                      // stealing attention.
-                      border: showNetwork
-                          ? Border(left: BorderSide(color: accent, width: 3))
-                          : null,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (showNetwork && !groupedWithPrevious) ...[
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              NetworkGlyph(network: message.network, size: 12),
-                              const SizedBox(width: WeftSpace.xs),
-                              Text(
-                                message.network.label,
-                                style: context.text.labelSmall?.copyWith(
-                                  // The label is text and owes 4.5:1; the
-                                  // hairline beside it is a graphic and owes
-                                  // 3:1, which is why they are two tokens.
-                                  color: own
-                                      ? palette.mutedOnBubble(true, alpha: 0.8)
-                                      : palette.networkTextColor(
-                                          message.network,
-                                        ),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 10,
+                      decoration: BoxDecoration(
+                        color: own ? palette.ownBubble : palette.peerBubble,
+                        borderRadius: BorderRadius.only(
+                          topLeft: WeftRadius.lg,
+                          topRight: WeftRadius.lg,
+                          bottomLeft: own ? WeftRadius.lg : WeftRadius.xs,
+                          bottomRight: own ? WeftRadius.xs : WeftRadius.lg,
+                        ),
+                        // A merged chat marks each bubble's origin with a
+                        // hairline in the network's colour — readable without
+                        // stealing attention.
+                        border: showNetwork
+                            ? Border(left: BorderSide(color: accent, width: 3))
+                            : null,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (showNetwork && !groupedWithPrevious) ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                NetworkGlyph(
+                                  network: message.network,
+                                  size: 12,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                        ],
-                        // Inside the bubble, above everything: the quote is
-                        // part of what this message says, not chrome around it.
-                        if (replyPreview != null)
-                          ReplyChip(
-                            preview: replyPreview!,
-                            own: own,
-                            onTap: onJumpToReply == null
-                                ? null
-                                : () => onJumpToReply!(replyPreview!.eventId),
-                          ),
-                        if (content != null)
-                          content!
-                        // Before the attachment and voice branches, not after:
-                        // a redacted event keeps whatever `attachmentUrl` it
-                        // was mapped with, and a deleted photo that still drew
-                        // its own bubble would be a deletion that did nothing.
-                        else if (message.redacted)
-                          Text(
-                            'Message deleted',
-                            style: context.text.bodyMedium?.copyWith(
-                              fontStyle: FontStyle.italic,
-                              color: palette.mutedOnBubble(own),
+                                const SizedBox(width: WeftSpace.xs),
+                                Text(
+                                  message.network.label,
+                                  style: context.text.labelSmall?.copyWith(
+                                    // The label is text and owes 4.5:1; the
+                                    // hairline beside it is a graphic and owes
+                                    // 3:1, which is why they are two tokens.
+                                    color: own
+                                        ? palette.mutedOnBubble(
+                                            true,
+                                            alpha: 0.8,
+                                          )
+                                        : palette.networkTextColor(
+                                            message.network,
+                                          ),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
                             ),
-                          )
-                        else if (rendersAsAttachment(message))
-                          AttachmentBubble(
-                            message: message,
-                            own: own,
-                            onOpen: onOpen,
-                            transcribing: transcribing,
-                            onTranscribe: onTranscribe,
-                            onRetranscribe: onRetranscribe,
-                          )
-                        else if (message.kind == MessageKind.voice)
-                          _VoiceContent(
-                            message: message,
-                            own: own,
-                            transcribing: transcribing,
-                            onTranscribe: onTranscribe,
-                            onRetranscribe: onRetranscribe,
-                          )
-                        else
-                          RichTextView.message(
-                            message: message,
-                            baseStyle:
-                                context.text.bodyMedium?.copyWith(
-                                  color: own
-                                      ? palette.ownBubbleText
-                                      : palette.peerBubbleText,
-                                ) ??
-                                TextStyle(
-                                  color: own
-                                      ? palette.ownBubbleText
-                                      : palette.peerBubbleText,
-                                ),
-                            // Links and mention pills take the network's colour
-                            // on a peer bubble and the bubble's own ink on the
-                            // user's, where the accent would be invisible
-                            // against the primary fill it is derived from.
-                            accent: own ? palette.ownBubbleText : accent,
-                            onTapLink: onTapLink,
-                            onTapMention: onTapMention,
-                          ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (message.isEdited && !message.redacted) ...[
-                              _EditedMarker(
-                                message: message,
-                                own: own,
-                                onTap: onShowEditHistory,
-                              ),
-                              const SizedBox(width: WeftSpace.xs),
-                            ],
+                            const SizedBox(height: 3),
+                          ],
+                          // Inside the bubble, above everything: the quote is
+                          // part of what this message says, not chrome around it.
+                          if (replyPreview != null)
+                            ReplyChip(
+                              preview: replyPreview!,
+                              own: own,
+                              onTap: onJumpToReply == null
+                                  ? null
+                                  : () => onJumpToReply!(replyPreview!.eventId),
+                            ),
+                          if (content != null)
+                            content!
+                          // Before the attachment and voice branches, not after:
+                          // a redacted event keeps whatever `attachmentUrl` it
+                          // was mapped with, and a deleted photo that still drew
+                          // its own bubble would be a deletion that did nothing.
+                          else if (message.redacted)
                             Text(
-                              DateFormat.Hm().format(message.timestamp),
-                              style: context.text.labelSmall?.copyWith(
-                                fontSize: 10,
+                              'Message deleted',
+                              style: context.text.bodyMedium?.copyWith(
+                                fontStyle: FontStyle.italic,
                                 color: palette.mutedOnBubble(own),
                               ),
+                            )
+                          else if (rendersAsAttachment(message))
+                            AttachmentBubble(
+                              message: message,
+                              own: own,
+                              onOpen: onOpen,
+                              transcribing: transcribing,
+                              onTranscribe: onTranscribe,
+                              onRetranscribe: onRetranscribe,
+                            )
+                          else if (message.kind == MessageKind.voice)
+                            _VoiceContent(
+                              message: message,
+                              own: own,
+                              transcribing: transcribing,
+                              onTranscribe: onTranscribe,
+                              onRetranscribe: onRetranscribe,
+                            )
+                          else
+                            RichTextView.message(
+                              message: message,
+                              baseStyle:
+                                  context.text.bodyMedium?.copyWith(
+                                    color: own
+                                        ? palette.ownBubbleText
+                                        : palette.peerBubbleText,
+                                  ) ??
+                                  TextStyle(
+                                    color: own
+                                        ? palette.ownBubbleText
+                                        : palette.peerBubbleText,
+                                  ),
+                              // Links and mention pills take the network's colour
+                              // on a peer bubble and the bubble's own ink on the
+                              // user's, where the accent would be invisible
+                              // against the primary fill it is derived from.
+                              accent: own ? palette.ownBubbleText : accent,
+                              onTapLink: onTapLink,
+                              onTapMention: onTapMention,
                             ),
-                            if (own) ...[
-                              const SizedBox(width: 3),
-                              Icon(
-                                // An upload still on the wire, and one that
-                                // failed, must not wear the same double tick a
-                                // delivered message does.
-                                switch (message.deliveryState) {
-                                  DeliveryState.sending =>
-                                    Icons.schedule_rounded,
-                                  DeliveryState.failed =>
-                                    Icons.error_outline_rounded,
-                                  _ => Icons.done_all_rounded,
-                                },
-                                size: 13,
-                                color:
-                                    message.deliveryState ==
-                                        DeliveryState.failed
-                                    ? context.colors.error
-                                    : palette.mutedOnBubble(true, alpha: 0.7),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (message.isEdited && !message.redacted) ...[
+                                _EditedMarker(
+                                  message: message,
+                                  own: own,
+                                  onTap: onShowEditHistory,
+                                ),
+                                const SizedBox(width: WeftSpace.xs),
+                              ],
+                              // The time and the tick are one clause — "Sent
+                              // 14:32, Read" — rather than a bare number followed
+                              // by an unlabelled 13dp glyph whose only difference
+                              // between delivered and read is its colour.
+                              Semantics(
+                                container: true,
+                                excludeSemantics: true,
+                                label: _metaLabel,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      DateFormat.Hm().format(message.timestamp),
+                                      style: context.text.labelSmall?.copyWith(
+                                        fontSize: 10,
+                                        color: palette.mutedOnBubble(own),
+                                      ),
+                                    ),
+                                    if (own) ...[
+                                      const SizedBox(width: 3),
+                                      Tooltip(
+                                        message: deliveryStateLabel(
+                                          message.deliveryState,
+                                        ),
+                                        excludeFromSemantics: true,
+                                        child: Icon(
+                                          // An upload still on the wire, and one
+                                          // that failed, must not wear the same
+                                          // double tick a delivered message does.
+                                          switch (message.deliveryState) {
+                                            DeliveryState.sending =>
+                                              Icons.schedule_rounded,
+                                            DeliveryState.failed =>
+                                              Icons.error_outline_rounded,
+                                            _ => Icons.done_all_rounded,
+                                          },
+                                          size: 13,
+                                          color:
+                                              message.deliveryState ==
+                                                  DeliveryState.failed
+                                              ? context.colors.error
+                                              : palette.mutedOnBubble(
+                                                  true,
+                                                  alpha: 0.7,
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ],
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1402,24 +1560,45 @@ class _EditedMarker extends StatelessWidget {
     final palette = context.palette;
     final ink = palette.mutedOnBubble(own);
     final editedAt = message.editedAt;
+    // Only when there is history to show. A message mapped outside an open
+    // timeline knows it was edited and has no versions to open — offering the
+    // sheet there would open an empty one, so there is nothing to announce as
+    // a button either.
+    final openable = message.editHistory.isNotEmpty && onTap != null;
 
-    return GestureDetector(
-      // Only when there is history to show. A message mapped outside an open
-      // timeline knows it was edited and has no versions to open — offering the
-      // sheet there would open an empty one.
-      onTap: message.editHistory.isEmpty ? null : onTap,
-      child: Text(
+    return Semantics(
+      button: openable,
+      // Its own node, not a fragment merged into the words above it: it is a
+      // control, and a control that shares a node with the message body cannot
+      // be reached separately from it.
+      container: true,
+      excludeSemantics: true,
+      onTap: openable ? onTap : null,
+      label: semanticsSentence([
         editedAt == null
-            ? 'edited'
-            : 'edited ${DateFormat.Hm().format(editedAt)}',
-        style: context.text.labelSmall?.copyWith(
-          fontSize: 10,
-          fontStyle: FontStyle.italic,
-          color: ink,
-          decoration: message.editHistory.isEmpty
-              ? null
-              : TextDecoration.underline,
-          decorationColor: ink,
+            ? 'Edited'
+            : 'Edited at ${DateFormat.Hm().format(editedAt)}',
+        if (openable) 'show edit history',
+      ]),
+      child: Tooltip(
+        message: openable ? 'Show edit history' : 'This message was edited',
+        excludeFromSemantics: true,
+        child: GestureDetector(
+          onTap: openable ? onTap : null,
+          child: Text(
+            editedAt == null
+                ? 'edited'
+                : 'edited ${DateFormat.Hm().format(editedAt)}',
+            style: context.text.labelSmall?.copyWith(
+              fontSize: 10,
+              fontStyle: FontStyle.italic,
+              color: ink,
+              decoration: message.editHistory.isEmpty
+                  ? null
+                  : TextDecoration.underline,
+              decorationColor: ink,
+            ),
+          ),
         ),
       ),
     );
@@ -1453,59 +1632,78 @@ class _VoiceContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.play_arrow_rounded, size: 22, color: onBubble),
-            const SizedBox(width: WeftSpace.sm),
-            // Waveform takes the space the bubble actually has rather than a
-            // fixed 22 bars: previously the bubble stretched to full width
-            // while the bars and timestamp stopped around the middle.
-            Flexible(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final barCount = ((constraints.maxWidth - 60) / 5.5)
-                      .floor()
-                      .clamp(8, 48);
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Deterministic pseudo-waveform: real amplitude data arrives with
-                      // the recorder in M9.
-                      for (var i = 0; i < barCount; i++)
-                        Container(
-                          width: 2.5,
-                          height:
-                              6 +
-                              ((message.eventId.hashCode >> (i % 28)) & 0x0F)
-                                  .toDouble(),
-                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                          decoration: BoxDecoration(
-                            // A waveform bar is a graphic, not text, so 3:1
-                            // rather than 4.5:1 — it can stay fainter than the
-                            // duration beside it and still be seen.
-                            color: WeftContrast.dim(
-                              onBubble,
-                              bubble,
-                              alpha: 0.55,
-                              minRatio: WeftContrast.uiComponent,
+        // One node for the recording itself: a reader was told the duration and
+        // never that this was a voice message at all, because "0:42" beside a
+        // row of coloured bars is the entire visual signal. Whether there is a
+        // transcript belongs here too — it is the difference between a message
+        // this reader can read and one they cannot.
+        Semantics(
+          container: true,
+          excludeSemantics: true,
+          label: semanticsSentence([
+            'Voice message',
+            formatMediaDuration(message.durationMs),
+            if (transcribing)
+              'transcribing'
+            else if (message.transcript != null)
+              'transcript below'
+            else if (onTranscribe != null)
+              'no transcript yet',
+          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.play_arrow_rounded, size: 22, color: onBubble),
+              const SizedBox(width: WeftSpace.sm),
+              // Waveform takes the space the bubble actually has rather than a
+              // fixed 22 bars: previously the bubble stretched to full width
+              // while the bars and timestamp stopped around the middle.
+              Flexible(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final barCount = ((constraints.maxWidth - 60) / 5.5)
+                        .floor()
+                        .clamp(8, 48);
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Deterministic pseudo-waveform: real amplitude data arrives with
+                        // the recorder in M9.
+                        for (var i = 0; i < barCount; i++)
+                          Container(
+                            width: 2.5,
+                            height:
+                                6 +
+                                ((message.eventId.hashCode >> (i % 28)) & 0x0F)
+                                    .toDouble(),
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            decoration: BoxDecoration(
+                              // A waveform bar is a graphic, not text, so 3:1
+                              // rather than 4.5:1 — it can stay fainter than the
+                              // duration beside it and still be seen.
+                              color: WeftContrast.dim(
+                                onBubble,
+                                bubble,
+                                alpha: 0.55,
+                                minRatio: WeftContrast.uiComponent,
+                              ),
+                              borderRadius: WeftRadius.pill,
                             ),
-                            borderRadius: WeftRadius.pill,
                           ),
-                        ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: WeftSpace.sm),
-            Text(
-              formatMediaDuration(message.durationMs) ?? '',
-              style: context.text.labelSmall?.copyWith(
-                color: palette.muted(onBubble, bubble, alpha: 0.75),
+              const SizedBox(width: WeftSpace.sm),
+              Text(
+                formatMediaDuration(message.durationMs) ?? '',
+                style: context.text.labelSmall?.copyWith(
+                  color: palette.muted(onBubble, bubble, alpha: 0.75),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         AttachmentTranscript(
           message: message,
@@ -1572,6 +1770,17 @@ class _Composer extends StatelessWidget {
   final VoidCallback onAttach;
   final ValueChanged<ChatNetwork> onPickNetwork;
 
+  /// What the next send will do, in one phrase.
+  ///
+  /// Used as both the hint and the accessible name, so the two cannot drift and
+  /// the mode survives the first keystroke.
+  String _fieldLabel(ChatNetwork? sendNetwork) => switch (composing?.mode) {
+    ComposerMode.edit => 'Edit message',
+    ComposerMode.reply => 'Reply',
+    null =>
+      sendNetwork == null ? 'Message' : 'Message via ${sendNetwork.label}',
+  };
+
   @override
   Widget build(BuildContext context) {
     final sendNetwork = chat.sendNetwork;
@@ -1630,23 +1839,25 @@ class _Composer extends StatelessWidget {
                   onPressed: editing ? null : onAttach,
                 ),
                 Expanded(
-                  child: TextField(
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: 5,
-                    autofocus: composing != null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => onSend(),
-                    decoration: InputDecoration(
-                      hintText: switch (composing?.mode) {
-                        ComposerMode.edit => 'Edit message',
-                        ComposerMode.reply => 'Reply',
-                        null =>
-                          sendNetwork == null
-                              ? 'Message'
-                              : 'Message via ${sendNetwork.label}',
-                      },
-                      isDense: true,
+                  // The hint is the *only* place the composer's mode is stated
+                  // in words, and a hint disappears the moment a character is
+                  // typed — so a reader who started replying and then typed had
+                  // no way left to find out that the next send is a reply. The
+                  // label says it whether the field is empty or not.
+                  child: Semantics(
+                    label: _fieldLabel(sendNetwork),
+                    textField: true,
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 5,
+                      autofocus: composing != null,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      decoration: InputDecoration(
+                        hintText: _fieldLabel(sendNetwork),
+                        isDense: true,
+                      ),
                     ),
                   ),
                 ),
@@ -1695,25 +1906,38 @@ class _ComposerContextBar extends StatelessWidget {
       redacted: message.redacted,
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.xs),
-      child: Row(
-        children: [
-          Icon(
-            editing ? Icons.edit_outlined : Icons.reply_rounded,
-            size: 16,
-            color: context.colors.onSurfaceVariant,
-          ),
-          const SizedBox(width: WeftSpace.sm),
-          Expanded(
-            child: ReplyChip(preview: preview, own: false, compact: true),
-          ),
-          IconButton(
-            tooltip: editing ? 'Cancel edit' : 'Cancel reply',
-            icon: const Icon(Icons.close_rounded, size: 18),
-            onPressed: onCancel,
-          ),
-        ],
+    // A live region, because this bar *appearing* is the whole event: it is put
+    // there by a long-press three bubbles up the thread, and a reader who was
+    // reading the timeline gets no other sign that the composer has changed
+    // what it does.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: editing
+          ? 'Editing your message'
+          : 'Replying to ${message.senderName}',
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+        child: Row(
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                editing ? Icons.edit_outlined : Icons.reply_rounded,
+                size: 16,
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: WeftSpace.sm),
+            Expanded(
+              child: ReplyChip(preview: preview, own: false, compact: true),
+            ),
+            IconButton(
+              tooltip: editing ? 'Cancel edit' : 'Cancel reply',
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: onCancel,
+            ),
+          ],
+        ),
       ),
     );
   }

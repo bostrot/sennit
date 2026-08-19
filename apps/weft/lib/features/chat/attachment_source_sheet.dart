@@ -46,10 +46,13 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
               horizontal: WeftSpace.xl,
               vertical: WeftSpace.xs,
             ),
-            child: Text(
-              'Attach',
-              style: context.text.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+            child: Semantics(
+              header: true,
+              child: Text(
+                'Attach',
+                style: context.text.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
