@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dark half of `values/colors.xml`. Same seed, `Brightness.dark`.
+
+     Dark is Weft's default brightness in the app (`WeftTheme.build` defaults to
+     it), but a widget has no say in the matter: the launcher's configuration
+     decides, and this file is how that decision reaches a Glance composable. -->
+<resources>
+    <color name="weft_widget_primary">#FFC6BFFF</color>
+    <color name="weft_widget_on_primary">#FF2E295F</color>
+    <color name="weft_widget_primary_container">#FF454077</color>
+    <color name="weft_widget_on_primary_container">#FFE4DFFF</color>
+    <color name="weft_widget_secondary">#FFC8C3DC</color>
+    <color name="weft_widget_on_secondary">#FF302E41</color>
+    <color name="weft_widget_secondary_container">#FF474459</color>
+    <color name="weft_widget_on_secondary_container">#FFE4DFF9</color>
+    <color name="weft_widget_tertiary">#FFECB8CF</color>
+    <color name="weft_widget_on_tertiary">#FF482537</color>
+    <color name="weft_widget_tertiary_container">#FF613B4E</color>
+    <color name="weft_widget_on_tertiary_container">#FFFFD8E8</color>
+    <color name="weft_widget_error">#FFFFB4AB</color>
+    <color name="weft_widget_on_error">#FF690005</color>
+    <color name="weft_widget_error_container">#FF93000A</color>
+    <color name="weft_widget_on_error_container">#FFFFDAD6</color>
+    <color name="weft_widget_surface">#FF131318</color>
+    <color name="weft_widget_on_surface">#FFE5E1E9</color>
+    <color name="weft_widget_surface_variant">#FF47464F</color>
+    <color name="weft_widget_on_surface_variant">#FFC9C5D0</color>
+    <color name="weft_widget_outline">#FF928F99</color>
+    <color name="weft_widget_inverse_surface">#FFE5E1E9</color>
+    <color name="weft_widget_inverse_on_surface">#FF313036</color>
+    <color name="weft_widget_inverse_primary">#FF5D5791</color>
+</resources>

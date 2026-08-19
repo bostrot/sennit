@@ -1,5 +1,13 @@
 plugins {
     id("com.android.application")
+    // Declared explicitly rather than left to the Flutter Gradle Plugin, which
+    // applies `kotlin-android` for a module that does not name it. The Compose
+    // compiler plugin below has to be applied *after* KGP, and "after" is only
+    // a thing that can be said about plugins this block lists.
+    id("org.jetbrains.kotlin.android")
+    // Glance. See settings.gradle.kts for why the Compose compiler is in a
+    // Flutter app at all.
+    id("org.jetbrains.kotlin.plugin.compose")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -45,6 +53,13 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
+    buildFeatures {
+        // Glance composables only. There is no Compose UI in Weft — the app is
+        // Flutter — but a `GlanceAppWidget` is compiled by the Compose compiler
+        // like any other `@Composable`, and AGP will not run it without this.
+        compose = true
+    }
+
     testOptions {
         // `clearPackageData` is an orchestrator argument: without the
         // orchestrator it is silently ignored, and the tests leak state into
@@ -75,6 +90,22 @@ dependencies {
     // dependency that a plugin upgrade drops would break the build with an
     // unresolved import rather than a version conflict.
     implementation("androidx.core:core-ktx:1.13.1")
+    // The home screen widgets. Glance is the only way to build an AppWidget
+    // without hand-writing `RemoteViews` against a layout XML per state, and
+    // this widget has five states.
+    //
+    // 1.1.1 rather than the 1.2/1.3 pre-releases on purpose: this is a surface
+    // that runs in the *launcher's* process, where a regression is a crash the
+    // user attributes to their home screen rather than to Weft, and there is
+    // nothing in the newer line these two widgets need.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    // Deliberately *not* `androidx.glance:glance-material3`. It is the obvious
+    // way to build a `ColorProviders` — hand it a `lightColorScheme` and a
+    // `darkColorScheme` — but it does not expose Compose Material 3 to its
+    // consumers, so using it means adding `androidx.compose.material3` here,
+    // which drags Compose UI, Foundation and Animation into an APK whose entire
+    // user interface is Flutter. `WeftWidgetTokens` builds the same palette out
+    // of colour resources instead; see the comment there.
     // The other half of `isCoreLibraryDesugaringEnabled` above.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // The other half of `execution = "ANDROIDX_TEST_ORCHESTRATOR"`. It is an

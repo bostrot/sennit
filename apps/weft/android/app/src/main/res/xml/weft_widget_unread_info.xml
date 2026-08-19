@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The compact unread tile. See `WeftUnreadWidget.kt`.
+
+     `updatePeriodMillis` is the one attribute here that needs explaining. The
+     snapshot is *pushed*: `WeftSnapshotStore.write` broadcasts
+     ACTION_APPWIDGET_UPDATE the moment the payload changes, so nothing on this
+     screen waits for a poll while the app is running. What a period buys is the
+     opposite case — the app is *not* running, and the snapshot ages past
+     `kSnapshotStaleAfter` (12 hours) with nobody left to notice. Without a
+     period the widget would keep showing a day-old count as though it were
+     current. An hour is well inside that window and is the coarsest granularity
+     that still gives twelve chances to notice; the system clamps anything under
+     thirty minutes anyway, and each tick is a device wake, so shorter would be
+     paying battery for a number that only changes when the app is open.
+
+     `initialLayout` is Glance's own loading layout, merged in from the
+     glance-appwidget AAR. It is what the launcher draws in the moment between
+     the widget being dropped and the first composition arriving.
+
+     `targetCellWidth`/`targetCellHeight`, `maxResize*` and `description` are all
+     API 31+ and ignored below it, which is why `minWidth`/`minHeight` and
+     `previewImage` are still here rather than replaced by them. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="57dp"
+    android:minHeight="57dp"
+    android:minResizeWidth="57dp"
+    android:minResizeHeight="57dp"
+    android:maxResizeWidth="180dp"
+    android:maxResizeHeight="180dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/weft_widget_preview_unread"
+    android:description="@string/weft_widget_unread_description"
+    android:updatePeriodMillis="3600000" />

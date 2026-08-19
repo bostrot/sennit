@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings the *launcher* renders.
+
+     Weft's own copy lives in Flutter's ARB catalogue and is reached through
+     `AppLocalizations`. Nothing in a Glance composable can reach it: the widget
+     is drawn by the launcher's process, with no Flutter engine anywhere in it,
+     so its strings have to be Android resources. That duplicates the
+     localisation *mechanism* and not a single string — no sentence in this file
+     appears in the Flutter app, and none should be copied into it.
+
+     The wording follows `surfaces_screen.dart`: plain language, the setting
+     named as it is spelled on the screen, and no jargon about payloads,
+     containers or snapshots. A person reading the empty state on their home
+     screen has not read the architecture doc. -->
+<resources>
+    <!-- Widget picker entries. `android:label` on the receiver and
+         `android:description` in the provider XML — the label is the name under
+         the icon, the description is the sentence beneath it on Android 12+. -->
+    <string name="weft_widget_unread_name">Weft unread</string>
+    <string name="weft_widget_unread_description">How many unread messages you have, across every conversation.</string>
+    <string name="weft_widget_inbox_name">Weft conversations</string>
+    <string name="weft_widget_inbox_description">Your most recent conversations. Tap one to open it.</string>
+
+    <!-- The list widget's heading. "Recent" rather than "Inbox": the rows are
+         the top of the chat list, not all of it, and the row cap means they
+         always will be. -->
+    <string name="weft_widget_inbox_heading">Recent</string>
+
+    <!-- Under the compact tile's number. Lower case because it is the second
+         half of "7 unread", not a heading. -->
+    <string name="weft_widget_unread_label">unread</string>
+
+    <!-- Spoken, never drawn: the merged half of a row's accessibility
+         description. The other half is the number of network dots, so that
+         merged-ness is never carried by colour alone. -->
+    <string name="weft_widget_merged">Merged conversation</string>
+
+    <!-- Signed out: no payload at all, because the writer deletes it on logout.
+         The one empty state that must not mention the setting — the setting is
+         not the problem, and pointing someone at it who has simply signed out
+         sends them looking for a switch that will not help. -->
+    <string name="weft_widget_signed_out_title">Sign in to Weft</string>
+    <string name="weft_widget_signed_out_body">Open Weft and sign in to see your conversations here.</string>
+
+    <!-- Switched off: signed in, and the home screen may not draw. Names the
+         switch as it is spelled on the settings screen. -->
+    <string name="weft_widget_disabled_title">Widgets are off</string>
+    <string name="weft_widget_disabled_body">Open Weft and turn on Home screen widgets under Widgets &amp; watch.</string>
+
+    <!-- Stale or unreadable. Deliberately one sentence for both: a
+         twelve-hour-old snapshot and a half-written one are the same fact to the
+         person reading it — these counts are not the truth — and there is
+         nothing a home screen can offer for either except this. It does not say
+         "error", because nothing has gone wrong: a phone that was not opened
+         overnight arrives here every morning. -->
+    <string name="weft_widget_stale_title">Open Weft on your phone</string>
+    <string name="weft_widget_stale_body">This is out of date. Open Weft to refresh it.</string>
+
+    <!-- Switched on, nothing to show: an empty inbox, or one whose every
+         conversation is on a network you excluded. Phrased so it does not read
+         as a failure, and it names the second cause because that one is a
+         setting the user chose and may have forgotten. -->
+    <string name="weft_widget_empty_title">No conversations</string>
+    <string name="weft_widget_empty_body">Nothing to show yet. Conversations on excluded networks are never shown here.</string>
+
+    <!-- Spoken for the compact tile and for a row's badge. A quantity string
+         rather than "%1$d unread" because "1 unread messages" is a widget being
+         read aloud getting it wrong. -->
+    <plurals name="weft_widget_unread_count">
+        <item quantity="one">%1$d unread message</item>
+        <item quantity="other">%1$d unread messages</item>
+    </plurals>
+</resources>

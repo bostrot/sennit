@@ -244,6 +244,49 @@
             android:name=".call.CallActionReceiver"
             android:exported="false"/>
 
+        <!-- Home screen widgets. Both are `GlanceAppWidgetReceiver`s, which are
+             `AppWidgetProvider`s underneath, which are `BroadcastReceiver`s —
+             so what is declared here is the same three lines an AppWidget has
+             always needed: the UPDATE action, and the `<meta-data>` pointing at
+             the provider XML that describes the sizes.
+
+             `exported="true"` is not optional and not a widening: the sender of
+             ACTION_APPWIDGET_UPDATE is the system, in another process, and a
+             non-exported provider is one the launcher can never place. It is
+             also what lets `WeftSnapshotStore.notifySurfaces` redraw them the
+             moment the payload changes — that broadcast is explicit, aimed at
+             our own component, and is how a widget is current rather than up to
+             an hour old.
+
+             What a widget may *draw* is not decided here. The receivers read
+             `WeftSnapshotStore.widgetsEnabled` on every update and render an
+             empty state when it is false, so a placed widget on a phone whose
+             owner never turned the setting on shows a sentence explaining that
+             and no conversations. Fail-closed lives in Kotlin, not in the
+             manifest, because the manifest cannot express "off until asked". -->
+        <receiver
+            android:name=".widget.WeftUnreadWidgetReceiver"
+            android:label="@string/weft_widget_unread_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/weft_widget_unread_info"/>
+        </receiver>
+        <receiver
+            android:name=".widget.WeftInboxWidgetReceiver"
+            android:label="@string/weft_widget_inbox_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/weft_widget_inbox_info"/>
+        </receiver>
+
         <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
              declared by the firebase_messaging plugin and merged in from its
              own manifest — redeclaring it here would be a second entry for one

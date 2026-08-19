@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- `weft_design`'s scheme, as Android resources, for the home screen widgets.
+
+     These are `ColorScheme.fromSeed(WeftTheme.defaultSeed)` — the exact tones
+     Material's tonal palette derives from `0xFF6C5CE7`, read out of the running
+     app rather than eyeballed — so a widget on a device without dynamic colour
+     is the same indigo-violet as the app above it rather than a near miss.
+     `weft_design` remains the source of truth; this file is a copy, and a change
+     to the seed is a change owed here. That duplication is the same one
+     `ShareContainer.swift` makes for its path constants and for the same reason:
+     the process that renders this has no Flutter in it.
+
+     **Light here, dark in `values-night/colors.xml`.** Glance resolves a
+     resource-backed `ColorProvider` against the configuration it is drawn in, so
+     the night variant is the whole of the widget's dark mode — there is no
+     branch in Kotlin and there should not be one. The same mechanism the app's
+     own `values-night/styles.xml` already uses.
+
+     Only reached below Android 12. From 12 up `WeftGlanceTheme` defers to the
+     system's dynamic palette, which is what makes a widget look like it belongs
+     on the home screen it was placed on. -->
+<resources>
+    <color name="weft_widget_primary">#FF5D5791</color>
+    <color name="weft_widget_on_primary">#FFFFFFFF</color>
+    <color name="weft_widget_primary_container">#FFE4DFFF</color>
+    <color name="weft_widget_on_primary_container">#FF454077</color>
+    <color name="weft_widget_secondary">#FF5F5C71</color>
+    <color name="weft_widget_on_secondary">#FFFFFFFF</color>
+    <color name="weft_widget_secondary_container">#FFE4DFF9</color>
+    <color name="weft_widget_on_secondary_container">#FF474459</color>
+    <color name="weft_widget_tertiary">#FF7B5266</color>
+    <color name="weft_widget_on_tertiary">#FFFFFFFF</color>
+    <color name="weft_widget_tertiary_container">#FFFFD8E8</color>
+    <color name="weft_widget_on_tertiary_container">#FF613B4E</color>
+    <color name="weft_widget_error">#FFBA1A1A</color>
+    <color name="weft_widget_on_error">#FFFFFFFF</color>
+    <color name="weft_widget_error_container">#FFFFDAD6</color>
+    <color name="weft_widget_on_error_container">#FF93000A</color>
+    <color name="weft_widget_surface">#FFFCF8FF</color>
+    <color name="weft_widget_on_surface">#FF1C1B20</color>
+    <color name="weft_widget_surface_variant">#FFE5E1EC</color>
+    <color name="weft_widget_on_surface_variant">#FF47464F</color>
+    <color name="weft_widget_outline">#FF787680</color>
+    <color name="weft_widget_inverse_surface">#FF313036</color>
+    <color name="weft_widget_inverse_on_surface">#FFF4EFF7</color>
+    <color name="weft_widget_inverse_primary">#FFC6BFFF</color>
+</resources>

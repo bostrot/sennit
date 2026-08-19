@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget-picker preview for the recent-conversations list.
+
+     Same reasoning as weft_widget_preview_unread.xml: a shape study, not a
+     screenshot, because a compiled-in preview cannot show real conversations and
+     inventing plausible ones would advertise a disclosure the user has not
+     agreed to. Three rows, each with its network dot, its title bar, its preview
+     bar and its unread pill — the layout `WeftConversationRow` actually draws.
+
+     Canvas is 256×192, roughly a 4×3 cell widget. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="192dp"
+    android:viewportWidth="256"
+    android:viewportHeight="192">
+    <!-- The card. -->
+    <path
+        android:fillColor="#FCF8FF"
+        android:pathData="M14,0 L242,0 A14,14 0 0 1 256,14 L256,178 A14,14 0 0 1 242,192 L14,192 A14,14 0 0 1 0,178 L0,14 A14,14 0 0 1 14,0 Z" />
+    <!-- "Recent" heading. -->
+    <path
+        android:fillColor="#47464F"
+        android:pathData="M16,16 L60,16 A3,3 0 0 1 60,22 L16,22 A3,3 0 0 1 16,16 Z" />
+
+    <!-- Row one: unread, so a filled pill on the right. -->
+    <path android:fillColor="#25D366" android:pathData="M16,42 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#1C1B20" android:pathData="M32,36 L140,36 A4,4 0 0 1 140,44 L32,44 A4,4 0 0 1 32,36 Z" />
+    <path android:fillColor="#47464F" android:pathData="M32,50 L188,50 A3,3 0 0 1 188,56 L32,56 A3,3 0 0 1 32,50 Z" />
+    <path android:fillColor="#5D5791" android:pathData="M218,38 L232,38 A8,8 0 0 1 232,54 L218,54 A8,8 0 0 1 218,38 Z" />
+
+    <!-- Row two: merged — two dots stacked, which is the non-colour half of how
+         a merged conversation says so. -->
+    <path android:fillColor="#3A76F0" android:pathData="M16,76 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#25D366" android:pathData="M16,90 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#1C1B20" android:pathData="M32,78 L120,78 A4,4 0 0 1 120,86 L32,86 A4,4 0 0 1 32,78 Z" />
+    <path android:fillColor="#47464F" android:pathData="M32,92 L200,92 A3,3 0 0 1 200,98 L32,98 A3,3 0 0 1 32,92 Z" />
+
+    <!-- Row three: read, so no pill. -->
+    <path android:fillColor="#2AABEE" android:pathData="M16,126 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#1C1B20" android:pathData="M32,120 L156,120 A4,4 0 0 1 156,128 L32,128 A4,4 0 0 1 32,120 Z" />
+    <path android:fillColor="#47464F" android:pathData="M32,134 L176,134 A3,3 0 0 1 176,140 L32,140 A3,3 0 0 1 32,134 Z" />
+
+    <!-- Row four, half-height: the list scrolls. -->
+    <path android:fillColor="#5865F2" android:pathData="M16,166 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#1C1B20" android:pathData="M32,162 L132,162 A4,4 0 0 1 132,170 L32,170 A4,4 0 0 1 32,162 Z" />
+</vector>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The recent-conversations list. See `WeftInboxWidget.kt`.
+
+     `updatePeriodMillis` is an hour for the reason spelled out in
+     weft_widget_unread_info.xml: the payload is pushed, and the period exists
+     only so a snapshot that goes stale while the app is closed stops being
+     presented as current.
+
+     The resize range is what makes this widget worth having at more than one
+     size. `minResizeHeight` is deliberately below `minHeight` — the system uses
+     the first to decide whether the widget may be *offered* at a size and the
+     second for how small it may be *dragged* to, and a two-row Weft list is a
+     perfectly good widget even though nobody would place it that way. Below
+     `WeftWidgetTokens.PREVIEW_MIN_WIDTH` (220dp) the rows drop their preview
+     line, which is why the horizontal range goes down to 180dp rather than
+     stopping at a width where every row would be an ellipsis. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="70dp"
+    android:maxResizeWidth="500dp"
+    android:maxResizeHeight="400dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/weft_widget_preview_inbox"
+    android:description="@string/weft_widget_inbox_description"
+    android:updatePeriodMillis="3600000" />
