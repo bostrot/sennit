@@ -13,6 +13,7 @@ related:
   - '[[Share-Surfaces]]'
   - '[[Notifications]]'
   - '[[E2E-Matrix]]'
+  - '[[Companion-Surfaces]]'
 ---
 
 # ADR-002: iOS signing handoff
@@ -77,6 +78,10 @@ profiles. This document is the exact list.
 | `NotificationService` | `com.bostrot.weft.NotificationService` | Notification service extension (`com.apple.usernotifications.service`) | **No** | none, deliberately |
 | `RunnerTests` | `com.bostrot.weft.RunnerTests` | Unit test bundle | No | none |
 | `RunnerUITests` | `com.bostrot.weft.RunnerUITests` | UI test bundle (XCUITest), added Phase 09 | No | none |
+| `WeftWidget` (iOS) | `com.bostrot.weft.WeftWidget` | WidgetKit extension (`com.apple.widgetkit-extension`), added Phase 10 | **Yes** | `ios/WeftWidget/WeftWidget.entitlements` |
+| `WeftWidget` (macOS) | `com.bostrot.weft.WeftWidget` | WidgetKit extension, macOS half of the same source, added Phase 10 | **Yes**, once signed | `ios/WeftWidget/WeftWidget-macOS.entitlements` |
+| `WeftWatch` | `com.bostrot.weft.watchkitapp` | watchOS app (`WKApplication`), added Phase 10 | **Yes** | `ios/WeftWatch/WeftWatch.entitlements` |
+| `WeftWatchComplication` | `com.bostrot.weft.watchkitapp.WeftWatchComplication` | WidgetKit extension inside the watch app, added Phase 10 | **Yes** | `ios/WeftWatch/WeftWatchComplication.entitlements` |
 
 Three App IDs and **two** profiles carrying the App Group, not three.
 `NotificationService` has no entitlements file on purpose: it does not read the
@@ -90,6 +95,14 @@ match the portal and each other:
 - `ios/Runner/Runner.entitlements`
 - `ios/ShareExtension/ShareExtension.entitlements`
 - `WeftShareContainer.appGroupIdentifier` in `ios/Shared/ShareContainer.swift`
+
+> [!NOTE]
+> **The two counts above are Phase 04's and are left as they were written**, per
+> the append-only rule at the top. Phase 10 added four more targets, three more
+> of them carrying the group; the current totals are in
+> [Phase 10](#phase-10--widgetkit-watchos-and-wear-os), which also lists the two
+> further files the group identifier is now spelled in. Nothing in Phase 04's
+> arithmetic became *wrong* — it stopped being complete.
 
 ## What you must do
 
@@ -277,9 +290,11 @@ compile despite all of the above.
 
 ## Added by later phases
 
-Phase 10 still appends here — WidgetKit and watchOS. Phase 09 has appended: the
-Patrol UI-test target is [below](#phase-09--the-patrol-ui-test-target-and-why-it-is-a-fourth-app-id).
-Add a `### Phase NN — <capability>` section and a row to
+Phase 09 has appended: the Patrol UI-test target is
+[below](#phase-09--the-patrol-ui-test-target-and-why-it-is-a-fourth-app-id).
+Phase 10 has appended: WidgetKit, watchOS and Wear OS are
+[below](#phase-10--widgetkit-watchos-and-wear-os). Add a
+`### Phase NN — <capability>` section and a row to
 [Targets and bundle ids](#targets-and-bundle-ids) rather than editing what is
 above.
 
@@ -459,3 +474,149 @@ it builds and signs *Sign to Run Locally* with no identity at all. macOS's
 blocker is an interactive Accessibility grant instead, which is
 [recorded with the matrix](../quality/e2e-matrix.md#results) rather than here —
 it is not a signing question and this document does not own it.
+
+### Phase 10 — WidgetKit, watchOS and Wear OS
+
+Phase 10 added the companion surfaces: home screen widgets on both mobile
+platforms, a Lock Screen accessory, and a watch app with a complication on each
+watch platform. See [[Companion-Surfaces]] for what they render and why none of
+them can hold a Matrix session.
+
+**Four new Apple targets across two projects, and three of them need the App
+Group.** They are authored, committed and compiled; none is signed, on the same
+terms as everything above.
+
+| Target | Project | Bundle id | Deployment target | App Group |
+|---|---|---|---|---|
+| `WeftWidget` | `ios/Runner.xcodeproj` | `com.bostrot.weft.WeftWidget` | `IPHONEOS_DEPLOYMENT_TARGET = 16.0` | **Yes**, in the entitlements for real |
+| `WeftWidget` | `macos/Runner.xcodeproj` | `com.bostrot.weft.WeftWidget` | `MACOSX_DEPLOYMENT_TARGET = 12.0` | **Commented out** — see below |
+| `WeftWatch` | `ios/Runner.xcodeproj` | `com.bostrot.weft.watchkitapp` | `WATCHOS_DEPLOYMENT_TARGET = 11.0` | **Yes** |
+| `WeftWatchComplication` | `ios/Runner.xcodeproj` | `com.bostrot.weft.watchkitapp.WeftWatchComplication` | `WATCHOS_DEPLOYMENT_TARGET = 11.0` | **Yes** |
+
+The App Group is unchanged and is still **`group.com.bostrot.weft`** — one
+group, one capability, one string that can be wrong. It is now spelled in five
+files rather than three:
+
+- `ios/Runner/Runner.entitlements`
+- `ios/ShareExtension/ShareExtension.entitlements`
+- `ios/WeftWidget/WeftWidget.entitlements` *(new)*
+- `ios/WeftWatch/WeftWatch.entitlements` *(new)*
+- `ios/WeftWatch/WeftWatchComplication.entitlements` *(new)*
+
+plus the two Swift constants: `WeftShareContainer.appGroupIdentifier` in
+`ios/Shared/ShareContainer.swift` and `WeftSnapshotContainer.appGroupIdentifier`
+in `ios/Shared/SnapshotContainer.swift`. `ios/WeftWidget/WeftWidget-macOS.entitlements`
+carries it as a **comment** rather than a key, for the reason in the next
+section.
+
+So the running totals: **six App IDs**, and **five** of them carrying the App
+Group. `NotificationService`, `RunnerTests` and `RunnerUITests` still carry none,
+for the reasons already stated.
+
+#### Two things about these bundle ids that are not free choices
+
+**`com.bostrot.weft.watchkitapp` is a convention with teeth.** A watch app is
+submitted *inside* its companion's archive rather than beside it, and the pairing
+is by `WKCompanionAppBundleIdentifier` in `WeftWatch/Info.plist` — spelled
+literally as `com.bostrot.weft`, because this target's id derives from the
+phone's rather than the other way round. A typo there is a watch app that
+installs, launches, and never hears from the phone. The complication's id is a
+prefixed child of the watch app's, not of `Runner`'s: it is an extension embedded
+in `WeftWatch.app/PlugIns/`, so its App ID has to sit under the watch app's in
+the portal's hierarchy.
+
+**The version pair applies to all four**, the same as
+[step 5](#5-check-the-version-pair-before-uploading). Every new `Info.plist`
+reads `$(FLUTTER_BUILD_NAME)` / `$(FLUTTER_BUILD_NUMBER)`, in scope through each
+target's own xcconfig `#include` of `Flutter/Generated.xcconfig`. A watch app
+whose `CFBundleShortVersionString` differs from the phone app's is rejected at
+upload, and so is a complication whose differs from the watch app's — three
+bundles that must agree rather than two.
+
+#### The macOS App Group is deliberately a comment
+
+`ios/WeftWidget/WeftWidget-macOS.entitlements` carries the sandbox key for real
+and the App Group as a documented block. Three facts, in the order they matter:
+
+1. **The spelling differs from iOS and not cosmetically.** macOS App Groups are
+   team-prefixed: the same group is `group.com.bostrot.weft` on iOS and
+   `<TeamID>.group.com.bostrot.weft` here. `$(TeamIdentifierPrefix)` is the build
+   setting that expands to `<TeamID>.`, which keeps the team id out of version
+   control. The exact block to paste is in the file.
+2. **Adding it now breaks the build for everyone.** Unlike the sandbox, an App
+   Group entitlement cannot be ad-hoc signed. With it present `xcodebuild`
+   refuses before compiling anything — *"WeftWidget requires a provisioning
+   profile"* — and because `Runner` depends on this target, that is
+   `flutter build macos` failing on any machine without the team's certificate.
+   Verified by building the same target with a sandbox-only entitlements file,
+   which got past it. The iOS half has no such problem, because
+   `flutter build ios --no-codesign` skips signing entirely.
+3. **It buys nothing until `macos/Runner` has the group too**, and that target
+   does not request one either — Phase 04 left it out on the same reasoning. So
+   the *writing* side is equally inert: `containerURL(...)` returns nil in both
+   processes, the app reports the snapshot write as refused, and the extension
+   draws its signed-out state. Both are states the code already survives.
+
+#### Checklist, for whoever holds the signing identity
+
+Nothing below is optional if a widget is to show anything but "Sign in to Weft".
+All of it is the same trip to the same portal as the rest of this document.
+
+- [ ] **Register three new App IDs** under *Identifiers → App IDs*, in the order
+      of the table below — each is a prefixed child of the one above it, and the
+      portal is happier when the parent already exists. All three get **App
+      Groups** → `group.com.bostrot.weft` and nothing else. The group itself
+      already exists from
+      [step 1](#1-create-the-app-group-on-the-developer-portal); do not create a
+      second one.
+
+  | Identifier | Capabilities |
+  |---|---|
+  | `com.bostrot.weft.WeftWidget` | **App Groups** → `group.com.bostrot.weft` |
+  | `com.bostrot.weft.watchkitapp` | **App Groups** → `group.com.bostrot.weft` |
+  | `com.bostrot.weft.watchkitapp.WeftWatchComplication` | **App Groups** → `group.com.bostrot.weft` |
+
+- [ ] **Select the team on all four new targets** in Xcode —
+      `WeftWidget` in *both* projects, `WeftWatch`, `WeftWatchComplication` —
+      the same as [step 3](#3-select-a-team-in-xcode-for-every-target). Check the
+      resulting `*.entitlements` diff: "fix" occasionally means *remove the
+      entitlement that does not match a profile*.
+- [ ] **Uncomment the App Group in `WeftWidget-macOS.entitlements`**, with the
+      `$(TeamIdentifierPrefix)` prefix, **and add the same key to
+      `macos/Runner/DebugProfile.entitlements` and
+      `macos/Runner/Release.entitlements`.** One without the other is two private
+      containers and a widget that renders its signed-out state forever. Do this
+      in the same change, and expect `flutter build macos` to start requiring a
+      certificate from that commit onward — which is the trade, stated so it is
+      not a surprise.
+- [ ] **Generate distribution profiles** for the three new App IDs, per
+      [step 4](#4-generate-the-distribution-profiles). An appex is signed
+      separately and a missing profile fails the **upload**, not the build.
+- [ ] **Then run `flutter build ios`.** It has never completed here, and not
+      because of these targets — `pod install` fails first on `whisper_ggml`, per
+      [Outstanding](#outstanding-the-ios-deployment-target-is-your-call). The
+      `WeftWidget` target's own iOS 16.0 floor appears in that same output as a
+      *warning* about the Podfile's unspecified platform, not as the error.
+
+#### Wear OS needs nothing from this document
+
+The Wear OS companion (`apps/weft/android/wear/`) is a separate Gradle module
+producing a separate APK, and it is here only so nobody goes looking for it under
+a heading it does not belong to. It has no Apple relationship and no portal step.
+
+What it *does* have is one rule with the same shape as the App Group's, and it is
+worth stating because getting it wrong fails the same way — silently:
+
+> **Wear OS pairs a watch app to a phone app by package name and signing
+> certificate.** That is the entire mechanism.
+
+So `android/wear/build.gradle.kts` sets `applicationId = "com.bostrot.weft"` —
+the *same* id as the phone app, deliberately — and signs its release build with
+the same debug key `:app` uses. A watch APK with an id of its own, or signed with
+a different certificate, is one the Data Layer will happily deliver nothing to,
+forever, with no error anywhere. When the phone app moves to a real upload key,
+**both APKs must move to it together.**
+
+For the record: `:wear` declares no `INTERNET` permission, requests no App Group
+analogue, and applies no Flutter Gradle plugin. There is nothing on a watch to
+provision because there is nothing on the watch that can reach a homeserver.

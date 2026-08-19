@@ -45,7 +45,9 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Notification delivery — pusher registration, sync + push pipeline, channels per network, `MessagingStyle`, conversation shortcuts, tap routing | **Done**, 61 + 78 tests, and **verified on an Android device**: channels, shortcut, `MessagingStyle`, actions, and a tap that opens the right chat both warm and from a killed process. Needs a push gateway URL and a Firebase config to receive a push; without them Weft notifies while it is running. |
 | Notification actions — direct reply, mark read, mute for an hour, on Android and iOS | **Done**, wired to `ChatRepository`; a reply typed in the Android shade has been sent as a real encrypted event. All three bring Weft to the foreground on Android: an action handled without doing so runs in a background isolate with no Matrix client. |
 | Notification settings — master switch, per-network on/muted/off, mentions-only, quiet hours, lock-screen previews, muted-chat list, push gateway, test notification | **Done**, 25 widget tests. The test button runs a synthetic message through the real `evaluateNotification` path and reports the rule that suppressed it. No per-chat notification screen yet: the policy has per-chat `mentionsOnly` and `bypassQuietHours` and nothing writes them. |
-| iOS Share Extension, notification service extension, Direct Share/People API, widgets, watch | **Not built** — the notification service extension is authored at `apps/weft/ios/NotificationService/` but needs Xcode targets and signing |
+| Direct Share / People API | **Done** and **verified on an Android device**: eight conversations published with both categories and per-face avatars, offered above the app row in another app's share sheet, and a tap landing on the confirm step from a cold start. See [share surfaces](docs/architecture/share-surfaces.md). |
+| Apple extension targets — Share Extension, notification service extension, WidgetKit widget, watchOS app + complication | **Authored, registered and compiling** — every target builds under `xcodebuild … CODE_SIGNING_ALLOWED=NO`, the widget appex is embedded by a real `flutter build macos`, and the watch app builds against `watchsimulator` with its complication inside it. **None is signed and none has run on an Apple device.** `flutter build ios` has never completed here: `pod install` fails on `whisper_ggml`'s 15.6 floor against Runner's `IPHONEOS_DEPLOYMENT_TARGET = 13.0`, which predates all of these targets. The macOS App Group is a documented comment rather than an entitlement, because one cannot be ad-hoc signed. [ADR-002](docs/decisions/adr-002-ios-signing-handoff.md) is the exact handoff — six App IDs, five carrying the group. |
+| Companion surfaces — the snapshot policy and codec, the writer and its privacy gate, Android Glance widgets, the WidgetKit widget and Lock Screen accessory, watchOS and Wear OS apps with tile and complications, and the watch quick-reply round trip | **Done**, 101 + 83 tests and 12 goldens. Off by default with separate widget and watch switches, two preview flags and per-network exclusion — no surface holds a Matrix session, so all four render one snapshot the app decides to write. **Verified on an Android emulator**: both widgets place from the picker, render the real inbox, count 21 unread correctly, redact correctly at every setting, and tap through to the right conversation including from a cold process. **No paired watch on either platform**, so no reply has made the round trip over a real radio — the emulator answers `Wearable.API is not available on this device`, which the bridge logs and survives. No iOS build, per the row above. See [companion surfaces](docs/architecture/companion-surfaces.md). |
 | SMS/MMS logic — phone normalisation, GSM-7/UCS-2 segment counting, MMS size limits, identity evidence that merges a number with its bridged handle | **Done**, pure Dart, 94 tests |
 | SMS Android surface — default-SMS-app role via `RoleManager`, `SMS_DELIVER`/`WAP_PUSH_DELIVER` receivers, respond-via-message service, system-provider reads and writes, delivery reports, `sms:`/`smsto:` composer links | **Done** and **wired into the merged inbox**: threads, messages, delivery reports and sending go through `SmsChatRepository`, an SMS number merges with the bridged chat for the same number, bodies are indexed for search, and the composer shows the segment count and a plaintext indicator. Kotlin + a `com.bostrot.weft/sms` channel, 66 tests and 4 goldens. The role is asked for from Settings → SMS, and **the dialog has been raised and declined on a device**: Weft stays fully functional as a non-default app, with the SMS network simply absent. **Incoming MMS are not downloaded**: Android exposes the transport but not the PDU parser, so retrieval means vendoring AOSP's. |
 | Multi-device — device manager (rename, sign out, sign out others with re-auth), unverified-device banner in encrypted chats, cross-signing and key-backup setup, recovery key with show-once and confirm steps, restore from key or passphrase, verification QR | **Done**, 86 tests and 6 goldens. The QR is rendered for the other device to scan, and the scanning end is a `QrScanner` seam with no camera behind it: the Matrix payload is binary, and a decoder that returns raw bytes on every platform is a dependency this has not taken yet. Emoji comparison covers Weft-to-Weft, and an Element on the other side can scan. |
@@ -53,7 +55,7 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | Calling — 1:1 voice and video over Matrix WebRTC, CallKit, `ConnectionService`, TURN handling | **Done**, 122 + 57 + 105 tests and 10 goldens, and **a real call between two accounts on the local Synapse**: invite, ring, answer, candidates both ways, connected, hangup, in an encrypted room. Matrix-native conversations only — the button is disabled with a reason for a bridged chat. **No media has been proven on a device**: the peer connection is a fake in every test, and iOS needs a VoIP APNs certificate before a call can ring a suspended app. See [calling](docs/architecture/calling.md). |
 | Patrol device matrix, a11y/RTL passes (M10) | **In progress**, against [`docs/quality/a11y-audit.md`](docs/quality/a11y-audit.md) — a per-screen, per-line inventory of 234 findings across all 50 UI files, and **all 234 are now fixed, verified correct, or deferred with a stated blocker**: the contrast and motion token layer (194 assertions over seven themes), all 140 semantics findings, all five keyboard findings, all 42 RTL findings, all 15 touch-target findings under the `meetsGuideline` sweep, and all 16 text-scale findings. Weft declares `en`, `ar` and `he` with the Flutter localisation delegates, so it can actually be put into RTL; every layout uses directional APIs, and each message resolves its own base direction from its own text, so a Hebrew message reads right-to-left inside an English conversation. 40 accessibility goldens cover Arabic, 0.85×, 2.0× and high contrast over five scenes in both themes, and a new CI job runs the whole a11y surface — including `weft_design`, which had never run in CI at all. **Open:** verification against a real screen reader. **Nothing here has been heard out loud** — no VoiceOver, no TalkBack, no device in an RTL locale.<br><br>The Patrol half is **written and partly run**, recorded per scenario in [`docs/quality/e2e-matrix.md`](docs/quality/e2e-matrix.md): a harness that builds and works on Android (instrumentation APK, `PatrolJUnitRunner`, native automator), 13 files holding **39 scenarios** against a live Synapse, a `tooling/scripts/e2e.sh` that runs the whole thing in one command, and an `e2e.yaml` nightly for an 11-row device matrix. **0 of those 11 rows has been executed.** 12 scenarios ran on an off-matrix API 36 emulator — **5 passed, 7 failed** — and nine files have never run anywhere. The suite found four defects doing it, two now fixed: Weft was pointing the Matrix SDK's file-store garbage collector at the directory holding its own `weft.sqlite` (a dormant account could lose its database and its device keys), and the devices list reported trust by scroll offset. Still open: sign-out throws and never reaches the login screen, a sent message stops at `Sent`, three of four chat actions fail on the peer, and the gallery picker hangs after the pick. Android needs a CI dispatch, iOS a simulator runtime and [ADR-002](docs/decisions/adr-002-ios-signing-handoff.md)'s signing identity, macOS one interactive Accessibility grant. |
 
-**2532 tests pass** (plus 9 integration tests on a real engine: 8 against a live Synapse, and one that drives the whole attachment loop; and, separately counted because most of it has never been executed, a 39-scenario Patrol device suite — see [the device matrix](docs/quality/e2e-matrix.md)). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added, and the Android APK after core library desugaring was enabled for the same plugin — the whole notification loop was then driven on an Android 16 emulator against the local Synapse. Both builds were re-verified again after `flutter_webrtc`, CallKit and `ConnectionService` landed, and a call was placed between two accounts on that Synapse — signalling end to end, media faked, and the homeserver's answer to "do you have a TURN server?" was no.
+**2716 tests pass** (plus 9 integration tests on a real engine: 8 against a live Synapse, and one that drives the whole attachment loop; and, separately counted because most of it has never been executed, a 39-scenario Patrol device suite — see [the device matrix](docs/quality/e2e-matrix.md)). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added, and the Android APK after core library desugaring was enabled for the same plugin — the whole notification loop was then driven on an Android 16 emulator against the local Synapse. Both builds were re-verified again after `flutter_webrtc`, CallKit and `ConnectionService` landed, and a call was placed between two accounts on that Synapse — signalling end to end, media faked, and the homeserver's answer to "do you have a TURN server?" was no. The macOS build was re-verified once more with the WidgetKit appex embedded, and a release APK with both home screen widgets was driven on an Android 16 emulator. **iOS is still the one platform with no whole-app build**, for two reasons that are not this repository's: `whisper_ggml`'s deployment-target floor and a machine with no iOS platform components. See [ADR-002](docs/decisions/adr-002-ios-signing-handoff.md).
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -107,7 +109,9 @@ Also valid: `-d linux`, `-d windows`, `-d ios`, `-d android`.
 > tells the gateway *that* something happened and never *what* — the body is
 > fetched and decrypted on the device. On iOS that makes a notification service
 > extension necessary; one is authored at `apps/weft/ios/NotificationService/`
-> and is not yet part of the Xcode project. See the README in that directory.
+> and has been a registered target in `Runner.xcodeproj` since Phase 04. It is
+> unsigned, like every other Apple target here, and has never run on a device.
+> See the README in that directory.
 >
 > Firebase's CocoaPods distribution is deprecated after October 2026 and this
 > project has Swift Package Manager disabled (see the macOS note above), so the
@@ -273,6 +277,7 @@ packages/
   weft_transcribe/          pluggable STT adapters
   weft_notify/              notification rules, content, dedupe ledger
   weft_share/               share-target ranking, network capability, App Group staging
+  weft_snapshot/            what a widget, a Lock Screen and a watch may know
   weft_richtext/            formatted-body allowlist, reply fallbacks, reactions, edits
   weft_sms/                 phone identity, GSM-7/UCS-2 segments, MMS part planning
   weft_call/                call state machine, glare resolution, ICE candidate buffering
@@ -297,7 +302,7 @@ because a full matrix on every commit is not affordable. What each row covers,
 what it skips and why is [`docs/quality/e2e-matrix.md`](docs/quality/e2e-matrix.md).
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
-`weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext`, `weft_sms`, `weft_call` and `weft_mcp` are **pure Dart** —
+`weft_transcribe`, `weft_notify`, `weft_share`, `weft_snapshot`, `weft_richtext`, `weft_sms`, `weft_call` and `weft_mcp` are **pure Dart** —
 no Flutter, no I/O. That is deliberate: the subtle logic lives there and runs under `dart test` in about a
 second, with no device and no homeserver.
 
@@ -322,15 +327,21 @@ what is lost with no backup and no second device, and how the session-transfer
 QR reuses the bridge login's card, and
 [calling](docs/architecture/calling.md) covers glare resolution, ICE candidate
 buffering, why the media engine is injected, and why a homeserver with no TURN
-server has to say so rather than place a call that never connects.
+server has to say so rather than place a call that never connects, and
+[companion surfaces](docs/architecture/companion-surfaces.md) covers why no
+widget or watch can hold a Matrix session, the snapshot as a privacy decision
+rather than a layout, why its codec must survive a payload from a *newer* app
+than the extension reading it, and the watch reply round trip.
 
 Decisions that need something this repository cannot hold live in
 `docs/decisions/` —
 [ADR-002](docs/decisions/adr-002-ios-signing-handoff.md) is the iOS signing
-handoff: the App Group, the three bundle ids and the profiles that have to exist
-before iOS share-in works, and the VoIP Services certificate — a second
-credential an APNs auth key cannot substitute for — that has to exist before an
-incoming call can ring a suspended iPhone.
+handoff: the App Group, the six bundle ids and the profiles that have to exist
+before iOS share-in, the WidgetKit widget and the watch app work; the VoIP
+Services certificate — a second credential an APNs auth key cannot substitute
+for — that has to exist before an incoming call can ring a suspended iPhone; and
+the deployment-target decision that currently stops `flutter build ios` before it
+reaches Xcode.
 
 ## Two things worth knowing before contributing
 
@@ -377,6 +388,13 @@ your plaintext to that endpoint. So:
 - Remote embedding and remote STT are **off by default**.
 - Enabling either requires explicit opt-in with a plain-language warning.
 - Both support per-network exclusion.
+- **Home screen widgets and the watch companions are off by default too**, and
+  for a related reason: a widget row is message content sitting outside the
+  encrypted store, in a file the OS and any device-level backup can read. Same
+  treatment — one plain sentence attached to the switch itself, per-network
+  exclusion, and *separate* flags for what was said and who said it. Nothing is
+  written until a surface is turned on. See
+  [companion surfaces](docs/architecture/companion-surfaces.md).
 - An on-device embedding model is the intended private default.
 - `HashingEmbeddingProvider` gives working (non-semantic) vectors with no
   network at all, so search degrades rather than breaking when nothing is
