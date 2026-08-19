@@ -41,11 +41,16 @@ class WeftInboxWidget : GlanceAppWidget() {
     /// is already capped at `kDefaultSnapshotRowCap`.
     override val sizeMode: SizeMode = SizeMode.Exact
 
+    /// The state read is *inside* [provideContent], and that placement is the
+    /// whole of whether this widget ever changes. See [WeftUnreadWidget] for the
+    /// device behaviour that settled it.
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val state = WeftWidgetState.read(context, System.currentTimeMillis())
         provideContent {
             WeftGlanceTheme {
-                WeftInboxContent(context = context, state = state)
+                WeftInboxContent(
+                    context = context,
+                    state = WeftWidgetState.read(context, System.currentTimeMillis()),
+                )
             }
         }
     }

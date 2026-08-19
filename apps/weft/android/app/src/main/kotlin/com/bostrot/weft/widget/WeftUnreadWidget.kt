@@ -36,15 +36,31 @@ class WeftUnreadWidget : GlanceAppWidget() {
     /// recomposition per size for no difference in output.
     override val sizeMode: SizeMode = SizeMode.Single
 
-    /// The state read is here rather than inside the composition on purpose: it
-    /// touches `SharedPreferences`, `provideGlance` is the suspending half where
-    /// that belongs, and the system may compose the returned content more than
-    /// once.
+    /// The state read is *inside* [provideContent], not before it.
+    ///
+    /// This was the other way round until a device pass caught what it costs.
+    /// `provideGlance` runs once per Glance *session* — when the widget is first
+    /// bound, or after the hosting process dies — while
+    /// `AppWidgetManager.ACTION_APPWIDGET_UPDATE`, which is what
+    /// `WeftSnapshotStore.notifySurfaces` broadcasts on every write, recomposes
+    /// the content of a session that is already running. A state captured before
+    /// `provideContent` is therefore read exactly once and never again: on an
+    /// emulator, switching message previews on left both widgets drawing
+    /// redacted "Conversation" rows indefinitely, and the only thing that ever
+    /// refreshed them was killing the app. Reading here means every recomposition
+    /// re-reads the file, which is what the broadcast was always meant to buy.
+    ///
+    /// The cost is a `SharedPreferences` lookup per recomposition. That is a read
+    /// of an already-parsed in-memory map — `getSharedPreferences` caches per
+    /// process — against a redraw of every home screen this widget is on, which
+    /// is the expensive half either way.
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val state = WeftWidgetState.read(context, System.currentTimeMillis())
         provideContent {
             WeftGlanceTheme {
-                WeftUnreadContent(context = context, state = state)
+                WeftUnreadContent(
+                    context = context,
+                    state = WeftWidgetState.read(context, System.currentTimeMillis()),
+                )
             }
         }
     }
