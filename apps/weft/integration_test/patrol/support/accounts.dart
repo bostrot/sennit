@@ -30,10 +30,12 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -107,6 +109,32 @@ class TestAccount {
     );
 
     return TestAccount._(localpart, session, path);
+  }
+
+  /// An account that has never existed before, signed in and ready to talk.
+  ///
+  /// `seed.sh` provisions two accounts and two is enough for every scenario
+  /// that needs *a* peer. The merge scenarios need something else: two peers who
+  /// are distinct people, in a test that can be run twice.
+  ///
+  /// A merge is recorded against a **pair of handle ids**, and a Matrix handle's
+  /// id is the peer's user id — so a scenario that merges `@bob` with `@carol`,
+  /// or unmerges them, writes a decision into the identity store under that
+  /// exact pair, and `IdentityGraph.unmerge` records a *rejection* against every
+  /// former group-mate on purpose (`identity_graph.dart:220-242`) so the scorer
+  /// cannot immediately re-suggest what the user just took apart. The store
+  /// outlives the app, there is no screen that forgets a decision, and the next
+  /// run of the same scenario would therefore find no suggestion at all: the
+  /// second run fails and the first passed, which is the worst shape a test
+  /// failure comes in.
+  ///
+  /// Fresh handles cannot collide with a decision that does not mention them.
+  /// The accounts cost a registration each and are left behind on a homeserver
+  /// that `e2e.sh` throws away; `--keep` accumulates them, harmlessly, under
+  /// names that say where they came from.
+  static Future<TestAccount> freshPeer(String prefix) async {
+    final localpart = await registerAccount(prefix);
+    return signIn(localpart);
   }
 
   /// A second session of the account the *app* is signed in as.
@@ -196,6 +224,66 @@ class TestAccount {
 
   Future<String?> sendText(String roomId, String body) async =>
       (await awaitRoom(roomId)).sendTextEvent(body);
+
+  /// Sends a voice message, MSC3245 and all.
+  ///
+  /// The audio is bytes rather than a recording, and it can be: the only thing
+  /// downstream of it in this suite is a transcription endpoint that is a stub
+  /// in this same process, and every step in between — the encrypted upload, the
+  /// `m.audio` event, the download, the decrypt — treats it as an opaque
+  /// payload. A real Ogg would prove nothing more and would have to live in the
+  /// tree.
+  ///
+  /// `org.matrix.msc3245.voice` is what makes it a *voice message* rather than a
+  /// music file: `isVoiceMessage` in `mapping.dart:110-116` reads that key and
+  /// nothing else, and it is the difference between a bubble that offers to
+  /// transcribe itself and one that does not. `org.matrix.msc1767.audio` carries
+  /// the duration the bubble prints.
+  Future<String> sendVoiceNote(
+    String roomId, {
+    String filename = 'voice.ogg',
+    int durationMs = 3200,
+    List<int>? bytes,
+  }) async {
+    final room = await awaitRoom(roomId);
+    final eventId = await room.sendFileEvent(
+      sdk.MatrixAudioFile(
+        bytes: Uint8List.fromList(
+          bytes ?? List<int>.generate(4096, (i) => (i * 31) % 256),
+        ),
+        name: filename,
+        mimeType: 'audio/ogg',
+        duration: durationMs,
+      ),
+      extraContent: const {
+        'org.matrix.msc3245.voice': <String, Object?>{},
+        'org.matrix.msc1767.audio': {'duration': 3200},
+      },
+    );
+    if (eventId == null) {
+      fail('$localpart could not send a voice message to $roomId');
+    }
+    return eventId;
+  }
+
+  /// Sets this account's profile display name on the homeserver.
+  ///
+  /// The merge scorer's only usable signal on a bare Synapse. Phone numbers and
+  /// emails come off bridge ghosts and there are no bridges here, avatars are
+  /// not compared until they are fetched, and `MergeSignal.nameExact` is
+  /// weighted at 0.62 against a 0.55 bar precisely because in practice a name is
+  /// all a bridge exposes (`merge_scorer.dart:14-23`).
+  ///
+  /// Set *before* the account joins anything. `MatrixChatRepository` reads the
+  /// name off the room's member event
+  /// (`unsafeGetUserFromMemoryOrFallback(peerId).calcDisplayname()`), and a
+  /// member event is written at join time from whatever the profile said then. A
+  /// name set afterwards does reach the room eventually — Synapse rewrites the
+  /// membership in every joined room — but "eventually" is a race this does not
+  /// need to run.
+  Future<void> setDisplayName(String name) async {
+    await client.setProfileField(userId, 'displayname', {'displayname': name});
+  }
 
   /// Posts a read receipt for [eventId], as a client whose user has read it.
   ///
@@ -601,6 +689,68 @@ class SasResponder {
       _acting = false;
     }
   }
+}
+
+/// Registers a brand-new account and returns its localpart.
+///
+/// Raw HTTP rather than `Client.register`, deliberately. The SDK's register
+/// *logs in*: it calls `init` with the returned token, which means a database, a
+/// device and a session for an account this only wants to bring into existence.
+/// `inhibit_login` asks the homeserver not to issue any of that, and
+/// [TestAccount.signIn] then signs in the ordinary way, through the same
+/// `WeftMatrixSession` every other helper uses.
+///
+/// The two calls are user-interactive auth, which is not optional even for a
+/// homeserver with registration wide open: the first request comes back 401 with
+/// a session id and the flows it will accept, and the second replays it with the
+/// stage answered. `m.login.dummy` is the only stage
+/// `enable_registration_without_verification` leaves.
+///
+/// Two things this needs from the homeserver, both of which `tooling/scripts/e2e.sh`
+/// arranges and neither of which is Synapse's default:
+/// `enable_registration`, and an `rc_registration` raised off the stock
+/// 3-per-burst — eight registrations in a run is a 429 partway through
+/// otherwise, surfacing as a scenario that could not make its peers.
+Future<String> registerAccount(String prefix) async {
+  final localpart = uniqueToken('weft-e2e-$prefix-');
+  final uri = kHomeserverUri.replace(path: '/_matrix/client/v3/register');
+
+  Future<http.Response> attempt(Map<String, Object?> auth) => http.post(
+    uri,
+    headers: const {'content-type': 'application/json'},
+    body: jsonEncode({
+      'username': localpart,
+      'password': kTestPassword,
+      'inhibit_login': true,
+      if (auth.isNotEmpty) 'auth': auth,
+    }),
+  );
+
+  final challenge = await attempt(const {});
+  if (challenge.statusCode == 200) return localpart;
+  if (challenge.statusCode != 401) {
+    fail(
+      'Registering @$localpart failed with ${challenge.statusCode}: '
+      '${challenge.body}',
+    );
+  }
+
+  final session = (jsonDecode(challenge.body) as Map)['session'];
+  if (session is! String) {
+    fail(
+      'The homeserver asked for user-interactive auth without a session id. '
+      'Is registration enabled? Body: ${challenge.body}',
+    );
+  }
+
+  final answered = await attempt({'type': 'm.login.dummy', 'session': session});
+  if (answered.statusCode != 200) {
+    fail(
+      'Registering @$localpart failed at the dummy stage with '
+      '${answered.statusCode}: ${answered.body}',
+    );
+  }
+  return localpart;
 }
 
 /// The one device id that appeared on [account] since [before] was taken.

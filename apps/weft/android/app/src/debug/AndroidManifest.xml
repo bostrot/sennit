@@ -4,4 +4,25 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Every Android row of the device matrix talks to the disposable Synapse
+         in `tooling/docker` over plain HTTP — `http://10.0.2.2:8008` from an
+         emulator, `http://localhost:8008` through `adb reverse` from a phone —
+         and the Patrol suite additionally stands up loopback stub servers inside
+         the app's own process for the bridge, transcription and embedding
+         endpoints it has nothing real to point at.
+
+         None of that reaches a socket without this. Weft targets API 36, and
+         from API 28 the platform's default network security config sets
+         `cleartextTrafficPermitted="false"`: every one of those connections
+         fails with "CLEARTEXT communication to 10.0.2.2 not permitted by
+         network security policy", which surfaces as a homeserver that appears
+         never to have come up. Verified against the merged manifest, which
+         carried no `usesCleartextTraffic` and no `networkSecurityConfig` before
+         this: nothing in the Flutter embedding or in any plugin supplies one.
+
+         Debug only, and that is the point rather than an oversight. Patrol
+         builds and installs the debug variant, so the whole suite is covered;
+         a release Weft still refuses cleartext, which for a messenger is the
+         correct default and is not something a test harness should relax. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

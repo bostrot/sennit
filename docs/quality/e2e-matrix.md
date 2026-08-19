@@ -295,8 +295,19 @@ which works in an app process on Android and iOS. The Cloudflare tunnel is
 `Process.start('cloudflared', …)` (`cloudflared.dart:81`) — iOS forbids spawning
 subprocesses outright and Android has no such binary. On mobile rows
 `mcp_test` covers server start, the authenticated request, the rejected
-unauthenticated one, and the audit entries; the tunnel toggle is asserted to be
-*absent or disabled*, not exercised.
+unauthenticated one, and the audit entries; the tunnel is asserted to be
+*stopped and untried*, not exercised.
+
+> [!NOTE]
+> **Corrected, 2026-08-19.** This originally said the tunnel toggle would be
+> asserted "absent or disabled". It is neither. `_TunnelTile` is rendered on
+> every platform as soon as the server is running, with an enabled **Start**
+> button, and pressing it on a phone reaches `Process.start('cloudflared', …)`
+> — which iOS forbids outright. What `mcp_test` asserts is what is true: the
+> tunnel reads *"Off. Requires cloudflared on this machine."* and Weft has not
+> tried to start it, because `start()` only reaches the supervisor when
+> `mcp.tunnel_enabled` says so and it does not by default. Hiding the control
+> where it cannot work is a product decision, not a test fixture.
 
 ---
 
@@ -380,26 +391,41 @@ cold start kills the test. Recorded as not-executed rather than approximated.
 
 ### Merge, search, bridges, MCP
 
+Written up in
+[The merge, search, bridge and MCP scenarios](#the-merge-search-bridge-and-mcp-scenarios),
+which records the prerequisite the Android matrix did not have — that Weft could
+not have opened a cleartext socket to the homeserver from *any* Android row — and
+the three services that are answered by a loopback stub inside the app's process.
+
 **`merge_test.dart`** — two source chats for one contact produce a suggestion
 with visible evidence; accept collapses them into one correctly ordered thread;
 unmerge restores both. The ordering assertion is the watermark invariant from
-`MergedTimeline` seen from the outside.
+`MergedTimeline` seen from the outside. The peers are registered per scenario
+rather than seeded, because a merge decision outlives the app and two fixed peers
+make the unmerge scenario poison the suggestion one on the next run.
 
 **`search_test.dart`** — send, query, assert hybrid search returns them.
 Includes a voice message with a transcript, to prove transcript indexing end to
-end. Transcription needs an STT endpoint; with none configured the transcript
-leg is not-executed and says so.
+end. Transcription needs an STT endpoint; one is stood up on loopback, so the
+transcript leg is written rather than deferred — what it does not prove is
+anything about speech recognition.
 
 **`bridges_test.dart`** — the bridges screen renders health probes against the
 local homeserver, and the QR login flow shows both a rendered QR and a copyable
 payload. **No bridge runs in `tooling/docker`** (`tooling/docker/README.md:36-43`
-— the mock bridge is still outstanding), so the probe asserted is the
-*unreachable* one rendered as a readable sentence, which is the honest available
-assertion until a bridge exists to probe.
+— the mock bridge is still outstanding), so the *unreachable* probe is answered
+by Synapse itself, which is a genuine socket and a genuine Matrix error, and the
+reachable one by a provisioning-v3 stub in this process.
 
 **`mcp_test.dart`** — start the server from settings, authenticated request
-succeeds on the loopback endpoint, unauthenticated is rejected 401, both appear
-in the audit view. Tunnel per skip reason ⑦.
+succeeds on the loopback endpoint, unauthenticated is rejected 401. Tunnel per
+skip reason ⑦.
+
+> **"Both appear in the audit view" is not true.** Auth is checked in the
+> transport and the audit log is written by the registry, so a 401 never reaches
+> the thing that writes an entry. The scenario asserts the absence and produces
+> the denial the log *can* show — see
+> [finding 1](#five-findings). It is a gap in the feature, not in the test.
 
 ### Addressing the homeserver from a device
 
@@ -860,6 +886,163 @@ Three constraints the scenarios are shaped around:
 
 ---
 
+## The merge, search, bridge and MCP scenarios
+
+Twelve scenarios across four files, closing the suite. **Nothing was
+executed** — `patrol_cli` is still not on this host and no matrix row is
+runnable — but rather less of this rests on inspection than the three sections
+above it: three of the four files talk to a service, all three services are
+`HttpServer`s inside the app's process, and `apps/weft/test/e2e_stubs_test.dart`
+drives every one of them with Weft's own client on every push.
+
+### One prerequisite the Android matrix did not have
+
+**Weft could not have reached the homeserver from any Android row.** Weft targets
+API 36; from API 28 the platform's default network security config sets
+`cleartextTrafficPermitted="false"`, and the merged debug manifest carried
+neither a `usesCleartextTraffic` attribute nor a `networkSecurityConfig` —
+nothing in the Flutter embedding or in any plugin supplies one. Every connection
+to `http://10.0.2.2:8008` would have failed with *"CLEARTEXT communication to
+10.0.2.2 not permitted by network security policy"*, which surfaces as a
+homeserver that appears never to have come up: the wrong diagnosis, on every
+scenario, on every Android row.
+
+`android/app/src/debug/AndroidManifest.xml` now sets it, and the merge was
+verified rather than assumed — `:app:processDebugManifest` produces a manifest
+carrying `usesCleartextTraffic="true"`, and `:app:processReleaseManifest`
+produces one that still does not. Debug only is the point: Patrol installs the
+debug variant, so the whole suite is covered, and a release Weft refusing
+cleartext is the correct default for a messenger and not something a test
+harness should relax.
+
+### Three services that do not exist, answered in this process
+
+A mautrix bridge, a Whisper endpoint and an embeddings endpoint. Weft hosts none
+of them by design and `tooling/docker` runs none of them; waiting for all three
+is waiting forever, and asserting nothing is worse.
+`integration_test/patrol/support/stubs.dart` binds an `HttpServer` to the
+device's own loopback — the test process *is* the app's process — and answers
+them. The division is stated in the file and holds throughout:
+
+- **Everything on Weft's side of the socket is real** and is what is being
+  asserted: the settings screen, the provider built from it, the `http` client,
+  the multipart encoder, the JSON decoding, the error mapping, the queue, the
+  index, the widget that draws the answer.
+- **The other side is not a bridge, a model or a GPU.** The stub decides what a
+  QR payload is, what a clip says and which two sentences are neighbours. No
+  assertion depends on the quality of any of those answers.
+
+`test/e2e_stubs_test.dart` closes the loop that a device would otherwise have to:
+seven tests, run on every push with no device, driving `BridgeProvisioningClient`,
+`OpenAiCompatibleTranscriptionProvider` and `OpenAiCompatibleEmbeddingProvider`
+against the stubs over a real socket. A wire-shape mistake fails there in a
+minute instead of on a device in an afternoon.
+
+### Five findings
+
+1. **`mcp_test`'s brief is not achievable as written, and the reason is a real
+   gap.** The task asks that an authenticated request and an unauthenticated one
+   *both* appear in the audit view. They cannot. Auth is checked in the
+   transport and the audit log is written by the registry:
+   `WeftMcpHttpServer.handler` returns 401 before `WeftToolRegistry.call` is
+   reached, so a request with no key — or with a revoked one — leaves no trace
+   anywhere in the app. This matters past the test. The MCP screen's own copy
+   promises every call "is scope-checked, rate-limited and logged", and
+   `McpAuditLog`'s doc comment calls itself what "the user checks after a key
+   leaks" — but the shape a leak takes from outside, somebody trying keys that do
+   not work, is exactly the shape it cannot show. The scenarios assert the
+   absence rather than working around it, and produce the *denial* the log can
+   show: a key the server recognises and then refuses for want of a scope. Not
+   fixed — it is a change to the server's auth path.
+2. **A merge decision outlives the app, so the peers cannot be `@bob` and
+   `@carol`.** A decision is recorded against a pair of handle ids, a Matrix
+   handle's id is the peer's user id, and `IdentityGraph.unmerge` deliberately
+   records a *rejection* against every former group-mate so the scorer cannot
+   re-suggest what the user just took apart. With two fixed peers the unmerge
+   scenario poisons the suggestion scenario on the *next* run of the file: the
+   second run fails and the first passed. `merge_test` registers a throwaway pair
+   per scenario instead, which needs `rc_registration` raised — Synapse's stock
+   burst is three, verified against the container: the fourth registration in a
+   run answers `{"errcode":"M_LIMIT_EXCEEDED","retry_after_ms":4266}`. `e2e.sh`
+   and `ci.yaml` now raise it alongside `rc_login`.
+3. **On a bare Synapse the name is the only merge signal there is.** Five of
+   `MergeScorer`'s six need a bridge — a phone number in a ghost's localpart, an
+   email, a fetched avatar hash, shared groups. `nameExact` is weighted 0.62
+   against a 0.55 bar precisely because in practice a name is all a bridge
+   exposes, and it is what the scenarios use: two peers with the same two-word
+   display name, set *before* they join so the member event carries it. The peers
+   also have to speak before the app looks, or lazy-loaded members leave the
+   handle with a localpart for a name — one word, which the scorer does not treat
+   as evidence at all.
+4. **A `uniqueBody` is not searchable, which would have read as a broken
+   index.** `toFtsMatchQuery` strips `-` out of every query token while FTS5
+   tokenised the indexed body *on* it, so searching for the literal string a test
+   just sent returns nothing. Every marker in `search_test` is a `uniqueToken` —
+   one word, letters and digits — added to `environment.dart` for this.
+5. **A semantic query answers with as much of the index as fits.**
+   `FlatVectorIndex` scores every stored vector and returns the best
+   `candidateDepth` with no similarity floor, so rows orthogonal to the query
+   come back at a similarity of exactly zero, each labelled "meaning" in the UI.
+   It is why the semantic scenario asserts presence rather than a count, and why
+   the keyword scenarios explicitly turn embeddings *off* first — otherwise "1
+   result" would be a claim about run order. Not fixed: a floor is a ranking
+   decision, not a test fixture.
+
+Two smaller ones, recorded where they were found rather than acted on:
+`TranscriptionService.transcribe` re-indexes a transcript under
+`chatId: message.roomId` and `chatTitle: message.senderName`, which is right for
+an unmerged chat and wrong for a merged one — the repository's own `indexMessages`
+resolves `chatForRoom(roomId)?.id` for exactly this reason. And
+`macos/Runner/Release.entitlements` has no `com.apple.security.network.server`,
+which the debug one does: a release macOS Weft cannot bind the MCP server's
+socket at all. Neither affects the suite, which runs debug builds.
+
+### What each scenario does
+
+**`merge_test.dart`** — a suggestion naming both handles with its evidence chip
+and its 62%; accepting it collapsing two inbox rows into one and interleaving
+both legs in timestamp order (the `MergedTimeline` watermark seen from outside);
+unmerging giving both rows back; and *"Not the same person"* still holding after
+the screen is left and re-entered.
+
+**`search_test.dart`** — a message unfindable until its conversation is opened
+and findable afterwards, with the result opening the chat it came from; a voice
+note transcribed through the bubble's own Transcribe button and then found by a
+word only the transcript contains; and a semantic hit for a query sharing no word
+with the message, reached through the *Backfill now* button, which is the only
+thing in Weft that drains the embedding queue.
+
+**`bridges_test.dart`** — a bridge pointed at this container's own address,
+whose card prints Synapse's `Unrecognized request` verbatim (quoted from a live
+probe, not guessed) with *Sign in* disabled; a reachable bridge rendering its
+network name and both a connected and a bad-credentials login with the bridge's
+own reason; and the QR flow's rendered code, its payload in selectable text, and
+*Copy code* asserted by reading the system clipboard back.
+
+**`mcp_test.dart`** — a key minted through the dialog (read off the screen,
+because a salted hash is all Weft keeps), the server started from the switch, its
+port read from the subtitle, and then real JSON-RPC over `127.0.0.1`: a scoped
+call answered, an unauthenticated one 401'd with `WWW-Authenticate`, exactly one
+audit line for the two, a scope refusal logged as `DENIED`, and a revoked key
+dead on the very next request.
+
+### What was verified for these scenarios
+
+| Checked | How |
+|---|---|
+| The stub servers answer what the real clients expect | `test/e2e_stubs_test.dart`, **7 tests**, against a real loopback socket |
+| Android can open a cleartext socket at all | `:app:processDebugManifest` → `usesCleartextTraffic="true"`; `:app:processReleaseManifest` → absent |
+| Synapse answers the bridge probe as asserted | live container: `GET /_matrix/provision/v3/whoami` → 404 `{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}` |
+| Registration works the way `registerAccount` drives it | live container: 401 + session, then `m.login.dummy` → 200 |
+| The stock registration limit really would have bitten | live container: 4th registration → `M_LIMIT_EXCEEDED`; with `rc_registration` raised, six in a row → 200 |
+| `setDisplayName` reaches the profile | live container: `PUT /profile/{user}/displayname` → 200, `GET /profile/{user}` reads it back |
+| `e2e.sh` still runs end to end | driven against the live container with a stubbed `patrol` binary; the new `rc_registration` block appends, and Synapse restarts healthy with it |
+| The suite analyses and is formatted | `dart analyze integration_test/patrol` clean, `flutter analyze` clean, `dart format --set-exit-if-changed` clean |
+| Nothing existing regressed | `flutter test` in `apps/weft`, **922 pass** (915 + the 7 new) |
+| **Not** checked: anything the twelve scenarios assert | no row was executed — `patrol_cli` is not on this host and no matrix row is runnable |
+
+---
+
 ## Environment reality on this host
 
 Recorded 2026-08-19, so a later reader knows what "not executed" meant at the
@@ -914,6 +1097,11 @@ API 36 and writing it into an API 35 cell.
    of `/login` in a short window. `ci.yaml:168-172` already raises `rc_login`;
    `e2e.sh` must apply the same override locally or the suite will fail
    mid-matrix with 429s that look like flakes.
+
+   > **And `rc_registration`**, which this list did not know when it was
+   > written: `merge_test` registers two throwaway peers per scenario and
+   > Synapse's stock burst is three. Both overrides are now in `e2e.sh` and in
+   > `ci.yaml`.
 5. **Notifications need a foreground app or a gateway.** Weft notifies while
    running; being notified while *closed* needs sygnal and a Firebase project,
    neither of which exists here. `notification_test` backgrounds the app rather
@@ -931,15 +1119,15 @@ API 36 and writing it into an API 35 cell.
 
 ## Results
 
-Filled in by the last task of Phase 09. Every cell is **not executed**. For the
-first nine scenarios the reason is no longer *not written* — they are written,
-and what that means is recorded above for the
+Filled in by the last task of Phase 09. Every cell is **not executed**, and for
+every one of the thirteen the reason is now the same: no row on this host can run
+them. `patrol_cli` is absent, the Android system images are API 36 only, and
+there is no iOS runtime. Every scenario is written; what that means, file group
+by file group, is recorded above for the
 [core three](#what-was-verified-and-what-was-not), the
-[media three](#what-was-verified-for-these-scenarios) and the
-[notification and deep-link three](#what-was-verified-for-these-scenarios-1) —
-it is that no row on this host can run them: `patrol_cli` is absent, the Android
-system images are API 36 only, and there is no iOS runtime. For the remaining
-four the reason is still that the scenario does not exist yet.
+[media three](#what-was-verified-for-these-scenarios), the
+[notification and deep-link three](#what-was-verified-for-these-scenarios-1) and
+the [merge, search, bridge and MCP four](#what-was-verified-for-these-scenarios-2).
 
 | Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|

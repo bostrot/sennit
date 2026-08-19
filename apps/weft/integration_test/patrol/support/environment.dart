@@ -28,6 +28,24 @@ const String kTestPassword = String.fromEnvironment(
   defaultValue: 'weft-test-password',
 );
 
+/// [kHomeserver] as something a test can make an HTTP request to.
+///
+/// Separate from the string because the string is deliberately *not* a URL:
+/// Weft's login screen takes a bare host and resolves the scheme itself, and
+/// `e2e.sh` passes `http://10.0.2.2:8008` with a scheme only because 10.0.2.2 is
+/// not loopback by that rule. So the define arrives in both shapes, and anything
+/// that has to build a URL out of it — the bridge probe pointed at the
+/// homeserver, the registration call below — has to cope with both.
+///
+/// http, not https: the disposable Synapse in `tooling/docker` serves plain
+/// HTTP, which on Android is only reachable at all because the *debug* manifest
+/// permits cleartext. See `android/app/src/debug/AndroidManifest.xml`.
+final Uri kHomeserverUri = Uri.parse(
+  kHomeserver.startsWith('http://') || kHomeserver.startsWith('https://')
+      ? kHomeserver
+      : 'http://$kHomeserver',
+);
+
 /// The homeserver's `server_name`, which is the domain half of every user id.
 ///
 /// Separate from [kHomeserver] because they are genuinely different facts: the
@@ -145,5 +163,23 @@ const PatrolTesterConfig kWeftPatrolConfig = PatrolTesterConfig(
 /// microsecond; the timestamp covers two runs.
 String uniqueBody(String prefix) =>
     '$prefix ${DateTime.now().microsecondsSinceEpoch}-${_bodyCounter++}';
+
+/// A unique *word*: one token, letters and digits only.
+///
+/// [uniqueBody] is not usable everywhere it looks like it should be, and the
+/// place it breaks is search. `toFtsMatchQuery` strips `-` and `.` out of every
+/// token before handing the query to FTS5, so the query for
+/// `"needle 1755-3"` becomes `"needle" "17553"*` — while the *index* tokenised
+/// the same body on the hyphen into `1755` and `3`. The literal string a test
+/// just sent is therefore unfindable by searching for it, which reads as a
+/// broken index rather than as a broken test.
+///
+/// Base 36 of the same clock, with a counter, so it stays one token: unique
+/// across runs, unique within one, and identical in the index and in the query.
+/// Also what a registered account's localpart is built from — Synapse's
+/// localpart grammar is lower-case, and base 36 is.
+String uniqueToken(String prefix) =>
+    '$prefix${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+    '${_bodyCounter++}';
 
 int _bodyCounter = 0;

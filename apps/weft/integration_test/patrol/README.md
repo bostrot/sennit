@@ -64,15 +64,25 @@ dart pub global activate patrol_cli
 | `notification_test.dart` | A backgrounded Weft posting to the shade, the tap landing in the right conversation, and reply and mark-as-read pressed from the shade itself. |
 | `notification_mute_test.dart` | A muted conversation staying quiet, and mentions-only letting a mention through — each asserted beside a control that had to be noisy. |
 | `deeplink_test.dart` | `weft://chat/<id>`, `weft://search?q=` and `weft://user/<id>` fired by the OS as real `ACTION_VIEW`s. Warm start; see below. |
-| `support/` | Shared account provisioning, login, teardown, the app driver, the media helpers, device verification and the shade. Setup is not repeated per file. |
+| `merge_test.dart` | A suggestion with its evidence, accepting it into one ordered thread, unmerging, and a dismissal that sticks. |
+| `search_test.dart` | Indexing on chat open, a voice note found by its transcript, and a semantic hit containing none of the typed words. |
+| `bridges_test.dart` | A probe against the homeserver that is honestly unreachable, a probe against a stub that is not, and the QR login's code and copyable payload. |
+| `mcp_test.dart` | The loopback server started from settings and actually called: a key that works, one that does not, a scope refusal, and what the audit view does and does not show. |
+| `support/` | Shared account provisioning, login, teardown, the app driver, the media helpers, device verification, the shade, and the loopback stub servers. Setup is not repeated per file. |
 | `test_bundle.dart` | **Generated** by `patrol_cli` on every run, and gitignored. Never edit it. |
 
-`support/` is seven files because it answers seven questions — what the world is
+`support/` is eight files because it answers eight questions — what the world is
 (`environment.dart`), who else is in it (`accounts.dart`), how the app is worked
 (`app.dart`), what the platform does with a file (`media.dart`), what a scenario
 starts from (`scenario.dart`), how this device becomes trusted
-(`verification.dart`), and what is in the notification shade (`shade.dart`) — and
-`support.dart` re-exports all of them, which is what a scenario imports.
+(`verification.dart`), what is in the notification shade (`shade.dart`), and what
+a service Weft calls out to says back (`stubs.dart`) — and `support.dart`
+re-exports all of them, which is what a scenario imports.
+
+A driver used by exactly one scenario file stays private to it. The merge
+screen, the search and endpoints screens, the bridges screen and the MCP screen
+each have one caller, so their helpers live at the bottom of their own test file
+rather than in `support/`, where they would only add a place to look.
 
 Each scenario file must be independently runnable and must clean up the rooms it
 made. The homeserver is shared across a run, so a test that leaves a room behind
@@ -158,6 +168,27 @@ shortcut around missing keys. A delivered tick and a read tick are the same
 13dp glyph in two colours; the label beside it is the only place the difference
 exists in words, for a test and for a screen reader alike. `semanticsEnabled` is
 on by default in `patrolTest`, which is what makes `find.bySemanticsLabel` work.
+
+## Three services that do not exist, answered in this process
+
+A bridge, a Whisper endpoint and an embeddings endpoint. `tooling/docker` runs
+none of the three, and Weft hosts none of them by design — so
+`support/stubs.dart` binds an `HttpServer` on the device's own loopback, inside
+the app's process, and answers them.
+
+What that proves is everything on Weft's side of the socket: the settings
+screen, the provider built from it, the HTTP client, the multipart encoder, the
+JSON decoding, the error mapping, the index, the widget. What it does not prove
+is anything about a bridge, a model or a GPU, and no assertion depends on one.
+The stubs themselves are checked against Weft's real clients by
+`test/e2e_stubs_test.dart`, which runs on every push with no device at all.
+
+One consequence worth knowing before an Android run: this needs the app to be
+able to open a **cleartext** socket, to 127.0.0.1 and to the homeserver alike.
+Weft targets API 36, where the platform default forbids it, and the merged debug
+manifest carried nothing to relax that — so
+`android/app/src/debug/AndroidManifest.xml` now sets
+`usesCleartextTraffic="true"`. Debug only; a release Weft still refuses.
 
 ## Addressing the homeserver
 

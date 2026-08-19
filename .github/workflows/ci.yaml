@@ -169,6 +169,9 @@ jobs:
           rc_login:
             address: { per_second: 100, burst_count: 100 }
             account: { per_second: 100, burst_count: 100 }
+          rc_registration:
+            per_second: 100
+            burst_count: 100
           EOF
       - name: Start homeserver
         run: docker compose -f tooling/docker/compose.yaml up -d --wait

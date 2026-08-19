@@ -127,6 +127,24 @@ rc_login:
 EOF
 fi
 
+# The same problem one endpoint over. `merge_test` registers a pair of throwaway
+# peers per scenario — a merge decision is recorded against a pair of handle ids
+# and the identity store outlives the app, so reusing @bob and @carol would make
+# the unmerge scenario poison the suggestion scenario on the next run. Synapse's
+# stock rc_registration is 3 per burst: verified against this container, the
+# fourth registration in a run comes back
+# `{"errcode":"M_LIMIT_EXCEEDED","retry_after_ms":4266}`, and a scenario that
+# could not make its peers fails looking like a homeserver problem.
+if ! grep -q '^rc_registration:' "$HOMESERVER_CONFIG"; then
+  step "Raising the registration rate limit"
+  cat >>"$HOMESERVER_CONFIG" <<'EOF'
+
+rc_registration:
+  per_second: 100
+  burst_count: 100
+EOF
+fi
+
 teardown() {
   local status=$?
   if [[ $KEEP -eq 1 ]]; then
