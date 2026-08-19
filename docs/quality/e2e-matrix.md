@@ -486,6 +486,107 @@ a compiled one, and the first `pod install` on a machine with an SDK will say.
 
 ---
 
+## The core scenarios
+
+Landed 2026-08-19: `login_test.dart` (3), `messaging_test.dart` (3) and
+`chat_actions_test.dart` (4) — ten scenarios over a shared `support/`.
+
+**None of them has been executed.** `patrol_cli` is not on this host and no
+matrix row is runnable here; the whole of what was verified is
+[below](#what-was-verified-and-what-was-not). Every cell in [Results](#results)
+stays *not executed*.
+
+### The shape
+
+The app is signed in as `@alice` and driven entirely through its own screens.
+The other participant is a headless `WeftMatrixSession` in the same process, and
+so is a *second* session of the app's own account. Every scenario asserts at both
+ends: a send is checked on the peer's timeline as well as in the app, because a
+silently-failed send renders a perfectly convincing local bubble, and a read is
+checked as a receipt the peer receives, because "the badge went away" is a
+statement about one device.
+
+### Four things the app cannot do, which the suite had to work around
+
+Each is a real gap, found while writing against the app rather than around it.
+None is fixed here — three belong to later phases and one to a later task.
+
+1. **Weft cannot start a conversation, and cannot accept an invitation.** The
+   start-chat flow behind `OpenUserLink` does not exist, and nothing anywhere in
+   the app reads `Membership.invite` — `MatrixChatRepository` renders every room
+   the client knows about without distinguishing an invitation from a joined
+   room. So a scenario cannot make a conversation through the UI at all. The
+   suite's answer is `TestAccount.control`, the app account's own second
+   session: it creates the room, which makes the app's device a member from the
+   first moment rather than an invitee. Ordering is load-bearing — the app must
+   be signed in *before* the room is made, or its device keys have not been
+   published and the peer shares its megolm session with every device except the
+   one under test.
+2. **`DeliveryState.read` is unreachable in the live path.** `_deliveryFor`
+   (`mapping.dart:349-359`) maps event status to sending / sent / delivered /
+   failed and nothing anywhere applies a read receipt to it, though the comment
+   beside it says read state "is applied separately". The word `Read` therefore
+   exists in `deliveryStateLabel`, in the demo repository and in the goldens, and
+   never on a real message. `messaging_test` asserts the sequence is monotonic
+   and ends at `Delivered`; it does not assert a `Read` tick the app has never
+   drawn.
+3. **A read receipt is sent from one place only.** `markRead` is called by the
+   inbox row's tap handler and by the selection bar, so a message that arrives
+   while its conversation is already open is never receipted. `messaging_test`
+   sends before opening the chat for that reason, and its header says so rather
+   than the test looking like it chose an order arbitrarily.
+4. **An unverified session never starts notifications.** `main.dart:299-315`
+   starts the notification service on `WeftSessionState.ready` only, and a device
+   that skipped verification stays `unverified` indefinitely — so no pusher is
+   registered and no notification is posted. This one matters to task 4 rather
+   than here: `notification_test` must verify the device first, or it will be
+   asserting on a shade that Weft was never going to write to.
+
+### Where the assertions come from
+
+Three of them read an *accessible name* rather than a pixel, and that is a
+deliberate reuse of what the a11y phase built rather than a shortcut around
+missing test keys:
+
+| What | Where it is read | Why nothing else would do |
+|---|---|---|
+| A refused sign-in | the banner's live region, `Sign-in failed. …` | `_ErrorBanner` is private and its message is one `Text` among several |
+| A delivery state | the bubble's meta node, `Sent 14:32, Delivered` | delivered and read are the same 13dp glyph in two colours |
+| The SAS emoji | `SasEmojiCell.name` | the comparison *is* the seven names, in order, on both devices |
+
+Everything else is found by what is on screen. Two finders are worth naming
+because they are what make a two-pane row work at all: a message bubble is the
+only `WeftFocusable` Weft builds with `button: false` — it is a group, not a
+control — which separates it from the inbox row beside it that contains the same
+words; and the composer is the last `TextField` in the tree, because the panes
+run rail, inbox, conversation and the inbox's search box is an `InputDecorator`
+with nothing inside it.
+
+### What was verified, and what was not
+
+| Checked | How |
+|---|---|
+| The suite analyses and is formatted | `flutter analyze` clean, `dart format --set-exit-if-changed` clean |
+| Nothing existing regressed | `flutter test` in `apps/weft`, **915 pass** |
+| Every app symbol the suite reaches still exists | the analyzer, against `weft`, `weft_design`, `weft_matrix`, `weft_domain` and `matrix` 10.1.0 |
+| The macOS app builds with Patrol linked in | `flutter test -d macos` built `weft.app` with the `patrol` pod and `CocoaAsyncSocket`; `macos/Podfile.lock` now records it |
+| **Not** checked: anything the tests assert | no row was executed — see below |
+
+**`flutter test -d macos` cannot run a Patrol test either.** Worth recording,
+because it is the obvious shortcut and it does not work: the flutter tool's
+device runner initialises `IntegrationTestWidgetsFlutterBinding` before the test
+file is loaded, and `PatrolBinding` is a `LiveTestWidgetsFlutterBinding` —
+
+> `Failed assertion: '_debugInitializedType == null': Binding is already
+> initialized to IntegrationTestWidgetsFlutterBinding`
+
+`--dart-define=PATROL_HOT_RESTART=true` does not help; it skips the wait for a
+native execution request, not the binding. Even the macOS row therefore needs
+`patrol_cli`, which is a global tool this host does not have. That is a decision
+for task 7, along with the Android system images.
+
+---
+
 ## Environment reality on this host
 
 Recorded 2026-08-19, so a later reader knows what "not executed" meant at the
@@ -549,9 +650,12 @@ API 36 and writing it into an API 35 cell.
 
 ## Results
 
-Filled in by the last task of Phase 09. Until then every cell is
-**not executed**, and the reason is either *harness not yet written* or one of
-the environment gaps above.
+Filled in by the last task of Phase 09. Every cell is **not executed**. For the
+first three scenarios the reason is no longer *not written* — they are written,
+and [what that means](#what-was-verified-and-what-was-not) is recorded above —
+it is that no row on this host can run them: `patrol_cli` is absent, the
+Android system images are API 36 only, and there is no iOS runtime. For the
+other ten the reason is still that the scenario does not exist yet.
 
 | Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|

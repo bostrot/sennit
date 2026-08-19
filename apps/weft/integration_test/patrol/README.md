@@ -47,13 +47,46 @@ dart pub global activate patrol_cli
 | Path | What it is |
 |---|---|
 | `harness_test.dart` | Proves the harness itself — the bundle runs, the automator answers. Touches nothing of Weft's. |
-| `support/` | Shared account provisioning, login and teardown. Arrives with the first scenario; setup is not repeated per file. |
+| `login_test.dart` | Homeserver discovery, a refused password, interactive device verification, sign-out. |
+| `messaging_test.dart` | Two accounts, encrypted messages, delivery states, read receipts, inbox order. |
+| `chat_actions_test.dart` | Reply, react, edit, redact — each asserted on the peer's timeline. |
+| `support/` | Shared account provisioning, login, teardown and the app driver. Setup is not repeated per file. |
 | `test_bundle.dart` | **Generated** by `patrol_cli` on every run, and gitignored. Never edit it. |
+
+`support/` is three files because it answers three questions — what the world is
+(`environment.dart`), who else is in it (`accounts.dart`), and how the app is
+worked (`app.dart`) — and `support.dart` re-exports all three, which is what a
+scenario imports.
 
 Each scenario file must be independently runnable and must clean up the rooms it
 made. The homeserver is shared across a run, so a test that leaves a room behind
 poisons the next one — and on a matrix the next one is on a different device,
 where the failure is much harder to read.
+
+## Two things a scenario cannot do through the UI
+
+Both are gaps in the app rather than in the harness, and `support/accounts.dart`
+works around them in the open rather than quietly:
+
+- **Weft cannot start a conversation.** There is no start-chat flow and no
+  accept-invite affordance — nothing in the app reads `Membership.invite`. So a
+  scenario that needs a conversation has the app account's *own* second session
+  (`TestAccount.control`) create it, which makes the app a member from the
+  moment the room exists rather than an invitee waiting for a button that does
+  not exist.
+- **Weft posts a read receipt from one place only**, the inbox row's tap
+  handler. A message arriving in a conversation that is already open is never
+  receipted, so `messaging_test` sends *before* opening the chat. It is testing
+  the path the app has, and the header of that test says so.
+
+## Reading state a screen does not spell out
+
+The suite asserts on accessible names in three places — the sign-in error
+banner, the delivery tick, the SAS emoji — and that is deliberate rather than a
+shortcut around missing keys. A delivered tick and a read tick are the same
+13dp glyph in two colours; the label beside it is the only place the difference
+exists in words, for a test and for a screen reader alike. `semanticsEnabled` is
+on by default in `patrolTest`, which is what makes `find.bySemanticsLabel` work.
 
 ## Addressing the homeserver
 
