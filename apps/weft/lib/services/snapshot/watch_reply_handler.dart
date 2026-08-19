@@ -352,20 +352,26 @@ class WatchReplyHandler {
       // arrive and a sign-out can empty the queue underneath us.
       while (_pending.isNotEmpty) {
         final reply = _pending.first;
-        final chats = _chats;
 
-        if (chats == null) {
-          // No inbox yet. Age the queue, then stop — every remaining reply is
-          // waiting on the same thing this one is.
-          if (_expired(reply)) {
-            _pending.removeFirst();
-            await _report(
-              WatchReplyResult.failed(reply.id, WatchReplyFailure.timedOut),
-            );
-            continue;
-          }
-          return;
+        // Aged before the inbox is consulted rather than only when there is
+        // none. A reply that waited out [pendingFor] is one the user has been
+        // watching a "sending…" spinner over for two minutes, and an inbox
+        // arriving after that — a sign-in, a sync that finally completed — must
+        // not turn it into a message sent long after the moment it was about.
+        // Sending it late is the failure `pendingFor` names, and it is worse
+        // than reporting it: the wrist has already given up on it.
+        if (_expired(reply)) {
+          _pending.removeFirst();
+          await _report(
+            WatchReplyResult.failed(reply.id, WatchReplyFailure.timedOut),
+          );
+          continue;
         }
+
+        final chats = _chats;
+        // No inbox yet. Stop — every remaining reply is waiting on the same
+        // thing this one is, and none of them is older than it.
+        if (chats == null) return;
 
         _pending.removeFirst();
         await _send1(reply, chats);
