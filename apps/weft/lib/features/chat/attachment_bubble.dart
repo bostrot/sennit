@@ -301,6 +301,7 @@ class _AudioAttachment extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
     final duration = formatMediaDuration(message.durationMs);
 
     return Column(
@@ -310,7 +311,11 @@ class _AudioAttachment extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _AttachmentGlyph(icon: Icons.audiotrack_rounded, tint: onBubble),
+            _AttachmentGlyph(
+              icon: Icons.audiotrack_rounded,
+              tint: onBubble,
+              bubble: bubble,
+            ),
             const SizedBox(width: WeftSpace.sm),
             Flexible(
               child: Column(
@@ -330,7 +335,7 @@ class _AudioAttachment extends StatelessWidget {
                     Text(
                       duration,
                       style: context.text.labelSmall?.copyWith(
-                        color: onBubble.withValues(alpha: 0.7),
+                        color: palette.muted(onBubble, bubble, alpha: 0.7),
                       ),
                     ),
                 ],
@@ -366,6 +371,7 @@ class _FileAttachment extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
     final bytes = message.mediaSizeBytes;
     final size = bytes == null ? null : formatAttachmentSize(bytes);
 
@@ -375,7 +381,11 @@ class _FileAttachment extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _AttachmentGlyph(icon: _iconFor(message.body), tint: onBubble),
+          _AttachmentGlyph(
+            icon: _iconFor(message.body),
+            tint: onBubble,
+            bubble: bubble,
+          ),
           const SizedBox(width: WeftSpace.sm),
           Flexible(
             child: Column(
@@ -398,7 +408,7 @@ class _FileAttachment extends StatelessWidget {
                   Text(
                     size,
                     style: context.text.labelSmall?.copyWith(
-                      color: onBubble.withValues(alpha: 0.7),
+                      color: palette.muted(onBubble, bubble, alpha: 0.7),
                     ),
                   ),
               ],
@@ -433,10 +443,18 @@ class _FileAttachment extends StatelessWidget {
 
 /// A file bubble's leading icon on its own tinted disc.
 class _AttachmentGlyph extends StatelessWidget {
-  const _AttachmentGlyph({required this.icon, required this.tint});
+  const _AttachmentGlyph({
+    required this.icon,
+    required this.tint,
+    required this.bubble,
+  });
 
   final IconData icon;
   final Color tint;
+
+  /// The bubble fill behind the disc, so the glyph's contrast is measured
+  /// against what is really under it.
+  final Color bubble;
 
   @override
   Widget build(BuildContext context) {
@@ -447,7 +465,18 @@ class _AttachmentGlyph extends StatelessWidget {
         color: tint.withValues(alpha: 0.12),
         borderRadius: WeftRadius.allSm,
       ),
-      child: Icon(icon, size: 20, color: tint.withValues(alpha: 0.9)),
+      child: Icon(
+        icon,
+        size: 20,
+        // Measured against the disc it sits on rather than the bubble behind
+        // it — the 12% tint is what is actually under this glyph.
+        color: WeftContrast.dim(
+          tint,
+          WeftContrast.flatten(tint.withValues(alpha: 0.12), bubble),
+          alpha: 0.9,
+          minRatio: WeftContrast.uiComponent,
+        ),
+      ),
     );
   }
 }
@@ -479,6 +508,13 @@ class AttachmentTranscript extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
+    // The transcript block lays an 8% tint over the bubble, so anything drawn
+    // inside it is read against the tint, not against the bubble.
+    final transcriptFill = WeftContrast.flatten(
+      onBubble.withValues(alpha: 0.08),
+      bubble,
+    );
     final transcript = message.transcript;
 
     return Column(
@@ -496,14 +532,14 @@ class AttachmentTranscript extends StatelessWidget {
                   height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: onBubble.withValues(alpha: 0.8),
+                    color: palette.muted(onBubble, bubble, alpha: 0.8),
                   ),
                 ),
                 const SizedBox(width: WeftSpace.sm),
                 Text(
                   'Transcribing…',
                   style: context.text.labelSmall?.copyWith(
-                    color: onBubble.withValues(alpha: 0.8),
+                    color: palette.muted(onBubble, bubble, alpha: 0.8),
                   ),
                 ),
               ],
@@ -521,12 +557,12 @@ class AttachmentTranscript extends StatelessWidget {
               icon: Icon(
                 Icons.graphic_eq_rounded,
                 size: 14,
-                color: onBubble.withValues(alpha: 0.8),
+                color: palette.muted(onBubble, bubble, alpha: 0.8),
               ),
               label: Text(
                 'Transcribe',
                 style: context.text.labelSmall?.copyWith(
-                  color: onBubble.withValues(alpha: 0.8),
+                  color: palette.muted(onBubble, bubble, alpha: 0.8),
                 ),
               ),
             ),
@@ -538,6 +574,8 @@ class AttachmentTranscript extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(WeftSpace.sm),
               decoration: BoxDecoration(
+                // A tint, not ink — it is the background the transcript is
+                // read against, so it stays exactly as faint as it was.
                 color: onBubble.withValues(alpha: 0.08),
                 borderRadius: WeftRadius.allSm,
               ),
@@ -548,14 +586,18 @@ class AttachmentTranscript extends StatelessWidget {
                   Icon(
                     Icons.graphic_eq_rounded,
                     size: 13,
-                    color: onBubble.withValues(alpha: 0.7),
+                    color: palette.muted(onBubble, transcriptFill, alpha: 0.7),
                   ),
                   const SizedBox(width: WeftSpace.xs),
                   Flexible(
                     child: Text(
                       transcript,
                       style: context.text.bodySmall?.copyWith(
-                        color: onBubble.withValues(alpha: 0.9),
+                        color: palette.muted(
+                          onBubble,
+                          transcriptFill,
+                          alpha: 0.9,
+                        ),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -603,6 +645,7 @@ class UploadProgressBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
     final failed = task.state == UploadState.failed;
     final plan = task.plan;
 
@@ -616,6 +659,7 @@ class UploadProgressBubble extends StatelessWidget {
             _AttachmentGlyph(
               icon: failed ? Icons.error_outline_rounded : _kindIcon(plan.kind),
               tint: failed ? context.colors.error : onBubble,
+              bubble: bubble,
             ),
             const SizedBox(width: WeftSpace.sm),
             Flexible(
@@ -637,7 +681,7 @@ class UploadProgressBubble extends StatelessWidget {
                     style: context.text.labelSmall?.copyWith(
                       color: failed
                           ? context.colors.error
-                          : onBubble.withValues(alpha: 0.75),
+                          : palette.muted(onBubble, bubble, alpha: 0.75),
                     ),
                   ),
                 ],
@@ -651,7 +695,7 @@ class UploadProgressBubble extends StatelessWidget {
               tooltip: failed ? 'Discard' : 'Cancel upload',
               icon: Icon(
                 Icons.close_rounded,
-                color: onBubble.withValues(alpha: 0.8),
+                color: palette.muted(onBubble, bubble, alpha: 0.8),
               ),
             ),
           ],
@@ -666,6 +710,7 @@ class UploadProgressBubble extends StatelessWidget {
             child: LinearProgressIndicator(
               value: task.progress.clamp(0.0, 1.0),
               minHeight: 4,
+              // The unfilled track behind the bar, not a foreground.
               backgroundColor: onBubble.withValues(alpha: 0.15),
               color: failed ? context.colors.error : context.colors.primary,
             ),

@@ -279,6 +279,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final appearance = ref.watch(appearanceProvider);
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    // Read once, here, and folded into the theme: every widget below then gets
+    // the answer from `context.palette` / `context.motion` rather than each
+    // checking `MediaQuery` for itself and half of them forgetting to.
+    final highContrast = MediaQuery.highContrastOf(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     // Listened to rather than watched: this starts a service, it does not
     // decide what to draw, and a rebuild must not restart it.
@@ -304,7 +309,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       title: 'Weft',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
-      theme: appearance.themeFor(platformBrightness),
+      theme: appearance.themeFor(
+        platformBrightness,
+        highContrast: highContrast,
+        reduceMotion: reduceMotion,
+      ),
       // Above the navigator, so a ringing call appears over whatever route is
       // open — a chat, the settings, a share sheet — and the minimised call bar
       // survives navigating away from the call screen. It takes the navigator

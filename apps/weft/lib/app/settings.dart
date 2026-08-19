@@ -32,7 +32,14 @@ class WeftAppearance {
     );
   }
 
-  ThemeData themeFor(Brightness platformBrightness) {
+  /// [highContrast] and [reduceMotion] are the platform's own accessibility
+  /// switches, not Weft settings — they arrive from `MediaQuery` at the app
+  /// root and are folded into the theme so no widget below has to ask.
+  ThemeData themeFor(
+    Brightness platformBrightness, {
+    bool highContrast = false,
+    bool reduceMotion = false,
+  }) {
     final brightness = switch (mode) {
       WeftThemeMode.light => Brightness.light,
       WeftThemeMode.dark || WeftThemeMode.amoled => Brightness.dark,
@@ -43,6 +50,8 @@ class WeftAppearance {
       brightness: brightness,
       amoled: mode == WeftThemeMode.amoled,
       densityScale: densityScale,
+      highContrast: highContrast,
+      reduceMotion: reduceMotion,
     );
   }
 }

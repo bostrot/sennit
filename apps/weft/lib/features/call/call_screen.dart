@@ -260,17 +260,45 @@ class _CallHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = state.session;
     final onDark = overVideo;
+    final palette = context.palette;
+
+    // Over video there is no token that can promise a ratio — the background
+    // is whatever the caller's camera is pointing at, and a white-walled room
+    // is a white background. So the header brings its own: a scrim gradient
+    // under the text, and ink measured against the worst case that scrim can
+    // sit on, which is pure white.
+    final scrimmed = WeftContrast.flatten(
+      palette.scrim,
+      const Color(0xFFFFFFFF),
+    );
     final titleColour = onDark ? Colors.white : context.colors.onSurface;
     final subtitleColour = onDark
-        ? Colors.white70
+        ? palette.muted(Colors.white, scrimmed, alpha: 0.7)
         : context.colors.onSurfaceVariant;
 
-    return Padding(
+    return Container(
+      decoration: onDark
+          ? BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                // Full strength for the whole text block, fading only across
+                // the bottom padding — a scrim that starts fading under the
+                // last line is a scrim that does not cover the last line.
+                colors: [
+                  palette.scrim,
+                  palette.scrim,
+                  palette.scrim.withValues(alpha: 0),
+                ],
+                stops: const [0, 0.85, 1],
+              ),
+            )
+          : null,
       padding: const EdgeInsets.fromLTRB(
         WeftSpace.sm,
         WeftSpace.sm,
         WeftSpace.lg,
-        0,
+        WeftSpace.lg,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +381,16 @@ class _ConnectionNote extends StatelessWidget {
       return _Note(
         icon: Icons.graphic_eq_rounded,
         text: codecs.label,
-        colour: onDark ? Colors.white70 : context.colors.onSurfaceVariant,
+        colour: onDark
+            ? context.palette.muted(
+                Colors.white,
+                WeftContrast.flatten(
+                  context.palette.scrim,
+                  const Color(0xFFFFFFFF),
+                ),
+                alpha: 0.7,
+              )
+            : context.colors.onSurfaceVariant,
         onDark: onDark,
       );
     }
@@ -579,7 +616,7 @@ class _CallControlBar extends StatelessWidget {
             tooltip: 'Hang up',
             icon: Icons.call_end_rounded,
             background: context.palette.callDecline,
-            foreground: Colors.white,
+            foreground: context.palette.onCallDecline,
             onPressed: live ? controls.hangUp : null,
           ),
         ],

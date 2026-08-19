@@ -134,7 +134,7 @@ class _AttachmentPreviewSheetState
               WeftSpace.md,
             ),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: context.palette.divider)),
+              border: Border(top: BorderSide(color: context.palette.border)),
             ),
             child: SafeArea(
               top: false,

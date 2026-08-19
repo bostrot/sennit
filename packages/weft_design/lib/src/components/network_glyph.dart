@@ -26,12 +26,17 @@ class NetworkGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = context.palette.networkColor(network);
+    final palette = context.palette;
+    final color = palette.networkColor(network);
+    // White on a harmonised brand colour is 1.9:1 for half the set on a light
+    // theme; the ink that reads on this particular chip comes from the token
+    // layer, which computed it against both ends of the gradient below.
+    final ink = palette.networkInk;
     final radius = size * 0.32;
 
     final chip = AnimatedContainer(
-      duration: WeftMotion.fast,
-      curve: WeftMotion.standard,
+      duration: context.motion.fast,
+      curve: context.motion.standard,
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -45,18 +50,24 @@ class NetworkGlyph extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: _brandIcon == null
-          ? Text(
-              _initial,
-              style: TextStyle(
-                // Two-character marks shrink to stay inside the chip.
-                fontSize: size * (_initial.length > 1 ? 0.36 : 0.5),
-                height: 1,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: -0.5,
+          // A lettermark is a logo standing in for a logo, sized from the chip
+          // that holds it — so like the avatar's initials it opts out of text
+          // scaling rather than overflowing a container that cannot grow. The
+          // network's name reaches a reader from the label, not from "Gc".
+          ? MediaQuery.withNoTextScaling(
+              child: Text(
+                _initial,
+                style: TextStyle(
+                  // Two-character marks shrink to stay inside the chip.
+                  fontSize: size * (_initial.length > 1 ? 0.36 : 0.5),
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  color: ink,
+                  letterSpacing: -0.5,
+                ),
               ),
             )
-          : Icon(_brandIcon, size: size * 0.58, color: Colors.white),
+          : Icon(_brandIcon, size: size * 0.58, color: ink),
     );
 
     if (!showLabel) return chip;

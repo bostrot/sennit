@@ -703,7 +703,7 @@ class _MultiSelectBar extends StatelessWidget {
         WeftSpace.md,
       ),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: context.palette.divider)),
+        border: Border(top: BorderSide(color: context.palette.border)),
       ),
       child: SafeArea(
         top: false,
@@ -815,7 +815,7 @@ class _ConfirmStep extends StatelessWidget {
             WeftSpace.md,
           ),
           decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: context.palette.divider)),
+            border: Border(top: BorderSide(color: context.palette.border)),
           ),
           child: SafeArea(
             top: false,

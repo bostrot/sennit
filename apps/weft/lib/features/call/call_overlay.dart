@@ -209,7 +209,7 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
         : context.palette.callAccept;
     final foreground = widget.state.reconnecting
         ? context.colors.onTertiaryContainer
-        : Colors.black;
+        : context.palette.onCallAccept;
 
     return Material(
       color: background,

@@ -1227,11 +1227,14 @@ class _MessageBubble extends StatelessWidget {
                               Text(
                                 message.network.label,
                                 style: context.text.labelSmall?.copyWith(
+                                  // The label is text and owes 4.5:1; the
+                                  // hairline beside it is a graphic and owes
+                                  // 3:1, which is why they are two tokens.
                                   color: own
-                                      ? palette.ownBubbleText.withValues(
-                                          alpha: 0.8,
-                                        )
-                                      : accent,
+                                      ? palette.mutedOnBubble(true, alpha: 0.8)
+                                      : palette.networkTextColor(
+                                          message.network,
+                                        ),
                                   fontWeight: FontWeight.w700,
                                   fontSize: 10,
                                 ),
@@ -1261,11 +1264,7 @@ class _MessageBubble extends StatelessWidget {
                             'Message deleted',
                             style: context.text.bodyMedium?.copyWith(
                               fontStyle: FontStyle.italic,
-                              color:
-                                  (own
-                                          ? palette.ownBubbleText
-                                          : palette.peerBubbleText)
-                                      .withValues(alpha: 0.6),
+                              color: palette.mutedOnBubble(own),
                             ),
                           )
                         else if (rendersAsAttachment(message))
@@ -1324,11 +1323,7 @@ class _MessageBubble extends StatelessWidget {
                               DateFormat.Hm().format(message.timestamp),
                               style: context.text.labelSmall?.copyWith(
                                 fontSize: 10,
-                                color:
-                                    (own
-                                            ? palette.ownBubbleText
-                                            : palette.peerBubbleText)
-                                        .withValues(alpha: 0.6),
+                                color: palette.mutedOnBubble(own),
                               ),
                             ),
                             if (own) ...[
@@ -1349,9 +1344,7 @@ class _MessageBubble extends StatelessWidget {
                                     message.deliveryState ==
                                         DeliveryState.failed
                                     ? context.colors.error
-                                    : palette.ownBubbleText.withValues(
-                                        alpha: 0.7,
-                                      ),
+                                    : palette.mutedOnBubble(true, alpha: 0.7),
                               ),
                             ],
                           ],
@@ -1407,8 +1400,7 @@ class _EditedMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final ink = (own ? palette.ownBubbleText : palette.peerBubbleText)
-        .withValues(alpha: 0.6);
+    final ink = palette.mutedOnBubble(own);
     final editedAt = message.editedAt;
 
     return GestureDetector(
@@ -1455,6 +1447,7 @@ class _VoiceContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1488,7 +1481,15 @@ class _VoiceContent extends StatelessWidget {
                                   .toDouble(),
                           margin: const EdgeInsets.symmetric(horizontal: 1.5),
                           decoration: BoxDecoration(
-                            color: onBubble.withValues(alpha: 0.55),
+                            // A waveform bar is a graphic, not text, so 3:1
+                            // rather than 4.5:1 — it can stay fainter than the
+                            // duration beside it and still be seen.
+                            color: WeftContrast.dim(
+                              onBubble,
+                              bubble,
+                              alpha: 0.55,
+                              minRatio: WeftContrast.uiComponent,
+                            ),
                             borderRadius: WeftRadius.pill,
                           ),
                         ),
@@ -1501,7 +1502,7 @@ class _VoiceContent extends StatelessWidget {
             Text(
               formatMediaDuration(message.durationMs) ?? '',
               style: context.text.labelSmall?.copyWith(
-                color: onBubble.withValues(alpha: 0.75),
+                color: palette.muted(onBubble, bubble, alpha: 0.75),
               ),
             ),
           ],
@@ -1585,7 +1586,10 @@ class _Composer extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: context.colors.surface,
-        border: Border(top: BorderSide(color: context.palette.divider)),
+        // `border`, not `divider`: this bounds the composer rather than
+        // separating two blocks of text, and a low-vision user relies on it to
+        // find where the message goes.
+        border: Border(top: BorderSide(color: context.palette.border)),
       ),
       child: SafeArea(
         top: false,

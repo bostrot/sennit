@@ -49,7 +49,7 @@ class InboxShell extends ConsumerWidget {
           ),
           Expanded(flex: wide ? 2 : 1, child: const _InboxPane()),
           if (wide) ...[
-            VerticalDivider(width: 1, color: context.palette.divider),
+            VerticalDivider(width: 1, color: context.palette.border),
             Expanded(
               flex: 3,
               child: selectedChatId == null

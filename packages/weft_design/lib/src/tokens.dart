@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 /// Spacing scale. A 4pt grid — every gap in Weft is one of these.
 abstract final class WeftSpace {
@@ -51,6 +51,51 @@ abstract final class WeftMotion {
 
   /// Per-item delay for staggered list entry.
   static const Duration stagger = Duration(milliseconds: 28);
+}
+
+/// The motion scale a widget should actually animate at.
+///
+/// [WeftMotion]'s constants are the *design* durations; this is the pair of
+/// them with the platform's "reduce motion" switch applied. Read it through
+/// `context.motion` and every transition in the app collapses to nothing when
+/// the user has asked for that, without a `MediaQuery.disableAnimationsOf`
+/// check at each of the sixty-odd animation sites.
+///
+/// Reduced motion means [Duration.zero] rather than a shorter duration: a
+/// vestibular trigger is movement, not slow movement, and the accessibility
+/// setting is a request for none. The curves are kept as-is because a
+/// zero-length animation never samples them.
+@immutable
+class WeftMotionTokens extends ThemeExtension<WeftMotionTokens> {
+  const WeftMotionTokens({this.reduced = false});
+
+  /// Set from `MediaQuery.disableAnimations`.
+  final bool reduced;
+
+  Duration get instant => reduced ? Duration.zero : WeftMotion.instant;
+  Duration get fast => reduced ? Duration.zero : WeftMotion.fast;
+  Duration get normal => reduced ? Duration.zero : WeftMotion.normal;
+  Duration get slow => reduced ? Duration.zero : WeftMotion.slow;
+
+  /// Per-item entry delay. Zero when reduced, so a staggered list appears at
+  /// once rather than marching in.
+  Duration get stagger => reduced ? Duration.zero : WeftMotion.stagger;
+
+  Curve get standard => WeftMotion.standard;
+  Curve get spring => WeftMotion.spring;
+  Curve get enter => WeftMotion.enter;
+
+  @override
+  WeftMotionTokens copyWith({bool? reduced}) =>
+      WeftMotionTokens(reduced: reduced ?? this.reduced);
+
+  /// Motion has no meaningful midpoint — half a disabled animation is still an
+  /// animation — so this snaps rather than interpolating.
+  @override
+  WeftMotionTokens lerp(ThemeExtension<WeftMotionTokens>? other, double t) {
+    if (other is! WeftMotionTokens) return this;
+    return t < 0.5 ? this : other;
+  }
 }
 
 /// Elevation as shadow, tuned to stay subtle on dark surfaces where a heavy

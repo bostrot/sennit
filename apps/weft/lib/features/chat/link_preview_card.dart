@@ -118,7 +118,21 @@ class LinkPreviewCardBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final ink = own ? palette.ownBubbleText : palette.peerBubbleText;
+    // The card's own fill: a half-strength own bubble over the bubble itself,
+    // or the peer bubble as-is. Everything inside is read against this.
+    final card = own
+        ? WeftContrast.flatten(
+            palette.ownBubble.withValues(alpha: 0.55),
+            palette.ownBubble,
+          )
+        : palette.peerBubble;
+    // The rule down the left is a graphic and owes 3:1; the host line above is
+    // text and owes 4.5:1, which is why they are two different derivations of
+    // the same brand colour.
     final accent = own ? ink : palette.networkColor(network);
+    final hostInk = own
+        ? ink
+        : WeftContrast.ensure(palette.networkTextColor(network), card);
 
     return Padding(
       padding: const EdgeInsets.only(top: WeftSpace.xs),
@@ -164,7 +178,7 @@ class LinkPreviewCardBody extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: context.text.labelSmall?.copyWith(
-                          color: accent,
+                          color: hostInk,
                           fontWeight: FontWeight.w700,
                           fontSize: 10,
                         ),
@@ -189,7 +203,7 @@ class LinkPreviewCardBody extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: context.text.bodySmall?.copyWith(
-                            color: ink.withValues(alpha: 0.7),
+                            color: palette.muted(ink, card, alpha: 0.7),
                             height: 1.25,
                           ),
                         ),
@@ -203,7 +217,7 @@ class LinkPreviewCardBody extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.text.labelSmall?.copyWith(
-                            color: ink.withValues(alpha: 0.55),
+                            color: palette.muted(ink, card, alpha: 0.55),
                             fontSize: 10,
                           ),
                         ),

@@ -35,12 +35,25 @@ class ReplyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final ink = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final bubble = own ? palette.ownBubble : palette.peerBubble;
+    // The chip tints the bubble it sits in, so this — not the bubble — is the
+    // background everything inside it has to be readable against.
+    final fill = WeftContrast.flatten(ink.withValues(alpha: 0.10), bubble);
+
     // The rule down the left takes the network's colour when the target is on a
     // known leg — in a merged chat that is the answer to "which app was this
     // said on?", which the reply itself may not share.
     final accent = preview.network == null
         ? ink.withValues(alpha: 0.45)
         : palette.networkColor(preview.network!);
+
+    // The title is *text*, so it owes 4.5:1 rather than the rule's 3:1 — and
+    // on the user's own bubble it gives up the network colour entirely, which
+    // is derived from the same primary the bubble is filled with and would be
+    // invisible against it. Same rule the merged-bubble label follows.
+    final titleInk = preview.network == null || own
+        ? ink
+        : WeftContrast.ensure(palette.networkTextColor(preview.network!), fill);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: WeftSpace.xs),
@@ -79,8 +92,8 @@ class ReplyChip extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: context.text.labelSmall?.copyWith(
                           color: preview.isStub
-                              ? ink.withValues(alpha: 0.6)
-                              : accent,
+                              ? palette.muted(ink, fill, alpha: 0.6)
+                              : titleInk,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -92,7 +105,11 @@ class ReplyChip extends StatelessWidget {
                   maxLines: compact ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                   style: context.text.bodySmall?.copyWith(
-                    color: ink.withValues(alpha: preview.isStub ? 0.55 : 0.8),
+                    color: palette.muted(
+                      ink,
+                      fill,
+                      alpha: preview.isStub ? 0.55 : 0.8,
+                    ),
                     fontStyle: _placeholder ? FontStyle.italic : null,
                   ),
                 ),

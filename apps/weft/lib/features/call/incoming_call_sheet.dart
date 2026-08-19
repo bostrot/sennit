@@ -81,6 +81,7 @@ class IncomingCallSheet extends StatelessWidget {
                     label: 'Decline',
                     icon: Icons.call_end_rounded,
                     colour: context.palette.callDecline,
+                    ink: context.palette.onCallDecline,
                     onPressed: controls.decline,
                   ),
                   // Answering a video call on audio only is a first-class
@@ -92,6 +93,7 @@ class IncomingCallSheet extends StatelessWidget {
                       label: 'Voice only',
                       icon: Icons.phone_rounded,
                       colour: context.palette.callAccept,
+                      ink: context.palette.onCallAccept,
                       onPressed: () => controls.accept(video: false),
                     ),
                   _Answer(
@@ -100,6 +102,7 @@ class IncomingCallSheet extends StatelessWidget {
                         ? Icons.videocam_rounded
                         : Icons.call_rounded,
                     colour: context.palette.callAccept,
+                    ink: context.palette.onCallAccept,
                     onPressed: controls.accept,
                   ),
                 ],
@@ -118,12 +121,19 @@ class _Answer extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.colour,
+    required this.ink,
     required this.onPressed,
   });
 
   final String label;
   final IconData icon;
   final Color colour;
+
+  /// Glyph on [colour]. White on the accept green is 1.9:1, and the glyph is
+  /// the only thing telling accept apart from decline — so the ink comes from
+  /// the token layer, which picked it against the fill.
+  final Color ink;
+
   final VoidCallback onPressed;
 
   @override
@@ -135,7 +145,7 @@ class _Answer extends StatelessWidget {
           tooltip: label,
           icon: icon,
           background: colour,
-          foreground: Colors.white,
+          foreground: ink,
           size: 68,
           onPressed: onPressed,
         ),
@@ -216,7 +226,7 @@ class IncomingCallBanner extends StatelessWidget {
                 tooltip: 'Decline',
                 icon: Icons.call_end_rounded,
                 background: context.palette.callDecline,
-                foreground: Colors.white,
+                foreground: context.palette.onCallDecline,
                 size: 44,
                 onPressed: controls.decline,
               ),
@@ -227,7 +237,7 @@ class IncomingCallBanner extends StatelessWidget {
                     ? Icons.videocam_rounded
                     : Icons.call_rounded,
                 background: context.palette.callAccept,
-                foreground: Colors.white,
+                foreground: context.palette.onCallAccept,
                 size: 44,
                 onPressed: controls.accept,
               ),

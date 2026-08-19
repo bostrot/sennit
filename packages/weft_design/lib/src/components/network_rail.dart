@@ -70,7 +70,7 @@ class NetworkRail extends StatelessWidget {
                     unread: unreadByNetwork[network] ?? 0,
                     onTap: () => onToggle(network),
                     // Stagger entry so the rail assembles rather than snapping.
-                    delay: WeftMotion.stagger * i,
+                    delay: context.motion.stagger * i,
                   );
                 },
               ),
@@ -102,8 +102,8 @@ class _AllEntry extends StatelessWidget {
       tooltip: 'All conversations',
       badge: total,
       child: AnimatedContainer(
-        duration: WeftMotion.fast,
-        curve: WeftMotion.standard,
+        duration: context.motion.fast,
+        curve: context.motion.standard,
         width: 40,
         height: 40,
         decoration: BoxDecoration(
@@ -165,13 +165,20 @@ class _RailEntryState extends State<_RailEntry>
 
   @override
   Widget build(BuildContext context) {
+    final motion = context.motion;
+    // Assigned here rather than at construction because the reduce-motion
+    // answer lives in the theme, which a field initialiser cannot reach. A
+    // zero duration makes the pending `forward()` land instantly, so a rail
+    // built under reduced motion appears rather than marching in.
+    _entry.duration = motion.normal;
+
     return FadeTransition(
-      opacity: CurvedAnimation(parent: _entry, curve: WeftMotion.enter),
+      opacity: CurvedAnimation(parent: _entry, curve: motion.enter),
       child: SlideTransition(
         position: Tween<Offset>(
           begin: const Offset(-0.35, 0),
           end: Offset.zero,
-        ).animate(CurvedAnimation(parent: _entry, curve: WeftMotion.enter)),
+        ).animate(CurvedAnimation(parent: _entry, curve: motion.enter)),
         child: _RailButton(
           selected: widget.selected,
           onTap: widget.onTap,
@@ -216,6 +223,7 @@ class _RailButtonState extends State<_RailButton> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final colors = context.colors;
+    final motion = context.motion;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -238,8 +246,8 @@ class _RailButtonState extends State<_RailButton> {
             onTap: widget.onTap,
             child: AnimatedScale(
               scale: _pressed ? 0.92 : 1,
-              duration: WeftMotion.instant,
-              curve: WeftMotion.standard,
+              duration: motion.instant,
+              curve: motion.standard,
               child: SizedBox(
                 height: 52,
                 child: Stack(
@@ -250,8 +258,8 @@ class _RailButtonState extends State<_RailButton> {
                     // awkward slabs of colour above and below the icon on
                     // narrow rails; a fitted squircle reads as "this icon".
                     AnimatedContainer(
-                      duration: WeftMotion.normal,
-                      curve: WeftMotion.spring,
+                      duration: motion.normal,
+                      curve: motion.spring,
                       width: widget.selected ? 48 : 44,
                       height: widget.selected ? 48 : 44,
                       decoration: BoxDecoration(
@@ -263,13 +271,13 @@ class _RailButtonState extends State<_RailButton> {
                     ),
                     // Accent bar slides out from the left edge on selection.
                     AnimatedPositioned(
-                      duration: WeftMotion.normal,
-                      curve: WeftMotion.spring,
+                      duration: motion.normal,
+                      curve: motion.spring,
                       left: widget.selected ? -WeftSpace.sm : -WeftSpace.lg,
                       top: 12,
                       bottom: 12,
                       child: AnimatedOpacity(
-                        duration: WeftMotion.fast,
+                        duration: motion.fast,
                         opacity: widget.selected ? 1 : 0,
                         child: Container(
                           width: 3,
@@ -307,7 +315,7 @@ class _UnreadBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return AnimatedSwitcher(
-      duration: WeftMotion.fast,
+      duration: context.motion.fast,
       transitionBuilder: (child, animation) =>
           ScaleTransition(scale: animation, child: child),
       child: Container(

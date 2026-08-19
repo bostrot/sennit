@@ -61,13 +61,25 @@ class WeftAvatar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Text(
-            _initials,
-            style: TextStyle(
-              fontSize: inner * 0.36,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              height: 1,
+          // The initials are a *mark*, not text: their size is derived from
+          // the circle around them, so letting the text scaler grow them
+          // pushes them straight out of a container that cannot grow with
+          // them. At 2.0× the avatar would show half of one letter.
+          //
+          // Opting out is safe because nothing here is reading material — the
+          // person's name reaches a screen reader through this widget's
+          // semantics label, and a sighted user gets the name from the row the
+          // avatar sits in. A scale-aware measurement is the right answer for
+          // text; for a glyph, no scaling is.
+          MediaQuery.withNoTextScaling(
+            child: Text(
+              _initials,
+              style: TextStyle(
+                fontSize: inner * 0.36,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1,
+              ),
             ),
           ),
           if (imageUrl != null)

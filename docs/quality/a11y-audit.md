@@ -352,6 +352,41 @@ scaler grows the glyph but not the circle it lives in:
 
 These are the "absolute `fontSize` used for layout maths" task 2 names.
 
+### Resolved by task 2
+
+The token layer now computes its own contrast. `packages/weft_design/lib/src/contrast.dart`
+carries `WeftContrast.ratio/flatten/meets/inkOn/ensure/dim`, and
+`packages/weft_design/test/contrast_test.dart` asserts every pair below across
+**seven** themes — light, dark, AMOLED, each of those in high contrast, and a
+second seed — so a new seed or a Material tone-mapping change is checked rather
+than re-blessed. 194 assertions where there were none.
+
+| ID | Resolution |
+|---|---|
+| CONTRAST-1 | `online` is derived, not fixed: corrected to 4.5:1 against both the surface and a peer bubble. On light it is `#1A7541`, on dark the original `#2ECC71` already passes. All six call sites keep reading `palette.online` |
+| CONTRAST-2 | New `onCallAccept` / `onCallDecline` tokens. `inkOn(…, preferred: white)` keeps white where it already passes — decline red is 3.9:1 — and flips only the accept glyph to black. The four `foreground: Colors.white` call sites now read the token |
+| CONTRAST-3 | `WeftContrast.dim` / `palette.muted` / `palette.mutedOnBubble` apply the requested alpha and back off only as far as AA needs. All fourteen sites migrated across `chat_view.dart`, `attachment_bubble.dart`, `reply_chip.dart` and `link_preview_card.dart`, each measured against the fill actually behind it — the reply chip's 10% tint and the transcript block's 8% tint included, not the bubble behind them |
+| CONTRAST-4 | Split in two: `networkColor` is the **fill** and owes 3:1, `networkTextColor` is the **text** derivation and owes 4.5:1. The four text sites take the second. A single `networkInk` per theme covers every chip glyph — chosen per network, a light rail would have come out half white glyphs and half black |
+| CONTRAST-5 | `mergedAccent` corrected against the surface, the peer bubble *and* its own 16% pill tint, which is the background the "Merged" label is actually read on |
+| CONTRAST-6 | The call header brings its own scrim (`palette.scrim`, full strength across the text block, fading only under the bottom padding) and its ink is measured against that scrim over pure white — the worst frame a camera can send |
+| CONTRAST-7 | Decided rather than inherited: `divider` stays the faint hairline (WCAG 1.4.11 exempts a content divider), and a new `border` token meets 3:1 for the composer edge, the share sheet's action bar, the preview sheet and the two-pane split. Under high contrast `divider` is promoted to `border` |
+| SCALE-1 | Both marks opt out of text scaling via `MediaQuery.withNoTextScaling`, with `text_scale_test.dart` pinning them inside their boxes at 0.85×, 1.0×, 1.3× and 2.0× — and asserting the glyph's real *label* still scales, so the opt-out cannot spread |
+| CROSS-4 | `WeftTheme.build` takes `highContrast` and `reduceMotion`; `main.dart` reads `MediaQuery.highContrastOf` / `.disableAnimationsOf` once at the root. High contrast goes through Material's own `contrastLevel: 1.0`. Reduced motion is a `WeftMotionTokens` theme extension read as `context.motion`, plus `NoSplash` and a no-op page transition. `weft_design`'s own components are migrated; the app's staggered lists are task 5's |
+| CROSS-5 | A `focusRing` token at 3:1 against every surface a control is drawn on — page, field, card, rail. Wired to `focusedBorder` and to a focused `side` on filled/outlined/text/icon buttons, replacing Material's `onSurface` wash that was invisible on AMOLED black |
+| CROSS-6 | Closed — the test exists, and `packages/weft_design/test/` is no longer empty |
+
+Two things deliberately *not* changed, with reasons:
+
+- **The focus ring is not required to clear 3:1 against `railSelected`.** Under
+  light high contrast the page is near-white and `primaryContainer` is dark;
+  no single colour clears 3:1 against both, and the demands point opposite
+  ways. The ring is drawn on a control's outer boundary, so the surfaces it
+  has to stand out against are the ones *around* the control. Pretending
+  otherwise would have moved the failure somewhere less visible.
+- **`callAccept` / `callDecline` still hold their fixed brand values.** They
+  are the two colours a call is allowed to break the theme with; the ink on
+  them moved instead.
+
 ---
 
 ## Per-screen findings

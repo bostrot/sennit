@@ -31,7 +31,10 @@ class SmsComposerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plan = segmentMessage(body);
-    final accent = context.palette.networkColor(ChatNetwork.sms);
+    // The text derivation, not the fill one: every use of `accent` on this bar
+    // is a word or a glyph on the app surface, so it owes 4.5:1 rather than the
+    // 3:1 a filled chip does.
+    final accent = context.palette.networkTextColor(ChatNetwork.sms);
     final muted = context.colors.onSurfaceVariant;
 
     return Padding(

@@ -66,8 +66,8 @@ class _ChatTileState extends State<ChatTile> {
           onLongPress: widget.onLongPress,
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
-            duration: WeftMotion.fast,
-            curve: WeftMotion.standard,
+            duration: context.motion.fast,
+            curve: context.motion.standard,
             margin: const EdgeInsets.symmetric(
               horizontal: WeftSpace.sm,
               vertical: 2,
