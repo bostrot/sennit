@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.bostrot.weft.call.CallBridge
 import com.bostrot.weft.sms.SmsBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -121,12 +122,19 @@ class MainActivity : FlutterActivity() {
         // process. `SmsBridge` is the singleton that outlives this class; all
         // the activity contributes is somewhere to show the role dialog.
         SmsBridge.attach(this, flutterEngine)
+        // Calling, for the same reason and one more: a `ConnectionService` is
+        // bound *by Telecom*, so an incoming call can reach this process with no
+        // activity at all — and answering from the lock screen routinely does.
+        // `CallBridge` holds that answer until an engine exists, which is why it
+        // is a singleton rather than a `when` arm here.
+        CallBridge.attach(this, flutterEngine)
 
         intent?.let { handleIntent(it, replay = true) }
     }
 
     override fun onDestroy() {
         SmsBridge.detach()
+        CallBridge.detach()
         super.onDestroy()
     }
 

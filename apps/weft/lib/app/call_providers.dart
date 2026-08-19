@@ -9,6 +9,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 
 import '../features/call/call_controls.dart';
 import '../services/call/call_audio.dart';
+import '../services/call/call_platform.dart';
 import '../services/call/call_service.dart';
 import '../services/call/webrtc_media_engine.dart';
 import 'providers.dart';
@@ -55,8 +56,18 @@ final callServiceProvider = Provider<CallService?>((ref) {
     audio: PlatformCallAudio(),
   );
 
+  // CallKit and Telecom. Wired here rather than inside [CallService] because it
+  // is the same kind of seam as the other three — a thing that needs a device —
+  // and because the direction is what keeps the two in step: the bridge
+  // *follows* the state stream rather than being notified by the service, so a
+  // future transition cannot forget to tell the system about a call.
+  final platform = CallPlatformBridge(
+    actions: CallServicePlatformActions(service),
+  )..follow(service.states);
+
   ref.onDispose(() {
     turnServers.invalidate();
+    unawaited(platform.dispose());
     unawaited(service.dispose());
   });
   return service;

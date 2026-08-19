@@ -18,5 +18,13 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftShareChannel") {
       WeftShareChannel.register(with: registrar)
     }
+    // CallKit and PushKit. Registered on the launch path rather than when the
+    // first call happens, and the reason is PushKit: the VoIP registry has to
+    // exist before a push can be delivered to it, and the push that matters most
+    // is the one that arrives while Weft is not running. Registering lazily would
+    // mean the first incoming call after every launch is the one that is missed.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftCallManager") {
+      WeftCallManager.register(with: registrar)
+    }
   }
 }

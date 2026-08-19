@@ -32,6 +32,12 @@
 	<string>Weft needs your photo library so you can send photos and videos in a conversation.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Weft needs the camera so you can take a photo and send it in a conversation.</string>
+	<!-- Calling. Without this key the app is *terminated* the first time WebRTC
+	     opens a capture device — not refused, not prompted: killed — so its
+	     absence is a crash on the first call rather than a call with no sound.
+	     The camera description above already covers a video call. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Weft needs the microphone so you can talk in a voice or video call.</string>
 	<key>CFBundleName</key>
 	<string>weft</string>
 	<key>CFBundlePackageType</key>
@@ -50,11 +56,19 @@
 	     is already in the foreground, and every push while it is backgrounded
 	     shows the placeholder alert from `kIosDefaultPayload` and nothing else.
 	     `fetch` is what lets the client catch up on sync in the background so a
-	     notification is not the first the app has heard of a conversation. -->
+	     notification is not the first the app has heard of a conversation.
+
+	     `voip` is what lets `PKPushRegistry` be created at all and what keeps the
+	     WebRTC connection alive once the call screen is no longer in front: a
+	     call the user backgrounds to look up an address must not go silent. It
+	     is *not* what makes an incoming call ring — CallKit does that, off a VoIP
+	     push signed with its own certificate (see the iOS signing handoff ADR). -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 		<string>fetch</string>
+		<string>voip</string>
+		<string>audio</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

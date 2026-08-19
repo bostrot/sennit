@@ -275,7 +275,56 @@ compile despite all of the above.
 
 ## Added by later phases
 
-Nothing yet. Phases 07, 09 and 10 append here — VoIP APNs, the Patrol UI-test
-target, WidgetKit and watchOS. Add a `### Phase NN — <capability>` section and a
-row to [Targets and bundle ids](#targets-and-bundle-ids) rather than editing what
-is above.
+Phases 09 and 10 still append here — the Patrol UI-test target, WidgetKit and
+watchOS. Add a `### Phase NN — <capability>` section and a row to
+[Targets and bundle ids](#targets-and-bundle-ids) rather than editing what is
+above.
+
+### Phase 07 — VoIP push, and why it is a second certificate
+
+`ios/Runner/CallManager.swift` registers a `PKPushRegistry` for `.voIP` and the
+`voip` background mode is declared in `Info.plist`. Neither of those makes a
+push arrive. **A VoIP push is signed with its own credential, and it is not the
+one Weft's message notifications already use.**
+
+The distinction is not a formality:
+
+| | Message notifications | VoIP pushes |
+|---|---|---|
+| Credential | The APNs auth key (`.p8`) `firebase_messaging` is configured with | A **VoIP Services certificate** (`.p12`), generated per app id |
+| Topic | `com.bostrot.weft` | `com.bostrot.weft.voip` — the bundle id with `.voip` appended |
+| Delivered to | `UNUserNotificationCenter` | `PKPushRegistry`, waking a suspended or terminated app |
+| Gateway | Firebase | Sygnal, or whatever pusher the homeserver's account is registered against |
+
+Three consequences for whoever holds the signing identity:
+
+1. **Generate the VoIP Services certificate** at
+   *Certificates, Identifiers & Profiles → Certificates → VoIP Services
+   Certificate*, against the `com.bostrot.weft` app id. It is a certificate
+   rather than a key: it expires annually and has to be renewed, unlike the
+   `.p8`. An auth key **cannot** be substituted — APNs rejects a VoIP topic
+   signed with one.
+2. **Register it with the push gateway.** Matrix delivers pushes through a
+   gateway (Sygnal for a self-hosted homeserver), and a VoIP push needs a
+   *second* pusher on the account with its own `app_id` — conventionally
+   `com.bostrot.weft.voip` — pointed at a gateway app configured with the
+   `.p12`. Weft's own `Pusher` type (`packages/weft_matrix/lib/src/pusher.dart`)
+   keys a pusher by `(appId, pushKey)`, so the VoIP pusher sits alongside the
+   message one rather than replacing it.
+3. **Until both exist, the token goes nowhere on purpose.**
+   `CallPlatformBridge.voipTokens` publishes what PushKit hands over and nothing
+   consumes it. That is deliberate: registering a pusher against a gateway that
+   cannot sign for the topic produces a pusher the homeserver believes in and
+   APNs rejects, which is worse than no pusher — the homeserver stops trying
+   other routes. Wire it up in the same change that lands the certificate.
+
+**What works without any of this.** Every call placed or received while Weft is
+in the foreground, and every call on Android, where the wake-up is the existing
+FCM path plus a `ConnectionService`. What is missing without the certificate is
+precisely one thing: an incoming call ringing a phone whose screen is off and
+whose Weft has been suspended.
+
+`Info.plist` also gained `NSMicrophoneUsageDescription` in this phase. Its
+absence is not a permission prompt that fails — it is a **termination** the first
+time WebRTC opens a capture device, so a build that lost it would crash on the
+first call rather than take a silent one.

@@ -62,7 +62,9 @@ String callEndLabel(CallEndReason? reason, {required bool isOutgoing}) {
     case CallEndReason.remoteReject:
       return isOutgoing ? 'They declined' : 'Call declined';
     case CallEndReason.userBusy:
-      return isOutgoing ? 'They are on another call' : 'Declined — you were busy';
+      return isOutgoing
+          ? 'They are on another call'
+          : 'Declined — you were busy';
     case CallEndReason.inviteTimeout:
       return isOutgoing ? 'No answer' : 'Missed call';
     case CallEndReason.answeredElsewhere:

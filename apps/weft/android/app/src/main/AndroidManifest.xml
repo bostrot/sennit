@@ -17,6 +17,42 @@
     <uses-permission android:name="android.permission.SEND_SMS"/>
     <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <uses-permission android:name="android.permission.RECEIVE_MMS"/>
+    <!-- Calling. `MANAGE_OWN_CALLS` is what lets Weft register a *self-managed*
+         phone account and hand Telecom a call of its own; it is a normal
+         permission, granted at install, and without it `addNewIncomingCall`
+         throws `SecurityException` rather than failing quietly. `RECORD_AUDIO`
+         and `CAMERA` are the dangerous pair WebRTC actually opens — requested at
+         runtime, at the moment a call is placed or answered, because a
+         permission sheet in front of a ringing phone is the only place either
+         question makes sense.
+
+         `USE_FULL_SCREEN_INTENT` is what makes an incoming call take over a
+         locked screen instead of arriving as a card behind it. From Android 14
+         the system grants it only to apps whose function is calling or alarms,
+         which a self-managed `ConnectionService` app is — and revokes it from
+         everyone else, which is exactly why the notification is posted under
+         `CATEGORY_CALL` and by a calling app rather than as one more message.
+
+         The two `FOREGROUND_SERVICE` entries go together: from Android 14 a
+         foreground service must declare a type *and* hold the permission that
+         matches it, and `phoneCall` additionally requires a Telecom call to be
+         in progress. See `CallForegroundService`. -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <!-- Bluetooth headsets are a call audio *route*, and from Android 12 the
+         route cannot even be enumerated without this. Declared with
+         `neverForLocation` because Weft has no interest in where the user is and
+         the permission would otherwise imply it. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- A phone with no camera can still take a voice call, and a tablet with no
+         microphone is not a device this refuses to install on. Both are declared
+         optional so the Play listing does not exclude hardware that works. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application
         android:label="weft"
         android:name="${applicationName}"
@@ -172,6 +208,41 @@
                 <data android:scheme="mmsto"/>
             </intent-filter>
         </service>
+
+        <!-- Calling. Telecom binds this to build a `Connection` for every call,
+             incoming or outgoing, and it binds it *itself* — which is why the
+             whole call bridge is written to work with no activity and no Flutter
+             engine in the process.
+
+             `android:permission` here is the contract in the other direction: it
+             declares that only the system, which holds `BIND_TELECOM_CONNECTION_SERVICE`,
+             may bind this. Without it any installed app could bind the service
+             and manufacture a call. Exported because the binder is the system,
+             in another process. -->
+        <service
+            android:name=".call.WeftConnectionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService"/>
+            </intent-filter>
+        </service>
+        <!-- What keeps a backgrounded call alive through Doze. Not exported:
+             the only thing that starts it is `WeftConnection`, in this process,
+             immediately after Telecom has created the call the `phoneCall` type
+             requires. -->
+        <service
+            android:name=".call.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall"/>
+        <!-- Answer and decline on the incoming-call notification. A receiver
+             rather than an activity so a decline costs no engine start: it hands
+             the action to `CallBridge`, which replays it if Dart is not
+             listening yet. Not exported — the only sender is this app's own
+             PendingIntent, the same rule `SmsStatusReceiver` follows. -->
+        <receiver
+            android:name=".call.CallActionReceiver"
+            android:exported="false"/>
 
         <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
              declared by the firebase_messaging plugin and merged in from its

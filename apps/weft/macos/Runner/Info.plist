@@ -14,6 +14,14 @@
 		</dict>
 	</array>
 
+	<!-- The entitlements let the sandbox open these devices; these strings are
+	     what TCC shows the user when it asks. Both are needed on macOS: an
+	     entitlement with no usage description is a prompt that never appears and
+	     a capture that never starts. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Weft needs the microphone so you can talk in a voice or video call.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Weft needs the camera so you can be seen in a video call.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
