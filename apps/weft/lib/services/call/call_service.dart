@@ -630,7 +630,13 @@ class CallService {
       // Nothing in the machine ends a call that never connects.
       _iceDeadline = _clock().add(iceTimeout);
     }
-    if (transition.to == CallState.connected) {
+    // Only on the transition *into* connected, never on every input received
+    // while already there. A [Tick] is a transition too, and clearing the
+    // reconnection deadline on each of them would mean the grace period never
+    // expired: a peer connection that dropped and did not heal would sit in
+    // "Reconnecting…" until one of the two people gave up, which is precisely
+    // the failure the grace period exists to bound.
+    if (transition.to == CallState.connected && transition.changedState) {
       _iceDeadline = null;
       _reconnectDeadline = null;
     }
