@@ -281,6 +281,47 @@ class TestAccount {
     within: within,
   );
 
+  /// A file event of [msgtype] that actually carries an attachment, decrypted.
+  ///
+  /// The `hasAttachment` half is what makes this worth asserting on rather than
+  /// the msgtype alone: an upload that failed after the event was composed, or
+  /// a client that sent the caption and abandoned the file, produces an
+  /// `m.image` with no `url` and no `file` block — which renders as a text
+  /// message and is exactly the silent failure this suite exists to catch.
+  ///
+  /// Matched by kind rather than by name because a picked file's name is the
+  /// content provider's to choose: a photo taken by the camera, or one handed
+  /// over by a documents picker, arrives under a name the test did not pick.
+  /// Every scenario makes a room of its own, so one image in it is unambiguous.
+  Future<sdk.Event> requireAttachment(
+    String roomId, {
+    String msgtype = sdk.MessageTypes.Image,
+    Duration? within,
+  }) => requireEvent(
+    roomId,
+    (event) =>
+        event.type == sdk.EventTypes.Message &&
+        event.messageType == msgtype &&
+        event.hasAttachment,
+    description: 'a $msgtype attachment',
+    within: within,
+  );
+
+  /// Every attachment of [msgtype] this session currently holds in [roomId].
+  ///
+  /// For the shares that send more than one file, where the assertion is a
+  /// count as much as a presence.
+  Future<List<sdk.Event>> attachments(
+    String roomId, {
+    String msgtype = sdk.MessageTypes.Image,
+  }) async => [
+    for (final event in (await timeline(roomId)).events)
+      if (event.type == sdk.EventTypes.Message &&
+          event.messageType == msgtype &&
+          event.hasAttachment)
+        event,
+  ];
+
   /// Every device id the homeserver currently lists for this account.
   Future<Set<String>> deviceIds() async {
     final devices = await client.getDevices();

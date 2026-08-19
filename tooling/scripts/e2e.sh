@@ -6,11 +6,13 @@
 #   ./tooling/scripts/e2e.sh --device emulator-5554 --keep
 #   ./tooling/scripts/e2e.sh --target integration_test/patrol/harness_test.dart
 #
-# One command, because a device run has five prerequisites that each fail in a
+# One command, because a device run has seven prerequisites that each fail in a
 # way that looks like a test failure: a homeserver that is up *and* healthy,
 # accounts that exist, a login rate limit raised high enough to survive two
-# logins per test, an address the *device* can reach, and `patrol_cli` on PATH.
-# Getting any of them wrong produces a red suite and a wrong diagnosis.
+# logins per test, an address the *device* can reach, `patrol_cli` on PATH, a
+# photo in the device's gallery for the picker to find, and a permission state
+# that has not already been answered. Getting any of them wrong produces a red
+# suite and a wrong diagnosis.
 #
 # The matrix, and what each row can actually run, is docs/quality/e2e-matrix.md.
 set -euo pipefail
@@ -40,6 +42,11 @@ Usage: tooling/scripts/e2e.sh [options] [-- <extra patrol test args>]
                           Inferred from the device when not given.
       --keep              Leave the homeserver running afterwards.
       --no-seed           Skip account provisioning (they already exist).
+      --no-media          Skip seeding a photo into the device's gallery.
+                          The attachment and permission scenarios need one.
+      --no-reset          Leave Weft's data and permissions on the device as
+                          they are. The permission scenarios need a dialog that
+                          an already-granted permission will not raise.
   -h, --help              This.
 
 Requires `patrol_cli` on PATH:  dart pub global activate patrol_cli
@@ -47,6 +54,8 @@ EOF
 }
 
 SEED=1
+MEDIA=1
+RESET=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -d|--device) DEVICE="$2"; shift 2 ;;
@@ -54,6 +63,8 @@ while [[ $# -gt 0 ]]; do
     --homeserver) HOMESERVER="$2"; shift 2 ;;
     --keep) KEEP=1; shift ;;
     --no-seed) SEED=0; shift ;;
+    --no-media) MEDIA=0; shift ;;
+    --no-reset) RESET=0; shift ;;
     -h|--help) usage; exit 0 ;;
     --) shift; PATROL_ARGS=("$@"); break ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -185,6 +196,69 @@ if [[ -z "$HOMESERVER" ]]; then
   esac
 fi
 
+# --- the device itself -----------------------------------------------------
+#
+# Two things the attachment, share and permission scenarios need and cannot do
+# for themselves: a photo in the gallery, and a permission that has not already
+# been answered. Both are the host's job — a compiled test binary on a device
+# has no `adb`, no `simctl` and no way to reach the media store from outside its
+# own sandbox.
+
+# The seeded photo is the app's own 512pt icon: a real PNG of a real size that
+# is already in the tree, so nothing here carries a second copy of an image.
+# 36 KB is also large enough that an upload has a progress bar worth watching.
+SEED_PHOTO="$APP_DIR/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png"
+SEED_PHOTO_NAME="weft-e2e-photo.png"
+APP_ID="com.bostrot.weft"
+
+is_android_device() {
+  [[ -n "$DEVICE" ]] && command -v adb >/dev/null &&
+    adb -s "$DEVICE" get-state >/dev/null 2>&1
+}
+
+is_ios_simulator() {
+  [[ -n "$DEVICE" ]] && command -v xcrun >/dev/null &&
+    xcrun simctl list devices 2>/dev/null | grep -q "$DEVICE"
+}
+
+if [[ $RESET -eq 1 ]] && is_android_device; then
+  step "Clearing Weft's data and permissions on $DEVICE"
+  # A granted permission survives `adb install -r`, and so does a denial — so
+  # without this, `permissions_test` passes once on a clean device and then
+  # fails on every later run saying no dialog appeared. Clearing also drops the
+  # stored Matrix session, which is the state the suite is written for: every
+  # scenario decides for itself whether it has to sign in.
+  #
+  # Tolerated when it fails: on a machine that has never run the suite the
+  # package is not installed yet, and `patrol test` is about to install it.
+  adb -s "$DEVICE" shell pm clear "$APP_ID" >/dev/null 2>&1 || true
+fi
+
+if [[ $MEDIA -eq 1 ]]; then
+  if is_android_device; then
+    step "Seeding $SEED_PHOTO_NAME into the gallery on $DEVICE"
+    adb -s "$DEVICE" push "$SEED_PHOTO" "/sdcard/Pictures/$SEED_PHOTO_NAME" >/dev/null
+    # A file on disk is not a file in the gallery. The picker reads MediaStore
+    # and nothing indexes what `adb push` wrote, so an unscanned photo is an
+    # empty picker — which fails as a timeout pointing at the picker rather
+    # than at the missing image. Verified against a live emulator: after the
+    # broadcast, `content query --uri content://media/external/images/media`
+    # returns the row.
+    adb -s "$DEVICE" shell am broadcast \
+      -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
+      -d "file:///sdcard/Pictures/$SEED_PHOTO_NAME" >/dev/null
+  elif is_ios_simulator; then
+    step "Seeding $SEED_PHOTO_NAME into the photo library on $DEVICE"
+    # `addmedia` takes the file's own name into the library, so the copy is what
+    # gives it the name the suite is told about.
+    cp "$SEED_PHOTO" "${TMPDIR:-/tmp}/$SEED_PHOTO_NAME"
+    xcrun simctl addmedia "$DEVICE" "${TMPDIR:-/tmp}/$SEED_PHOTO_NAME"
+  else
+    echo "no device to seed a gallery on — attachment_test and permissions_test" \
+         "have no photo to pick and will fail in the picker"
+  fi
+fi
+
 # --- the run ---------------------------------------------------------------
 
 cmd=(patrol test)
@@ -194,6 +268,7 @@ cmd=(patrol test)
 # there is no shell on a device for `Platform.environment` to read.
 cmd+=(--dart-define "WEFT_HOMESERVER=$HOMESERVER")
 cmd+=(--dart-define "WEFT_TEST_PASSWORD=$PASSWORD")
+cmd+=(--dart-define "WEFT_SEEDED_PHOTO=$SEED_PHOTO_NAME")
 cmd+=("${PATROL_ARGS[@]+"${PATROL_ARGS[@]}"}")
 
 step "patrol test  (homeserver: $HOMESERVER)"

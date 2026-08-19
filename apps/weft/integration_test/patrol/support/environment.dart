@@ -50,8 +50,33 @@ const String kPeerUser = 'bob';
 /// A localpart as the full Matrix id the homeserver knows it by.
 String matrixUserId(String localpart) => '@$localpart:$kServerName';
 
+/// What the OS calls Weft.
+///
+/// The `applicationId` in `android/app/build.gradle.kts`, the
+/// `PRODUCT_BUNDLE_IDENTIFIER` of the `Runner` target, and the two ids in the
+/// pubspec's `patrol:` block — all four are this string, and the native
+/// automator needs it to tell Weft's own windows from the ones the OS puts in
+/// front of them.
+const String kAppId = 'com.bostrot.weft';
+
+/// What the launcher calls Weft, which is not the same thing.
+///
+/// `android:label` in the manifest, lower-case, and it is what a system share
+/// sheet writes under the app's icon — so it is how a test taps "share this to
+/// Weft" in a chooser that is not Weft's to draw.
+const String kAndroidAppLabel = 'weft';
+
 /// How long a UI transition that waits on nothing but Flutter may take.
 const Duration kUiDeadline = Duration(seconds: 20);
+
+/// How long a *native* surface may take to appear.
+///
+/// Generous for the same reason [kSyncDeadline] is, and then some: the first
+/// tap of a run launches another application. Android's documents picker and
+/// its share sheet are cold-started processes on an emulator that is already
+/// busy running Weft, and ten seconds — Patrol's own default — is comfortably
+/// less than that takes.
+const Duration kNativeDeadline = Duration(seconds: 60);
 
 /// How long a UI transition that waits on the *homeserver* may take.
 ///

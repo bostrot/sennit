@@ -255,10 +255,18 @@ and nothing for a test to fire. macOS likewise has no share target. Revisit when
 the extension has an Xcode target and a profile.
 
 ③ **API 28 has no notification runtime permission.** `POST_NOTIFICATIONS`
-arrived in API 33. The storage/photos half of `permissions_test` still applies —
-API 28 predates scoped storage, so a `READ_EXTERNAL_STORAGE` grant is what the
-picker asks for. The deny path is asserted on both; only the *dialog identity*
-differs.
+arrived in API 33.
+
+> [!NOTE]
+> **Superseded in its second half, 2026-08-19.** This reason originally also
+> said that API 28's storage half "still applies", because a pre-scoped-storage
+> picker would ask for `READ_EXTERNAL_STORAGE`. It does not: Weft's picker is
+> `ACTION_GET_CONTENT`, which asks for nothing on *any* API level — see
+> [finding 1](#three-findings-that-changed-what-these-tests-can-assert). What
+> `permissions_test` exercises across every row is the camera dialog, granted and
+> denied, plus the assertion that the gallery raises none. The row stays `◐`
+> because the notification permission this reason is really about still does not
+> exist on API 28.
 
 ④ **API 28 predates the notification surfaces the test asserts on.** Conversation
 shortcuts and bubbles are API 30+; `MessagingStyle` exists but is not
@@ -315,20 +323,28 @@ asserted on the *peer's* timeline, not only locally.
 
 ### Attachments and media
 
-**`attachment_test.dart`** — the real system gallery picker via
-`native.pickImageFromGallery()`, upload progress bubble, settled bubble,
-full-screen viewer, save back out. Needs a seeded image in the device gallery;
-the support helper pushes one (`adb push` / `simctl addmedia`) as part of setup,
-because an empty gallery is a hang rather than a failure.
+**`attachment_test.dart`** — the real system gallery picker, upload progress
+bubble, settled bubble, full-screen viewer, hand back to the platform. Needs a
+seeded image in the device gallery; `e2e.sh` pushes one (`adb push` /
+`simctl addmedia`) before the run, because an empty gallery is a hang rather
+than a failure. Written up in
+[The attachment and media scenarios](#the-attachment-and-media-scenarios) —
+which also records why it does *not* go through
+`native.pickImageFromGallery()`, and why "save back out" is Share on a phone.
 
-**`share_in_test.dart`** — `ACTION_SEND` with a file URI fired from outside the
-app, share-target sheet appears, chat selected, message arrives on the peer.
-Then `SEND_MULTIPLE`. Android rows only.
+**`share_in_test.dart`** — `ACTION_SEND` with a file URI routed by the OS,
+share-target sheet appears, chat selected, message arrives on the peer. Then
+`SEND_MULTIPLE`. Android rows only. The chooser is raised through Weft's own
+`SharePlus` call, because a device-side test cannot fire an arbitrary intent;
+[finding 2](#three-findings-that-changed-what-these-tests-can-assert) is exact
+about what that does and does not weaken.
 
-**`permissions_test.dart`** — the photos/storage dialog handled by the native
-automator, including the **deny** path leaving the app usable. Deny is the
-half that matters: an app that only works when every dialog is accepted has
-untested error surface exactly where users are most cautious.
+**`permissions_test.dart`** — the native dialog handled by the automator,
+including the **deny** path leaving the app usable. Deny is the half that
+matters: an app that only works when every dialog is accepted has untested error
+surface exactly where users are most cautious. The dialog is the *camera's* —
+Weft's pickers raise none at all, and that absence is asserted rather than
+assumed.
 
 Across all three: **assert on the peer's received event**, not on local UI. A
 silently-failed upload renders a perfectly convincing local bubble.
@@ -587,6 +603,116 @@ for task 7, along with the Android system images.
 
 ---
 
+## The attachment and media scenarios
+
+Landed 2026-08-19: `attachment_test.dart` (3), `share_in_test.dart` (3) and
+`permissions_test.dart` (2) — eight scenarios over the same `support/`, which
+grew two files: `media.dart` (the pickers, the upload bubble, the native
+surfaces, the share sheet) and `scenario.dart` (the app-plus-peer-plus-room
+opening that the first three files each had a private copy of, now written once
+and used by all five).
+
+**None of them has been executed**, for the reasons already recorded: no
+`patrol_cli` on this host and no runnable matrix row. What *was* run here is
+[below](#what-was-verified-for-these-scenarios).
+
+### Three findings that changed what these tests can assert
+
+**1. Weft does not open Android's photo picker, and therefore never asks for a
+storage permission.** `AttachmentPicker.pick` calls
+`ImagePicker().pickMultipleMedia()`; `ImagePickerAndroid.useAndroidPhotoPicker`
+is `false` by default and Weft never sets it, so the intent is
+`ACTION_GET_CONTENT` with `EXTRA_ALLOW_MULTIPLE` — the Storage Access Framework,
+served by **DocumentsUI**, on API 28 and API 35 alike. The manifest declares
+neither `READ_EXTERNAL_STORAGE` nor `READ_MEDIA_IMAGES`. iOS is the same shape
+for the same reason: `PHPickerViewController` is out-of-process and prompts for
+nothing.
+
+That retires skip reason ③'s premise about the storage half of
+`permissions_test`: there is no storage dialog on any row, not because API 28
+predates something but because the app does not use a permission-gated picker at
+all. `permissions_test` asserts the *absence* — a picker that prompts is a
+picker Weft did not mean to open — and exercises grant and deny against the
+permission Weft genuinely does raise here, `CAMERA`. `image_picker` requests it
+whenever the manifest declares it, and Weft's declares it for calls.
+
+It also breaks Patrol's own helper on the newest rows: `AutomatorServer`'s
+default gallery selectors are DocumentsUI resource ids below API 34
+(`com.google.android.documentsui:id/icon_thumb`) and photo-picker ids from 34 up
+(`com.google.android.providers.media.module:id/icon_thumbnail`). On A35 rows
+`native.pickImageFromGallery()` would wait for a picker Weft never opened.
+`support/media.dart`'s `pickFirstPhoto` taps DocumentsUI directly instead, on
+every API level.
+
+*Not fixed here, and worth someone's attention:* a messenger whose "Photo or
+video" row opens the file browser rather than the photo grid on Android 13+ is a
+product decision that looks like an oversight. Turning `useAndroidPhotoPicker`
+on is one line — and it would change what these two tests drive, which is why it
+is a decision rather than a drive-by.
+
+**2. There is no way to fire an arbitrary intent from a device-side test, so the
+share-in scenarios raise the chooser through Weft itself.** `am start` needs a
+shell the compiled test binary does not have; Patrol's automator exposes
+`openUrl`, which is `ACTION_VIEW`. What it can do is ask the platform to *begin*
+a share — the same `SharePlus` call `PlatformMediaExporter.share` makes — and
+then tap Weft in the system chooser with the native automator.
+
+The seam is exactly one thing: the originating application is Weft rather than a
+third party. Everything downstream is the OS's and is exercised in full —
+resolving against the manifest's `ACTION_SEND` / `ACTION_SEND_MULTIPLE` filters,
+the `content://` grant the app cannot read unless it is given it, starting
+`MainActivity`, `onNewIntent` on a `singleTop` activity, the platform side's copy
+out of the grant, and the sheet Dart draws over the result.
+
+Two risks the first Android run will settle, recorded rather than assumed:
+Android's Sharesheet is expected to list the calling app (nothing sets
+`EXTRA_EXCLUDE_COMPONENTS`), and `MainActivity` carries `taskAffinity=""`, so a
+chooser launching it with `FLAG_ACTIVITY_NEW_TASK` may create a second activity
+rather than reaching `onNewIntent` on the instrumented one. If it does, that is a
+finding about Weft's share-in on *every* sharing app, not a harness problem to
+work around.
+
+**3. "Save it back out" is Share on a phone, and that is the app being right.**
+`MediaExporter.canSave` is `false` on Android and iOS — `file_selector` has no
+save dialog there — and the viewer reads the flag rather than offering a button
+that throws. So `attachment_test` asserts the Save action is *absent* and that
+Share hands the file to a window the OS owns. The desktop Save dialog belongs to
+the MAC row, which does not run this scenario at all (skip reason ①).
+
+### What each scenario does
+
+| File | Scenarios |
+|---|---|
+| `attachment_test.dart` | gallery pick → preview → upload bubble → settled picture → peer holds an encrypted `m.image`; viewer opens, Save is absent, Share reaches a system window; a photo keeps its place in the order between two typed messages |
+| `share_in_test.dart` | one file through the chooser into the share sheet and onto the peer; `SEND_MULTIPLE` arriving as two events in the order shared; a caption typed on the confirmation step landing *before* its file |
+| `permissions_test.dart` | the gallery pick raising no permission dialog at all; the camera denied → *"Could not open the picker."* → the conversation still sends, then asked again and granted → `takeCameraPhoto` → the peer holds the photo |
+
+Two constraints the scenarios are shaped around:
+
+- **The gallery must not be empty.** A test process on a device has no `adb` and
+  no `simctl`, so `tooling/scripts/e2e.sh` pushes the app's own 512pt icon to
+  `/sdcard/Pictures/weft-e2e-photo.png` and fires
+  `MEDIA_SCANNER_SCAN_FILE` (or `simctl addmedia` on an iOS simulator). The name
+  reaches the suite as `--dart-define=WEFT_SEEDED_PHOTO`, so the script owns it
+  and the two cannot drift.
+- **Permission state outlives a test.** A grant survives `adb install -r`, and so
+  does a denial. `permissions_test` therefore does deny-then-grant in one
+  scenario — the only order that is true of a device in any state except
+  "already granted" — and `e2e.sh` now runs `pm clear` before the suite so that
+  state is the one the scenario expects.
+
+### What was verified for these scenarios
+
+| Checked | How |
+|---|---|
+| The suite analyses and is formatted | `flutter analyze` clean (including no deprecated `$.native` use — the suite is on `platformAutomator`), `dart format --set-exit-if-changed` clean |
+| Nothing existing regressed | `flutter test` in `apps/weft`, **915 pass**, unchanged |
+| The gallery seeding actually indexes the photo | run against the live emulator: after the broadcast, `content query --uri content://media/external/images/media` returns `weft-e2e-photo.png, image/png, 36406`. API 36 — the broadcast receiver long predates API 28, but 28/33/35 were not run |
+| `e2e.sh` drives the new device steps | run end to end against the live container with a stubbed `patrol`: homeserver healthy, accounts seeded, `pm clear`, photo pushed and scanned, and the emulator row resolved to `http://10.0.2.2:8008` with all three `--dart-define`s |
+| **Not** checked: anything the eight scenarios assert | no row was executed |
+
+---
+
 ## Environment reality on this host
 
 Recorded 2026-08-19, so a later reader knows what "not executed" meant at the
@@ -651,11 +777,13 @@ API 36 and writing it into an API 35 cell.
 ## Results
 
 Filled in by the last task of Phase 09. Every cell is **not executed**. For the
-first three scenarios the reason is no longer *not written* — they are written,
-and [what that means](#what-was-verified-and-what-was-not) is recorded above —
-it is that no row on this host can run them: `patrol_cli` is absent, the
-Android system images are API 36 only, and there is no iOS runtime. For the
-other ten the reason is still that the scenario does not exist yet.
+first six scenarios the reason is no longer *not written* — they are written, and
+what that means is recorded above for the
+[core three](#what-was-verified-and-what-was-not) and for the
+[media three](#what-was-verified-for-these-scenarios) — it is that no row on this
+host can run them: `patrol_cli` is absent, the Android system images are API 36
+only, and there is no iOS runtime. For the other seven the reason is still that
+the scenario does not exist yet.
 
 | Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|

@@ -24,7 +24,7 @@ void main() {
   patrolTest(
     "a reply quotes the peer's message on the peer's timeline",
     ($) async {
-      final scenario = await _ActionsScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Chat actions');
       final target = await scenario.peerSays('reply to me');
       await openChat($, scenario.room.title);
       await awaitBubble($, target.body);
@@ -56,7 +56,7 @@ void main() {
   patrolTest(
     'a reaction reaches the peer as an annotation on the right event',
     ($) async {
-      final scenario = await _ActionsScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Chat actions');
       final target = await scenario.peerSays('react to me');
       await openChat($, scenario.room.title);
       await awaitBubble($, target.body);
@@ -98,7 +98,7 @@ void main() {
   patrolTest(
     "an edit replaces the words on the peer's timeline",
     ($) async {
-      final scenario = await _ActionsScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Chat actions');
       await openChat($, scenario.room.title);
 
       final original = uniqueBody('first thoughts');
@@ -141,7 +141,7 @@ void main() {
   patrolTest(
     'a redaction removes the message for the peer as well',
     ($) async {
-      final scenario = await _ActionsScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Chat actions');
       await openChat($, scenario.room.title);
 
       final doomed = uniqueBody('regretted immediately');
@@ -188,43 +188,6 @@ void main() {
 /// is normalised on the way out (`normaliseReactionKey`), and a test asserting
 /// on the raw string would be asserting on the wrong one.
 const String _reaction = '👍';
-
-/// The app signed in, a peer, and a conversation to act in.
-class _ActionsScenario {
-  _ActionsScenario._(this.control, this.bob, this.room);
-
-  static Future<_ActionsScenario> start(PatrolIntegrationTester $) async {
-    await ensureSignedIn($);
-
-    final control = await TestAccount.control();
-    addTearDown(control.dispose);
-    final bob = await TestAccount.peer();
-    addTearDown(bob.dispose);
-
-    final room = await createJoinedRoom(
-      creator: control,
-      peer: bob,
-      title: 'Chat actions',
-    );
-    addTearDown(room.dispose);
-
-    return _ActionsScenario._(control, bob, room);
-  }
-
-  final TestAccount control;
-  final TestAccount bob;
-  final TestRoom room;
-
-  /// Has the peer send something for the app to act on, and waits until the
-  /// peer's own timeline holds it — so its event id is a fact rather than the
-  /// return value of a request that may still be in flight.
-  Future<({String eventId, String body})> peerSays(String prefix) async {
-    final body = uniqueBody(prefix);
-    await bob.sendText(room.id, body);
-    final event = await bob.requireMessage(room.id, body);
-    return (eventId: event.eventId, body: body);
-  }
-}
 
 /// The event id an `m.in_reply_to` names, or null when the event is not a reply.
 String? _replyTargetOf(sdk.Event event) {

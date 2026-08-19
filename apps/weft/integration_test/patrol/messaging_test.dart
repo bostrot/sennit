@@ -24,7 +24,7 @@ void main() {
   patrolTest(
     'an encrypted message reaches the peer and settles as delivered',
     ($) async {
-      final scenario = await _MessagingScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Messaging');
       await openChat($, scenario.room.title);
 
       final body = uniqueBody('from the app');
@@ -78,7 +78,7 @@ void main() {
   patrolTest(
     'a message from the peer is read, and the peer sees the receipt',
     ($) async {
-      final scenario = await _MessagingScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Messaging');
 
       // Sent *before* the conversation is opened, and that ordering is the
       // whole scenario. Weft posts a read receipt from one place only — the
@@ -124,7 +124,7 @@ void main() {
   patrolTest(
     'the inbox reorders when an older conversation gets the newest message',
     ($) async {
-      final scenario = await _MessagingScenario.start($);
+      final scenario = await ChatScenario.start($, title: 'Messaging');
 
       // A second conversation, made after the first.
       final second = await createJoinedRoom(
@@ -175,45 +175,6 @@ void main() {
     config: kWeftPatrolConfig,
     timeout: kScenarioTimeout,
   );
-}
-
-/// The app signed in, a peer, and one encrypted conversation between them.
-///
-/// The order is load-bearing and not incidental: the app signs in *first*, so
-/// its device keys are published before the room exists and before the peer
-/// encrypts anything into it. A room created against an account whose device
-/// has not appeared yet is a room the peer shares its megolm session with every
-/// device except the one under test, and the symptom is an undecryptable bubble
-/// that reads as an encryption bug.
-class _MessagingScenario {
-  _MessagingScenario._(this.control, this.bob, this.room);
-
-  static Future<_MessagingScenario> start(
-    PatrolIntegrationTester $, {
-    String title = 'Messaging',
-  }) async {
-    await ensureSignedIn($);
-
-    final control = await TestAccount.control();
-    addTearDown(control.dispose);
-    final bob = await TestAccount.peer();
-    addTearDown(bob.dispose);
-
-    final room = await createJoinedRoom(
-      creator: control,
-      peer: bob,
-      title: title,
-    );
-    // Registered last so it runs first: teardowns are LIFO, and a room has to
-    // be left before the accounts that are in it log out.
-    addTearDown(room.dispose);
-
-    return _MessagingScenario._(control, bob, room);
-  }
-
-  final TestAccount control;
-  final TestAccount bob;
-  final TestRoom room;
 }
 
 /// The order Weft's delivery states are allowed to move in.
