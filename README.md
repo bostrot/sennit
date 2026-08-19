@@ -49,10 +49,11 @@ Weft is early. This is what is actually built and tested today, and what is not.
 | SMS/MMS logic — phone normalisation, GSM-7/UCS-2 segment counting, MMS size limits, identity evidence that merges a number with its bridged handle | **Done**, pure Dart, 94 tests |
 | SMS Android surface — default-SMS-app role via `RoleManager`, `SMS_DELIVER`/`WAP_PUSH_DELIVER` receivers, respond-via-message service, system-provider reads and writes, delivery reports, `sms:`/`smsto:` composer links | **Done** and **wired into the merged inbox**: threads, messages, delivery reports and sending go through `SmsChatRepository`, an SMS number merges with the bridged chat for the same number, bodies are indexed for search, and the composer shows the segment count and a plaintext indicator. Kotlin + a `com.bostrot.weft/sms` channel, 66 tests and 4 goldens. The role is asked for from Settings → SMS, and **the dialog has been raised and declined on a device**: Weft stays fully functional as a non-default app, with the SMS network simply absent. **Incoming MMS are not downloaded**: Android exposes the transport but not the PDU parser, so retrieval means vendoring AOSP's. |
 | Multi-device — device manager (rename, sign out, sign out others with re-auth), unverified-device banner in encrypted chats, cross-signing and key-backup setup, recovery key with show-once and confirm steps, restore from key or passphrase, verification QR | **Done**, 86 tests and 6 goldens. The QR is rendered for the other device to scan, and the scanning end is a `QrScanner` seam with no camera behind it: the Matrix payload is binary, and a decoder that returns raw bytes on every platform is a dependency this has not taken yet. Emoji comparison covers Weft-to-Weft, and an Element on the other side can scan. |
-| Calling, rich content (M9) | **Not built** |
+| Rich content — formatted-body allowlist, reactions, replies, edits, link previews | **Done**, see [rich content](docs/architecture/rich-content.md) |
+| Calling — 1:1 voice and video over Matrix WebRTC, CallKit, `ConnectionService`, TURN handling | **Done**, 122 + 57 + 105 tests and 10 goldens, and **a real call between two accounts on the local Synapse**: invite, ring, answer, candidates both ways, connected, hangup, in an encrypted room. Matrix-native conversations only — the button is disabled with a reason for a bridged chat. **No media has been proven on a device**: the peer connection is a fake in every test, and iOS needs a VoIP APNs certificate before a call can ring a suspended app. See [calling](docs/architecture/calling.md). |
 | Patrol device matrix, a11y/RTL passes (M10) | **Not built** — needs devices; the logic under it is unit-tested |
 
-**1756 tests pass** (plus 6 integration tests on a real engine: 5 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added, and the Android APK after core library desugaring was enabled for the same plugin — the whole notification loop was then driven on an Android 16 emulator against the local Synapse.
+**2064 tests pass** (plus 9 integration tests on a real engine: 8 against a live Synapse, and one that drives the whole attachment loop). Verified builds: macOS app and Android APK (all four ABIs, including the vodozemac Rust cross-compile), and the app has been run on a physical Galaxy S25 (One UI, Android 16) with deep-link and share intents fired at it over adb. The attachment path has been run end to end on macOS in demo mode — pick, preview, upload with progress, settled bubble, full-screen viewer. The macOS build was re-verified after Firebase and `flutter_local_notifications` were added, and the Android APK after core library desugaring was enabled for the same plugin — the whole notification loop was then driven on an Android 16 emulator against the local Synapse. Both builds were re-verified again after `flutter_webrtc`, CallKit and `ConnectionService` landed, and a call was placed between two accounts on that Synapse — signalling end to end, media faked, and the homeserver's answer to "do you have a TURN server?" was no.
 
 The app signs in to a real homeserver, syncs over E2EE, and renders live rooms
 through the same UI as the fixtures. `--dart-define=WEFT_DEMO=true` swaps in
@@ -141,6 +142,14 @@ cd apps/weft && flutter test integration_test -d macos
 
 These cover a real login, a real encrypted round trip between two accounts, and
 the mapping of decrypted events onto Weft's domain model.
+
+`integration_test/call_test.dart` runs there too, and places a real call between
+`@alice` and `@bob` in an encrypted room: invite, ring, answer, ICE candidates in
+both directions, connected on both sides, hangup. The *signalling* is entirely
+real, including the encryption; the media is not — both peer connections are
+fakes, because opening a microphone needs a permission grant no test can give
+itself. It also asks the homeserver for a TURN server and asserts that the answer
+becomes a sentence a user can read.
 
 The attachment flow needs no homeserver, only a real engine:
 
@@ -286,13 +295,18 @@ normalisation as merge evidence, GSM-7 segment counting, and the explicit
 no-encryption indicator, and
 [multi-device](docs/architecture/multi-device.md) covers the recovery-key flow,
 what is lost with no backup and no second device, and how the session-transfer
-QR reuses the bridge login's card.
+QR reuses the bridge login's card, and
+[calling](docs/architecture/calling.md) covers glare resolution, ICE candidate
+buffering, why the media engine is injected, and why a homeserver with no TURN
+server has to say so rather than place a call that never connects.
 
 Decisions that need something this repository cannot hold live in
 `docs/decisions/` —
 [ADR-002](docs/decisions/adr-002-ios-signing-handoff.md) is the iOS signing
 handoff: the App Group, the three bundle ids and the profiles that have to exist
-before iOS share-in works.
+before iOS share-in works, and the VoIP Services certificate — a second
+credential an APNs auth key cannot substitute for — that has to exist before an
+incoming call can ring a suspended iPhone.
 
 ## Two things worth knowing before contributing
 

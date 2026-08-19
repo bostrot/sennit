@@ -328,3 +328,55 @@ whose Weft has been suspended.
 absence is not a permission prompt that fails — it is a **termination** the first
 time WebRTC opens a capture device, so a build that lost it would crash on the
 first call rather than take a silent one.
+
+#### Checklist, for whoever holds the signing identity
+
+Nothing below is optional if an incoming call is to ring a phone whose screen is
+off. All of it is on the same trip to the same portal as the rest of this
+document.
+
+- [ ] **VoIP Services certificate** (`.p12`) against `com.bostrot.weft`, at
+      *Certificates, Identifiers & Profiles → Certificates → **VoIP Services
+      Certificate***. Not the `.p8` auth key — APNs rejects a `.voip` topic
+      signed with one — and it **expires annually**, unlike the key.
+- [ ] **Background Modes → Voice over IP** is already declared in
+      `Info.plist` (`UIBackgroundModes` gained `voip` in Phase 07); Xcode may
+      also want it ticked under *Signing & Capabilities*. Both spellings are the
+      same thing and neither is a portal capability.
+- [ ] **A second pusher on the account**, `app_id` `com.bostrot.weft.voip`,
+      pointed at a Sygnal app configured with the `.p12`. Weft's `Pusher` type
+      keys on `(appId, pushKey)`, so it sits alongside the message pusher rather
+      than replacing it.
+- [ ] **Then, and only then, consume `CallPlatformBridge.voipTokens`** — one
+      call site, currently absent on purpose. Wire it in the same change that
+      lands the certificate.
+
+Push Notifications on `com.bostrot.weft` (step 2 above) covers both credentials;
+there is no separate App ID capability for VoIP. What is separate is the
+certificate and the topic.
+
+### Phase 07 — what was verified when the phase closed, 2026-08-19
+
+Re-checked at the end of the phase rather than trusted from Phase 04, because
+calling added Swift to `Runner` for the first time since:
+
+- `flutter build ios --no-codesign` still **fails in `pod install`**, with the
+  `whisper_ggml` 15.6 error quoted verbatim above. Unchanged, and unrelated to
+  calling — it happens before a line of Swift is read.
+- `ios/Runner/CallManager.swift` **type-checks against the iOS SDK**:
+
+  ```sh
+  xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios13.0 \
+    -F "$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")"/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64 \
+    apps/weft/ios/Runner/CallManager.swift
+  ```
+
+  Exit 0, with one warning left in deliberately: `.allowBluetooth` is renamed
+  `.allowBluetoothHFP` only in the newest SDK, so adopting the new spelling would
+  make the file uncompilable on every earlier Xcode. This is also how it was
+  found that `CXProviderConfiguration()` is iOS 14 and the deployment target is
+  13 — `CXProviderConfiguration(localizedName:)` is used instead.
+
+Both `flutter build macos` and `flutter build apk` succeed. So the one platform
+without a whole-app build remains iOS, for the two reasons above this section,
+neither of which is calling's.
