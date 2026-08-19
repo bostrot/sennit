@@ -194,26 +194,6 @@ is an alpha wash of `onSurface` — on the AMOLED palette
 (`theme.dart:141-150`, base surface `0xFF000000`) that wash is a very dark grey
 on black and will not meet 3:1 against the adjacent surface.
 
-### CROSS-8 — `SnackBar` is the app's only error channel, and it is transient
-
-Ten `showSnackBar` calls across eight files are how the app reports a failed
-send (`chat_view.dart:951-956`), a failed transcription (`:808-810`), a failed
-save or share (`media_viewer.dart:217-222`), a device action
-(`devices_screen.dart:82-86`), a recovery-key outcome
-(`security_screen.dart:94-98`), a bridge error (`bridges_screen.dart:156-158`,
-`:206-208`), a share result (`share_target_sheet.dart:194-202`), a cleared
-preview cache (`link_previews_screen.dart:131-137`) and a call that could not be
-placed (`start_call.dart:28-29`).
-
-Flutter's `SnackBar` does not set `liveRegion`, and it disappears on a timer. A
-screen-reader user who is reading elsewhere in the tree when one appears gets
-nothing, and by the time they navigate to it, it is gone. Every one of those is
-the *only* report of an operation that failed.
-
-Whichever task closes CROSS-2 should decide the app-wide answer here rather than
-patching ten call sites: a shared `announce()` helper alongside the snackbar, or
-a `Semantics(liveRegion: true)` host.
-
 ### CROSS-6 — no contrast test exists
 
 `packages/weft_design/test/` is empty. There is no `contrastRatio()` helper
@@ -233,6 +213,26 @@ Note for task 8: `themeFor(Brightness.dark)` on line 209 is passed the *platform
 brightness, and `WeftThemeMode.light` overrides it internally — so the existing
 light goldens work. Any new variant must go through the same `WeftAppearance`
 path rather than building a `ThemeData` directly.
+
+### CROSS-8 — `SnackBar` is the app's only error channel, and it is transient
+
+Ten `showSnackBar` calls across eight files are how the app reports a failed
+send (`chat_view.dart:951-956`), a failed transcription (`:808-810`), a failed
+save or share (`media_viewer.dart:217-222`), a device action
+(`devices_screen.dart:82-86`), a recovery-key outcome
+(`security_screen.dart:94-98`), a bridge error (`bridges_screen.dart:156-158`,
+`:206-208`), a share result (`share_target_sheet.dart:194-202`), a cleared
+preview cache (`link_previews_screen.dart:131-137`) and a call that could not be
+placed (`start_call.dart:28-29`).
+
+Flutter's `SnackBar` does not set `liveRegion`, and it disappears on a timer. A
+screen-reader user who is reading elsewhere in the tree when one appears gets
+nothing, and by the time they navigate to it, it is gone. Every one of those is
+the *only* report of an operation that failed.
+
+Whichever task closes CROSS-2 should decide the app-wide answer here rather than
+patching ten call sites: a shared `announce()` helper alongside the snackbar, or
+a `Semantics(liveRegion: true)` host.
 
 ---
 
@@ -396,6 +396,22 @@ These are the "absolute `fontSize` used for layout maths" task 2 names.
 | SCALE-6 | `_RailButton`'s `SizedBox(height: 52)` and the 44/48 selection pill are glyph-sized and safe | `243-263` |
 | KEY-02 | Rail items are `GestureDetector`s — not focusable, so Tab never reaches the network filter | `234-238` |
 | KEY-03 | Staggered entry animation with no `disableAnimations` guard | `143-188` |
+
+### Avatar and network glyph — `packages/weft_design/lib/src/components/`
+
+Both are drawn on nearly every screen — inbox rows, the chat app bar, search
+results, bridges, merge, share targets, the call screen — so one fix here closes
+findings on eight screens at once.
+
+| ID | Finding | File · Line |
+|---|---|---|
+| A11Y-136 | `WeftAvatar` has **no `Semantics` at all**. What a reader actually hears is the initials `Text` — "AB" — because that node is never excluded. It should carry a label (the person, and "merged across N networks" when the ring is drawn) and exclude its children | `weft_avatar.dart:42-150` |
+| A11Y-137 | The merged-identity ring and the network badge are purely visual; the merge is signalled three ways for a sighted user and zero ways for a screen reader | `weft_avatar.dart:91-130` |
+| A11Y-138 | The `online` dot has no label | `weft_avatar.dart:131-146` |
+| A11Y-139 | `NetworkGlyph` has no semantics. The lettermark fallback is the visible failure: a reader announces "Sm", "iM", "Gc", "Mx" literally. This is the root cause behind A11Y-57, A11Y-63, A11Y-88 and A11Y-89 | `network_glyph.dart:28-76` |
+| A11Y-140 | `showLabel: true` renders `network.label` beneath the chip — the label exists, it is simply not used in the glyph-only case, which is every case in the app today | `network_glyph.dart:62-75` |
+| RTL-38 | `Positioned(right: -1, bottom: -1)` — the network badge stays on the physical trailing corner | `weft_avatar.dart:120-130` |
+| RTL-39 | `Positioned(right: 0, top: 0)` — the online dot, likewise | `weft_avatar.dart:131-146` |
 
 ### Chat view — `features/chat/chat_view.dart`
 
@@ -778,8 +794,8 @@ needs a 2.0× golden before and after.
 | Scroll axis that should be pinned LTR | **1** | RTL-42 — the code block |
 | Directional icons that do **not** auto-mirror | **2** | RTL-22 (`login_rounded`), RTL-32 (`logout_rounded`) |
 
-The two `weft_avatar.dart` `Positioned` uses (the network badge at `right: -1,
-bottom: -1` and the online dot at `right: 0, top: 0`) are RTL-38 and RTL-39.
+RTL-38 and RTL-39 are the two `weft_avatar.dart` `Positioned` uses, listed under
+[Avatar and network glyph](#avatar-and-network-glyph--packagesweft_designlibsrccomponents).
 
 ---
 
@@ -851,7 +867,7 @@ Findings mapped to the phase's remaining tasks, so nothing here is orphaned.
 | Task | Closes |
 |---|---|
 | 2 — tokens, contrast, typography | CROSS-4, CROSS-5, CROSS-6, CONTRAST-1…8, SCALE-1 |
-| 3 — inbox, chat, composer semantics | A11Y-01…31, 34…47, 127…132, CROSS-2 (chat half) |
+| 3 — inbox, chat, composer semantics | A11Y-01…31, 34…47, 127…132, 136…140, CROSS-2 (chat half) |
 | 4 — remaining screens | A11Y-48…126, 133…135, CROSS-2 (rest), CROSS-8 |
 | 5 — keyboard | CROSS-3, KEY-01…05, A11Y-127 (mention pills must be focusable) |
 | 6 — direction-agnostic layout | CROSS-1, RTL-01…42 |
@@ -860,9 +876,9 @@ Findings mapped to the phase's remaining tasks, so nothing here is orphaned.
 | 9 — run everything, close the audit | this document's status column |
 | 10 — real assistive technology | the `Verified with` section, appended then |
 
-Totals: **135 semantics findings**, **42 RTL findings**, **16 text-scale
+Totals: **140 semantics findings**, **42 RTL findings**, **16 text-scale
 findings**, **15 touch-target findings**, **8 contrast findings**, **5 keyboard
-findings**, **8 cross-cutting findings** — 229 in all.
+findings**, **8 cross-cutting findings** — 234 in all.
 
 ## Status
 
