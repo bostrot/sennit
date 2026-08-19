@@ -1258,13 +1258,265 @@ API 36 and writing it into an API 35 cell.
 
 ---
 
+## The run
+
+The suite was executed for the first time on 2026-08-19. What follows is what
+the device did, not what the files say it should do.
+
+Two things changed before anything could run at all, and both were real:
+`patrol_cli` 4.7.0 was installed (`dart pub global activate patrol_cli` — the
+version the pubspec was written against, and no resolution moved), and a macOS
+blocker was found and fixed. The homeserver came up healthy from
+`tooling/docker` on the first try and stayed up for every run.
+
+### The device that ran, and the eleven rows that did not
+
+**No row of the matrix above was executed.** The emulator on this host is
+`emulator-5554`, `sdk_gphone64_arm64`, **API 36 / Android 16** — the only system
+image installed. API 36 is not A28, not A33 and not A35, and writing an API 36
+result into an API 35 cell is precisely what
+[Environment reality](#environment-reality-on-this-host) forbids. So the results
+below are reported as their own off-matrix row, **A36-P**, and every cell of the
+eleven-row table stays *not executed*.
+
+What A36-P is worth: it is a genuine Android device running the real app, the
+real native automator, the real Synapse and the real encryption, so a scenario
+that fails there is almost certainly broken on A35 too. What it is not worth:
+it says nothing about API 28's DocumentsUI, about a tablet layout, or about any
+behaviour that changed between 28 and 36 — which is most of what the Android
+rows exist to separate.
+
+### macOS: two blockers, one fixed, one needing a human
+
+The MAC row is **not executed**, and the reason is now known precisely rather
+than suspected. `patrol test -d macos` builds cleanly — *"Completed building app
+with entrypoint test_bundle.dart for macos"*, the `RunnerUITests` target task 6
+authored — and then fails twice over.
+
+1. **A TCC file-access prompt nobody can answer. Fixed.** `patrol_cli` hardcodes
+   `-derivedDataPath ../build/macos_integ` (`app_options.dart:449`), so the
+   XCUITest runner app is built *inside the checkout* — and this checkout is
+   under `~/Documents`, a TCC-protected folder. `RunnerUITests-Runner.app` is
+   ad-hoc signed and launched by launchd, so it is its own responsible process
+   and inherits no consent from the shell. Its first `dlopen` blocked in the
+   kernel sandbox and stayed there for five minutes:
+
+   ```
+   -[XCTestDriver _loadTestBundleFromURL:error:] → dlopen → __open
+     → hook_vnode_check_open (Sandbox)
+       → approval_solicit → __WAITING_ON_APPROVAL_FROM_SANDBOXD__
+   ```
+
+   read out of the hang spindump xcodebuild itself collected, and corroborated
+   by `tccd` logging an unanswered request attributed to
+   `com.bostrot.weft.RunnerUITests.xctrunner`. xcodebuild reports this as *"The
+   test runner timed out while preparing to run tests"*, which reads like a
+   broken Patrol install and is not one. `e2e.sh` now relocates
+   `build/{macos,ios}_integ` to a symlink under `$TMPDIR` when — and only when —
+   the checkout sits under `~/Documents`, `~/Desktop` or `~/Downloads`. Verified:
+   with the relocation the five-minute hang disappears entirely and the run
+   proceeds to the next stage in 71 s. CI is unaffected; a GitHub runner checks
+   out to `/Users/runner/work`, which is not protected.
+
+2. **An interactive Accessibility grant. Not fixed, and not fixable from here.**
+   Past the first blocker the runner reaches XCTest's automation handshake and
+   dies on *"Timed out while enabling automation mode."* `testmanagerd` logs
+   *"Test session with pid N requesting automation mode"* and never answers;
+   `universalAccessAuthWarn` — the process that draws *"… would like to control
+   this computer using accessibility features"* — activates at exactly that
+   moment, and `tccd` evaluates `kTCCServiceAccessibility` to **Auth:Unknown
+   (None)**. That is a consent dialog waiting for a click. It cannot be granted
+   from a shell: writing `TCC.db` needs Full Disk Access (this shell does not
+   have it), and clicking the dialog needs the very permission being asked for.
+
+   **To make the MAC row run**, a human has to approve it once: run
+   `./tooling/scripts/e2e.sh --device macos --subset macos` at the keyboard and
+   allow the prompt, or add `RunnerUITests-Runner` under *System Settings →
+   Privacy & Security → Accessibility*. This is the risk task 6 recorded about
+   hosted macOS runners, now witnessed on a local machine — so the nightly's
+   macOS job should be expected to hit it too.
+
+iOS remains not executed for the reason it always had: `xcrun simctl list
+runtimes` is empty, and ADR-002 still owns the signing identity.
+
+### A36-P, per scenario
+
+`harness_test` first, because it is the answer to "is any of this real":
+
+| Scenario | Result | Time |
+|---|---|--:|
+| the test bundle runs on the device | **pass** | 1 s |
+| the platform automator answers outside the Flutter view | **pass** | 5 s |
+
+So the whole chain works on Android: `patrol_cli` bundles the Dart tests, Gradle
+assembles the instrumentation APK with `PatrolJUnitRunner`, the runner launches
+Weft, `listDartTests` reports each scenario separately, and the native automator
+drives Home and back — the thing `integration_test` cannot do and the reason
+Patrol is in this repo at all.
+
+Then the scenarios, in the order they ran:
+
+| Scenario | Result | Time | Note |
+|---|---|--:|---|
+| `login_test` refuses a wrong password, then signs in | **pass** | 21 s | |
+| `login_test` verifies this device against another session | **pass** | 45 s | failed first; a suite bug, fixed — ① |
+| `login_test` signing this device out leaves no session behind | **fail** | 38 s | app defect — ② |
+| `messaging_test` an encrypted message reaches the peer and settles as delivered | **fail** | 113 s | reached `Sent`, never `Delivered` — ③ |
+| `messaging_test` a message from the peer is read, and the peer sees the receipt | **pass** | 52 s | |
+| `messaging_test` the inbox reorders when an older conversation gets the newest message | **pass** | 55 s | |
+| `chat_actions_test` a reply quotes the peer's message | **fail** | 88 s | the chat never appeared in the inbox — ⑤ |
+| `chat_actions_test` a reaction reaches the peer as an annotation | **pass** | 58 s | failed first; an app defect, fixed — ④ |
+| `chat_actions_test` an edit replaces the words on the peer's timeline | **fail** | 81 s | bubble never admitted it was edited |
+| `chat_actions_test` a redaction removes the message for the peer | **fail** | 121 s | message never disappeared |
+| `attachment_test` a photo picked from the gallery reaches the peer encrypted | **fail** | 481 s | hung after the native pick — ⑥ |
+| `attachment_test` the sent photo opens full screen and can be handed back | **fail** | 482 s | same |
+| `share_in_test`, `permissions_test`, `notification_test`, `notification_mute_test`, `deeplink_test`, `merge_test`, `search_test`, `bridges_test`, `mcp_test` | **not executed** | — | the run was stopped — ⑦ |
+
+Six passes, seven failures, nineteen scenarios not reached. Nothing here is a
+scenario that was "marked passing"; every pass above is a line the device
+printed.
+
+⑦ The run was stopped deliberately after `attachment_test`'s second scenario.
+Both media scenarios burned their **full eight-minute** scenario timeout on the
+same hang, and the six media scenarios still queued would have spent
+approximately another fifty minutes re-demonstrating a failure already
+characterised in ⑥. That is a decision about this session's time, not a
+judgement that those scenarios pass — they are recorded as not executed, and
+`share_in`, `permissions`, `notification`, `deeplink`, `merge`, `search`,
+`bridges` and `mcp` have **never been run on any device**.
+
+### What the run found
+
+Four findings, two of them fixed here and verified against the device.
+
+1. **A suite bug that read exactly like a broken feature. Fixed.**
+   `verifyThisDeviceAgainst` finished the emoji comparison, both ends reached
+   `done`, both derived the same short authentication string — and then timed
+   out waiting for the devices list to call the helper session verified. The
+   verification was correct the whole time. The devices screen is a
+   `ListView(children: ...)`, whose `SliverChildListDelegate` **only builds the
+   rows in the viewport**, and `sortDevices` puts everything that
+   `needsAttention` above everything that does not (`devices.dart:152`).
+   Verifying a device therefore *moves it* — past every unverified session on
+   the account, and this suite leaves one behind per run, so on this homeserver
+   that was past **seventeen** of them and off the bottom of the built range.
+   `Finder.evaluate()` cannot see a row that was never built, so the assertion
+   was reading scroll offset and reporting it as trust.
+
+   Diagnosed by dumping every built tile before and after the comparison: the
+   helper row was present before (`Weft E2E control ¦ Not verified ¦
+   MTIWGJNTBV`) and absent after, while the *control's own* key store said
+   `GIQAOBPGDN direct=true verified=true` — the app's device, correctly
+   verified, from the other end. `pumpUntilDeviceVerified` in `support/app.dart`
+   now scrolls to the row before asserting on it. The scenario passed on the
+   next run and on the one after that.
+
+2. **Signing out of Weft raises an unhandled exception, and Weft has no other
+   way out.** Not fixed — see below. `deleteDevices` revokes the running
+   client's own access token behind its back and leaves it syncing; the sync
+   loop then fails with `M_UNKNOWN_TOKEN`, `Client._handleSoftLogout` tries to
+   refresh a token the deleted device no longer has, and — having cleared the
+   session — **rethrows** into the unawaited future `_sync` was started in
+   (`client.dart:2350,2390`). On the device that is
+   `M_UNKNOWN_TOKEN: refresh token does not exist`, every time.
+
+   It matters more than it looks: the devices screen's *Sign out* on **This
+   device** is the app's entire sign-out flow — `grep` finds no other caller of
+   `WeftMatrixSession.logout()` anywhere in `lib/`, and that method is never
+   called at all. So every user meets this.
+
+   A fix was written and reverted, on purpose. Routing the current device
+   through `logout()` inside `MatrixDeviceManager` removes the unhandled
+   exception and is almost certainly right — `Client.clear()` reaches
+   `onLoginStateChanged.add(LoginState.loggedOut)` unconditionally
+   (`client.dart:2319`), so the session state stays deterministic — but the
+   scenario still failed afterwards, on a *different* wait: the app did not
+   return to the login screen within 60 s. That is a second defect behind the
+   first, and shipping an unverified change to the only sign-out path in the app
+   to half-fix it is worse than recording it. Both belong in one follow-up, with
+   the devices screen's pushed route as the first suspect for why the login
+   screen never arrives.
+
+3. **A sent message stops at `Sent` and never becomes `Delivered`.** Not
+   diagnosed. `_deliveryFor` maps `EventStatus.synced` to
+   `DeliveryState.delivered` (`mapping.dart:349-359`), so the bubble is saying
+   the homeserver accepted the event but never echoed it back down `/sync`
+   within 60 s — on a local Synapse, with the peer receiving the message
+   perfectly well in the same scenario. Worth suspecting the same sync-loop
+   health that ② disturbs, since this scenario ran immediately after it.
+
+4. **Weft aimed a garbage collector at its own database. Fixed.**
+   `_openDatabase` passed `fileStorageLocation: directory.uri` — the directory
+   that holds `weft.sqlite` — together with
+   `deleteFilesAfterDuration: 30 days`. The SDK's file store periodically lists
+   that directory and `delete()`s every plain file older than the window,
+   excluding nothing (`database_file_storage_io.dart:63-80`).
+
+   The visible symptom was a flake with no connection to anything under test:
+   `PathNotFoundException: Cannot delete file … weft.sqlite-journal`, thrown out
+   of an unawaited future when sqlite removed its journal between the `list()`
+   and the `delete()`. It failed **three** scenarios across these runs —
+   `login_test`'s verification once, and two of `chat_actions_test`'s four —
+   each time with an error about a file none of them had ever heard of.
+
+   The unseen half is worse: nothing stops the same sweep deleting
+   `weft.sqlite` itself, which is only safe while it keeps being written. The
+   account at risk is the dormant one — open Weft after a month away and the
+   sweep is entitled to delete the database, the device keys in it, and with
+   them every encrypted message this device could still read. The attachment
+   cache now gets a `files/` subdirectory of its own.
+
+   Verified against the device: `chat_actions_test` re-run with the fix produced
+   **zero** `weft.sqlite-journal` exceptions where the previous run had two, and
+   *a reaction reaches the peer as an annotation on the right event* — which had
+   failed on nothing but that exception — passed.
+
+5. **Three chat scenarios fail on their own subject.** Not diagnosed, and not
+   flakes: a reply could not open the conversation at all (`openChat` never
+   found the inbox row for a room the peer had just created), an edit never
+   made the bubble admit it was edited, and a redaction never made the message
+   disappear. These are the next thing to look at, and they are the reason the
+   quality track cannot yet claim Phase 05's chat actions work end to end.
+
+6. **The gallery picker hangs after the photo is chosen.** Not diagnosed.
+   `pickFirstPhoto` reaches DocumentsUI, the seeded `weft-e2e-photo.png` is
+   there (the gallery seeding in `e2e.sh` works — `content query` confirmed the
+   row), the native tap succeeds, and then nothing happens until the
+   eight-minute scenario timeout. Whether the picker never returns to Weft or
+   the upload bubble never appears needs a screenshot at the moment it hangs,
+   which is the first thing to do next.
+
+### What was verified for this task, and what was not
+
+| Checked | How |
+|---|---|
+| The homeserver comes up and stays healthy | `docker compose up -d --wait` → `weft-synapse Up (healthy)`; unchanged across nine device runs |
+| The Patrol toolchain works on Android | `harness_test` 2/2, including the native automator |
+| The macOS TCC file-access hang is real, and the relocation fixes it | hang spindump (`__WAITING_ON_APPROVAL_FROM_SANDBOXD__`), `tccd` request for the runner's bundle id; after relocation the 300 s bootstrap hang is gone |
+| The macOS Accessibility blocker is real | `testmanagerd` "requesting automation mode" → 60 s timeout, `universalAccessAuthWarn` activating at that moment, `kTCCServiceAccessibility` → `Auth:Unknown (None)` |
+| The devices-list scroll fix works | the verification scenario passed twice after failing twice, with no other change |
+| The file-store fix works | `chat_actions_test`: two `weft.sqlite-journal` failures before, zero after; one scenario converted from fail to pass |
+| Nothing regressed | `flutter analyze` clean, `dart format --set-exit-if-changed` clean, `dart analyze integration_test/patrol` clean, and the unit suites — see the commit |
+| **Not** checked | every one of the eleven matrix rows; nineteen of the thirty-two scenarios, nine files of which have never run anywhere; any iOS anything; the macOS row past the automation handshake; whether findings ③, ⑤ and ⑥ are app defects or suite defects |
+
+That last cell is the honest headline. This task moved the suite from *nothing
+executed* to *thirteen scenarios executed on an off-matrix Android emulator*, and
+found four defects doing it — two of them in Weft, one of them a data-loss
+hazard. It did not establish that the matrix passes, on any row.
+
+---
+
 ## Results
 
-Filled in by the last task of Phase 09. Every cell is **not executed**, and for
-every one of the thirteen the reason is now the same: no row on this host can run
-them. `patrol_cli` is absent, the Android system images are API 36 only, and
-there is no iOS runtime. Every scenario is written; what that means, file group
-by file group, is recorded above for the
+To be filled in by the last task of Phase 09. Every cell of the matrix table
+below is still **not executed**: the run above happened on an **API 36** phone
+emulator, which is not one of the eleven rows, and its per-scenario results are
+recorded as [A36-P](#a36-p-per-scenario) rather than smuggled into an A35 cell.
+The reasons per platform are now specific rather than shared — Android has no
+28/33/35 system image installed, iOS has no simulator runtime and no signing
+identity, and macOS is one interactive Accessibility grant away from running.
+Every scenario is written; what that means, file group by file group, is
+recorded above for the
 [core three](#what-was-verified-and-what-was-not), the
 [media three](#what-was-verified-for-these-scenarios), the
 [notification and deep-link three](#what-was-verified-for-these-scenarios-1) and

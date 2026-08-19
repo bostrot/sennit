@@ -135,6 +135,28 @@ class WeftMatrixSession {
     final directory = Directory(p.join(support.path, 'matrix'));
     if (!directory.existsSync()) directory.createSync(recursive: true);
 
+    // The attachment cache gets a directory of its own, and must not be given
+    // the one the database lives in. `deleteFilesAfterDuration` makes the SDK
+    // periodically `list()` this directory and `delete()` every plain file
+    // older than the retention window (`database_file_storage_io.dart:63-80`),
+    // and it excludes nothing — so pointing it at the database directory aims
+    // a garbage collector at `weft.sqlite`.
+    //
+    // Two consequences, one seen and one waiting. The seen one is a race: the
+    // listing picks up sqlite's transient `weft.sqlite-journal`, sqlite removes
+    // it, and the `delete()` throws `PathNotFoundException` out of an unawaited
+    // future. It surfaced on the emulator as three unrelated Patrol scenarios
+    // failing on "Cannot delete file … weft.sqlite-journal" — an error with
+    // nothing to do with what any of them was testing.
+    //
+    // The unseen one is worse: nothing stops the same sweep deleting
+    // `weft.sqlite` itself. The file is only safe while it keeps being written,
+    // so the account at risk is the dormant one — open Weft after a month away
+    // and the sweep is entitled to delete the database, the device keys in it,
+    // and with them every encrypted message this device could still read.
+    final files = Directory(p.join(directory.path, 'files'));
+    if (!files.existsSync()) files.createSync(recursive: true);
+
     return sdk.MatrixSdkDatabase.init(
       'weft',
       database: await openWeftSqfliteDatabase(
@@ -143,7 +165,7 @@ class WeftMatrixSession {
       // Attachments are cached on disk with a cap, so a chat full of video
       // doesn't grow the database without bound.
       maxFileSize: 32 * 1024 * 1024,
-      fileStorageLocation: directory.uri,
+      fileStorageLocation: files.uri,
       deleteFilesAfterDuration: const Duration(days: 30),
     );
   }

@@ -145,11 +145,14 @@ Future<void> verifyThisDeviceAgainst(
         'the same order — that is what the comparison proves',
   );
 
-  // Back to the list, which is where a user would go to check.
+  // Back to the list, which is where a user would go to check. Scrolled to
+  // rather than pumped for: verifying a device moves it below every unverified
+  // session on the account, and the list only builds the rows in view. See
+  // `pumpUntilDeviceVerified`.
   await $.tap(find.text('Continue'));
-  await pumpUntil(
+  await pumpUntilDeviceVerified(
     $,
-    () => deviceIsVerified(tile),
+    kControlDeviceName,
     within: kSyncDeadline,
     reason: 'the devices list to show the helper session as verified',
   );

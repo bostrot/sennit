@@ -406,6 +406,58 @@ Finder deviceTile(String deviceName) =>
 bool deviceIsVerified(Finder tile) =>
     showing(find.descendant(of: tile, matching: find.text('Verified')));
 
+/// Waits until the devices list calls [deviceName] verified, scrolling to find
+/// it.
+///
+/// The scroll is not a convenience, and leaving it out is a wrong-answer bug
+/// rather than a flake. Two facts about the screen combine:
+///
+/// 1. `ListView(children: ...)` builds a `SliverChildListDelegate`, so only the
+///    rows inside the viewport exist as elements at all. `showing` reads
+///    `Finder.evaluate()`, which cannot see a row that was never built.
+/// 2. `sortDevices` puts everything that `needsAttention` above everything that
+///    does not (`devices.dart:152`), and *verified* is the one trust state that
+///    does not need attention.
+///
+/// So verifying a device **moves it down past every unverified session on the
+/// account** — and this suite leaves one behind per run, so that is a dozen and
+/// counting on a homeserver a few runs old. Observed against the live emulator:
+/// the helper row was on screen before the verification and off the built range
+/// after it, which made a name-anchored finder match nothing and read exactly
+/// like a verification that never took. The trust was correct the whole time.
+///
+/// Polled rather than scrolled once, because the reload that re-sorts the list
+/// is the async `_load()` the verification screen runs after it pops.
+Future<void> pumpUntilDeviceVerified(
+  PatrolIntegrationTester $,
+  String deviceName, {
+  Duration? within,
+  required String reason,
+}) async {
+  final label = find.text(deviceName);
+  final deadline = DateTime.now().add(within ?? kSyncDeadline);
+
+  while (DateTime.now().isBefore(deadline)) {
+    if (deviceIsVerified(deviceTile(deviceName))) return;
+    if (!showing(label)) {
+      try {
+        await $.scrollUntilVisible(finder: label, maxScrolls: 40);
+      } on Object {
+        // Not in the list yet, or not yet where the sort will leave it. The
+        // next turn of the loop looks again; the deadline is what gives up.
+      }
+    }
+    await $.pump(const Duration(milliseconds: 200));
+  }
+
+  fail(
+    'Timed out after ${(within ?? kSyncDeadline).inSeconds}s waiting for '
+    '$reason. The row for "$deviceName" '
+    '${showing(label) ? 'is on screen and does not say Verified' : 'was not '
+              'found even after scrolling the list'}.',
+  );
+}
+
 /// Opens the actions menu of a device row and chooses [entry].
 Future<void> chooseDeviceAction(
   PatrolIntegrationTester $,

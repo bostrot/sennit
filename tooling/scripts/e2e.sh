@@ -346,6 +346,49 @@ if [[ $MEDIA -eq 1 ]]; then
   fi
 fi
 
+# --- derived data, and the folder macOS will not let a test runner read ------
+#
+# `patrol_cli` hardcodes `-derivedDataPath ../build/{macos,ios}_integ`
+# (`app_options.dart:338,449`), so the XCUITest runner app is built *inside the
+# checkout*. When the checkout is under ~/Documents, ~/Desktop or ~/Downloads,
+# that is a TCC-protected folder, and the consequences are not a permission
+# error — they are a hang that reads like a broken Patrol install.
+#
+# What happens: `RunnerUITests-Runner.app` is ad-hoc signed and launched by
+# launchd, so it is its own responsible process and inherits no consent from the
+# shell that started the run. Its first `dlopen` of a linked dylib blocks in the
+# kernel sandbox — `approval_solicit` → `__WAITING_ON_APPROVAL_FROM_SANDBOXD__`
+# — while sandboxd shows a "would like to access files in your Documents folder"
+# prompt. Under CI, or any non-interactive run, nobody clicks it, and five
+# minutes later xcodebuild gives up with "The test runner timed out while
+# preparing to run tests." Confirmed here from the hang spindump and from
+# `tccd` logging an unanswered request for the runner's bundle id.
+#
+# Xcode users do not normally meet this because DerivedData lives under
+# ~/Library. Moving it back there is the whole fix, and a symlink is the only
+# lever: `patrol test` takes no derived-data flag. The sandbox resolves symlinks
+# before it checks, so the build lands — and is read from — outside the
+# protected tree. Only done when it is needed: a GitHub runner checks out to
+# /Users/runner/work, which is not protected, and CI should keep its build
+# output where the workflow's artifact steps expect it.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  for integ in macos_integ ios_integ; do
+    path="$APP_DIR/build/$integ"
+    # Already relocated by an earlier run.
+    [[ -L "$path" ]] && continue
+    case "$REPO_ROOT/" in
+      "$HOME"/Documents/*|"$HOME"/Desktop/*|"$HOME"/Downloads/*) ;;
+      *) continue ;;
+    esac
+    step "Relocating $integ out of a TCC-protected folder"
+    outside="${TMPDIR:-/tmp}/weft-$integ"
+    mkdir -p "$outside" "$APP_DIR/build"
+    rm -rf "$path"
+    ln -s "$outside" "$path"
+    echo "  $path -> $outside"
+  done
+fi
+
 # --- the run ---------------------------------------------------------------
 
 cmd=(patrol test)
