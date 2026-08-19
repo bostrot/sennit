@@ -1,0 +1,6 @@
+// Base configuration for the iOS WeftWidget target, Release and Profile.
+//
+// See WeftWidget-Debug.xcconfig for why the CocoaPods include and the Flutter
+// generated config both have to be reachable from here.
+#include? "../Pods/Target Support Files/Pods-WeftWidget/Pods-WeftWidget.release.xcconfig"
+#include "../Flutter/Generated.xcconfig"

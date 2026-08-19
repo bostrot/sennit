@@ -1,0 +1,19 @@
+// Base configuration for the iOS WeftWidget target, Debug.
+//
+// Mirrors ShareExtension/ShareExtension-Debug.xcconfig, and for the same two
+// reasons:
+//
+//  * the optional CocoaPods include has to be *here*, in a config the project
+//    already points at, or `pod install` sees a custom base configuration it
+//    did not set and warns on every run. CocoaPods checks for its own include
+//    and stays quiet when it finds one;
+//  * Generated.xcconfig is where FLUTTER_BUILD_NAME and FLUTTER_BUILD_NUMBER
+//    come from, and WeftWidget/Info.plist needs both — an app extension whose
+//    version pair differs from its host app's is rejected at upload.
+//
+// Generated.xcconfig is not in version control; `flutter pub get` writes it.
+//
+// The macOS half of this target reads WeftWidget-macOS.xcconfig instead, which
+// points at the macOS project's own generated config.
+#include? "../Pods/Target Support Files/Pods-WeftWidget/Pods-WeftWidget.debug.xcconfig"
+#include "../Flutter/Generated.xcconfig"

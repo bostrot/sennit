@@ -21,6 +21,15 @@
 		5F30000000000000000000F3 /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000F2 /* CallManager.swift */; };
 		5F40000000000000000000F1 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
 		5F40000000000000000000F2 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E2 /* SnapshotChannel.swift */; };
+		5F50000000000000000000F1 /* WeftWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E1 /* WeftWidget.swift */; };
+		5F50000000000000000000F2 /* SnapshotPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E2 /* SnapshotPayload.swift */; };
+		5F50000000000000000000F3 /* WeftWidgetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E3 /* WeftWidgetState.swift */; };
+		5F50000000000000000000F4 /* WeftWidgetTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E4 /* WeftWidgetTokens.swift */; };
+		5F50000000000000000000F5 /* WeftWidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E5 /* WeftWidgetViews.swift */; };
+		5F50000000000000000000F6 /* WeftWidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E6 /* WeftWidgetProvider.swift */; };
+		5F50000000000000000000F7 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000E2 /* ShareContainer.swift */; };
+		5F50000000000000000000F8 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
+		5F50000000000000000000F9 /* WeftWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000EE /* WeftWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -51,6 +60,13 @@
 			remoteGlobalIDString = 5F20000000000000000000E9;
 			remoteInfo = NotificationService;
 		};
+		5F50000000000000000000D6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F50000000000000000000D1;
+			remoteInfo = WeftWidget;
+		};
 		6ED46B2479E8481CA220DB80 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -69,6 +85,7 @@
 			files = (
 				5F10000000000000000000EF /* ShareExtension.appex in Embed Foundation Extensions */,
 				5F20000000000000000000EF /* NotificationService.appex in Embed Foundation Extensions */,
+				5F50000000000000000000F9 /* WeftWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -111,6 +128,20 @@
 		5F30000000000000000000F2 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E1 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotContainer.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E2 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotChannel.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E1 /* WeftWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E2 /* SnapshotPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotPayload.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E3 /* WeftWidgetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidgetState.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E4 /* WeftWidgetTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidgetTokens.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E5 /* WeftWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidgetViews.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E6 /* WeftWidgetProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidgetProvider.swift; sourceTree = "<group>"; };
+		5F50000000000000000000E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5F50000000000000000000E8 /* WeftWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeftWidget.entitlements; sourceTree = "<group>"; };
+		5F50000000000000000000E9 /* WeftWidget-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "WeftWidget-Debug.xcconfig"; sourceTree = "<group>"; };
+		5F50000000000000000000EA /* WeftWidget-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "WeftWidget-Release.xcconfig"; sourceTree = "<group>"; };
+		5F50000000000000000000EB /* WeftWidget-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "WeftWidget-macOS.entitlements"; sourceTree = "<group>"; };
+		5F50000000000000000000EC /* WeftWidget-macOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "WeftWidget-macOS.xcconfig"; sourceTree = "<group>"; };
+		5F50000000000000000000ED /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		5F50000000000000000000EE /* WeftWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeftWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -134,6 +165,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5F20000000000000000000E7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F50000000000000000000FB /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -199,6 +237,26 @@
 			path = NotificationService;
 			sourceTree = "<group>";
 		};
+		5F50000000000000000000E0 /* WeftWidget */ = {
+			isa = PBXGroup;
+			children = (
+				5F50000000000000000000E1 /* WeftWidget.swift */,
+				5F50000000000000000000E6 /* WeftWidgetProvider.swift */,
+				5F50000000000000000000E3 /* WeftWidgetState.swift */,
+				5F50000000000000000000E5 /* WeftWidgetViews.swift */,
+				5F50000000000000000000E4 /* WeftWidgetTokens.swift */,
+				5F50000000000000000000E2 /* SnapshotPayload.swift */,
+				5F50000000000000000000E7 /* Info.plist */,
+				5F50000000000000000000E8 /* WeftWidget.entitlements */,
+				5F50000000000000000000E9 /* WeftWidget-Debug.xcconfig */,
+				5F50000000000000000000EA /* WeftWidget-Release.xcconfig */,
+				5F50000000000000000000EB /* WeftWidget-macOS.entitlements */,
+				5F50000000000000000000EC /* WeftWidget-macOS.xcconfig */,
+				5F50000000000000000000ED /* README.md */,
+			);
+			path = WeftWidget;
+			sourceTree = "<group>";
+		};
 		5F30000000000000000000E1 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
@@ -228,6 +286,7 @@
 				5F30000000000000000000E1 /* Shared */,
 				5F10000000000000000000E5 /* ShareExtension */,
 				5F20000000000000000000E5 /* NotificationService */,
+				5F50000000000000000000E0 /* WeftWidget */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				0B72D16D0CE02E7D132FCF11 /* RunnerUITests */,
@@ -241,6 +300,7 @@
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				5F10000000000000000000E4 /* ShareExtension.appex */,
 				5F20000000000000000000E4 /* NotificationService.appex */,
+				5F50000000000000000000EE /* WeftWidget.appex */,
 				2409B564CFADD6E18FB3C1A7 /* RunnerUITests.xctest */,
 			);
 			name = Products;
@@ -320,6 +380,23 @@
 			productReference = 5F20000000000000000000E4 /* NotificationService.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		5F50000000000000000000D1 /* WeftWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F50000000000000000000D2 /* Build configuration list for PBXNativeTarget "WeftWidget" */;
+			buildPhases = (
+				5F50000000000000000000FA /* Sources */,
+				5F50000000000000000000FB /* Frameworks */,
+				5F50000000000000000000FC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WeftWidget;
+			productName = WeftWidget;
+			productReference = 5F50000000000000000000EE /* WeftWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		685E5C8AC5099835509AD548 /* RunnerUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C251A9F02FAD72103EE6C2FF /* Build configuration list for PBXNativeTarget "RunnerUITests" */;
@@ -355,6 +432,7 @@
 			dependencies = (
 				5F10000000000000000000F1 /* PBXTargetDependency */,
 				5F20000000000000000000F1 /* PBXTargetDependency */,
+				5F50000000000000000000D7 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			packageProductDependencies = (
@@ -386,6 +464,10 @@
 						CreatedOnToolsVersion = 26.4.1;
 						ProvisioningStyle = Automatic;
 					};
+					5F50000000000000000000D1 = {
+						CreatedOnToolsVersion = 26.4.1;
+						ProvisioningStyle = Automatic;
+					};
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
 						LastSwiftMigration = 1100;
@@ -412,6 +494,7 @@
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				5F10000000000000000000E9 /* ShareExtension */,
 				5F20000000000000000000E9 /* NotificationService */,
+				5F50000000000000000000D1 /* WeftWidget */,
 				685E5C8AC5099835509AD548 /* RunnerUITests */,
 			);
 		};
@@ -433,6 +516,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5F20000000000000000000E8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F50000000000000000000FC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -519,6 +609,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F50000000000000000000FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F50000000000000000000F1 /* WeftWidget.swift in Sources */,
+				5F50000000000000000000F6 /* WeftWidgetProvider.swift in Sources */,
+				5F50000000000000000000F3 /* WeftWidgetState.swift in Sources */,
+				5F50000000000000000000F5 /* WeftWidgetViews.swift in Sources */,
+				5F50000000000000000000F4 /* WeftWidgetTokens.swift in Sources */,
+				5F50000000000000000000F2 /* SnapshotPayload.swift in Sources */,
+				5F50000000000000000000F8 /* SnapshotContainer.swift in Sources */,
+				5F50000000000000000000F7 /* ShareContainer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EA1CF9000F007C117D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -559,6 +664,11 @@
 			isa = PBXTargetDependency;
 			target = 5F20000000000000000000E9 /* NotificationService */;
 			targetProxy = 5F20000000000000000000F0 /* PBXContainerItemProxy */;
+		};
+		5F50000000000000000000D7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F50000000000000000000D1 /* WeftWidget */;
+			targetProxy = 5F50000000000000000000D6 /* PBXContainerItemProxy */;
 		};
 		81C81002640FA78120CC790C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -860,6 +970,86 @@
 			};
 			name = Profile;
 		};
+		5F50000000000000000000D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F50000000000000000000E9 /* WeftWidget-Debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWidget/WeftWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.WeftWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5F50000000000000000000D4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F50000000000000000000EA /* WeftWidget-Release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWidget/WeftWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.WeftWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5F50000000000000000000D5 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F50000000000000000000EA /* WeftWidget-Release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWidget/WeftWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.WeftWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 		5FB46B01572D12C66DDDC88C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
@@ -1110,6 +1300,16 @@
 				5F20000000000000000000EB /* Debug */,
 				5F20000000000000000000EC /* Release */,
 				5F20000000000000000000ED /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5F50000000000000000000D2 /* Build configuration list for PBXNativeTarget "WeftWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F50000000000000000000D3 /* Debug */,
+				5F50000000000000000000D4 /* Release */,
+				5F50000000000000000000D5 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

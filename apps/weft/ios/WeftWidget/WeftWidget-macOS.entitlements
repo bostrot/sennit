@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Every macOS app extension is sandboxed, and unlike on iOS that is a key
+	     the target has to state rather than a property of being an extension.
+	     Runner/DebugProfile.entitlements and Runner/Release.entitlements say the
+	     same thing for the app. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- The App Group is deliberately NOT here yet, and this is the note that
+	     says so rather than an omission anyone has to rediscover.
+
+	     What belongs here, once there is signing material:
+
+	         <key>com.apple.security.application-groups</key>
+	         <array>
+	           <string>$(TeamIdentifierPrefix)group.com.bostrot.weft</string>
+	         </array>
+
+	     Three facts, in the order they matter.
+
+	     1. The spelling differs from the iOS entitlements file, and not
+	        cosmetically: App Groups on macOS are team-prefixed and iOS's are
+	        not, so the same group is `group.com.bostrot.weft` there and
+	        `<TeamID>.group.com.bostrot.weft` here. `$(TeamIdentifierPrefix)` is
+	        the build setting that expands to `<TeamID>.`, which keeps the team id
+	        itself out of version control. ../Shared/SnapshotContainer.swift
+	        already records this and points at
+	        docs/decisions/adr-002-ios-signing-handoff.md.
+
+	     2. **Adding it now would break the build for everyone**, which is the
+	        reason it is a comment rather than a key. Unlike the sandbox, an App
+	        Group entitlement cannot be ad-hoc signed: with it present
+	        `xcodebuild` refuses before it compiles anything —
+
+	            error: "WeftWidget" requires a provisioning profile. Enable
+	            development signing and select a provisioning profile in the
+	            Signing & Capabilities editor.
+
+	        — and because Runner depends on this target, that is `flutter build
+	        macos` failing on any machine without the team's certificate. The iOS
+	        half has no such problem: `flutter build ios --no-codesign` skips
+	        signing entirely, so ios/WeftWidget/WeftWidget.entitlements carries
+	        its group for real.
+
+	     3. **It buys nothing until macos/Runner has the group too.** That target
+	        does not request one either — Phase 04 left it out on the same
+	        reasoning — so the writing side is equally inert:
+	        `containerURL(forSecurityApplicationGroupIdentifier:)` returns nil in
+	        both processes, the app reports the snapshot write as refused, and
+	        this extension draws its signed-out state. Both are states the code
+	        already survives, which is what makes authoring the target now and
+	        provisioning it later the honest order — the phase's own rule, "Xcode
+	        targets are authored but not signed". -->
+</dict>
+</plist>

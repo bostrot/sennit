@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Weft</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<!-- Both must equal the host app's or the App Store rejects the bundle, so
+	     they come from the same two Flutter variables Runner/Info.plist reads.
+	     `WeftWidget-{Debug,Release}.xcconfig` (iOS) and `WeftWidget-macOS.xcconfig`
+	     are what put them in scope for this target — the same arrangement
+	     ShareExtension and NotificationService already use. -->
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- One plist for the iOS and the macOS widget target, the same way
+	     `Runner/SnapshotChannel.swift` is one file in both Runner targets: the
+	     macOS project references this path through `../ios/` rather than holding
+	     a copy. Nothing in here is platform-specific — the extension point is
+	     spelled identically on both, and the two things that do differ (the
+	     entitlements, the deployment target) live in the project file and in
+	     their own entitlements files. -->
+	<key>NSExtension</key>
+	<dict>
+		<!-- No `NSExtensionPrincipalClass` and no `NSExtensionMainStoryboard`. A
+		     WidgetKit extension's entry point is the `@main` `WidgetBundle` in
+		     `WeftWidget.swift`, found by the runtime rather than named here; the
+		     Share Extension needs a principal class because it is a view
+		     controller and this is not. -->
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+</dict>
+</plist>

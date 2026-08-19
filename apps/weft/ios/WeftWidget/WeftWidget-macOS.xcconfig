@@ -1,0 +1,46 @@
+// Base configuration for the macOS WeftWidget target, all three configurations.
+//
+// One file rather than the Debug/Release pair the iOS half has, and for the same
+// reason NotificationService.xcconfig is one file: this target is deliberately
+// absent from macos/Podfile. It needs no pods — the whole extension is SwiftUI,
+// WidgetKit and Foundation, and an extension that linked the Flutter engine
+// would be an extension the system kills for exceeding its memory limit before
+// it had drawn a row — so there is no CocoaPods include to make conditional and
+// nothing for `pod install` to warn about.
+//
+// What it does need is the Flutter version pair: WeftWidget/Info.plist reads
+// FLUTTER_BUILD_NAME and FLUTTER_BUILD_NUMBER, and an app extension whose
+// version differs from its host app's is rejected at upload.
+//
+// The path reaches across into the macOS project because this file lives beside
+// the sources it configures — one WeftWidget directory feeding both targets, the
+// same arrangement Runner/SnapshotChannel.swift already has. macos/Flutter/
+// ephemeral/Flutter-Generated.xcconfig is not in version control; `flutter pub
+// get` writes it.
+#include "../../macos/Flutter/ephemeral/Flutter-Generated.xcconfig"
+
+// Everything below undoes an inheritance the iOS project does not have.
+//
+// macos/Runner.xcodeproj sets a *project-level* base configuration
+// (Runner/Configs/Debug.xcconfig → Flutter/Flutter-Debug.xcconfig →
+// Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig), and a
+// project-level xcconfig reaches every target in the project, including this
+// one. So without these five lines the widget extension inherits Runner's entire
+// CocoaPods link line — WebRTC, whisper_ggml, CocoaAsyncSocket, the lot — and
+// the first symptom is not a memory limit at runtime but a link failure at build
+// time:
+//
+//     ld: framework 'CocoaAsyncSocket' not found
+//
+// which is what happens when a target is handed another target's `-framework`
+// flags without that target's search paths. Resetting them is the same decision
+// the Podfile comment states in words: this extension links nothing but the
+// system frameworks it imports.
+//
+// ios/Runner.xcodeproj has no project-level base configuration, so its half of
+// this target inherits nothing and needs no equivalent.
+OTHER_LDFLAGS =
+OTHER_SWIFT_FLAGS =
+FRAMEWORK_SEARCH_PATHS =
+LIBRARY_SEARCH_PATHS =
+HEADER_SEARCH_PATHS =

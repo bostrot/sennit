@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The extension's only capability, and the only thing that makes it useful:
+	     without the group it gets a private container the host app cannot see,
+	     `WeftSnapshotContainer.containerURL` returns nil, and every widget on the
+	     device renders "Sign in to Weft" forever regardless of who is signed in.
+
+	     Must stay identical to Runner/Runner.entitlements, to
+	     ShareExtension/ShareExtension.entitlements, and to
+	     WeftShareContainer.appGroupIdentifier — one group, one entitlement to
+	     provision, one string that can be wrong. See
+	     ../Shared/SnapshotContainer.swift for why the four processes that read
+	     these paths must never spell the group twice. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.bostrot.weft</string>
+	</array>
+</dict>
+</plist>

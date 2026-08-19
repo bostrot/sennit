@@ -77,6 +77,33 @@ target 'ShareExtension' do
   use_frameworks!
 end
 
+# The WidgetKit extension, integrated with no pods, for the same reason and one
+# sharper.
+#
+# It must not inherit Runner's: `flutter_install_all_ios_pods` pulls in the
+# Flutter engine and every plugin, and a widget extension that links the engine
+# is one the system kills for exceeding its memory limit before it has drawn a
+# row. The limit here is tighter than the Share Extension's — a widget is woken
+# by the OS on its own schedule, repeatedly, and an extension that gets killed
+# often enough stops being scheduled at all, which the user sees as a blank
+# rectangle they eventually delete. Everything in `WeftWidget/` imports SwiftUI,
+# WidgetKit and Foundation and nothing else.
+#
+# The block is here rather than absent so that CocoaPods generates
+# `Pods-WeftWidget.{debug,release}.xcconfig`, which
+# `WeftWidget/WeftWidget-{Debug,Release}.xcconfig` includes optionally. That is
+# what stops `pod install` warning about a base configuration it did not set,
+# and it means the day this target does need a pod, adding it here is the only
+# step.
+#
+# The macOS half of this target is *not* listed in `../macos/Podfile`: it needs
+# nothing either and its single `WeftWidget-macOS.xcconfig` has no CocoaPods
+# include to collide with, which is the NotificationService arrangement rather
+# than this one.
+target 'WeftWidget' do
+  use_frameworks!
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
