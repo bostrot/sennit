@@ -427,6 +427,12 @@ String disambiguatedSenderName(
 /// degrades [NotificationContent.title] and [NotificationContent.senderName]
 /// too, which it can do with `copyWith`.
 ///
+/// A [maxLength] of zero or less disables truncation. That is how
+/// `weft_snapshot` reuses the per-kind rendering under a cut of its own: a
+/// widget row is a fixed box where the UTF-16 `substring` below can leave half
+/// a surrogate pair on screen until the next message arrives, so it truncates
+/// on grapheme clusters instead and needs the untruncated body to do it.
+///
 /// No emoji, deliberately, which is where this parts company with
 /// `ChatTile._preview` ("📷 Photo"). A notification body is read aloud by
 /// TalkBack and VoiceOver; "camera Photo IMG_4021.jpg" is not an improvement on

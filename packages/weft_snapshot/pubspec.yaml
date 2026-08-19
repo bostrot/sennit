@@ -1,0 +1,36 @@
+name: weft_snapshot
+description: >-
+  The payload every companion surface renders from: a small, policy-filtered
+  view of the inbox that a home screen widget, a Lock Screen accessory and a
+  watch app can read without a Matrix session. Pure Dart, because what a widget
+  is allowed to say about a conversation is a privacy decision rather than a
+  layout one, and it has to be decided identically for Glance, WidgetKit and
+  Wear OS — none of which can run a test.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  # Grapheme clusters, for the preview cut. Dart's `substring` counts UTF-16
+  # code units, and a widget row is a fixed box where half a surrogate pair
+  # renders as a replacement glyph rather than as nothing. See
+  # `truncatePreview` for why this package parts company with
+  # `weft_notify._truncate` here.
+  characters: ^1.4.0
+  collection: ^1.19.0
+  meta: ^1.17.0
+  weft_domain: ^0.1.0
+  # For `renderNotificationBody` and `kHiddenPreviewBody`. Not in the phase
+  # brief's dependency list, and taken deliberately: a widget preview asks the
+  # identical question a notification body does — what does this message say,
+  # per kind, with the formatted body projected to plain text — and answering it
+  # a second time here would mean a second HTML projection over untrusted
+  # bridged input. That is the one duplication this package must not have.
+  weft_notify: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0
