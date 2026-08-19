@@ -1,0 +1,13 @@
+// Base configuration for the WeftWatch and WeftWatchComplication targets, Release.
+//
+// Mirrors WeftWidget/WeftWidget-Debug.xcconfig, minus the one thing that does
+// not apply: there is **no optional CocoaPods include**. A watch app cannot link
+// Runner's pods — they are built for iOS — and there is no
+// `Pods-WeftWatch.debug.xcconfig` for `pod install` to look for, so including
+// one would be a path that is never satisfied rather than an option.
+//
+// Generated.xcconfig is where FLUTTER_BUILD_NAME and FLUTTER_BUILD_NUMBER come
+// from, and both Info.plists here need both — a watch app is submitted inside
+// its companion's archive and is rejected if the pair differs from the phone's.
+// It is not in version control; `flutter pub get` writes it.
+#include "../Flutter/Generated.xcconfig"

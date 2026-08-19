@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The watch app's launcher icon.
+
+     A vector rather than the phone's PNG set, and a shape study rather than a
+     copy of the app icon: Wear OS renders launcher icons round and small, and
+     downsampling the phone's artwork into a 48dp circle produces mud. Three
+     strands over a rounded square is Weft's name as a mark — a weft is the yarn
+     drawn across a warp — which is the one part of the phone icon that survives
+     being drawn at this size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FF2E295F"
+        android:pathData="M0,0h48v48h-48z"/>
+    <path
+        android:fillColor="#FFC6BFFF"
+        android:pathData="M10,15h28v4h-28z"/>
+    <path
+        android:fillColor="#FFC6BFFF"
+        android:pathData="M10,22h28v4h-28z"/>
+    <path
+        android:fillColor="#FFC6BFFF"
+        android:pathData="M10,29h18v4h-18z"/>
+</vector>

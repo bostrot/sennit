@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the tile picker shows before the tile is added.
+
+     **A shape study, not a screenshot, and deliberately not plausible fake
+     conversations.** This drawable is compiled into the APK and shipped to
+     everyone, so it cannot show real rows; drawing invented ones would have the
+     picker teaching a wearer to expect names on this surface before they had
+     agreed to any leaving the encrypted store on the phone. The same rule the
+     Android widget preview images follow and the same one
+     `WeftWidgetProvider.placeholder(in:)` follows in Swift.
+
+     The number is a count and identifies nobody, so it is the one real-looking
+     thing here. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M96,0A96,96 0,1 1,96 192A96,96 0,1 1,96 0z"/>
+    <!-- The unread heading, as a bar rather than as glyphs. -->
+    <path
+        android:fillColor="#FFC6BFFF"
+        android:pathData="M62,52h68v14h-68z"/>
+    <!-- Three conversation lines, shortening the way a list of titles does. -->
+    <path
+        android:fillColor="#FF47464F"
+        android:pathData="M44,88h104v10h-104z"/>
+    <path
+        android:fillColor="#FF47464F"
+        android:pathData="M44,108h88v10h-88z"/>
+    <path
+        android:fillColor="#FF47464F"
+        android:pathData="M44,128h96v10h-96z"/>
+    <!-- Network dots, in real `ChatNetwork.brandColor` values: WhatsApp's green
+         and Signal's blue. The one place this file is not abstract, because the
+         glyph strip is the part of a row a wearer has to recognise. -->
+    <path
+        android:fillColor="#FF25D366"
+        android:pathData="M32,88m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+    <path
+        android:fillColor="#FF3A76F0"
+        android:pathData="M32,108m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+</vector>

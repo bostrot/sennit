@@ -11,7 +11,8 @@ signing material, and — on macOS — one entitlement that cannot exist without
 | `WeftWidget.swift` | The `@main` `WidgetBundle`: the inbox widget, the Lock Screen accessory, and their views |
 | `WeftWidgetProvider.swift` | The `TimelineProvider` — the only thing here that touches the App Group |
 | `WeftWidgetState.swift` | The five states a widget can be in, and every sentence it can say |
-| `WeftWidgetViews.swift` | Rows, badge, network dots, empty state |
+| `WeftWidgetViews.swift` | The widget row and the empty state |
+| `SnapshotViews.swift` | Badge and network dots. **Also compiled into `WeftWatch`** — everything here needs a row and the tokens, and nothing else |
 | `WeftWidgetTokens.swift` | `weft_design`, duplicated for a process with no Flutter in it |
 | `SnapshotPayload.swift` | The hand-written reader for `SnapshotCodec`'s JSON |
 | `Info.plist` | `com.apple.widgetkit-extension`. **One file for both targets** |

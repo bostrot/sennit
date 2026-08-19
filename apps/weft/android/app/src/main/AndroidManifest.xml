@@ -287,6 +287,30 @@
                 android:resource="@xml/weft_widget_inbox_info"/>
         </receiver>
 
+        <!-- The Wear OS reply path. A `WearableListenerService` is started by
+             the system when a message arrives on a path this filter names,
+             whether or not Weft is running — which is why the reply path is a
+             queue that reports rather than a call that returns: this component
+             can be what starts the process, with no Flutter engine in it yet.
+
+             `android:exported` true and the `com.google.android.gms.wearable.BIND_LISTENER`
+             action are both required of the *host*: the binder is Play services,
+             not another app, and a service without them is simply never bound —
+             no error, no log line, and a watch whose replies vanish.
+
+             The path filter is exact and names only the reply. The snapshot
+             travels the other way as a `DataItem` this phone puts, so there is
+             nothing inbound to listen for on it, and a `DATA_CHANGED` filter
+             here would wake this process every time it published to itself. -->
+        <service
+            android:name=".wear.WeftWearReplyService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"/>
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/weft/reply"/>
+            </intent-filter>
+        </service>
+
         <!-- FCM. The service itself (`FlutterFirebaseMessagingService`) is
              declared by the firebase_messaging plugin and merged in from its
              own manifest — redeclaring it here would be a second entry for one

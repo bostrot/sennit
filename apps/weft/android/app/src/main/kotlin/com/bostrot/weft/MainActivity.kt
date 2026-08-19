@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.bostrot.weft.call.CallBridge
 import com.bostrot.weft.sms.SmsBridge
+import com.bostrot.weft.wear.WeftWatchChannel
 import com.bostrot.weft.widget.WeftSnapshotChannel
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -136,6 +137,12 @@ class MainActivity : FlutterActivity() {
         // pair because it holds nothing — every call is a `SharedPreferences`
         // write against the application context.
         WeftSnapshotChannel.register(this, flutterEngine)
+        // The watch reply path, which travels the other way and therefore *does*
+        // hold state: a reply arrives from a `WearableListenerService` the system
+        // started, which has no reference to this engine. `WeftWatchChannel`
+        // holds the answer to "is there a Dart handler alive to give this to",
+        // and answers the watch itself when there is not.
+        WeftWatchChannel.register(this, flutterEngine)
 
         intent?.let { handleIntent(it, replay = true) }
     }

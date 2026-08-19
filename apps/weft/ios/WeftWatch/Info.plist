@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Weft</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<!-- Both must equal the phone app's or the App Store rejects the bundle: a
+	     watch app is submitted inside its companion's archive, not beside it.
+	     They come from the same two Flutter variables Runner/Info.plist reads,
+	     put in scope by WeftWatch-{Debug,Release}.xcconfig. -->
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- The single-target watchOS app shape, and the reason there is no
+	     `WeftWatch Extension` directory next to this one. Before watchOS 7 a
+	     watch app was two bundles — a storyboard carrier and a WatchKit
+	     extension — and every guide still shows that. `WKApplication` is the
+	     declaration that this is one bundle whose entry point is a SwiftUI
+	     `App`, which is what `WeftWatchApp.swift` is. -->
+	<key>WKApplication</key>
+	<true/>
+	<!-- Which phone app this belongs to. It is what pairs the two `WCSession`s,
+	     what makes the watch app installable from Weft's own page in the Watch
+	     app, and what has to match `Runner`'s bundle id exactly — a typo here is
+	     a watch app that installs, launches, and never hears from the phone.
+	     Spelled literally rather than as `$(PRODUCT_BUNDLE_IDENTIFIER:...)`
+	     because this target's own id is derived from the phone's rather than the
+	     other way round. -->
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>com.bostrot.weft</string>
+</dict>
+</plist>

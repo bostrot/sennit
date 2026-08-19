@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The declaration that makes this a watch APK rather than a phone one.
+         Required: without it Play will offer this build to phones, and the
+         launcher on a watch will not treat it as a watch app. -->
+    <uses-feature android:name="android.hardware.type.watch"/>
+
+    <!-- Dictation. The reply screen opens the *system's* input picker rather
+         than a recogniser of its own, so this is what the picker needs to offer
+         the microphone at all; a watch with no microphone simply shows the
+         other input methods, which is why the feature below is optional. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+
+    <!-- No INTERNET permission, and that is the architecture rather than an
+         omission. This app has no Matrix session, no homeserver and nothing to
+         fetch: everything it renders arrived over the Data Layer from a phone
+         that had already decided to send it, and every message it sends is sent
+         by that phone. See `docs/architecture/companion-surfaces.md`. -->
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/weft_launcher"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!-- Standalone: this watch app works with no phone app *installed*, in
+             the sense that it launches and explains itself. It does not work
+             without one *paired and signed in*, which is what every empty state
+             here says. Declaring false instead would make Play refuse to install
+             it on a watch whose phone had not installed Weft, which is exactly
+             the user this app's "open Weft on your phone" state is written for. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true"/>
+
+        <activity
+            android:name=".WeftWearActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- The Data Layer, inbound. Two paths and two reasons: `DATA_CHANGED`
+             is the snapshot arriving, `MESSAGE_RECEIVED` on the reply-result
+             path is the phone answering a message this watch asked it to send.
+
+             `android:exported` true and the `BIND_LISTENER`-family actions are
+             required of the host — the binder is Play services, not another app
+             — and a service missing either is never bound, with no error and no
+             log line. -->
+        <service
+            android:name=".WeftWearDataService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED"/>
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/weft/snapshot"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED"/>
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/weft/reply-result"/>
+            </intent-filter>
+        </service>
+
+        <!-- The tile: the surface a user reaches by swiping sideways from the
+             watch face, with no app launch. Same five states as the app. -->
+        <service
+            android:name=".WeftWearTileService"
+            android:label="@string/tile_name"
+            android:description="@string/tile_description"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER"/>
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview"/>
+        </service>
+
+        <!-- The complication: total unread, on a watch face.
+             `SUPPORTED_TYPES` is read by the *watch face editor* rather than at
+             runtime, so a type missing here is a complication the user is never
+             offered. `UPDATE_PERIOD_SECONDS` is a floor the system enforces
+             loosely; the real refresh is `ComplicationDataSourceUpdateRequester`
+             called the moment a snapshot lands, which is why this is an hour
+             rather than a minute — it exists so a stale snapshot stops being
+             presented as current while the phone is away, not to poll. -->
+        <service
+            android:name=".WeftWearComplicationService"
+            android:label="@string/complication_name"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,RANGED_VALUE"/>
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="3600"/>
+        </service>
+    </application>
+</manifest>

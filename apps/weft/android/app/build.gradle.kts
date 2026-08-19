@@ -53,6 +53,14 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
+    // The snapshot parser, compiled from `android/shared/` into this module and
+    // into `:wear`. Not a library module and not a dependency between the two
+    // apps: they are two APKs that ship separately, neither is a library for the
+    // other, and the one file they share has `org.json` as its entire dependency
+    // surface. The same arrangement `ios/Shared/` has, where
+    // `SnapshotContainer.swift` is a member of four Xcode targets.
+    sourceSets["main"].kotlin.srcDir("../shared/src/main/kotlin")
+
     buildFeatures {
         // Glance composables only. There is no Compose UI in Weft — the app is
         // Flutter — but a `GlanceAppWidget` is compiled by the Compose compiler
@@ -106,6 +114,16 @@ dependencies {
     // which drags Compose UI, Foundation and Animation into an APK whose entire
     // user interface is Flutter. `WeftWidgetTokens` builds the same palette out
     // of colour resources instead; see the comment there.
+    // The Wearable Data Layer, and the only reason this APK links Play
+    // services. It is confined to `com.bostrot.weft.wear` — the store the Glance
+    // providers read must not acquire this dependency, which is what
+    // `WeftSnapshotStore.notifySurfaces` says and this is the other half of.
+    //
+    // Play services is present on the overwhelming majority of Android phones
+    // and absent on some; every call through `WeftWearBridge` is wrapped for
+    // exactly that, because a device with no Play services and no watch is not
+    // an error state, it is most Weft users.
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
     // The other half of `isCoreLibraryDesugaringEnabled` above.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // The other half of `execution = "ANDROIDX_TEST_ORCHESTRATOR"`. It is an

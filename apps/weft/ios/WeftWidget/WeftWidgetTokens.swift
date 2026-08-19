@@ -123,6 +123,14 @@ enum WeftWidgetTokens {
   /// environment at build time is a colour that can be wrong until the next
   /// reload. A `UIColor`/`NSColor` provider is resolved at draw time, by the
   /// process doing the drawing, which is the only way this is right for free.
+  ///
+  /// **watchOS resolves to the dark value and does not branch**, and that is a
+  /// platform fact rather than a shortcut: there is no light mode on a watch,
+  /// `UITraitCollection.userInterfaceStyle` and `UIColor(dynamicProvider:)` are
+  /// both unavailable there, and the reason is a hardware one — an OLED pixel
+  /// showing black is a pixel that is off, on a device whose battery is measured
+  /// in hours. The wear module's `WeftWearTokens` states the same thing for the
+  /// same reason and takes only the `values-night` half of the scheme.
   private static func dynamic(light: UInt32, dark: UInt32) -> Color {
     #if os(macOS)
       return Color(
@@ -130,6 +138,8 @@ enum WeftWidgetTokens {
           let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
           return platformColor(fromARGB: isDark ? dark : light)
         })
+    #elseif os(watchOS)
+      return Color(platformColor(fromARGB: dark))
     #else
       return Color(
         UIColor { traits in

@@ -1,8 +1,22 @@
-package com.bostrot.weft.widget
+package com.bostrot.weft.snapshot
 
 import org.json.JSONObject
 
 /// Kotlin's reader for the payload `SnapshotCodec` writes.
+///
+/// **Compiled into two Gradle modules, from one file.** `:app` draws the Glance
+/// home screen widgets from this and `:wear` draws the watch list, the tile and
+/// the complication from it, and both add `android/shared/src/main/kotlin` to
+/// their own source set rather than either depending on the other — the phone
+/// app and the watch app are two APKs that ship separately and neither is a
+/// library for the other. It is the same arrangement `ios/Shared/` already has
+/// for `SnapshotContainer.swift`, which is a member of four Xcode targets for
+/// the same reason, and the reason is the one this file's own contract states:
+/// there is no compiler checking these key names against the Dart class, so a
+/// second copy of the parser is a second place for them to be checked wrongly.
+///
+/// Nothing here may reference `:app` or `:wear`. `org.json` is in the Android
+/// platform, and that is the whole of its dependency surface.
 ///
 /// The Dart side (`packages/weft_snapshot/lib/src/codec.dart`) is the only
 /// writer of this format and says so: *"the key names are a cross-language
@@ -24,9 +38,9 @@ import org.json.JSONObject
 /// writer is a host app the system can suspend between the first byte of the
 /// file and the last; the reader is a `GlanceAppWidget` the OS stops scheduling
 /// if it throws, which the user sees as a blank rectangle they eventually
-/// delete. So a payload that cannot be read is dropped and the widget falls to
-/// [WeftWidgetState.Unavailable] — a state it needs anyway, for a phone that has
-/// not been unlocked all day.
+/// delete. So a payload that cannot be read is dropped and the surface falls to
+/// its `Unavailable` state — one it needs anyway, for a phone that has not been
+/// unlocked all day.
 object SnapshotFormat {
     /// The version this reader understands. Mirrors `kSnapshotFormatVersion`.
     ///
@@ -39,6 +53,17 @@ object SnapshotFormat {
 
     /// Mirrors `kSnapshotStaleAfter` (12 hours).
     const val STALE_AFTER_MILLIS = 12L * 60 * 60 * 1000
+
+    /// The same ceiling `kMaxSnapshotBytes` enforces on the Dart side, checked
+    /// again on this one.
+    ///
+    /// It lives with the *format* rather than with any one transport, because
+    /// three of them now enforce it and they would otherwise each hold a copy:
+    /// `WeftSnapshotStore` before a `SharedPreferences` write, the Wear bridge
+    /// before a `DataItem` (which the Data Layer rejects outright over 100 KB),
+    /// and this decode before allocating a payload that is absurd rather than
+    /// merely large.
+    const val MAX_PAYLOAD_BYTES = 64 * 1024
 
     /// Mirrors `kUnreadBadgeCap`, and it is the one number on this side that
     /// genuinely had to be restated.
@@ -86,7 +111,7 @@ object SnapshotFormat {
     /// [raw] as a snapshot, or null when it is not a usable one.
     ///
     /// Refused, in every case without throwing: null or blank input; anything
-    /// past [WeftSnapshotStore.MAX_PAYLOAD_BYTES], which is what a partially
+    /// past [MAX_PAYLOAD_BYTES], which is what a partially
     /// overwritten file looks like from here; anything the JSON parser rejects,
     /// which is what a write killed partway through looks like. Everything else
     /// degrades — see the field comments below.
@@ -97,8 +122,8 @@ object SnapshotFormat {
         // a string longer than the cap is over it whatever it contains, and the
         // cheap check avoids encoding a payload that is absurd rather than
         // merely too big.
-        if (raw.length > WeftSnapshotStore.MAX_PAYLOAD_BYTES) return null
-        if (raw.toByteArray(Charsets.UTF_8).size > WeftSnapshotStore.MAX_PAYLOAD_BYTES) return null
+        if (raw.length > MAX_PAYLOAD_BYTES) return null
+        if (raw.toByteArray(Charsets.UTF_8).size > MAX_PAYLOAD_BYTES) return null
 
         val root = try {
             JSONObject(raw)

@@ -68,14 +68,29 @@ enum WeftSnapshotChannel {
         let stored = WeftSnapshotContainer.writePayload(
           json, widgets: widgets, watch: watch)
         if stored { reloadSurfaces() }
-        DispatchQueue.main.async { result(stored) }
+        DispatchQueue.main.async {
+          // The watch half, on the main queue and through the app's own session
+          // object rather than from the background queue above. `publish()`
+          // re-reads the container it was just handed, so the two can never
+          // disagree about what the watch was told.
+          if stored { WeftWatchChannel.shared.publish() }
+          result(stored)
+        }
       }
 
     case "clearSnapshot":
       background {
         WeftSnapshotContainer.clear()
         reloadSurfaces()
-        DispatchQueue.main.async { result(nil) }
+        DispatchQueue.main.async {
+          // Publishing a *cleared* container is what takes the conversations
+          // off the wrist: the context goes out with no payload and the flag
+          // off, which the watch renders as its signed-out state. Deleting
+          // nothing and hoping the watch notices would leave names on a screen
+          // whose owner has just signed out.
+          WeftWatchChannel.shared.publish()
+          result(nil)
+        }
       }
 
     default:
@@ -105,10 +120,11 @@ enum WeftSnapshotChannel {
   /// deployment target is iOS 13, one below WidgetKit's. Without it this file
   /// does not compile.
   ///
-  /// The watch is *not* reloaded from here. Its payload travels by
-  /// `WatchConnectivity` from the app's own session, and reaching a
+  /// The watch is *not* reloaded from here, and deliberately not: its payload
+  /// travels by `WatchConnectivity` from the app's own session, and reaching a
   /// `WCSession` out of a channel handler on a background queue is how that
-  /// gets subtly wrong.
+  /// gets subtly wrong. `WeftWatchChannel.shared.publish()` is called from the
+  /// main queue by both arms of `handle` above instead.
   private static func reloadSurfaces() {
     #if canImport(WidgetKit)
       if #available(iOS 14.0, macOS 11.0, *) {

@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import com.bostrot.weft.snapshot.SnapshotFormat
 
 /// Where the inbox snapshot lives on Android, described once.
 ///
@@ -49,7 +50,11 @@ object WeftSnapshotStore {
     /// transaction in flight*, so an oversized payload fails on a busy device
     /// rather than on a big one. A refusal is answered to Dart as `false`,
     /// which the writer reads as "try again next tick" rather than as an error.
-    const val MAX_PAYLOAD_BYTES = 64 * 1024
+    ///
+    /// Aliased rather than restated: the number belongs with the format, which
+    /// is where the three enforcers of it can all reach it. See
+    /// [SnapshotFormat.MAX_PAYLOAD_BYTES].
+    const val MAX_PAYLOAD_BYTES = SnapshotFormat.MAX_PAYLOAD_BYTES
 
     /// Stores [json] and redraws whatever is on a home screen.
     ///

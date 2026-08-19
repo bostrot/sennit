@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/snapshot/snapshot_writer.dart';
+import '../services/snapshot/watch_reply_handler.dart';
+import 'providers.dart';
 import 'stores.dart';
 
 /// The companion-surface gate as the app reads it.
@@ -40,4 +42,33 @@ final snapshotGatewayProvider = Provider<SnapshotGateway>(
 /// `main.dart` that already knows when the session is up.
 final snapshotWriterProvider = Provider<SnapshotWriter>(
   (ref) => SnapshotWriter(gateway: ref.watch(snapshotGatewayProvider)),
+);
+
+/// Where a watch reply arrives from, and where its result goes back to.
+///
+/// The same shape as [snapshotGatewayProvider] and for the same reason: the
+/// thing behind it is a `WCSession` on one platform and a `MessageClient` on
+/// another, and neither exists in a widget test.
+final watchReplyGatewayProvider = Provider<WatchReplyGateway>(
+  (ref) => WeftWatchBridge(),
+);
+
+/// The app's one [WatchReplyHandler].
+///
+/// One, for the reason [snapshotWriterProvider] is one and one sharper: it holds
+/// the queue and the set of reply ids already handled, and a second instance
+/// would be a second set — which is a duplicate delivery becoming a second
+/// message rather than a second acknowledgement.
+///
+/// `read` rather than `watch` on the repository, deliberately. Watching would
+/// rebuild the handler — and empty its queue — whenever the repository provider
+/// was invalidated, which is every sign-in. The send is resolved per call
+/// instead, so a reply queued before a reconnection is sent through the
+/// repository that exists when it finally goes.
+final watchReplyHandlerProvider = Provider<WatchReplyHandler>(
+  (ref) => WatchReplyHandler(
+    gateway: ref.watch(watchReplyGatewayProvider),
+    send: (chatId, body, {via}) =>
+        ref.read(chatRepositoryProvider).send(chatId, body, via: via),
+  ),
 );

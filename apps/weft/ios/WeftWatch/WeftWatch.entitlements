@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The watch's own App Group, and it is worth being precise about what that
+	     means because the phase brief's wording is not: an App Group **does not
+	     span devices**. This group is not the phone's container reached over
+	     Bluetooth — it is a container on the watch, shared between this app and
+	     WeftWatchComplication, holding a cache of what the phone last sent over
+	     `WatchConnectivity`. See WeftWatchStore for the two reasons that cache
+	     exists on disk rather than in memory.
+
+	     Same identifier as the phone's group deliberately, and for the same
+	     reason every other file here reuses it: one string that can be wrong
+	     rather than two. It is a different container on a different device that
+	     happens to be named the same way, which is what App Groups on watchOS
+	     are.
+
+	     Without it `WeftSnapshotContainer.containerURL` returns nil on both
+	     processes — a state the code already survives: the app draws its
+	     signed-out state and the complication shows zero. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.bostrot.weft</string>
+	</array>
+</dict>
+</plist>

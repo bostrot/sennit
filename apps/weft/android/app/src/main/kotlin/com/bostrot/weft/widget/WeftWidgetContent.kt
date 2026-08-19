@@ -11,10 +11,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.action.Action
 import androidx.glance.action.clickable
-// The `Intent` overload, which lives in the appwidget artifact rather than in
-// `androidx.glance.action` beside the `ComponentName` and `Class` ones. The
-// distinction matters: those two can only name an activity, and every tap on
-// this surface has to carry a *URI* — the row's `weft://chat/<id>` link.
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
@@ -39,6 +35,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.bostrot.weft.MainActivity
 import com.bostrot.weft.R
+import com.bostrot.weft.snapshot.SnapshotRow
 
 /// The pieces both Weft widgets are built from.
 ///

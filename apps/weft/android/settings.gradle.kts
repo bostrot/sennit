@@ -33,3 +33,9 @@ plugins {
 }
 
 include(":app")
+
+// The Wear OS companion: a separate APK for a separate device, built by
+// `./gradlew :wear:assembleDebug` and *not* by `flutter build apk`, which only
+// ever asks for `:app`. It applies no Flutter plugin and contains no Dart — see
+// `wear/build.gradle.kts` and `wear/README.md`.
+include(":wear")

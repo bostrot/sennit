@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings this watch renders.
+
+     Weft's own copy lives in Flutter's ARB catalogue and is reached through
+     `AppLocalizations`. Nothing here can reach it: this is a separate APK on a
+     separate device with no Flutter engine anywhere in it. That duplicates the
+     localisation *mechanism* and not a single string — no sentence in this file
+     appears in the Flutter app, and none should be copied into it.
+
+     The wording follows `surfaces_screen.dart` and the phone widgets'
+     `res/values/strings.xml`: plain language, the setting named as it is spelled
+     on the screen, and no jargon about payloads, snapshots or data layers. It is
+     kept word-for-word identical to the widget strings wherever the fact is the
+     same one, because a user with a widget and a watch must not be told two
+     different things about one switch. -->
+<resources>
+    <string name="app_name">Weft</string>
+
+    <!-- Tile and complication picker entries. -->
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">Your unread messages and most recent conversations.</string>
+    <string name="complication_name">Weft unread</string>
+
+    <!-- The list heading. "Recent" rather than "Inbox": the rows are the top of
+         the chat list, not all of it, and the row cap means they always will
+         be. -->
+    <string name="inbox_heading">Recent</string>
+
+    <!-- Signed out: no data item at all, because the phone deletes it on logout.
+         The one empty state that must not mention the setting — the setting is
+         not the problem, and pointing someone at it who has simply signed out
+         sends them looking for a switch that will not help. -->
+    <string name="signed_out_title">Sign in to Weft</string>
+    <string name="signed_out_body">Open Weft on your phone and sign in.</string>
+
+    <!-- Switched off: the phone is signed in and this watch may not draw. Names
+         the switch as it is spelled on the phone's settings screen. -->
+    <string name="disabled_title">Watch is off</string>
+    <string name="disabled_body">Open Weft on your phone and turn on Watch under Widgets &amp; watch.</string>
+
+    <!-- Stale or unreadable. Deliberately one sentence for both, the same
+         decision every other surface makes: a twelve-hour-old snapshot and a
+         half-written one are the same fact to the person reading it. It does not
+         say "error", because nothing has gone wrong — a phone left in another
+         room all morning arrives here. -->
+    <string name="stale_title">Open Weft on your phone</string>
+    <string name="stale_body">This is out of date. Open Weft to refresh it.</string>
+
+    <!-- Switched on, nothing to show: an empty inbox, or one whose every
+         conversation is on a network excluded on the phone. -->
+    <string name="empty_title">No conversations</string>
+    <string name="empty_body">Nothing to show yet. Conversations on excluded networks are never shown here.</string>
+
+    <!-- Spoken, never drawn: the merged half of a row's content description. The
+         other half is the number of network dots, so merged-ness is never
+         carried by colour alone. -->
+    <string name="merged">Merged conversation</string>
+
+    <plurals name="unread_count">
+        <item quantity="one">%1$d unread message</item>
+        <item quantity="other">%1$d unread messages</item>
+    </plurals>
+
+    <!-- Under the tile's number. Lower case: it is the second half of
+         "7 unread", not a heading. -->
+    <string name="unread_label">unread</string>
+
+    <!-- Reply. -->
+    <string name="reply_heading">Reply</string>
+    <string name="reply_dictate">Dictate</string>
+    <string name="reply_dictate_hint">Reply to %1$s</string>
+    <string name="reply_sending">Sending…</string>
+    <string name="reply_sent">Sent</string>
+    <string name="reply_sent_via">Sent via %1$s</string>
+
+    <!-- One sentence per `WeftWearProtocol` failure id, and a fallback for an id
+         this build has not heard of — the list will grow and watches are updated
+         late. Each says what happened and, where there is one, the thing the
+         wearer would do about it. None of them says "error". -->
+    <string name="reply_failed">Not sent</string>
+    <string name="reply_failed_unknown_chat">That conversation is no longer in Weft.</string>
+    <string name="reply_failed_not_signed_in">Not sent. Nobody is signed in on your phone.</string>
+    <string name="reply_failed_send_failed">Not sent. Open Weft on your phone to try again.</string>
+    <string name="reply_failed_timed_out">Not sent. Your phone did not answer.</string>
+    <string name="reply_failed_overflowed">Not sent. Too many replies at once.</string>
+    <string name="reply_failed_app_not_running">Not sent. Open Weft on your phone.</string>
+
+    <!-- Canned replies. Deliberately short, deliberately text: this list is what
+         a wearer taps when dictating out loud is the wrong thing to do, which is
+         most of the times a watch is the device being used. -->
+    <string name="canned_yes">Yes</string>
+    <string name="canned_no">No</string>
+    <string name="canned_on_my_way">On my way</string>
+    <string name="canned_thanks">Thanks!</string>
+    <string name="canned_call_later">Can I call you later?</string>
+    <string name="canned_cant_talk">Can\'t talk right now</string>
+</resources>

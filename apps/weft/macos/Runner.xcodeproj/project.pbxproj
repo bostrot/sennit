@@ -30,11 +30,14 @@
 		5F40000000000000000000F3 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* ShareContainer.swift */; };
 		5F40000000000000000000F4 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* SnapshotContainer.swift */; };
 		5F40000000000000000000F5 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E5 /* SnapshotChannel.swift */; };
+		5F40000000000000000000F6 /* WatchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E7 /* WatchChannel.swift */; };
+		5F40000000000000000000F7 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E8 /* WatchProtocol.swift */; };
 		5F60000000000000000000F1 /* WeftWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E1 /* WeftWidget.swift */; };
 		5F60000000000000000000F2 /* SnapshotPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E2 /* SnapshotPayload.swift */; };
 		5F60000000000000000000F3 /* WeftWidgetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E3 /* WeftWidgetState.swift */; };
 		5F60000000000000000000F4 /* WeftWidgetTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E4 /* WeftWidgetTokens.swift */; };
 		5F60000000000000000000F5 /* WeftWidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E5 /* WeftWidgetViews.swift */; };
+		5F60000000000000000000FE /* SnapshotViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000EF /* SnapshotViews.swift */; };
 		5F60000000000000000000F6 /* WeftWidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E6 /* WeftWidgetProvider.swift */; };
 		5F60000000000000000000F7 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* ShareContainer.swift */; };
 		5F60000000000000000000F8 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* SnapshotContainer.swift */; };
@@ -117,11 +120,14 @@
 		5F40000000000000000000E3 /* ShareContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareContainer.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E4 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SnapshotContainer.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E5 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runner/SnapshotChannel.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E7 /* WatchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runner/WatchChannel.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E8 /* WatchProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/WatchProtocol.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E1 /* WeftWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/WeftWidget.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E2 /* SnapshotPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/SnapshotPayload.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E3 /* WeftWidgetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/WeftWidgetState.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E4 /* WeftWidgetTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/WeftWidgetTokens.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E5 /* WeftWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/WeftWidgetViews.swift; sourceTree = "<group>"; };
+		5F60000000000000000000EF /* SnapshotViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/SnapshotViews.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E6 /* WeftWidgetProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget/WeftWidgetProvider.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "WeftWidget Info.plist"; path = WeftWidget/Info.plist; sourceTree = "<group>"; };
 		5F60000000000000000000E8 /* WeftWidget-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "WeftWidget/WeftWidget-macOS.entitlements"; sourceTree = "<group>"; };
@@ -216,10 +222,13 @@
 				5F40000000000000000000E3 /* ShareContainer.swift */,
 				5F40000000000000000000E4 /* SnapshotContainer.swift */,
 				5F40000000000000000000E5 /* SnapshotChannel.swift */,
+				5F40000000000000000000E7 /* WatchChannel.swift */,
+				5F40000000000000000000E8 /* WatchProtocol.swift */,
 				5F60000000000000000000E1 /* WeftWidget.swift */,
 				5F60000000000000000000E6 /* WeftWidgetProvider.swift */,
 				5F60000000000000000000E3 /* WeftWidgetState.swift */,
 				5F60000000000000000000E5 /* WeftWidgetViews.swift */,
+				5F60000000000000000000EF /* SnapshotViews.swift */,
 				5F60000000000000000000E4 /* WeftWidgetTokens.swift */,
 				5F60000000000000000000E2 /* SnapshotPayload.swift */,
 				5F60000000000000000000E7 /* Info.plist */,
@@ -708,6 +717,7 @@
 				5F60000000000000000000F6 /* WeftWidgetProvider.swift in Sources */,
 				5F60000000000000000000F3 /* WeftWidgetState.swift in Sources */,
 				5F60000000000000000000F5 /* WeftWidgetViews.swift in Sources */,
+				5F60000000000000000000FE /* SnapshotViews.swift in Sources */,
 				5F60000000000000000000F4 /* WeftWidgetTokens.swift in Sources */,
 				5F60000000000000000000F2 /* SnapshotPayload.swift in Sources */,
 				5F60000000000000000000F8 /* SnapshotContainer.swift in Sources */,
@@ -732,6 +742,8 @@
 				5F40000000000000000000F3 /* ShareContainer.swift in Sources */,
 				5F40000000000000000000F4 /* SnapshotContainer.swift in Sources */,
 				5F40000000000000000000F5 /* SnapshotChannel.swift in Sources */,
+				5F40000000000000000000F6 /* WatchChannel.swift in Sources */,
+				5F40000000000000000000F7 /* WatchProtocol.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

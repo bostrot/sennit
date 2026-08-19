@@ -1,6 +1,8 @@
 package com.bostrot.weft.widget
 
 import android.content.Context
+import com.bostrot.weft.snapshot.InboxSnapshot
+import com.bostrot.weft.snapshot.SnapshotFormat
 
 /// What a widget has to draw, decided once so both widgets decide it the same
 /// way.

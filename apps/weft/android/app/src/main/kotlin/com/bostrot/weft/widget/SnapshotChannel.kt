@@ -1,6 +1,7 @@
 package com.bostrot.weft.widget
 
 import android.content.Context
+import com.bostrot.weft.wear.WeftWearBridge
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -43,14 +44,25 @@ object WeftSnapshotChannel {
                         // runs on every inbox tick, and a home screen that
                         // could not be redrawn must not surface as an exception
                         // in a stream listener.
+                        val watch = call.argument<Boolean>("watch") ?: false
                         result.success(
                             try {
-                                WeftSnapshotStore.write(
+                                val stored = WeftSnapshotStore.write(
                                     context = application,
                                     json = json,
                                     widgets = call.argument<Boolean>("widgets") ?: false,
-                                    watch = call.argument<Boolean>("watch") ?: false,
+                                    watch = watch,
                                 )
+                                // The Wear half, from here rather than from the
+                                // store: `notifySurfaces` is read by every Glance
+                                // provider and must not acquire a Play services
+                                // dependency, so the module that owns the Data
+                                // Layer client is called by the module that owns
+                                // the channel. Only after a successful store —
+                                // a payload the phone refused to keep is not one
+                                // to hand a watch.
+                                if (stored) WeftWearBridge.publish(application, json, watch)
+                                stored
                             } catch (e: Exception) {
                                 false
                             }
@@ -60,6 +72,12 @@ object WeftSnapshotChannel {
                 "clearSnapshot" -> {
                     try {
                         WeftSnapshotStore.clear(application)
+                        // Deleted on the watch too, and deliberately not
+                        // emptied: an absent `DataItem` is how the watch tells
+                        // "nobody is signed in" from "signed in and switched
+                        // off", which is the same three-state distinction the
+                        // absent file draws here.
+                        WeftWearBridge.clear(application)
                     } catch (e: Exception) {
                         // Nothing useful for Dart to do about it, and the one
                         // caller is a sign-out that must complete either way.

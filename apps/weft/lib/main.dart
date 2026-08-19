@@ -118,17 +118,30 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// `ref.listen` below only fires on *changes*: without this, a launch into an
   /// app where widgets are already switched on would write the switched-off
   /// payload until the user next touched the setting.
+  ///
+  /// [WatchReplyHandler.start] is called here rather than lazily on the first
+  /// reply, and that ordering is load-bearing in the one case that matters: a
+  /// watch reply can be what *starts* this process, and a handler installed
+  /// after the platform had already tried to deliver would lose it. Starting at
+  /// session-ready means the queue exists before the inbox does, which is
+  /// exactly the state it was built to sit in.
   void _startInboxSurfaces() {
     unawaited(
       ref
           .read(snapshotWriterProvider)
           .applySettings(ref.read(snapshotSettingsProvider)),
     );
+    ref.read(watchReplyHandlerProvider).start();
     _inboxSurfaces ??= ref.listenManual(chatsProvider, (_, next) {
       final chats = next.value;
       if (chats == null) return;
       unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
       unawaited(ref.read(snapshotWriterProvider).refresh(chats));
+      // The same list, read a third way: the writer decides what a watch may
+      // see, and this decides whether a reply from one names a conversation
+      // that still exists. Cheap on every tick — with an empty queue it assigns
+      // a field and returns.
+      unawaited(ref.read(watchReplyHandlerProvider).refresh(chats));
       // A launch drain almost always arrives before the first chat list does,
       // and a share sheet with no conversations in it is not worth spending a
       // staged share on. This is where the inbox finally exists.
@@ -147,11 +160,17 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// says "switched off in Settings" and would leave a widget pointing at a
   /// setting; an absent one says "nobody is signed in", which is what has
   /// actually happened and what the surfaces render a sign-in prompt for.
+  ///
+  /// A reply still queued at this point is *failed back* rather than kept. It
+  /// was dictated against a session that has gone away, the watch is still
+  /// showing it as sending, and the next session is a different account — so
+  /// there is no later moment at which sending it would be right.
   void _stopInboxSurfaces() {
     _inboxSurfaces?.close();
     _inboxSurfaces = null;
     unawaited(ref.read(shareShortcutServiceProvider).clear());
     unawaited(ref.read(snapshotWriterProvider).clear());
+    unawaited(ref.read(watchReplyHandlerProvider).clear());
   }
 
   /// Re-ranks the share targets and rewrites the snapshot.
@@ -165,6 +184,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     if (chats == null) return;
     unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
     unawaited(ref.read(snapshotWriterProvider).refresh(chats));
+    unawaited(ref.read(watchReplyHandlerProvider).refresh(chats));
   }
 
   /// A drain was asked for before there was anywhere to put its result.
