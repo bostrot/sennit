@@ -12,6 +12,7 @@ import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
+import '../../app/call_providers.dart';
 import '../../app/intents.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
@@ -20,6 +21,7 @@ import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../auth/verification_screen.dart';
+import '../call/start_call.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
 import 'attachment_bubble.dart';
@@ -1023,6 +1025,23 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        // Disabled rather than hidden, with the reason in its tooltip: a
+        // conversation with no Matrix-native leg cannot carry a call, and a
+        // button that quietly disappeared for bridged chats would read as Weft
+        // having lost the feature.
+        Consumer(
+          builder: (context, ref, _) {
+            final availability = ref.watch(callAvailabilityProvider(chat.id));
+            final target = availability.target;
+            return IconButton(
+              tooltip: availability.message,
+              icon: const Icon(Icons.call_rounded),
+              onPressed: target == null
+                  ? null
+                  : () => startCall(context, ref, target),
+            );
+          },
+        ),
         IconButton(
           tooltip: chat.isMerged ? 'Manage merge' : 'Merge with…',
           icon: const Icon(Icons.merge_rounded),

@@ -1,3 +1,13 @@
+## 0.1.1
+
+- Added `callAvailabilityFor(chat, contact:)`, `CallTarget` and
+  `CallAvailability` — the conversation-level companion of
+  `CallPeer.forContact`. A conversation is callable only when the inbox
+  resolved a Matrix-*native* leg for it, which is not the same as having a
+  Matrix room id: a bridged WhatsApp chat has one too, and a bridge ghost never
+  answers an `m.call.invite`. Groups are refused separately, because
+  `weft_call` models 1:1 calls only.
+
 ## 0.1.0
 
 - Fixed: an incoming invite arriving after a previous call ended inherited that

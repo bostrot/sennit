@@ -13,6 +13,7 @@ import 'app/share_providers.dart';
 import 'app/stores.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
+import 'features/call/call_overlay.dart';
 import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/search/search_screen.dart';
@@ -304,6 +305,15 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
       theme: appearance.themeFor(platformBrightness),
+      // Above the navigator, so a ringing call appears over whatever route is
+      // open — a chat, the settings, a share sheet — and the minimised call bar
+      // survives navigating away from the call screen. It takes the navigator
+      // key rather than a context because everything above the navigator is
+      // outside it.
+      builder: (context, child) => CallOverlay(
+        navigatorKey: _navigatorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const AuthGate(),
     );
   }

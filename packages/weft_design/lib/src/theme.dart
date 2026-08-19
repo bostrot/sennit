@@ -24,6 +24,8 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
     required this.unreadDot,
     required this.mergedAccent,
     required this.online,
+    required this.callAccept,
+    required this.callDecline,
     required this.divider,
     required this.networkColors,
   });
@@ -41,6 +43,18 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
   final Color mergedAccent;
 
   final Color online;
+
+  /// Answer and hang up.
+  ///
+  /// Fixed rather than derived from the scheme, and the two colours a call is
+  /// allowed to break the theme with: green-means-answer and red-means-hang-up
+  /// are learned from every phone the user has ever held, and a call screen
+  /// that tinted them with a purple seed would be prettier and slower to read.
+  /// [callDecline] is deliberately not `ColorScheme.error` — an error is
+  /// something that went wrong, and hanging up is not.
+  final Color callAccept;
+  final Color callDecline;
+
   final Color divider;
 
   /// Per-network brand colours, already harmonised against the active scheme so
@@ -61,6 +75,8 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
     Color? unreadDot,
     Color? mergedAccent,
     Color? online,
+    Color? callAccept,
+    Color? callDecline,
     Color? divider,
     Map<ChatNetwork, Color>? networkColors,
   }) {
@@ -74,6 +90,8 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
       unreadDot: unreadDot ?? this.unreadDot,
       mergedAccent: mergedAccent ?? this.mergedAccent,
       online: online ?? this.online,
+      callAccept: callAccept ?? this.callAccept,
+      callDecline: callDecline ?? this.callDecline,
       divider: divider ?? this.divider,
       networkColors: networkColors ?? this.networkColors,
     );
@@ -92,6 +110,8 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
       unreadDot: Color.lerp(unreadDot, other.unreadDot, t)!,
       mergedAccent: Color.lerp(mergedAccent, other.mergedAccent, t)!,
       online: Color.lerp(online, other.online, t)!,
+      callAccept: Color.lerp(callAccept, other.callAccept, t)!,
+      callDecline: Color.lerp(callDecline, other.callDecline, t)!,
       divider: Color.lerp(divider, other.divider, t)!,
       networkColors: t < 0.5 ? networkColors : other.networkColors,
     );
@@ -211,6 +231,8 @@ abstract final class WeftTheme {
       unreadDot: scheme.primary,
       mergedAccent: scheme.tertiary,
       online: const Color(0xFF2ECC71),
+      callAccept: const Color(0xFF2ECC71),
+      callDecline: const Color(0xFFE5484D),
       divider: scheme.outlineVariant.withValues(alpha: 0.5),
       networkColors: {
         for (final n in ChatNetwork.values)

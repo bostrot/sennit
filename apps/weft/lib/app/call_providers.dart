@@ -1,12 +1,17 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart' as sdk;
+import 'package:weft_call/weft_call.dart';
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../features/call/call_controls.dart';
 import '../services/call/call_audio.dart';
 import '../services/call/call_service.dart';
 import '../services/call/webrtc_media_engine.dart';
+import 'providers.dart';
 import 'session_providers.dart';
 
 /// The call layer, assembled, or null when this build cannot carry a call.
@@ -80,3 +85,70 @@ final currentCallProvider = Provider<CallServiceState>((ref) {
       service?.state ??
       const CallServiceState();
 });
+
+/// What the call surfaces are allowed to do to the call.
+///
+/// [InertCallControls] before login and in demo mode rather than a null: every
+/// call surface would otherwise need a second branch for "the buttons are
+/// there but do nothing", and a screen that cannot be built at all is worse
+/// than one whose buttons are inert — there is no call in that state anyway.
+final callControlsProvider = Provider<CallControls>((ref) {
+  final service = ref.watch(callServiceProvider);
+  if (service == null) return const InertCallControls();
+  return CallServiceControls(service);
+});
+
+/// Whether a full-screen call surface is up.
+///
+/// The minimised call bar reads it, and it is written by the two screens that
+/// take over the display. A boolean rather than a route observer because that
+/// is exactly the fact the bar needs — "the call is already on screen, do not
+/// offer to return to it" — and a route observer would answer a related but
+/// different question about what is on top of the navigator.
+final callScreenVisibleProvider = NotifierProvider<CallScreenVisibility, bool>(
+  CallScreenVisibility.new,
+);
+
+class CallScreenVisibility extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  // ignore: avoid_positional_boolean_parameters
+  void set(bool visible) => state = visible;
+}
+
+/// Whether [chat] can carry a call, and where it would go.
+///
+/// The predicate lives in `weft_call`; what this adds is the merged identity
+/// behind the conversation, which is what turns a room into a person. Keyed by
+/// chat id and recomputed when the inbox changes, so the app bar does not walk
+/// the identity graph on every rebuild.
+final callAvailabilityProvider = Provider.family<CallAvailability, String>((
+  ref,
+  chatId,
+) {
+  final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
+  final chat = chats.firstWhereOrNull((c) => c.id == chatId);
+  if (chat == null) {
+    return const CallBlocked(
+      CallBlocker.unknownPeer,
+      'This conversation is still loading.',
+    );
+  }
+  return callAvailabilityFor(chat, contact: contactForChat(ref, chat));
+});
+
+/// The merged contact behind a conversation, or null when there is none.
+///
+/// `Chat.contactId` is set for every DM the identity graph knows — including
+/// unmerged ones, which get a contact of their own — so this is the ordinary
+/// path rather than a merged-only special case.
+UnifiedContact? contactForChat(Ref ref, Chat chat) {
+  final contactId = chat.contactId;
+  if (contactId == null) return null;
+  return ref
+      .watch(chatRepositoryProvider)
+      .identityGraph
+      .contacts()
+      .firstWhereOrNull((contact) => contact.id == contactId);
+}

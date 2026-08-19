@@ -46,6 +46,7 @@
 library;
 
 // Consumers import this barrel, never src/.
+export 'src/call_availability.dart';
 export 'src/call_session.dart';
 export 'src/call_state.dart';
 export 'src/ice_candidate_buffer.dart';

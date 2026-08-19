@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:weft_call/weft_call.dart';
 
+import 'call_video.dart';
 import 'sdp_codecs.dart';
 
 /// Opens a peer connection. Injected so the engine can be built in a test
@@ -38,7 +39,7 @@ typedef UserMediaFactory =
 ///    `flutter_webrtc` signals it with an empty candidate string, and
 ///    [IceCandidate.isEndOfCandidates] is the same sentinel, so it passes
 ///    straight through.
-class WebRTCMediaEngine implements MediaEngine {
+class WebRTCMediaEngine implements MediaEngine, CallVideoSource {
   WebRTCMediaEngine({
     List<Map<String, Object?>> iceServers = const [],
     PeerConnectionFactory? peerConnections,
@@ -77,12 +78,15 @@ class WebRTCMediaEngine implements MediaEngine {
 
   /// The local camera and microphone, for the call screen's preview. Null until
   /// media has been opened.
+  @override
   rtc.MediaStream? get localStream => _localStream;
 
   /// The far end's media, once a track has arrived.
+  @override
   rtc.MediaStream? get remoteStream => _remoteStream;
 
   /// Emits whenever [remoteStream] changes, including to null on teardown.
+  @override
   Stream<rtc.MediaStream?> get remoteStreams => _remoteStreams.stream;
 
   @override

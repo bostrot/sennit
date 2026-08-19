@@ -6,6 +6,7 @@ import 'package:weft_call/weft_call.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import 'call_audio.dart';
+import 'call_video.dart';
 
 /// Builds the media engine for one call, with the relay configuration the
 /// homeserver handed out.
@@ -44,6 +45,8 @@ class CallServiceState {
     this.session,
     this.audio = const CallAudioState(),
     this.ice,
+    this.video,
+    this.reconnecting = false,
   });
 
   /// The active call, or null when there is none. Survives into
@@ -62,6 +65,23 @@ class CallServiceState {
   /// with nothing on screen to explain it.
   final IceConfiguration? ice;
 
+  /// The engine's pictures, when this call has an engine that has any.
+  ///
+  /// Null for a call that has not opened media yet, and in any build whose
+  /// engine is not a [CallVideoSource] — which is every test that hands the
+  /// service a fake. The call screen draws a placeholder for both, because they
+  /// look the same to a user: no picture yet.
+  final CallVideoSource? video;
+
+  /// The peer connection has dropped and is being given a chance to heal.
+  ///
+  /// Published because it is the only honest connection-quality signal a 1:1
+  /// call has that the user can act on — a call that has gone quiet is either
+  /// this, in which case waiting a few seconds is right, or the other person
+  /// not talking. WebRTC's own statistics would say more and none of it in the
+  /// second it matters.
+  final bool reconnecting;
+
   /// A sentence to show, or null when there is nothing to say.
   String? get warning => ice?.warning;
 
@@ -73,14 +93,20 @@ class CallServiceState {
     CallSession? session,
     CallAudioState? audio,
     IceConfiguration? ice,
+    CallVideoSource? video,
+    bool? reconnecting,
   }) => CallServiceState(
     session: session ?? this.session,
     audio: audio ?? this.audio,
     ice: ice ?? this.ice,
+    video: video ?? this.video,
+    reconnecting: reconnecting ?? this.reconnecting,
   );
 
   @override
-  String toString() => 'CallServiceState(${session ?? 'idle'}, ${audio.route})';
+  String toString() =>
+      'CallServiceState(${session ?? 'idle'}, ${audio.route}'
+      '${reconnecting ? ', reconnecting' : ''})';
 }
 
 /// The one place a call's decisions meet its plumbing.
@@ -541,11 +567,17 @@ class CallService {
         _reconnectDeadline = null;
         _iceDeadline = null;
         unawaited(_dispatch(MediaConnected(codecs: _engine?.negotiatedCodecs)));
+        _publish();
       case MediaConnectionState.disconnected:
         // Recoverable, and routinely is: a phone changing from wifi to mobile
         // does this every time. Give it a grace period rather than ending a
         // call that would have healed.
         _reconnectDeadline ??= _clock().add(reconnectGrace);
+        // Published here rather than left for the next transition: nothing else
+        // is going to happen for the length of the grace period, and a call
+        // screen that says nothing while the audio has stopped is the one
+        // moment a user starts pressing buttons.
+        _publish();
       case MediaConnectionState.failed:
         unawaited(_dispatch(const MediaFailed()));
       case MediaConnectionState.connecting:
@@ -692,10 +724,18 @@ class CallService {
   }
 
   void _publish() {
+    final engine = _engine;
     _state = CallServiceState(
       session: _machine.session,
       audio: _state.audio,
       ice: _ice,
+      // `CallVideoSource` is not a subtype of `MediaEngine` — it is a second
+      // interface the real engine happens to implement — so this is a cast
+      // rather than a promotion.
+      video: engine is CallVideoSource ? engine as CallVideoSource : null,
+      // Only while there is a live call: a deadline left over from the call
+      // that just ended would leave "Reconnecting…" on an end screen.
+      reconnecting: _reconnectDeadline != null && _machine.state.isLive,
     );
     if (!_states.isClosed) _states.add(_state);
   }
