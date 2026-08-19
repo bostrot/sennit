@@ -5,6 +5,7 @@
 #   ./tooling/scripts/e2e.sh
 #   ./tooling/scripts/e2e.sh --device emulator-5554 --keep
 #   ./tooling/scripts/e2e.sh --target integration_test/patrol/harness_test.dart
+#   ./tooling/scripts/e2e.sh --device macos --subset macos     # a platform's rows
 #
 # One command, because a device run has seven prerequisites that each fail in a
 # way that looks like a test failure: a homeserver that is up *and* healthy,
@@ -24,7 +25,7 @@ HOMESERVER_CONFIG="$SYNAPSE_DATA/homeserver.yaml"
 APP_DIR="$REPO_ROOT/apps/weft"
 
 DEVICE=""
-TARGET=""
+TARGETS=()
 HOMESERVER=""
 PASSWORD="${WEFT_TEST_PASSWORD:-weft-test-password}"
 KEEP=0
@@ -37,7 +38,16 @@ Usage: tooling/scripts/e2e.sh [options] [-- <extra patrol test args>]
   -d, --device <id>       Device to run on. Defaults to the only attached
                           Android device, if there is exactly one.
   -t, --target <path>     One test file instead of the whole suite. Relative to
-                          apps/weft.
+                          apps/weft. Repeatable.
+  -s, --subset <name>     A named group of targets from the applicability table
+                          in docs/quality/e2e-matrix.md, so a platform's rows
+                          are named in one place rather than in every caller:
+                            android  every scenario
+                            ios      every scenario but share_in (no Share
+                                     Extension — skip reason ②)
+                            macos    the scenarios whose assertions are inside
+                                     the Flutter view, plus deep links
+                          Combines with --target; the union is what runs.
       --homeserver <h:p>  Override the address the *device* reaches Synapse on.
                           Inferred from the device when not given.
       --keep              Leave the homeserver running afterwards.
@@ -56,10 +66,14 @@ EOF
 SEED=1
 MEDIA=1
 RESET=1
+
+SUBSET=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -d|--device) DEVICE="$2"; shift 2 ;;
-    -t|--target) TARGET="$2"; shift 2 ;;
+    -t|--target) TARGETS+=("$2"); shift 2 ;;
+    -s|--subset) SUBSET="$2"; shift 2 ;;
     --homeserver) HOMESERVER="$2"; shift 2 ;;
     --keep) KEEP=1; shift ;;
     --no-seed) SEED=0; shift ;;
@@ -73,6 +87,61 @@ done
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\033[31merror:\033[0m %s\n' "$1" >&2; exit 1; }
+
+# --- subsets ---------------------------------------------------------------
+#
+# The applicability table of docs/quality/e2e-matrix.md, in the one place a
+# caller can reach it — so `.github/workflows/e2e.yaml` names a platform rather
+# than carrying its own copy of a list that the doc is the authority for.
+# `harness_test` is in every subset on purpose: it is the cheapest possible
+# answer to "is the harness itself alive on this row", and a row where it fails
+# needs no further diagnosis.
+#
+# macOS is the interesting one. Patrol's platform automation is Android, iOS and
+# Web — there is no automator on macOS — so the media, permission and shade
+# scenarios are not *reduced* there, they are absent, and running them would
+# time out against surfaces nothing can drive. Deep links are the exception and
+# are in: the test process shares the machine with the app, so `open weft://…`
+# is a real, OS-routed link.
+#
+# iOS drops exactly one, `share_in`: the Share Extension is not built (skip
+# reason ② and ADR-002), so there is no `ACTION_SEND` equivalent to fire.
+
+PATROL_DIR="integration_test/patrol"
+
+subset_targets() {
+  local files
+  case "$1" in
+    android)
+      files="harness login messaging chat_actions attachment share_in permissions
+             notification notification_mute deeplink merge search bridges mcp" ;;
+    ios)
+      files="harness login messaging chat_actions attachment permissions
+             notification notification_mute deeplink merge search bridges mcp" ;;
+    macos)
+      files="harness login messaging chat_actions deeplink merge search bridges
+             mcp" ;;
+    *) fail "unknown subset: $1 (android, ios or macos)" ;;
+  esac
+  local f
+  for f in $files; do printf '%s/%s_test.dart\n' "$PATROL_DIR" "$f"; done
+}
+
+if [[ -n "$SUBSET" ]]; then
+  # Assigned in one step rather than piped into a `read` loop: `fail` inside a
+  # process substitution exits the *subshell*, which would leave TARGETS empty
+  # and quietly run the whole suite instead of stopping on a typo.
+  subset_list="$(subset_targets "$SUBSET")" || exit 1
+  while IFS= read -r t; do
+    TARGETS+=("$t")
+  done <<<"$subset_list"
+fi
+
+# A target that does not exist is accepted by `patrol test` and simply runs
+# nothing, which on a matrix reads as a green row. Checked here instead.
+for t in "${TARGETS[@]+"${TARGETS[@]}"}"; do
+  [[ -f "$APP_DIR/$t" ]] || fail "no such test file: apps/weft/$t"
+done
 
 # --- prerequisites ---------------------------------------------------------
 #
@@ -280,7 +349,9 @@ fi
 # --- the run ---------------------------------------------------------------
 
 cmd=(patrol test)
-[[ -n "$TARGET" ]] && cmd+=(--target "$TARGET")
+for t in "${TARGETS[@]+"${TARGETS[@]}"}"; do
+  cmd+=(--target "$t")
+done
 [[ -n "$DEVICE" ]] && cmd+=(--device "$DEVICE")
 # Configuration reaches a compiled test binary as `String.fromEnvironment`;
 # there is no shell on a device for `Platform.environment` to read.

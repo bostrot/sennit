@@ -33,6 +33,19 @@ target 'Runner' do
   target 'RunnerTests' do
     inherit! :search_paths
   end
+
+  # Patrol's XCUITest bundle. `:complete` rather than `:search_paths` — unlike
+  # the unit tests above, this target *links* the patrol pod:
+  # `RunnerUITests.m` is `@import patrol;` and a macro expansion, so headers
+  # alone are not enough.
+  #
+  # No `use_modular_headers!`: patrol's own macOS example adds it, but
+  # `use_frameworks!` above already builds every pod as a module, and turning
+  # it on would change how the whole existing pod graph is built. The same
+  # decision, for the same reason, as in `../ios/Podfile`.
+  target 'RunnerUITests' do
+    inherit! :complete
+  end
 end
 
 post_install do |installer|

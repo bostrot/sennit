@@ -282,8 +282,19 @@ packages/
   weft_design/              tokens, themes, components
 docs/architecture/          design notes for the subsystems worth explaining
 docs/decisions/             ADRs, including what needs your Apple developer account
+docs/quality/               the a11y audit and the E2E device matrix
 tooling/docker/             disposable Synapse for tests
+tooling/scripts/e2e.sh      one command for a device run: homeserver, seeding, patrol
 ```
+
+Two workflows. `.github/workflows/ci.yaml` runs on every push and pull request —
+analyze, pure-Dart tests, widget and golden tests, the a11y sweep, and the
+integration tests against a Synapse container, all on `ubuntu-latest`.
+`.github/workflows/e2e.yaml` is the device matrix: six Android emulator rows,
+macOS, and four iOS simulator rows driving the Patrol suite against a real
+homeserver, on `workflow_dispatch` plus a nightly schedule rather than on push,
+because a full matrix on every commit is not affordable. What each row covers,
+what it skips and why is [`docs/quality/e2e-matrix.md`](docs/quality/e2e-matrix.md).
 
 `weft_attachments`, `weft_domain`, `weft_merge`, `weft_search`, `weft_bridges`,
 `weft_transcribe`, `weft_notify`, `weft_share`, `weft_richtext`, `weft_sms`, `weft_call` and `weft_mcp` are **pure Dart** —

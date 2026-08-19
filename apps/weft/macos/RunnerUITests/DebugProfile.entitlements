@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The XCUITest bundle is a second process beside the app, and the two talk
+	     over loopback: the runner hosts PatrolServer and the app connects back to
+	     it on PATROL_TEST_SERVER_PORT / PATROL_APP_SERVER_PORT. So it needs both
+	     halves of the network entitlement, exactly as patrol's own macOS example
+	     target does. Deliberately no `com.apple.security.app-sandbox` key —
+	     Runner is sandboxed, a test runner driving it is not. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+</dict>
+</plist>

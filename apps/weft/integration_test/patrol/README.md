@@ -50,6 +50,43 @@ pubspec dependency:
 dart pub global activate patrol_cli
 ```
 
+### Running one platform's rows
+
+Not every scenario applies to every platform, and the list of which does lives in
+`e2e.sh` rather than in each caller, so the workflow and a laptop cannot
+disagree:
+
+```bash
+./tooling/scripts/e2e.sh --subset android            # all thirteen
+./tooling/scripts/e2e.sh --subset ios --device <udid>
+./tooling/scripts/e2e.sh --subset macos --device macos --no-media
+```
+
+`ios` drops `share_in_test` — there is no Share Extension, so there is no
+`ACTION_SEND` to fire. `macos` is the nine scenarios whose assertions are inside
+the Flutter view, plus `deeplink_test`; the media, permission and shade
+scenarios are not reduced on macOS, they are absent, because Patrol has no
+platform automator there. `--target` is repeatable and combines with `--subset`.
+Both reject a path that is not a file: `patrol test` accepts a non-existent
+target and runs nothing, which on a matrix reads as a green row.
+
+## In CI
+
+`.github/workflows/e2e.yaml`, on `workflow_dispatch` plus a nightly schedule and
+deliberately not on push. Six Android emulator rows on `ubuntu-latest`, the
+macOS subset and four iOS simulator rows on `macos-15`. Every job is a toolchain
+plus one call to `e2e.sh`, so there is no second copy of the homeserver setup to
+drift. The iOS job is `continue-on-error` until ADR-002's signing is resolved,
+and it refuses to run a row whose iOS *major version* the runner image does not
+have rather than quietly running a different one.
+
+macOS needs `macos/RunnerUITests` to exist, which it now does. `patrol test -d
+macos` shells out to `xcodebuild build-for-testing -scheme Runner` and then
+looks for a `Runner_macosx*.xctestrun`; with no UI-test bundle in the scheme's
+test action there is nothing to produce one. Unlike the iOS bundle it needs no
+signing identity — the project signs macOS ad hoc — which is why the MAC row
+runs on an ordinary machine while the iOS rows wait.
+
 ## Layout
 
 | Path | What it is |

@@ -1,0 +1,446 @@
+name: E2E device matrix
+
+# Deliberately not on push, and this is a budget decision rather than a taste
+# one. A full matrix is six Android emulators, a macOS desktop run and an iOS
+# simulator run, each building the app from source — including the vodozemac
+# Rust cross-compile for four ABIs — and each driving a real Synapse. That is
+# tens of runner-minutes per row on runner types `ci.yaml` does not use at all
+# (every job there is `ubuntu-latest`). Nightly, plus on demand when a change
+# touches something the device rows are the only witness to.
+#
+# What runs here and why, row by row, is docs/quality/e2e-matrix.md. The suite
+# itself is apps/weft/integration_test/patrol/, and every job below is a
+# toolchain plus one call to tooling/scripts/e2e.sh — the script owns the
+# homeserver, the seeding, the device preparation and the address the *device*
+# reaches Synapse on, so CI and a laptop run the same thing.
+on:
+  workflow_dispatch:
+    inputs:
+      rows:
+        description: Which platform's rows to run
+        type: choice
+        default: all
+        options: [all, android, macos, ios]
+      target:
+        description: >-
+          One test file instead of the platform subset, relative to apps/weft
+          (e.g. integration_test/patrol/login_test.dart). Empty runs the subset.
+        type: string
+        default: ""
+  schedule:
+    # 03:17 UTC. Off the hour on purpose: the top of the hour is when most of
+    # GitHub's scheduled workflows queue, and a nightly that waits 40 minutes
+    # for a macOS runner has spent its budget on the queue.
+    - cron: "17 3 * * *"
+
+# A second nightly while the first is still running would fight it for the same
+# shared homeserver name per runner — they are separate VMs, so this is really
+# about not paying twice for the same commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.44.0"
+  # Pinned rather than floating. patrol_cli generates the Dart test bundle and
+  # drives the native entrypoints (`RunnerUITests.m`, `MainActivityTest.java`)
+  # that are committed in this repository; those were authored against 4.7.0,
+  # and a generator that moves under them is a failure with no diff to point at.
+  # `docs/quality/e2e-matrix.md` → *The harness* records the resolved versions.
+  PATROL_CLI_VERSION: "4.7.0"
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Android: six rows, the only platform where the whole suite applies.
+  # --------------------------------------------------------------------------
+  android:
+    name: ${{ matrix.row }} — Android ${{ matrix.api }} ${{ matrix.form }}
+    if: >-
+      ${{ github.event_name == 'schedule'
+          || inputs.rows == 'all' || inputs.rows == 'android' }}
+    runs-on: ubuntu-latest
+    # A row is thirteen scenarios, each of which logs two accounts in, exchanges
+    # encrypted messages and waits on real sync. 90 minutes is generous for a
+    # passing row and is here for the failure mode the task list names: a hung
+    # device that would otherwise sit until GitHub's six-hour ceiling.
+    timeout-minutes: 90
+    strategy:
+      # One row failing must not cancel the other five — the results table in
+      # docs/quality/e2e-matrix.md wants a verdict per row, and a cancelled row
+      # has none.
+      fail-fast: false
+      matrix:
+        include:
+          # `profile` is an id from `avdmanager list device`. The tablet rows
+          # exist for the two-pane inbox (`kTwoPaneBreakpoint = 900`), so the
+          # profile has to be genuinely ≥900 dp wide: pixel_c is 2560×1800 at
+          # xhdpi ≈ 1280 dp, pixel_5 is 393 dp.
+          - { row: A28-P, api: 28, form: phone,  profile: pixel_5 }
+          - { row: A28-T, api: 28, form: tablet, profile: pixel_c }
+          - { row: A33-P, api: 33, form: phone,  profile: pixel_5 }
+          - { row: A33-T, api: 33, form: tablet, profile: pixel_c }
+          - { row: A35-P, api: 35, form: phone,  profile: pixel_5 }
+          - { row: A35-T, api: 35, form: tablet, profile: pixel_c }
+    steps:
+      - uses: actions/checkout@v4
+
+      # Without KVM the x86_64 emulator falls back to pure software emulation
+      # and a boot that takes a minute takes twenty — or does not finish, which
+      # reads as a broken image rather than a missing device node. The udev rule
+      # is android-emulator-runner's own recipe.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # E2EE is Rust, cross-compiled by cargokit inside the Gradle build. A
+      # missing target fails the *build* with `E0463: can't find crate for
+      # core`, which reads as a broken toolchain rather than as a missing
+      # target — see the README's Android note.
+      #
+      # All four ABIs, not just the emulator's x86_64: a Flutter debug APK
+      # carries every ABI in the app's filter, so cargokit builds every one and
+      # the run dies on the first one that is absent.
+      - name: Android Rust targets
+        run: |
+          rustup target add aarch64-linux-android armv7-linux-androideabi \
+            i686-linux-android x86_64-linux-android
+          # The README's RUSTC pin, resolved rather than hardcoded. cargo takes
+          # `rustc` from PATH, so whatever rustc is ahead of rustup's shim wins
+          # — Homebrew's on a developer Mac, a distro package here — and a
+          # non-rustup rustc has no Android std however many targets were added.
+          # Harmless when PATH was already correct.
+          echo "RUSTC=$(rustup which rustc)" >> "$GITHUB_ENV"
+
+      - name: Install patrol_cli
+        run: |
+          dart pub global activate patrol_cli ${{ env.PATROL_CLI_VERSION }}
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      # The AVD is ~1.5 GB and identical between runs. Keyed on the API level
+      # and the profile because those are the two things that change it.
+      - name: Cache the AVD
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ matrix.api }}-${{ matrix.profile }}
+
+      - name: Create the AVD and snapshot it
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          disable-animations: false
+          script: echo "AVD created"
+
+      - name: Run the suite on ${{ matrix.row }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # Through the environment rather than interpolated into the script:
+          # `inputs.target` is user-supplied text on a `workflow_dispatch`, and
+          # `${{ }}` inside a `run` is textual substitution.
+          E2E_TARGET: ${{ inputs.target }}
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          force-avd-creation: false
+          # `-camera-back emulated` and not the action's default `none`:
+          # permissions_test drives the CAMERA dialog grant *and* deny, and
+          # image_picker does not ask for a permission to use a camera the
+          # device does not have.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          disable-animations: true
+          script: |
+            args="--device emulator-5554 --keep"
+            if [ -n "$E2E_TARGET" ]; then
+              args="$args --target $E2E_TARGET"
+            else
+              args="$args --subset android"
+            fi
+
+            # e2e.sh does the rest: generates the Synapse config on a fresh
+            # clone, opens registration, raises rc_login and rc_registration,
+            # waits on the container's healthcheck, seeds @alice and @bob,
+            # clears Weft's data and previously-answered permissions, pushes a
+            # photo into MediaStore, resolves the emulator's 10.0.2.2 address,
+            # and runs `patrol test`. `--keep` leaves the homeserver up for the
+            # log step below.
+            set +e
+            ./tooling/scripts/e2e.sh $args
+            status=$?
+            set -e
+
+            # Collected here and not in a later step because adb only exists
+            # while this action holds the emulator. The screenshot is the
+            # device's screen as the run ended — Patrol takes none of its own,
+            # so this is the closest honest thing to "Patrol's screenshots".
+            adb logcat -d > e2e-logcat.txt 2>&1 || true
+            adb exec-out screencap -p > e2e-screen.png 2>/dev/null || true
+            exit $status
+
+      - name: Homeserver logs on failure
+        if: failure()
+        run: docker compose -f tooling/docker/compose.yaml logs synapse
+
+      - name: Upload Patrol reports, logcat and the final screen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.row }}
+          # The first two are what Gradle's connected-test run writes and are
+          # where a per-scenario verdict lives; patrol_cli prints the index.html
+          # path at the end of a run.
+          path: |
+            apps/weft/build/app/reports/androidTests/**
+            apps/weft/build/app/outputs/androidTest-results/**
+            e2e-logcat.txt
+            e2e-screen.png
+          if-no-files-found: ignore
+
+      - name: Stop the homeserver
+        if: always()
+        run: docker compose -f tooling/docker/compose.yaml down || true
+
+  # --------------------------------------------------------------------------
+  # macOS: the desktop-applicable subset. Not a Patrol row in the sense that
+  # matters most — there is no platform automator on macOS, so the media,
+  # permission and notification-shade scenarios are absent rather than reduced —
+  # but every scenario whose assertions are inside the Flutter view runs here,
+  # plus deep links, which Launch Services delivers to a running app.
+  # --------------------------------------------------------------------------
+  macos:
+    name: MAC — macOS desktop
+    if: >-
+      ${{ github.event_name == 'schedule'
+          || inputs.rows == 'all' || inputs.rows == 'macos' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # GitHub's macOS runner images ship **no Docker daemon**, and there is no
+      # second way in: PyPI publishes matrix-synapse as manylinux and musllinux
+      # wheels only (checked — the sdist would want a Rust build of the
+      # extension on every run), and homebrew-core has no synapse formula. So
+      # the homeserver needs a Linux VM, and Colima is the one that leaves
+      # `tooling/docker/compose.yaml`, `seed.sh` and `e2e.sh` working unchanged
+      # rather than growing a second, macOS-only homeserver path that would
+      # drift from the one every other job uses.
+      #
+      # `docker compose` is the plugin form, which Homebrew's docker-compose
+      # does not install into ~/.docker/cli-plugins by itself.
+      - name: Docker via Colima
+        run: |
+          brew install docker docker-compose colima
+          mkdir -p ~/.docker/cli-plugins
+          ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" \
+            ~/.docker/cli-plugins/docker-compose
+          colima start --cpu 3 --memory 6 --vm-type=vz --mount-type=virtiofs
+          docker version
+          docker compose version
+
+      - name: Install patrol_cli
+        run: |
+          dart pub global activate patrol_cli ${{ env.PATROL_CLI_VERSION }}
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      # `--no-media`: the macOS subset has no picker scenario, and there is
+      # neither an adb nor a simctl here to seed a gallery with.
+      # `--keep`: so the log step below has a homeserver to ask.
+      - name: Run the macOS subset
+        env:
+          E2E_TARGET: ${{ inputs.target }}
+        run: |
+          args="--device macos --no-media --keep"
+          if [ -n "$E2E_TARGET" ]; then
+            args="$args --target $E2E_TARGET"
+          else
+            args="$args --subset macos"
+          fi
+          ./tooling/scripts/e2e.sh $args
+
+      - name: Homeserver logs on failure
+        if: failure()
+        run: docker compose -f tooling/docker/compose.yaml logs synapse
+
+      - name: Upload the xcresult bundle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-MAC
+          # patrol_cli passes `-resultBundlePath build/macos_results_<ms>.xcresult`
+          # to `xcodebuild test-without-building`; the bundle holds the
+          # per-test verdicts, the failure messages and any attachments.
+          path: apps/weft/build/macos_results_*.xcresult
+          if-no-files-found: ignore
+
+      - name: Stop the homeserver
+        if: always()
+        run: docker compose -f tooling/docker/compose.yaml down || true
+
+  # --------------------------------------------------------------------------
+  # iOS: reports, never blocks. Two things are missing and only one of them is
+  # this workflow's to fix.
+  #
+  #  1. **Signing.** The RunnerUITests target in ios/Runner.xcodeproj is
+  #     authored and unsigned; a UI-test bundle needs its own provisioning
+  #     profile, distinct from the app's, and no identity exists in this
+  #     repository. docs/decisions/adr-002-ios-signing-handoff.md holds the
+  #     handoff. Until it is resolved this job is expected to fail in the build,
+  #     which is why it is `continue-on-error` — a red iOS row must not hide a
+  #     green Android matrix.
+  #  2. **The runtimes.** The matrix asks for iOS 16 and 17. A `macos-15` image
+  #     ships whatever runtime its Xcode came with, and that is neither. The
+  #     step below prints what the runner actually has and fails with a plain
+  #     "not executed" when the requested version is absent, rather than
+  #     silently running a different iOS and letting the result be written into
+  #     an I16 or I17 cell. That mistake — recording a run of one version as
+  #     coverage of another — is the one docs/quality/e2e-matrix.md is most
+  #     explicit about.
+  # --------------------------------------------------------------------------
+  ios:
+    name: ${{ matrix.row }} — iOS ${{ matrix.ios }} ${{ matrix.form }}
+    if: >-
+      ${{ github.event_name == 'schedule'
+          || inputs.rows == 'all' || inputs.rows == 'ios' }}
+    runs-on: macos-15
+    continue-on-error: true
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { row: I16-P, ios: "16", form: iPhone, device: "iPhone 14" }
+          - { row: I16-T, ios: "16", form: iPad,   device: "iPad Pro" }
+          - { row: I17-P, ios: "17", form: iPhone, device: "iPhone 15" }
+          - { row: I17-T, ios: "17", form: iPad,   device: "iPad Pro" }
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before any toolchain cost is paid: if the runtime is not here, the row
+      # is not-executed and there is nothing to build.
+      - name: Find an iOS ${{ matrix.ios }} runtime, or say it is absent
+        id: sim
+        run: |
+          echo "::group::Runtimes on this image"
+          xcrun simctl list runtimes
+          echo "::endgroup::"
+
+          # jq is preinstalled on GitHub's macOS images. The runtime key looks
+          # like `com.apple.CoreSimulator.SimRuntime.iOS-17-5`, so matching on
+          # `iOS-<major>-` pins the major version and accepts any minor — and,
+          # the point of the whole step, does *not* match the iOS 18 simulator
+          # of the same device name that a current runner image actually ships.
+          #
+          # Collected into an array and reduced with `first` rather than piped
+          # through `head -1`: GitHub runs `run` steps under `bash -eo
+          # pipefail`, where head closing the pipe early can fail jq on SIGPIPE
+          # and take the step down before the diagnosis below is ever printed.
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r --arg major '${{ matrix.ios }}' --arg dev '${{ matrix.device }}' \
+                '[ .devices | to_entries[]
+                   | select(.key | test("iOS-" + $major + "-"))
+                   | .value[]
+                   | select(.isAvailable and (.name | startswith($dev)))
+                   | .udid ] | first // ""')
+
+          if [ -z "$udid" ]; then
+            echo "::error::${{ matrix.row }} NOT EXECUTED — this runner image has no iOS ${{ matrix.ios }} runtime, so no ${{ matrix.device }} simulator exists. Install one with 'xcodebuild -downloadPlatform iOS -buildVersion <version>' (multi-GB) or pin a runner image that ships it; do not record a run of a different iOS in an ${{ matrix.row }} cell."
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Same reasoning as the macOS job: no Docker daemon on a macOS runner.
+      - name: Docker via Colima
+        run: |
+          brew install docker docker-compose colima
+          mkdir -p ~/.docker/cli-plugins
+          ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" \
+            ~/.docker/cli-plugins/docker-compose
+          colima start --cpu 3 --memory 6 --vm-type=vz --mount-type=virtiofs
+
+      - name: Install patrol_cli
+        run: |
+          dart pub global activate patrol_cli ${{ env.PATROL_CLI_VERSION }}
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Run the iOS subset on ${{ matrix.row }}
+        env:
+          E2E_TARGET: ${{ inputs.target }}
+        run: |
+          args="--device ${{ steps.sim.outputs.udid }} --keep"
+          if [ -n "$E2E_TARGET" ]; then
+            args="$args --target $E2E_TARGET"
+          else
+            args="$args --subset ios"
+          fi
+          ./tooling/scripts/e2e.sh $args
+
+      - name: Homeserver logs on failure
+        if: failure()
+        run: docker compose -f tooling/docker/compose.yaml logs synapse
+
+      # Copied into the workspace first: actions/upload-artifact expands neither
+      # `~` nor `$HOME`, and CoreSimulator writes outside it.
+      - name: Collect the simulator log
+        if: failure() && steps.sim.outputs.udid != ''
+        run: |
+          cp -R "$HOME/Library/Logs/CoreSimulator/${{ steps.sim.outputs.udid }}" \
+            ios-simulator-logs || true
+
+      - name: Upload the xcresult bundle and the simulator log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.row }}
+          path: |
+            apps/weft/build/ios_results_*.xcresult
+            ios-simulator-logs/**
+          if-no-files-found: ignore
+
+      - name: Stop the homeserver
+        if: always()
+        run: docker compose -f tooling/docker/compose.yaml down || true

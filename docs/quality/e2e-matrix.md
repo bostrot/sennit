@@ -139,6 +139,9 @@ What CI does **not** have today: any Android, iOS or macOS runner. Every job is
 `ubuntu-latest`. The device matrix is entirely new runner surface, which is why
 task 6 gates it on `workflow_dispatch` + nightly rather than on push.
 
+> **Landed.** `.github/workflows/e2e.yaml` — see [CI](#ci) for what each job
+> does, the macOS UI-test target it needed, and what about it is verified.
+
 ### The intents the tests fire from outside
 
 From `apps/weft/lib/app/intents.dart` and
@@ -1040,6 +1043,144 @@ dead on the very next request.
 | The suite analyses and is formatted | `dart analyze integration_test/patrol` clean, `flutter analyze` clean, `dart format --set-exit-if-changed` clean |
 | Nothing existing regressed | `flutter test` in `apps/weft`, **922 pass** (915 + the 7 new) |
 | **Not** checked: anything the twelve scenarios assert | no row was executed — `patrol_cli` is not on this host and no matrix row is runnable |
+
+---
+
+## CI
+
+`.github/workflows/e2e.yaml`. Three jobs, eleven rows, one entry point: every
+job is a toolchain plus a single call to `tooling/scripts/e2e.sh`, so CI and a
+laptop run the same command against the same `tooling/docker` homeserver rather
+than two setups that drift.
+
+| Job | Runner | Rows | Gate |
+|---|---|---|---|
+| `android` | `ubuntu-latest` × 6 | A28-P/T, A33-P/T, A35-P/T | fails the workflow |
+| `macos` | `macos-15` | MAC | fails the workflow |
+| `ios` | `macos-15` × 4 | I16-P/T, I17-P/T | `continue-on-error` |
+
+`workflow_dispatch` (with a `rows` chooser and an optional single `--target`)
+plus a nightly `17 3 * * *`, and **not** `push`. That is a budget decision:
+eleven rows each build the app from source, including the vodozemac Rust
+cross-compile for four ABIs, on runner types `ci.yaml` does not use at all.
+
+### One prerequisite the macOS row did not have
+
+`macos/Runner.xcodeproj` had **no `RunnerUITests` target**. Task 2 authored the
+iOS one; macOS was left out, reasonably, because [macOS is not a Patrol
+row](#the-macos-row-is-not-a-patrol-row) in the sense that matters — there is no
+platform automator there. But the MAC row still runs nine scenarios, and
+[task 3 established](#what-was-verified-and-what-was-not) that even those need
+`patrol_cli`: `flutter test -d macos` installs
+`IntegrationTestWidgetsFlutterBinding` before the file loads and `PatrolBinding`
+is a `LiveTestWidgetsFlutterBinding`, so the two cannot coexist.
+
+And `patrol test -d macos` runs `xcodebuild build-for-testing -scheme Runner`
+and then looks for `build/macos_integ/Build/Products/Runner_macosx<sdk>*.xctestrun`
+(`macos_test_backend.dart:209`, `:235`), executing
+`-only-testing RunnerUITests/RunnerUITests`. With no UI-test bundle in the
+scheme's test action there is nothing to produce that file, and the run dies on
+*"No .xctestrun file was found"* — which reads as a broken Patrol install. So a
+macOS job without this target would have been decorative, and the MAC row would
+have stayed not-executed for a reason nobody had written down.
+
+The target is now authored, and unlike the iOS one it is **built rather than
+asserted**. It also needs no signing identity: the project signs macOS ad hoc
+(`CODE_SIGN_IDENTITY = "-"` at the project level) and a locally-run XCUITest
+bundle accepts that, which is why the MAC row is executable on an ordinary
+developer machine and a GitHub runner while the iOS rows wait on ADR-002.
+
+### Three things about the Android job worth knowing before reading it
+
+1. **KVM, or the row times out rather than fails.** Without the udev rule the
+   x86_64 emulator falls back to software emulation and a one-minute boot takes
+   twenty. The AVD is also cached, keyed on API level and device profile.
+2. **The Rust targets are a prerequisite of the *build*, not of a test.** All
+   four ABIs and not just the emulator's `x86_64`: a Flutter debug APK carries
+   every ABI in the app's filter, so cargokit builds every one. The README's
+   `RUSTC` pin is applied as `rustup which rustc` — resolved rather than
+   hardcoded, and harmless when PATH was already right.
+3. **`-camera-back emulated`, against the action's default of `none`.**
+   `permissions_test` drives the `CAMERA` dialog through grant *and* deny, and
+   `image_picker` does not ask for permission to use a camera the device does
+   not have. The default would have turned that scenario into a timeout.
+
+The tablet rows use the `pixel_c` profile (2560×1800 at xhdpi ≈ 1280 dp) because
+the two-pane inbox needs a genuine ≥900 dp width (`kTwoPaneBreakpoint`); the
+phone rows use `pixel_5` at 393 dp.
+
+### The homeserver on a macOS runner
+
+GitHub's macOS runner images ship **no Docker daemon**, and there is no second
+way in. PyPI publishes `matrix-synapse` as manylinux and musllinux wheels only —
+checked against the index, latest 1.159.0, seven files, not one of them
+`macosx` — so `pip install` would build the Rust extension from the sdist on
+every run; and homebrew-core has no synapse formula at all (404).
+
+So the homeserver needs a Linux VM, and the `macos` and `ios` jobs start one
+with Colima. That is the choice that leaves `compose.yaml`, `seed.sh` and
+`e2e.sh` working unchanged, instead of growing a second macOS-only homeserver
+path that would drift from the one every other job uses. `docker compose` is the
+plugin form, which Homebrew's `docker-compose` does not install into
+`~/.docker/cli-plugins` by itself — the job symlinks it.
+
+### Why the iOS job reports instead of blocking
+
+Two things are missing and only one of them is CI's to fix.
+
+**Signing**, which is ADR-002's, and which is why the job is
+`continue-on-error`: a red iOS row must not hide a green Android matrix.
+
+**The runtimes**, which nobody had accounted for. The matrix asks for iOS 16 and
+17. A `macos-15` image ships whatever runtime its Xcode came with, and that is
+neither — it is an iOS 18.x runtime whose simulators have the *same device
+names*. Booting "iPhone 15" on that image and writing the result into an I17
+cell is precisely the mistake [Environment reality](#environment-reality-on-this-host)
+forbids in its Android half. The job therefore selects a simulator by pinning
+the runtime's major version (`iOS-<major>-`) and, when there is no match, fails
+that row with a plain *"NOT EXECUTED — this runner image has no iOS N runtime"*
+and the `xcodebuild -downloadPlatform iOS -buildVersion` incantation that would
+make it real. Verified against a synthetic device list: the I17 rows select the
+17.5 iPhone 15 and **not** the 18.2 simulator of the same name, and I16-T with
+no iPad on 16 resolves to empty rather than to something plausible.
+
+### Subsets, and where they are defined
+
+`e2e.sh --subset android|ios|macos` expands the applicability table above into
+`--target` flags, so the workflow names a platform and the *script* owns the
+list. One place, next to the homeserver logic that already had to know about
+platforms. `--target` is now repeatable and both it and `--subset` reject a path
+that is not a file — `patrol test` accepts a non-existent target and runs
+nothing, which on a matrix reads as a green row.
+
+`android` is all thirteen scenarios; `ios` drops `share_in` (skip reason ②);
+`macos` is the nine whose assertions are inside the Flutter view, plus
+`deeplink`. `harness_test` is in all three: it is the cheapest answer to "is the
+harness alive on this row", and a row where it fails needs no further diagnosis.
+
+### What was verified for the CI configuration, and what was not
+
+The workflow itself **has not run** — that needs a push to GitHub and eleven
+runners, and this host is not either. What was checked here:
+
+| Checked | How |
+|---|---|
+| The macOS UI-test target actually builds | `xcodebuild build-for-testing -workspace Runner.xcworkspace -scheme Runner -configuration Debug -derivedDataPath ../build/macos_integ` with patrol's own `OTHER_SWIFT_FLAGS`/`OTHER_LDFLAGS` → **TEST BUILD SUCCEEDED**, `RunnerUITests.xctest` signed *Sign to Run Locally* |
+| …and produces the file patrol then looks for | `Runner_macosx26.4-arm64.xctestrun`, matching the `Runner_macosx${sdkVersion}*` glob, with `BlueprintName = RunnerUITests` and `IsUITestBundle = true` — so `-only-testing RunnerUITests/RunnerUITests` resolves |
+| The pbxproj edit is additive | 169 insertions, **0 deletions**; `xcodebuild -list` sees `RunnerUITests` |
+| `pod install` integrates the new target | `Pods-Runner-RunnerUITests.{debug,release,profile}.xcconfig` wired as base configurations; **no pod version moved** — the only Podfile.lock change is the PODFILE CHECKSUM |
+| The workflow is valid YAML with the shape the task asked for | parsed; `workflow_dispatch` + `schedule`, 6 + 1 + 4 rows, per-job `timeout-minutes` 90/60/75, `continue-on-error` on iOS only |
+| Every embedded shell block parses | `bash -n` over all 22 `run:`/`script:` bodies with the `${{ }}` expressions substituted out |
+| The iOS runtime selector picks the right runtime, and refuses the wrong one | run against a synthetic `simctl … --json` (see above) and against this host's empty runtime list — empty output, exit 0, under `bash -eo pipefail` |
+| `e2e.sh` still runs end to end | driven against the **live** Synapse container with a stubbed `patrol`: healthcheck awaited, accounts seeded, the `macos` subset expanded to its nine targets, `localhost:8008` resolved |
+| The subset and target guards work | `--subset windows` and `--target …/nope_test.dart` both fail before a container is started |
+| Nothing regressed | `flutter analyze` clean, `dart analyze integration_test/patrol` clean, `dart format --set-exit-if-changed` clean, `flutter test` in `apps/weft` **922 pass** (unchanged) |
+| **Not** checked | the workflow on a GitHub runner; Colima on a macOS runner; any emulator image below API 36; whether XCUITest's automation permissions are satisfied on a hosted macOS runner without interaction |
+
+That last row is the one to expect trouble from. Colima on a hosted macOS runner
+and macOS XCUITest automation are both *documented* to work and neither is
+witnessed here, so the first real nightly is where they get tested. If the macOS
+row fails, check those two before reading it as a Weft failure.
 
 ---
 
