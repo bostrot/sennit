@@ -163,9 +163,11 @@ class LinkPreviewCardBody extends StatelessWidget {
             child: Container(
               constraints: const BoxConstraints(maxWidth: 520),
               decoration: BoxDecoration(
-                border: Border(left: BorderSide(color: accent, width: 3)),
+                border: BorderDirectional(
+                  start: BorderSide(color: accent, width: 3),
+                ),
               ),
-              padding: const EdgeInsets.fromLTRB(
+              padding: const EdgeInsetsDirectional.fromSTEB(
                 WeftSpace.sm,
                 WeftSpace.sm,
                 WeftSpace.sm,

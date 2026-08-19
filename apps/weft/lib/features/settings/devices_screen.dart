@@ -1,7 +1,7 @@
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
@@ -284,9 +284,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         if (others.isNotEmpty) ...[
           const Divider(height: WeftSpace.xl),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.logout_rounded, size: 18),
+              icon: const WeftMirroredIcon(Icons.logout_rounded, size: 18),
               label: const Text('Sign out other devices'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: context.colors.error,

@@ -124,7 +124,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
         ),
         const SizedBox(height: WeftSpace.sm),
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
           child: FilledButton.icon(
             icon: const Icon(Icons.sms_outlined, size: 18),
             label: const Text('Make Weft the SMS app'),

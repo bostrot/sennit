@@ -609,7 +609,7 @@ class AttachmentTranscript extends StatelessWidget {
           )
         else if (transcript == null && onTranscribe != null)
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: TextButton.icon(
               onPressed: onTranscribe,
               style: TextButton.styleFrom(
@@ -814,7 +814,7 @@ class UploadProgressBubble extends StatelessWidget {
         ),
         if (task.canRetry)
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: TextButton.icon(
               onPressed: onRetry,
               style: TextButton.styleFrom(

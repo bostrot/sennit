@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../bidi.dart';
 import '../focus.dart';
 import '../semantics.dart';
 import '../theme.dart';
@@ -174,6 +175,11 @@ class _ChatTileState extends State<ChatTile> {
                 chat.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                // Content, not chrome: a Hebrew name in an English inbox reads
+                // right-to-left and truncates from the correct end, and so does
+                // an English one in an Arabic inbox. Null for a title with no
+                // strong character in it — "🎉" — which then inherits the row's.
+                textDirection: textDirectionOf(chat.title),
                 style: context.text.titleSmall?.copyWith(
                   fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
                 ),
@@ -234,6 +240,9 @@ class _ChatTileState extends State<ChatTile> {
                 _preview(last),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                // Same rule as the title: the preview is somebody's words, and
+                // its direction is theirs rather than the reader's locale.
+                textDirection: textDirectionOf(_preview(last)),
                 style: context.text.bodySmall?.copyWith(
                   color: unread
                       ? context.colors.onSurface

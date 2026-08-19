@@ -32,7 +32,7 @@ class _ShortcutsSheet extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding: const EdgeInsetsDirectional.fromSTEB(
           WeftSpace.xl,
           0,
           WeftSpace.xl,

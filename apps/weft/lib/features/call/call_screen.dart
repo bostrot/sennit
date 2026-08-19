@@ -260,9 +260,12 @@ class _CallScreenBodyState extends State<CallScreenBody> {
               ],
             ),
           ),
+          // The local picture-in-picture sits in the trailing top corner, which
+          // is the left one in an RTL window — the corner furthest from where
+          // the reader's eye starts on the remote video behind it.
           if (video && (session?.cameraOn ?? false))
-            Positioned(
-              right: WeftSpace.lg,
+            PositionedDirectional(
+              end: WeftSpace.lg,
               top: WeftSpace.huge + WeftSpace.xxl,
               width: 108,
               height: 148,
@@ -332,7 +335,7 @@ class _CallHeader extends StatelessWidget {
               ),
             )
           : null,
-      padding: const EdgeInsets.fromLTRB(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         WeftSpace.sm,
         WeftSpace.sm,
         WeftSpace.lg,
@@ -614,7 +617,7 @@ class _CallControlBar extends StatelessWidget {
         session?.state == CallState.onHold;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         WeftSpace.lg,
         WeftSpace.md,
         WeftSpace.lg,

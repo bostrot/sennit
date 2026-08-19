@@ -84,14 +84,16 @@ class ReplyChip extends StatelessWidget {
             onTap: onTap,
             child: Container(
               constraints: BoxConstraints(maxWidth: compact ? 640 : 496),
-              padding: const EdgeInsets.fromLTRB(
+              padding: const EdgeInsetsDirectional.fromSTEB(
                 WeftSpace.sm,
                 WeftSpace.xs,
                 WeftSpace.sm,
                 WeftSpace.xs,
               ),
               decoration: BoxDecoration(
-                border: Border(left: BorderSide(color: accent, width: 3)),
+                border: BorderDirectional(
+                  start: BorderSide(color: accent, width: 3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

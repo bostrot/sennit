@@ -379,7 +379,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
           ),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerEnd,
             child: FilledButton.tonal(
               onPressed: _saveGateway,
               child: const Text('Save gateway'),
@@ -395,7 +395,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 'appears, the reason is below.',
           ),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: FilledButton.icon(
               onPressed: _testing ? null : () => unawaited(_sendTest()),
               icon: const Icon(Icons.notifications_active_outlined, size: 18),
@@ -481,7 +481,7 @@ class _NetworkRow extends StatelessWidget {
       subtitle: Padding(
         padding: const EdgeInsets.only(top: WeftSpace.xs),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
           child: SegmentedButton<_NetworkMode>(
             showSelectedIcon: false,
             style: const ButtonStyle(visualDensity: VisualDensity.compact),

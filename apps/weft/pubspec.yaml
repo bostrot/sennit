@@ -27,6 +27,11 @@ dependencies:
   firebase_messaging: ^16.5.0
   flutter:
     sdk: flutter
+  # Material's own strings, and — the reason it is here — `GlobalWidgetsLocalizations`,
+  # which is what resolves a locale to a `TextDirection`. Without this the app
+  # cannot be put into RTL at all: see `lib/app/localisation.dart`.
+  flutter_localizations:
+    sdk: flutter
   # The one plugin that draws a notification on all five platforms. Android and
   # Darwin are its own; Linux and Windows come from its federated backends,
   # which is what lets the desktop foreground path post without a gateway.

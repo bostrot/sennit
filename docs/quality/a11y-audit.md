@@ -66,20 +66,20 @@ Six numbers, from the sweeps:
 |---|---|
 | `Semantics` widgets in the whole app | **6** |
 | `liveRegion` / `SemanticsService.announce` | **0** |
-| `EdgeInsetsDirectional` / `AlignmentDirectional` / `PositionedDirectional` | **0** |
-| `FocusTraversalGroup` / `Shortcuts` / `Actions` / `FocusNode` | **0** |
-| `supportedLocales` / `localizationsDelegates` / `flutter_localizations` | **0** |
+| `EdgeInsetsDirectional` / `AlignmentDirectional` / `PositionedDirectional` | **0** — closed by task 6 |
+| `FocusTraversalGroup` / `Shortcuts` / `Actions` / `FocusNode` | **0** — closed by task 5 |
+| `supportedLocales` / `localizationsDelegates` / `flutter_localizations` | **0** — closed by task 6 |
 | `MediaQuery.textScaler` / `.highContrast` / `.disableAnimations` reads | **0** |
 
 `packages/weft_design/test/` exists and is empty — the design system that owns
 every colour pair in the app has no test at all, so there is nothing today that
 would notice a token regressing below AA.
 
-The single most consequential finding is **CROSS-1**: the app declares no
-locales and no localisation delegates, so `Directionality` is unconditionally
-LTR. Weft cannot currently be *put into* RTL, on a device or in a test. Every
-other RTL finding below is latent until that is fixed, and fixing it is what
-turns the rest from theory into failing goldens.
+The single most consequential finding was **CROSS-1**: the app declared no
+locales and no localisation delegates, so `Directionality` was unconditionally
+LTR and Weft could not be *put into* RTL, on a device or in a test — which made
+every other RTL finding below latent. Task 6 closed it, and closing it is what
+turned the rest from theory into something a golden can fail on.
 
 ---
 
@@ -780,6 +780,136 @@ Covered by `apps/weft/test/a11y/keyboard_test.dart` (15 tests) and
 
 ---
 
+## Direction — resolved by task 6
+
+Forty-two RTL findings, and one of them was load-bearing for the other
+forty-one.
+
+**CROSS-1 first, because nothing else was reachable without it.** The app
+declared no locales and no localisation delegates, so `Directionality` resolved
+to left-to-right for every locale a device could be set to. Switching a phone to
+Arabic changed nothing in Weft, and no amount of `EdgeInsetsDirectional`
+downstream would have changed that, because nothing was ever going to set the
+direction. `flutter_localizations` is now a dependency,
+`apps/weft/lib/app/localisation.dart` declares `en`, `ar` and `he` with the three
+global delegates, and `main.dart` wires both. The first test in
+`apps/weft/test/a11y/rtl_test.dart` is that finding: if it regresses, every other
+test in the file quietly passes against a left-to-right app.
+
+Two things came with it that were not asked for and are not optional.
+`main` now awaits `initializeDateFormatting()`, and the app's `builder` — the
+first place under `Localizations` — points `Intl.defaultLocale` at the resolved
+locale, because every `DateFormat` in Weft is built without one. A `DateFormat`
+for a locale whose symbols were never loaded *throws*, inside `build`, on every
+bubble at once; `applyFormattingLocale` is guarded on `DateFormat.localeExists`
+so a widget test can put the app into Arabic without its clock bringing the
+screen down.
+
+**String extraction is deferred, deliberately.** The phase asks that "`intl`
+message lookup falls back cleanly for untranslated strings rather than showing
+keys". Weft has no message catalogue at all — every user-facing string is a Dart
+literal — so there are no keys to leak and the requirement is satisfied by there
+being nothing to fall back from. Extracting the ~400 literals into ARB files is
+a phase of its own. What the locales buy today is *direction* and *date
+formatting*, which is what M10 is for; the honest half-state is an RTL layout
+with English text, rather than an LTR layout pretending the locale does not
+exist.
+
+### What was built
+
+- **`packages/weft_design/lib/src/bidi.dart`.** `textDirectionOf` resolves one
+  string's base direction by the Unicode first-strong rule (UAX #9 P2/P3);
+  `WeftDirectionality` applies it; `WeftLtr` pins a subtree the other way; and
+  `WeftMirroredIcon` mirrors the two glyphs Material does not mirror for itself.
+- **`apps/weft/lib/app/localisation.dart`.** `weftSupportedLocales`,
+  `weftLocalizationsDelegates` and `applyFormattingLocale`.
+
+### Findings closed
+
+| ID | Resolution |
+|---|---|
+| CROSS-1 | `flutter_localizations` + `en`/`ar`/`he` + the three global delegates, wired in `main.dart`; `Intl.defaultLocale` follows the resolved locale |
+| RTL-01 | The inbox column's `SafeArea` now skips the edge the rail is on, resolved from the direction rather than hard-coded to the physical left |
+| RTL-02, 13, 14, 21, 23, 24, 25, 26, 27, 28, 30, 31 | All twelve `Alignment.center{Left,Right}` layout uses are `AlignmentDirectional.center{Start,End}` |
+| RTL-03, 12, 16, 18, 19, 29, 33, 36 | All fifteen `EdgeInsets.fromLTRB` uses across twelve files are `EdgeInsetsDirectional.fromSTEB` |
+| RTL-04 | The inbox list's padding is `EdgeInsetsDirectional`, for consistency rather than because it was wrong |
+| RTL-05 | The empty-detail mark's gradient runs `AlignmentDirectional.topStart → bottomEnd`. So do the other five gradients in the app, which the register listed as cosmetic — a sheen that lights the wrong corner is what makes a mirrored screen look subtly assembled wrong |
+| RTL-06 | Verified direction-neutral, unchanged |
+| RTL-07 | The rail's `SafeArea` honours the physical edge it is actually on |
+| RTL-08 | `AnimatedPositionedDirectional(start:)` — the accent bar slides in from the window's edge. `_RailEntry`'s `SlideTransition` was the same bug one layer up and now takes `textDirection` |
+| RTL-09, 38, 39 | `PositionedDirectional(end:)` — the rail's unread badge, the avatar's network badge and its online dot |
+| RTL-10, 15, 17, 41 | All four `Border(left:)` rules are `BorderDirectional(start:)` — the bubble hairline, the reply quote, the link preview and the blockquote |
+| RTL-11 | The bubble tail is `BorderRadiusDirectional`, so it points at the side of the thread the message is on in either direction |
+| RTL-20, 37 | Verified symmetric stretches, unchanged, as the register asked |
+| RTL-22, 32 | `login_rounded` and `logout_rounded` are drawn through `WeftMirroredIcon` |
+| RTL-34, 35 | `PositionedDirectional(end:)` — the call's local PiP window and the heads-up incoming banner |
+| RTL-40 | The blockquote's indent is `EdgeInsetsDirectional.only(start:)` |
+| RTL-42 | The code block is wrapped in `WeftLtr`, which pins both the text and the horizontal scroll view's axis |
+
+### Bidirectional text
+
+The phase's hardest line — "resolve each message's direction from its own
+content, not the app locale" — is `textDirectionOf`, applied in three places:
+the message body (`RichTextView`), the inbox row's title and preview
+(`ChatTile`), and the composer, whose field follows what is being typed so
+somebody answering a Hebrew message in an English UI gets a caret that starts on
+the right.
+
+Three decisions inside it are worth stating, because each has a plausible wrong
+answer:
+
+- **First-strong, not majority.** `Bidi.detectRtlDirectionality` counts RTL words
+  against LTR ones and takes the majority, which is the right rule for guessing
+  the language of a search result and the wrong one for a sentence somebody
+  typed: under it a Hebrew message containing two English brand names flips to
+  left-to-right, and flips back when the sender edits one out.
+- **Null is a real answer.** "👍", "42" and ":)" have no direction to get wrong,
+  and returning null lets them inherit the conversation's rather than pinning
+  them to LTR inside an Arabic thread.
+- **Astral characters are dropped before asking.** `Bidi`'s character classes are
+  written over UTF-16 code units and its LTR range spans the surrogate block, so
+  every emoji reads as strong Latin. Unfiltered, "👍" answers left-to-right and
+  "👍 שלום" answers left-to-right too — wrong twice, and the second one is a
+  Hebrew message rendered backwards.
+
+The wrapper is as tight as it goes: only the paragraph flips. A message's side of
+the thread, its tail, its ticks and the row it sits in all belong to the reader's
+locale, which is what every other messenger does and what the reader expects.
+
+### Four things later tasks must not get wrong
+
+- **`import 'package:intl/intl.dart'` shadows `TextDirection`.** intl exports a
+  class of that name, so in the seven files that imported it unqualified,
+  `TextDirection.rtl` did not compile and `Directionality.of(context)` could not
+  be compared to anything. All seven are now `show DateFormat`. A new file that
+  needs both will hit this, and the error message does not say why.
+- **Only two icons may be wrapped.** `reply`, `send`, `forward`,
+  `chevron_right` and `open_in_new` all carry `matchTextDirection: true` in the
+  SDK and mirror themselves; wrapping one would mirror it twice and point it the
+  wrong way. The sweep that produced that list is in this document's
+  [Verified correct](#verified-correct) section and was re-run against the
+  installed SDK for this task.
+- **`WeftMirroredIcon` is a `Transform`, not a rebuilt `IconData`.** Constructing
+  an `IconData` with `matchTextDirection: true` would be tidier and cannot be
+  used: a non-constant `IconData` anywhere in the tree is what makes
+  `flutter build --tree-shake-icons` refuse the release build.
+- **The tests sweep the source, and the sweep must keep reading everything.**
+  `rtl_test.dart` fails on any new physical-edge API in `apps/weft/lib` or
+  `packages/*/lib`, decoding bytes permissively rather than shelling out to
+  `grep` — which is what makes it immune to the binary-file problem in the
+  [Method](#method) note. It asserts a floor on the number of files it read, for
+  the obvious reason. **Task 9's CI step should call this test rather than add a
+  second grep**, or the two will disagree.
+
+No pixels moved: all 20 golden pairs pass untouched, because every fix resolves
+to the same geometry under LTR. The RTL goldens are task 8's, and they are the
+first images that will show any of this.
+
+Covered by `apps/weft/test/a11y/rtl_test.dart` (10 tests, including the two
+source sweeps) and `packages/weft_design/test/bidi_test.dart` (11).
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1313,9 +1443,11 @@ Closed so far: the token layer (task 2 — see
 semantics (task 3 — see
 [Semantics — resolved by task 3](#semantics--resolved-by-task-3)), every
 remaining screen (task 4 — see
-[Semantics — resolved by task 4](#semantics--resolved-by-task-4)) and the
+[Semantics — resolved by task 4](#semantics--resolved-by-task-4)), the
 keyboard model (task 5 — see
-[Keyboard — resolved by task 5](#keyboard--resolved-by-task-5)).
+[Keyboard — resolved by task 5](#keyboard--resolved-by-task-5)) and
+direction-agnostic layout (task 6 — see
+[Direction — resolved by task 6](#direction--resolved-by-task-6)).
 
 **All 140 semantics findings are now closed**, along with CROSS-2 and CROSS-8.
 One of them, **A11Y-08**, is closed for a screen reader and explicitly deferred
@@ -1327,11 +1459,20 @@ in colour is stated in words beside the glyph.
 One of them, **KEY-03**, was already closed by task 2 and is recorded as
 verified rather than re-fixed.
 
-Still **open**: direction-agnostic layout (CROSS-1, RTL-01…42), the test
-suite's guideline sweep (TAP-01…15), and the golden variants (CROSS-7,
-SCALE-02…16 — less SCALE-13, fixed early in task 4 because it was one line from
-a change already being made). Task 9 re-reads this file and marks each remaining
-one fixed or deferred with a reason.
+**All 42 RTL findings and CROSS-1 are now closed.** Four of them — RTL-06, 20,
+37 and the second half of the register's gradient row — were verified correct
+and left unchanged rather than re-fixed, which is what the
+[Verified correct](#verified-correct) section is for. One requirement inside
+task 6 is explicitly **deferred**: extracting Weft's ~400 string literals into
+ARB message catalogues. What blocks it is nothing technical — it is a phase of
+its own, and with no catalogue there are no keys to leak, so the phase's
+"falls back cleanly rather than showing keys" criterion is met today. The
+locales buy direction and date formatting, which is what M10 needs.
+
+Still **open**: the test suite's guideline sweep (TAP-01…15) and the golden
+variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed early in task 4 because it
+was one line from a change already being made). Task 9 re-reads this file and
+marks each remaining one fixed or deferred with a reason.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task

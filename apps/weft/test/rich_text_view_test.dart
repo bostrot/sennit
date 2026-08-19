@@ -165,15 +165,17 @@ void main() {
 
       expect(find.textContaining('she said'), findsWidgets);
       expect(find.textContaining('he said'), findsWidgets);
-      // Two rules down the left, one per level: two indents read as a margin,
-      // where two rules read as two levels.
+      // Two rules down the leading edge, one per level: two indents read as a
+      // margin, where two rules read as two levels. `BorderDirectional`, so the
+      // rules are on the right of a quote inside a Hebrew message — a physical
+      // `Border(left:)` would rule the far side of the text it is quoting.
       final rules = tester.widgetList<Container>(find.byType(Container)).where((
         c,
       ) {
         final decoration = c.decoration;
         return decoration is BoxDecoration &&
-            decoration.border is Border &&
-            (decoration.border! as Border).left.width == 3;
+            decoration.border is BorderDirectional &&
+            (decoration.border! as BorderDirectional).start.width == 3;
       });
       expect(rules, hasLength(2));
     });

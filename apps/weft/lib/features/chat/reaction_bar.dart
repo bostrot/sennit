@@ -209,7 +209,7 @@ Future<void> showReactionSendersSheet(
         shrinkWrap: true,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               WeftSpace.xl,
               0,
               WeftSpace.xl,

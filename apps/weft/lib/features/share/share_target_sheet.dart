@@ -4,7 +4,7 @@ import 'package:clock/clock.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -414,7 +414,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
             )
           else ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: const EdgeInsetsDirectional.fromSTEB(
                 WeftSpace.xl,
                 0,
                 WeftSpace.xl,
@@ -591,7 +591,7 @@ class _TargetList extends ConsumerWidget {
         }
         if (i == targets.length) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               WeftSpace.xl,
               WeftSpace.md,
               WeftSpace.xl,
@@ -747,7 +747,7 @@ class _MultiSelectBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         WeftSpace.lg,
         WeftSpace.sm,
         WeftSpace.lg,
@@ -859,7 +859,7 @@ class _ConfirmStep extends StatelessWidget {
           ),
         ),
         Container(
-          padding: const EdgeInsets.fromLTRB(
+          padding: const EdgeInsetsDirectional.fromSTEB(
             WeftSpace.lg,
             WeftSpace.sm,
             WeftSpace.lg,

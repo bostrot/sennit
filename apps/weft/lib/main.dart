@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import 'app/intents.dart';
+import 'app/localisation.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
 import 'app/session_providers.dart';
@@ -22,8 +24,14 @@ import 'features/share/share_target_sheet.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Loads `intl`'s date symbols for every locale before anything can format a
+  // timestamp. Awaited rather than fired off: a `DateFormat` built for a locale
+  // whose data has not arrived throws, and the first frame of the inbox formats
+  // one per row. It is embedded data rather than I/O, so this costs a
+  // microtask, not a round trip.
+  await initializeDateFormatting();
   runApp(const ProviderScope(child: WeftApp()));
 }
 
@@ -310,6 +318,14 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       title: 'Weft',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
+      // The whole of Weft's right-to-left support hangs off these two lines:
+      // `Directionality` has no other source, and until they were here every
+      // directional layout API downstream was decoration. English first is the
+      // fallback — Weft's own strings are untranslated, so a device set to a
+      // locale Weft does not declare gets English text in a left-to-right
+      // layout rather than English text mirrored.
+      localizationsDelegates: weftLocalizationsDelegates,
+      supportedLocales: weftSupportedLocales,
       theme: appearance.themeFor(
         platformBrightness,
         highContrast: highContrast,
@@ -321,13 +337,21 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       // call screen, while Cmd+F has to reach search from a settings screen as
       // much as from the inbox. Both take the navigator key rather than a
       // context because everything above the navigator is outside it.
-      builder: (context, child) => WeftShortcuts(
-        navigatorKey: _navigatorKey,
-        child: CallOverlay(
+      builder: (context, child) {
+        // The first place under `Localizations`, and therefore the first place
+        // that knows which locale actually resolved. Every `DateFormat` in the
+        // app is built without one and reads `Intl.defaultLocale`, so this is
+        // what makes a timestamp in an Arabic UI Arabic. Idempotent — it
+        // compares before it assigns — which is what makes it safe in a build.
+        applyFormattingLocale(Localizations.localeOf(context));
+        return WeftShortcuts(
           navigatorKey: _navigatorKey,
-          child: child ?? const SizedBox.shrink(),
-        ),
-      ),
+          child: CallOverlay(
+            navigatorKey: _navigatorKey,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       home: const AuthGate(),
     );
   }

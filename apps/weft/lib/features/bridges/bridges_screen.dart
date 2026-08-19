@@ -501,10 +501,12 @@ class _BridgeCard extends StatelessWidget {
                 ),
             const SizedBox(height: WeftSpace.sm),
             Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerEnd,
               child: FilledButton.tonalIcon(
                 onPressed: error != null ? null : onLogin,
-                icon: const Icon(Icons.login_rounded, size: 18),
+                // `login_rounded` is one of the two arrows in this app that
+                // Material does not mirror for itself — see [WeftMirroredIcon].
+                icon: const WeftMirroredIcon(Icons.login_rounded, size: 18),
                 label: Text(
                   (whoami?.logins.isEmpty ?? true)
                       ? 'Sign in'

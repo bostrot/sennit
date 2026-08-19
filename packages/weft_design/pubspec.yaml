@@ -13,6 +13,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Only for `Bidi`'s strong-character classes, which `src/bidi.dart` uses to
+  # resolve one message's direction from its own text. Already in the workspace
+  # lock — the app and the Matrix SDK both carry it — so this is a declaration
+  # rather than a new package, and hand-rolling the Unicode ranges instead would
+  # be a second, worse copy of a table that has to stay right.
+  intl: any
   simple_icons: ^16.23.0
   weft_domain: ^0.1.0
 

@@ -85,8 +85,8 @@ class _Splash extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: WeftRadius.allXl,
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: AlignmentDirectional.topStart,
+                  end: AlignmentDirectional.bottomEnd,
                   colors: [context.colors.primary, context.colors.tertiary],
                 ),
               ),

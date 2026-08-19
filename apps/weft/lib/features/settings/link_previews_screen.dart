@@ -101,7 +101,7 @@ class LinkPreviewsScreen extends ConsumerWidget {
                   'next time one of those links is on screen.',
             ),
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.delete_outline_rounded, size: 18),
                 label: const Text('Clear cached previews'),

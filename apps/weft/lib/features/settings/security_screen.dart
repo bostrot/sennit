@@ -379,7 +379,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         ),
         const SizedBox(height: WeftSpace.sm),
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: key));

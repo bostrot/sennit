@@ -127,7 +127,7 @@ class _AttachmentPreviewSheetState
             ),
           ),
           Container(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const EdgeInsetsDirectional.fromSTEB(
               WeftSpace.lg,
               WeftSpace.sm,
               WeftSpace.lg,

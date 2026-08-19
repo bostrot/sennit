@@ -163,9 +163,13 @@ class WeftAvatar extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Center(child: avatar),
+            // Both badges hang off the avatar's *trailing* corner, which is the
+            // one furthest from the row's text in either direction: in an RTL
+            // list the avatar is on the right and the badge belongs on its left,
+            // where it does not sit between the picture and the name.
             if (showNetworkBadge && networks.length == 1)
-              Positioned(
-                right: -1,
+              PositionedDirectional(
+                end: -1,
                 bottom: -1,
                 child: _Badged(
                   size: size,
@@ -176,8 +180,8 @@ class WeftAvatar extends StatelessWidget {
                 ),
               ),
             if (online)
-              Positioned(
-                right: 0,
+              PositionedDirectional(
+                end: 0,
                 top: 0,
                 child: _Badged(
                   size: size,
@@ -206,8 +210,8 @@ class WeftAvatar extends StatelessWidget {
     final hue = (label.hashCode % 360).abs().toDouble();
     final base = HSLColor.fromAHSL(1, hue, 0.45, 0.48).toColor();
     return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
+      begin: AlignmentDirectional.topStart,
+      end: AlignmentDirectional.bottomEnd,
       colors: [base, Color.lerp(base, Colors.black, 0.3)!],
     );
   }

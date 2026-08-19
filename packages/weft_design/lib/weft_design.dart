@@ -4,6 +4,7 @@
 /// `weft_domain` values, which is what keeps them golden-testable in isolation.
 library;
 
+export 'src/bidi.dart';
 export 'src/components/chat_tile.dart';
 export 'src/components/network_glyph.dart';
 export 'src/components/network_rail.dart';

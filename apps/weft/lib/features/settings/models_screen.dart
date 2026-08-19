@@ -290,7 +290,7 @@ class _ModelCard extends StatelessWidget {
               // Five cards, five buttons reading "Download", one of which is a
               // 1.5 GB file.
               ModelPhase.notInstalled => Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerEnd,
                 child: NamedButton(
                   label:
                       'Download ${spec.displayName}, '

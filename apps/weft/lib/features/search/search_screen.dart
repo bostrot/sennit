@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_search/weft_search.dart';
@@ -315,7 +315,7 @@ class _ResultSummary extends StatelessWidget {
       label: text,
       excludeSemantics: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding: const EdgeInsetsDirectional.fromSTEB(
           WeftSpace.lg,
           WeftSpace.xs,
           WeftSpace.lg,

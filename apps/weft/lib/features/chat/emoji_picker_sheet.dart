@@ -66,7 +66,7 @@ class _EmojiPickerSheet extends ConsumerWidget {
         ),
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(
+          padding: const EdgeInsetsDirectional.fromSTEB(
             WeftSpace.lg,
             0,
             WeftSpace.lg,

@@ -49,8 +49,8 @@ class NetworkGlyph extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomEnd,
           colors: [color, Color.lerp(color, Colors.black, 0.22)!],
         ),
         borderRadius: BorderRadius.circular(radius),

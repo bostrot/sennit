@@ -159,9 +159,9 @@ class _CallOverlayState extends ConsumerState<CallOverlay> {
             ),
           ),
         if (ringing && wide)
-          Positioned(
+          PositionedDirectional(
             top: WeftSpace.lg,
-            right: WeftSpace.lg,
+            end: WeftSpace.lg,
             width: 420,
             child: SafeArea(
               child: IncomingCallBanner(

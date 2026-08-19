@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
@@ -104,10 +104,17 @@ class _InboxPane extends ConsumerWidget {
     final selection = ref.watch(chatSelectionProvider);
     final selecting = selection.isNotEmpty;
 
+    // The rail handles its own insets and should keep painting behind the
+    // status bar; only the inbox column must start below it — and the edge the
+    // rail is on is the window's *starting* edge, which is the physical right
+    // one in an RTL window. `SafeArea` takes physical edges only, so this is
+    // one of the two places in the app where the direction is read rather than
+    // expressed.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+
     return SafeArea(
-      // The rail handles its own insets and should keep painting behind the
-      // status bar; only the inbox column must start below it.
-      left: false,
+      left: rtl,
+      right: !rtl,
       bottom: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -122,7 +129,9 @@ class _InboxPane extends ConsumerWidget {
             child: chats.isEmpty
                 ? const _EmptyInbox()
                 : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: WeftSpace.xl),
+                    padding: const EdgeInsetsDirectional.only(
+                      bottom: WeftSpace.xl,
+                    ),
                     itemCount: chats.length,
                     itemBuilder: (context, i) {
                       final chat = chats[i];
@@ -334,7 +343,7 @@ class _InboxHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         WeftSpace.lg,
         WeftSpace.lg,
         WeftSpace.md,
@@ -496,7 +505,7 @@ class _InboxHeader extends ConsumerWidget {
           const SizedBox(height: WeftSpace.md),
           if (activeFilter.isNotEmpty)
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: ActionChip(
                 avatar: const Icon(Icons.close_rounded, size: 16),
                 label: const Text('Clear filter'),
@@ -652,8 +661,12 @@ class _EmptyDetail extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: WeftRadius.allXl,
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      // Directional so the sheen runs from the mark's leading
+                      // corner in either direction. Cosmetic, but a gradient
+                      // that lights the wrong corner is the sort of thing that
+                      // makes a mirrored screen look subtly assembled wrong.
+                      begin: AlignmentDirectional.topStart,
+                      end: AlignmentDirectional.bottomEnd,
                       colors: [context.colors.primary, context.colors.tertiary],
                     ),
                   ),

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
@@ -1420,17 +1420,27 @@ class _MessageBubble extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: own ? palette.ownBubble : palette.peerBubble,
-                      borderRadius: BorderRadius.only(
-                        topLeft: WeftRadius.lg,
-                        topRight: WeftRadius.lg,
-                        bottomLeft: own ? WeftRadius.lg : WeftRadius.xs,
-                        bottomRight: own ? WeftRadius.xs : WeftRadius.lg,
+                      // The tail is on the corner nearest the side of the thread
+                      // the bubble sits on, and both are resolved from the
+                      // reader's direction rather than from physical space: the
+                      // row above already puts an own message at the *end*, so
+                      // a physically-computed tail would point away from the
+                      // speaker the moment the app is mirrored.
+                      borderRadius: BorderRadiusDirectional.only(
+                        topStart: WeftRadius.lg,
+                        topEnd: WeftRadius.lg,
+                        bottomStart: own ? WeftRadius.lg : WeftRadius.xs,
+                        bottomEnd: own ? WeftRadius.xs : WeftRadius.lg,
                       ),
                       // A merged chat marks each bubble's origin with a
                       // hairline in the network's colour — readable without
-                      // stealing attention.
+                      // stealing attention. On the leading edge, which is the
+                      // one facing the middle of the thread in either
+                      // direction.
                       border: showNetwork
-                          ? Border(left: BorderSide(color: accent, width: 3))
+                          ? BorderDirectional(
+                              start: BorderSide(color: accent, width: 3),
+                            )
                           : null,
                     ),
                     child: Column(
@@ -1871,7 +1881,7 @@ class _Composer extends StatelessWidget {
     final editing = composing?.mode == ComposerMode.edit;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(
+      padding: const EdgeInsetsDirectional.fromSTEB(
         WeftSpace.md,
         WeftSpace.sm,
         WeftSpace.md,
@@ -1957,19 +1967,33 @@ class _Composer extends StatelessWidget {
                                 },
                               ),
                         },
-                        child: TextField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          minLines: 1,
-                          maxLines: 5,
-                          // Kept for a soft keyboard, which sends no key events
-                          // at all: on a phone this is still what puts a send
-                          // glyph on the return key and what fires `onSend`.
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => onSend(),
-                          decoration: InputDecoration(
-                            hintText: _fieldLabel(sendNetwork),
-                            isDense: true,
+                        // Rebuilt per keystroke for one reason: the field's
+                        // base direction follows what is being typed, the same
+                        // way a sent message's follows what was typed. Someone
+                        // answering a Hebrew message in an English UI gets a
+                        // caret that starts on the right and punctuation that
+                        // lands where they meant it, without having to change
+                        // the app's language to write one sentence. The SMS bar
+                        // above listens to the same controller for the same
+                        // reason.
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: controller,
+                          builder: (context, value, _) => TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            minLines: 1,
+                            maxLines: 5,
+                            textDirection: textDirectionOf(value.text),
+                            // Kept for a soft keyboard, which sends no key
+                            // events at all: on a phone this is still what puts
+                            // a send glyph on the return key and what fires
+                            // `onSend`.
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => onSend(),
+                            decoration: InputDecoration(
+                              hintText: _fieldLabel(sendNetwork),
+                              isDense: true,
+                            ),
                           ),
                         ),
                       ),
