@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../focus.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'network_glyph.dart';
@@ -238,23 +239,26 @@ class _RailButtonState extends State<_RailButton> {
         // tooltip and once from the node below, which already says the same
         // thing and more.
         excludeFromSemantics: true,
-        child: Semantics(
-          container: true,
-          // Without this the glyph's own label and the unread badge's digits
-          // are announced under the item, which is the same doubling the
-          // tooltip caused.
-          excludeSemantics: true,
-          button: true,
+        // Excluding the subtree stops the glyph's own label and the unread
+        // badge's digits being announced under the item, which is the same
+        // doubling the tooltip caused. `WeftFocusable` also puts the item in
+        // the traversal order — a `GestureDetector` is not focusable, so Tab
+        // never reached the network filter at all.
+        child: WeftFocusable(
           selected: widget.selected,
           onTap: widget.onTap,
           label: widget.badge > 0
               ? '${widget.tooltip}, ${widget.badge} unread'
               : widget.tooltip,
-          child: GestureDetector(
-            onTapDown: (_) => setState(() => _pressed = true),
-            onTapUp: (_) => setState(() => _pressed = false),
-            onTapCancel: () => setState(() => _pressed = false),
-            onTap: widget.onTap,
+          borderRadius: WeftRadius.allMd,
+          child: Listener(
+            // A `Listener` rather than a second `GestureDetector`: the
+            // focusable already owns the tap, and two recognisers competing in
+            // the same arena is how a press state gets stuck down. This only
+            // watches the pointer to drive the scale.
+            onPointerDown: (_) => setState(() => _pressed = true),
+            onPointerUp: (_) => setState(() => _pressed = false),
+            onPointerCancel: (_) => setState(() => _pressed = false),
             child: AnimatedScale(
               scale: _pressed ? 0.92 : 1,
               duration: motion.instant,

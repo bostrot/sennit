@@ -185,30 +185,31 @@ class _SwatchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
+    return WeftFocusable(
       selected: selected,
       label: '$name accent',
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: WeftMotion.fast,
-          curve: WeftMotion.spring,
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? context.colors.onSurface : Colors.transparent,
-              width: 3,
-            ),
-            boxShadow: selected ? WeftShadow.glow(color) : null,
+      onTap: onTap,
+      // Round, so no corner radius describes it — and the ring goes outside
+      // the swatch rather than over it, because a ring drawn on top of a
+      // saturated accent is measured against the wrong colour.
+      shape: BoxShape.circle,
+      child: AnimatedContainer(
+        duration: context.motion.fast,
+        curve: context.motion.spring,
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? context.colors.onSurface : Colors.transparent,
+            width: 3,
           ),
-          child: selected
-              ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
-              : null,
+          boxShadow: selected ? WeftShadow.glow(color) : null,
         ),
+        child: selected
+            ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+            : null,
       ),
     );
   }

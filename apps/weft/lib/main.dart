@@ -10,6 +10,7 @@ import 'app/notification_providers.dart';
 import 'app/providers.dart';
 import 'app/session_providers.dart';
 import 'app/share_providers.dart';
+import 'app/shortcuts.dart';
 import 'app/stores.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
@@ -314,14 +315,18 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         highContrast: highContrast,
         reduceMotion: reduceMotion,
       ),
-      // Above the navigator, so a ringing call appears over whatever route is
-      // open — a chat, the settings, a share sheet — and the minimised call bar
-      // survives navigating away from the call screen. It takes the navigator
-      // key rather than a context because everything above the navigator is
-      // outside it.
-      builder: (context, child) => CallOverlay(
+      // Both above the navigator, and for the same reason: a ringing call
+      // appears over whatever route is open — a chat, the settings, a share
+      // sheet — and the minimised call bar survives navigating away from the
+      // call screen, while Cmd+F has to reach search from a settings screen as
+      // much as from the inbox. Both take the navigator key rather than a
+      // context because everything above the navigator is outside it.
+      builder: (context, child) => WeftShortcuts(
         navigatorKey: _navigatorKey,
-        child: child ?? const SizedBox.shrink(),
+        child: CallOverlay(
+          navigatorKey: _navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       home: const AuthGate(),
     );

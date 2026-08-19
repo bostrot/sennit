@@ -173,16 +173,16 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     // it, and whether there is anything there yet. A photo previously announced
     // *nothing at all* — an `Image.memory` under a bare `GestureDetector` has
     // no semantics of its own — and the caption was a second, unattached node.
-    return Semantics(
+    return WeftFocusable(
       image: true,
       button: _bytes != null && widget.onOpen != null,
-      excludeSemantics: true,
       onTap: _bytes == null ? null : widget.onOpen,
       label: semanticsSentence([
         messageKindLabel(widget.message.kind),
         caption,
         if (_failed) 'could not be loaded' else if (_bytes == null) 'loading',
       ]),
+      borderRadius: WeftRadius.allSm,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -194,27 +194,29 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  GestureDetector(
-                    onTap: _bytes == null ? null : widget.onOpen,
-                    // The flight the viewer lands: the same decoded bytes on both
-                    // ends, so the picture the user tapped is visibly the picture
-                    // that fills the screen. Only wrapped once there *are* bytes —
-                    // a hero whose source is a grey placeholder animates a grey
-                    // box into a photo, which reads as a glitch.
-                    child: switch ((_bytes, _failed)) {
-                      (final Uint8List bytes, _) => Hero(
-                        tag: mediaHeroTag(widget.message),
-                        child: Image.memory(
-                          bytes,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _placeholder(context, broken: true),
-                        ),
+                  // The flight the viewer lands: the same decoded bytes on both
+                  // ends, so the picture the user tapped is visibly the picture
+                  // that fills the screen. Only wrapped once there *are* bytes —
+                  // a hero whose source is a grey placeholder animates a grey
+                  // box into a photo, which reads as a glitch.
+                  //
+                  // No tap of its own any more: the focusable above owns it, and
+                  // a second recogniser on the same pixels was only ever a
+                  // duplicate of the one the keyboard also has to be able to
+                  // reach.
+                  switch ((_bytes, _failed)) {
+                    (final Uint8List bytes, _) => Hero(
+                      tag: mediaHeroTag(widget.message),
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            _placeholder(context, broken: true),
                       ),
-                      (_, true) => _placeholder(context, broken: true),
-                      _ => _placeholder(context, broken: false),
-                    },
-                  ),
+                    ),
+                    (_, true) => _placeholder(context, broken: true),
+                    _ => _placeholder(context, broken: false),
+                  },
                   // Over the picture rather than under it: a poster with a
                   // caption line reading "Video" is indistinguishable from a
                   // still at a glance, which is the one thing the badge exists to
@@ -634,53 +636,49 @@ class AttachmentTranscript extends StatelessWidget {
           // exist for a screen reader — it is not on any menu and there is no
           // other way to reach it. Naming it on the node is what puts it in the
           // rotor.
-          Semantics(
-            container: true,
-            excludeSemantics: true,
+          WeftFocusable(
+            // Not a button: there is nothing a tap does here. It is a block of
+            // text with one long-press action on it, so Tab lands on it and a
+            // reader finds "transcribe again" in the rotor, but neither is
+            // told it activates.
+            button: false,
             label: 'Transcript: $transcript',
             onLongPress: onRetranscribe,
-            onLongPressHint: onRetranscribe == null
-                ? null
-                : 'transcribe again in another language',
-            child: GestureDetector(
-              onLongPress: onRetranscribe,
-              child: Container(
-                padding: const EdgeInsets.all(WeftSpace.sm),
-                decoration: BoxDecoration(
-                  // A tint, not ink — it is the background the transcript is
-                  // read against, so it stays exactly as faint as it was.
-                  color: onBubble.withValues(alpha: 0.08),
-                  borderRadius: WeftRadius.allSm,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.graphic_eq_rounded,
-                      size: 13,
-                      color: palette.muted(
-                        onBubble,
-                        transcriptFill,
-                        alpha: 0.7,
-                      ),
-                    ),
-                    const SizedBox(width: WeftSpace.xs),
-                    Flexible(
-                      child: Text(
-                        transcript,
-                        style: context.text.bodySmall?.copyWith(
-                          color: palette.muted(
-                            onBubble,
-                            transcriptFill,
-                            alpha: 0.9,
-                          ),
-                          fontStyle: FontStyle.italic,
+            onLongPressHint: 'transcribe again in another language',
+            borderRadius: WeftRadius.allSm,
+            ringInset: 0,
+            child: Container(
+              padding: const EdgeInsets.all(WeftSpace.sm),
+              decoration: BoxDecoration(
+                // A tint, not ink — it is the background the transcript is
+                // read against, so it stays exactly as faint as it was.
+                color: onBubble.withValues(alpha: 0.08),
+                borderRadius: WeftRadius.allSm,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.graphic_eq_rounded,
+                    size: 13,
+                    color: palette.muted(onBubble, transcriptFill, alpha: 0.7),
+                  ),
+                  const SizedBox(width: WeftSpace.xs),
+                  Flexible(
+                    child: Text(
+                      transcript,
+                      style: context.text.bodySmall?.copyWith(
+                        color: palette.muted(
+                          onBubble,
+                          transcriptFill,
+                          alpha: 0.9,
                         ),
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

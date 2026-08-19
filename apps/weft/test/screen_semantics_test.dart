@@ -288,10 +288,7 @@ void main() {
       // returning to a screen they have used before — never passes the notice
       // at the top of the list.
       final node = tester.getSemantics(find.byType(SwitchListTile));
-      expect(
-        node.hint,
-        'Turning this on sends your messages to the endpoint.',
-      );
+      expect(node.hint, 'Turning this on sends your messages to the endpoint.');
       expect(node.label, contains('Enable embeddings'));
 
       // And the switch still works: a hint that cost the toggle its action

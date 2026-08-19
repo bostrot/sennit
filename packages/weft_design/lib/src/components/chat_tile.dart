@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../focus.dart';
 import '../semantics.dart';
 import '../theme.dart';
 import '../tokens.dart';
@@ -61,68 +62,68 @@ class _ChatTileState extends State<ChatTile> {
     final chat = widget.chat;
     final colors = context.colors;
 
-    return Semantics(
-      // Exclusive, and that is the whole fix. The label was right and the node
-      // was not a container, so the title, the pin, the mute glyph, the
-      // delivery tick, the preview, the time and the unread badge were *also*
-      // announced underneath it — the "five separate nodes read in isolation"
-      // failure, with the correct sentence sitting on top of them.
-      container: true,
-      excludeSemantics: true,
-      button: true,
+    // Exclusive, and that is the whole fix for what a reader hears. The label
+    // was right and the node was not a container, so the title, the pin, the
+    // mute glyph, the delivery tick, the preview, the time and the unread badge
+    // were *also* announced underneath it — the "five separate nodes read in
+    // isolation" failure, with the correct sentence sitting on top of them.
+    // `WeftFocusable` carries that recipe and adds the half the row was still
+    // missing: a `GestureDetector` is not focusable, so Tab skipped every
+    // conversation in the inbox.
+    //
+    // It has to be the outermost widget. `tester.getSemantics` and every
+    // screen reader alike resolve a node by walking *up* from the widget, so a
+    // `Padding` on top of it would hand back the list's node instead of the
+    // row's, and the row's label would read as absent.
+    return WeftFocusable(
       selected: widget.selected,
       checked: widget.checked,
-      // Excluding the subtree also excludes the `GestureDetector`'s own tap and
-      // long-press actions, so both are restated here. Losing them would make
-      // the inbox unopenable by a screen reader, which is a far worse bug than
-      // the one being fixed.
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
-      onLongPressHint: widget.onLongPress == null ? null : 'select',
+      onLongPressHint: 'select',
       label: _semanticsLabel(),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          onLongPress: widget.onLongPress,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: context.motion.fast,
-            curve: context.motion.standard,
-            margin: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.sm,
-              vertical: 2,
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.md,
-              vertical: WeftSpace.md,
-            ),
-            decoration: BoxDecoration(
-              color: widget.selected
-                  ? colors.primaryContainer
-                  : _hovered
-                  ? colors.surfaceContainerHigh
-                  : Colors.transparent,
-              borderRadius: WeftRadius.allLg,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                widget.leading ??
-                    WeftAvatar(
-                      label: chat.title,
-                      imageUrl: chat.avatarUrl,
-                      imageHeaders: widget.avatarHeaders,
-                      networks: chat.networks,
-                      size: 46,
-                    ),
-                const SizedBox(width: WeftSpace.md),
-                Expanded(child: _body(context)),
-                const SizedBox(width: WeftSpace.sm),
-                _trailing(context),
-              ],
-            ),
+      borderRadius: WeftRadius.allLg,
+      // Flush with the row's own box rather than 2dp outside it: the inbox
+      // list clips its viewport, and a ring that overhangs is a ring with its
+      // left and right edges shaved off.
+      ringInset: 0,
+      onHoverChanged: (value) => setState(() => _hovered = value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.sm,
+          vertical: 2,
+        ),
+        child: AnimatedContainer(
+          duration: context.motion.fast,
+          curve: context.motion.standard,
+          padding: const EdgeInsets.symmetric(
+            horizontal: WeftSpace.md,
+            vertical: WeftSpace.md,
+          ),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? colors.primaryContainer
+                : _hovered
+                ? colors.surfaceContainerHigh
+                : Colors.transparent,
+            borderRadius: WeftRadius.allLg,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              widget.leading ??
+                  WeftAvatar(
+                    label: chat.title,
+                    imageUrl: chat.avatarUrl,
+                    imageHeaders: widget.avatarHeaders,
+                    networks: chat.networks,
+                    size: 46,
+                  ),
+              const SizedBox(width: WeftSpace.md),
+              Expanded(child: _body(context)),
+              const SizedBox(width: WeftSpace.sm),
+              _trailing(context),
+            ],
           ),
         ),
       ),

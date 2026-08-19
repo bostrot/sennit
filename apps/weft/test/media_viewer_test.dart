@@ -653,7 +653,10 @@ void main() {
       // A full-screen photo with no label is a black screen with nothing on
       // it, and the caption was a separate node floating over the top of it —
       // so it is said as part of the picture and drawn as one node, not two.
-      expect(labelsIn(tester), contains('Photo, from Anna Maven, on the beach'));
+      expect(
+        labelsIn(tester),
+        contains('Photo, from Anna Maven, on the beach'),
+      );
       handle.dispose();
     });
 

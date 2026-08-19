@@ -17,6 +17,7 @@ import '../../app/call_providers.dart';
 import '../../app/intents.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
+import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
@@ -74,6 +75,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
   String? _unavailable;
 
   final _composer = TextEditingController();
+
+  /// The composer's focus, held here rather than left to the `TextField` for
+  /// one reason: `FocusComposerIntent` is pressed while the user is in the
+  /// inbox list, which on a two-pane window is a *sibling* of this widget. The
+  /// registry in `shortcuts.dart` is how the shortcut reaches across.
+  final _composerFocus = FocusNode(debugLabel: 'Weft composer');
+
   final _scroll = ScrollController();
 
   /// Keys for built bubbles, so a jump can scroll to one that is on screen.
@@ -104,9 +112,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// progressively jankier the further back you went.
   final Set<String> _indexed = {};
 
+  /// Held rather than read back in [dispose], where `ref` is already unsafe:
+  /// a `ConsumerState` is unmounted before its `dispose` runs, and reading a
+  /// provider through a dead `BuildContext` throws.
+  late final ComposerHandle _composerHandle;
+
   @override
   void initState() {
     super.initState();
+    _composerHandle = ref.read(composerHandleProvider)
+      ..register(this, _composerFocus);
     _open();
   }
 
@@ -118,6 +133,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   @override
   void dispose() {
+    // Released before the node is disposed, and only if this widget still holds
+    // the handle: pushing a conversation over another builds the new one first,
+    // so an unconditional release here would clear the registration the
+    // incoming screen has already made.
+    _composerHandle.release(this);
+    _composerFocus.dispose();
     _composer.dispose();
     _scroll.dispose();
     super.dispose();
@@ -350,7 +371,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     switch (choice.action) {
       case MessageAction.reply:
-        setState(() => _composerContext = ComposerContext.reply(message));
+        _enterComposerContext(ComposerContext.reply(message));
       case MessageAction.edit:
         _startEdit(message);
       case MessageAction.react:
@@ -384,7 +405,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.selection = TextSelection.collapsed(
       offset: _composer.text.length,
     );
-    setState(() => _composerContext = ComposerContext.edit(message));
+    _enterComposerContext(ComposerContext.edit(message));
+  }
+
+  /// Puts the composer into [context] and the caret in it.
+  ///
+  /// The focus is the part that was missing, and it was missing invisibly:
+  /// `autofocus` on the `TextField` is read once, when its focus node first
+  /// attaches, and the composer is on screen long before anyone long-presses a
+  /// bubble — so flipping the flag to true did nothing at all. Reply and edit
+  /// are both "now type", and a mode you have to click into before you can
+  /// type or press Escape is a mode with one way in and one way out.
+  void _enterComposerContext(ComposerContext context) {
+    setState(() => _composerContext = context);
+    _composerFocus.requestFocus();
   }
 
   /// The plain-text projection, never the markup.
@@ -578,122 +612,173 @@ class _ChatViewState extends ConsumerState<ChatView> {
     return Scaffold(
       backgroundColor: context.colors.surfaceContainerLowest,
       appBar: _ChatAppBar(chat: chat),
-      body: Column(
-        children: [
-          UnverifiedDevicesBanner(
-            // Absent while the key store is being read, which is the honest
-            // default: a warning that flashes in and out on every open would
-            // be trained away within a day.
-            trust:
-                ref.watch(chatTrustProvider(widget.chatId)).value ??
-                RoomTrust.none,
-            onVerify: _verifyOwnDevice,
-          ),
-          Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (n) {
-                // Reversed list: "extent after" is older history.
-                if (n.metrics.extentAfter < 600) _loadOlder();
-                return false;
-              },
-              child: ListView.builder(
-                controller: _scroll,
-                reverse: true,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: WeftSpace.lg,
-                  vertical: WeftSpace.md,
-                ),
-                itemCount: uploads.length + _view.messages.length + 1,
-                itemBuilder: (context, index) {
-                  if (index < uploads.length) {
-                    // Reversed: index 0 is the newest, and the newest upload is
-                    // the last one enqueued.
-                    return _uploadBubble(
-                      chat,
-                      uploads[uploads.length - 1 - index],
-                    );
-                  }
-                  final i = index - uploads.length;
-                  if (i == _view.messages.length) return _historyFooter();
-                  var message = _view.messages[i];
-                  // Transcripts arrive after the event was mapped; overlay the
-                  // session cache so a finished transcription shows in place.
-                  final cachedTranscript = ref
-                      .watch(transcriptionServiceProvider)
-                      .cached(message.eventId);
-                  if (cachedTranscript != null && message.transcript == null) {
-                    message = message.copyWith(
-                      transcript: cachedTranscript.text,
-                    );
-                  }
-                  final older = i + 1 < _view.messages.length
-                      ? _view.messages[i + 1]
-                      : null;
-                  return Column(
-                    key: _messageKeys.putIfAbsent(
-                      message.eventId,
-                      GlobalKey.new,
-                    ),
-                    children: [
-                      if (_needsDayDivider(message, older))
-                        _DayDivider(date: message.timestamp),
-                      _MessageBubble(
-                        message: message,
-                        replyPreview: _replyPreviewFor(message),
-                        highlighted: message.eventId == _highlightEventId,
-                        transcribing: _transcribing.contains(message.eventId),
-                        onOpen: rendersAsAttachment(message)
-                            ? () => _openMedia(message)
-                            : null,
-                        onTranscribe:
-                            message.canTranscribe && message.transcript == null
-                            ? () => _transcribe(message)
-                            : null,
-                        onRetranscribe:
-                            message.canTranscribe && message.transcript != null
-                            ? () => _retranscribe(message)
-                            : null,
-                        onActions: () => _openActions(message),
-                        onJumpToReply: (eventId) => _jumpTo(eventId),
-                        onToggleReaction: (tally) =>
-                            _toggleReaction(message, tally),
-                        onAddReaction: () => _pickReaction(message),
-                        onShowReactionSenders: (tally) =>
-                            showReactionSendersSheet(
-                              context,
-                              tally: tally,
-                              nameFor: _nameFor,
-                            ),
-                        onShowEditHistory: () =>
-                            showEditHistorySheet(context, message: message),
-                        onTapLink: _openLink,
-                        onTapMention: _openMention,
-                        showNetwork: chat.isMerged,
-                        groupedWithPrevious:
-                            older != null &&
-                            older.isOwn == message.isOwn &&
-                            older.network == message.network &&
-                            message.timestamp
-                                    .difference(older.timestamp)
-                                    .inMinutes <
-                                5,
-                      ),
-                    ],
-                  );
-                },
+      body: _escapeCancels(
+        // Ordered rather than reading order: the timeline comes before the
+        // composer whichever way the text runs, and the banner above them both
+        // is a warning that has to be met before either.
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Column(
+            children: [
+              UnverifiedDevicesBanner(
+                // Absent while the key store is being read, which is the honest
+                // default: a warning that flashes in and out on every open would
+                // be trained away within a day.
+                trust:
+                    ref.watch(chatTrustProvider(widget.chatId)).value ??
+                    RoomTrust.none,
+                onVerify: _verifyOwnDevice,
               ),
-            ),
+              Expanded(
+                child: FocusTraversalOrder(
+                  order: const NumericFocusOrder(1),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      // Reversed list: "extent after" is older history.
+                      if (n.metrics.extentAfter < 600) _loadOlder();
+                      return false;
+                    },
+                    child: ListView.builder(
+                      controller: _scroll,
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: WeftSpace.lg,
+                        vertical: WeftSpace.md,
+                      ),
+                      itemCount: uploads.length + _view.messages.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index < uploads.length) {
+                          // Reversed: index 0 is the newest, and the newest upload is
+                          // the last one enqueued.
+                          return _uploadBubble(
+                            chat,
+                            uploads[uploads.length - 1 - index],
+                          );
+                        }
+                        final i = index - uploads.length;
+                        if (i == _view.messages.length) return _historyFooter();
+                        var message = _view.messages[i];
+                        // Transcripts arrive after the event was mapped; overlay the
+                        // session cache so a finished transcription shows in place.
+                        final cachedTranscript = ref
+                            .watch(transcriptionServiceProvider)
+                            .cached(message.eventId);
+                        if (cachedTranscript != null &&
+                            message.transcript == null) {
+                          message = message.copyWith(
+                            transcript: cachedTranscript.text,
+                          );
+                        }
+                        final older = i + 1 < _view.messages.length
+                            ? _view.messages[i + 1]
+                            : null;
+                        return Column(
+                          key: _messageKeys.putIfAbsent(
+                            message.eventId,
+                            GlobalKey.new,
+                          ),
+                          children: [
+                            if (_needsDayDivider(message, older))
+                              _DayDivider(date: message.timestamp),
+                            _MessageBubble(
+                              message: message,
+                              replyPreview: _replyPreviewFor(message),
+                              highlighted: message.eventId == _highlightEventId,
+                              transcribing: _transcribing.contains(
+                                message.eventId,
+                              ),
+                              onOpen: rendersAsAttachment(message)
+                                  ? () => _openMedia(message)
+                                  : null,
+                              onTranscribe:
+                                  message.canTranscribe &&
+                                      message.transcript == null
+                                  ? () => _transcribe(message)
+                                  : null,
+                              onRetranscribe:
+                                  message.canTranscribe &&
+                                      message.transcript != null
+                                  ? () => _retranscribe(message)
+                                  : null,
+                              onActions: () => _openActions(message),
+                              onJumpToReply: (eventId) => _jumpTo(eventId),
+                              onToggleReaction: (tally) =>
+                                  _toggleReaction(message, tally),
+                              onAddReaction: () => _pickReaction(message),
+                              onShowReactionSenders: (tally) =>
+                                  showReactionSendersSheet(
+                                    context,
+                                    tally: tally,
+                                    nameFor: _nameFor,
+                                  ),
+                              onShowEditHistory: () => showEditHistorySheet(
+                                context,
+                                message: message,
+                              ),
+                              onTapLink: _openLink,
+                              onTapMention: _openMention,
+                              showNetwork: chat.isMerged,
+                              groupedWithPrevious:
+                                  older != null &&
+                                  older.isOwn == message.isOwn &&
+                                  older.network == message.network &&
+                                  message.timestamp
+                                          .difference(older.timestamp)
+                                          .inMinutes <
+                                      5,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: const NumericFocusOrder(2),
+                child: _Composer(
+                  chat: chat,
+                  controller: _composer,
+                  focusNode: _composerFocus,
+                  composing: _composerContext,
+                  onCancelContext: _cancelComposerContext,
+                  onSend: _send,
+                  onAttach: () => _attach(chat),
+                  onPickNetwork: _pickNetwork,
+                ),
+              ),
+            ],
           ),
-          _Composer(
-            chat: chat,
-            controller: _composer,
-            composing: _composerContext,
-            onCancelContext: _cancelComposerContext,
-            onSend: _send,
-            onAttach: () => _attach(chat),
-            onPickNetwork: _pickNetwork,
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  /// [child] with Escape wired to leaving reply or edit mode.
+  ///
+  /// Here rather than in the app-wide map, and *disabled* rather than absent
+  /// when there is no mode to leave. Escape belongs to whatever is on top: a
+  /// dialog over a conversation with a reply half-typed has to close on the
+  /// first press, and an action that reports itself disabled lets `Shortcuts`
+  /// pass the key on to the `DismissIntent` that does it.
+  Widget _escapeCancels({required Widget child}) {
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.escape):
+            CancelComposerContextIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          CancelComposerContextIntent:
+              WeftGuardedAction<CancelComposerContextIntent>(
+                onInvoke: _cancelComposerContext,
+                // Disabled rather than absent: with nothing to cancel the key
+                // has to reach the `DismissIntent` above, or a dialog over a
+                // conversation would need two presses to close.
+                enabled: () => _composerContext != null,
+              ),
+        },
+        child: child,
       ),
     );
   }
@@ -1307,207 +1392,206 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Flexible(
-                child: Semantics(
+                child: WeftFocusable(
                   // The bubble is a group, not a control: it holds a body whose
-                  // links and mention pills must stay individually reachable.
-                  // What the group adds is the header a sighted user reads off
-                  // the bubble's position and colour — who, and on what leg.
-                  container: true,
+                  // links and mention pills must stay individually reachable,
+                  // so its children keep speaking and keep their own focus
+                  // nodes. What the group adds is the header a sighted user
+                  // reads off the bubble's position and colour — who, and on
+                  // what leg.
+                  button: false,
+                  excludeSemantics: false,
                   label: _senderLabel,
+                  // Long-press rather than a visible affordance: a button per
+                  // bubble is six controls per screen the reader has to look
+                  // past to read the conversation. On a keyboard the same
+                  // sheet is Enter, since there is no long-press to make — and
+                  // deliberately not a tap, which would put a menu in front of
+                  // anyone who touched a message.
+                  onActivate: onActions,
                   onLongPress: onActions,
-                  onLongPressHint: onActions == null ? null : 'show actions',
-                  child: GestureDetector(
-                    // Long-press rather than a visible affordance: a button per
-                    // bubble is six controls per screen the reader has to look
-                    // past to read the conversation.
-                    onLongPress: onActions,
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 520),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: WeftSpace.md,
-                        vertical: WeftSpace.sm,
+                  onLongPressHint: 'show actions',
+                  borderRadius: WeftRadius.allLg,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: WeftSpace.md,
+                      vertical: WeftSpace.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: own ? palette.ownBubble : palette.peerBubble,
+                      borderRadius: BorderRadius.only(
+                        topLeft: WeftRadius.lg,
+                        topRight: WeftRadius.lg,
+                        bottomLeft: own ? WeftRadius.lg : WeftRadius.xs,
+                        bottomRight: own ? WeftRadius.xs : WeftRadius.lg,
                       ),
-                      decoration: BoxDecoration(
-                        color: own ? palette.ownBubble : palette.peerBubble,
-                        borderRadius: BorderRadius.only(
-                          topLeft: WeftRadius.lg,
-                          topRight: WeftRadius.lg,
-                          bottomLeft: own ? WeftRadius.lg : WeftRadius.xs,
-                          bottomRight: own ? WeftRadius.xs : WeftRadius.lg,
-                        ),
-                        // A merged chat marks each bubble's origin with a
-                        // hairline in the network's colour — readable without
-                        // stealing attention.
-                        border: showNetwork
-                            ? Border(left: BorderSide(color: accent, width: 3))
-                            : null,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (showNetwork && !groupedWithPrevious) ...[
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                NetworkGlyph(
-                                  network: message.network,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: WeftSpace.xs),
-                                Text(
-                                  message.network.label,
-                                  style: context.text.labelSmall?.copyWith(
-                                    // The label is text and owes 4.5:1; the
-                                    // hairline beside it is a graphic and owes
-                                    // 3:1, which is why they are two tokens.
-                                    color: own
-                                        ? palette.mutedOnBubble(
-                                            true,
-                                            alpha: 0.8,
-                                          )
-                                        : palette.networkTextColor(
-                                            message.network,
-                                          ),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                          ],
-                          // Inside the bubble, above everything: the quote is
-                          // part of what this message says, not chrome around it.
-                          if (replyPreview != null)
-                            ReplyChip(
-                              preview: replyPreview!,
-                              own: own,
-                              onTap: onJumpToReply == null
-                                  ? null
-                                  : () => onJumpToReply!(replyPreview!.eventId),
-                            ),
-                          if (content != null)
-                            content!
-                          // Before the attachment and voice branches, not after:
-                          // a redacted event keeps whatever `attachmentUrl` it
-                          // was mapped with, and a deleted photo that still drew
-                          // its own bubble would be a deletion that did nothing.
-                          else if (message.redacted)
-                            Text(
-                              'Message deleted',
-                              style: context.text.bodyMedium?.copyWith(
-                                fontStyle: FontStyle.italic,
-                                color: palette.mutedOnBubble(own),
-                              ),
-                            )
-                          else if (rendersAsAttachment(message))
-                            AttachmentBubble(
-                              message: message,
-                              own: own,
-                              onOpen: onOpen,
-                              transcribing: transcribing,
-                              onTranscribe: onTranscribe,
-                              onRetranscribe: onRetranscribe,
-                            )
-                          else if (message.kind == MessageKind.voice)
-                            _VoiceContent(
-                              message: message,
-                              own: own,
-                              transcribing: transcribing,
-                              onTranscribe: onTranscribe,
-                              onRetranscribe: onRetranscribe,
-                            )
-                          else
-                            RichTextView.message(
-                              message: message,
-                              baseStyle:
-                                  context.text.bodyMedium?.copyWith(
-                                    color: own
-                                        ? palette.ownBubbleText
-                                        : palette.peerBubbleText,
-                                  ) ??
-                                  TextStyle(
-                                    color: own
-                                        ? palette.ownBubbleText
-                                        : palette.peerBubbleText,
-                                  ),
-                              // Links and mention pills take the network's colour
-                              // on a peer bubble and the bubble's own ink on the
-                              // user's, where the accent would be invisible
-                              // against the primary fill it is derived from.
-                              accent: own ? palette.ownBubbleText : accent,
-                              onTapLink: onTapLink,
-                              onTapMention: onTapMention,
-                            ),
-                          const SizedBox(height: 2),
+                      // A merged chat marks each bubble's origin with a
+                      // hairline in the network's colour — readable without
+                      // stealing attention.
+                      border: showNetwork
+                          ? Border(left: BorderSide(color: accent, width: 3))
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showNetwork && !groupedWithPrevious) ...[
                           Row(
                             mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              if (message.isEdited && !message.redacted) ...[
-                                _EditedMarker(
-                                  message: message,
-                                  own: own,
-                                  onTap: onShowEditHistory,
-                                ),
-                                const SizedBox(width: WeftSpace.xs),
-                              ],
-                              // The time and the tick are one clause — "Sent
-                              // 14:32, Read" — rather than a bare number followed
-                              // by an unlabelled 13dp glyph whose only difference
-                              // between delivered and read is its colour.
-                              Semantics(
-                                container: true,
-                                excludeSemantics: true,
-                                label: _metaLabel,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      DateFormat.Hm().format(message.timestamp),
-                                      style: context.text.labelSmall?.copyWith(
-                                        fontSize: 10,
-                                        color: palette.mutedOnBubble(own),
-                                      ),
-                                    ),
-                                    if (own) ...[
-                                      const SizedBox(width: 3),
-                                      Tooltip(
-                                        message: deliveryStateLabel(
-                                          message.deliveryState,
+                              NetworkGlyph(network: message.network, size: 12),
+                              const SizedBox(width: WeftSpace.xs),
+                              Text(
+                                message.network.label,
+                                style: context.text.labelSmall?.copyWith(
+                                  // The label is text and owes 4.5:1; the
+                                  // hairline beside it is a graphic and owes
+                                  // 3:1, which is why they are two tokens.
+                                  color: own
+                                      ? palette.mutedOnBubble(true, alpha: 0.8)
+                                      : palette.networkTextColor(
+                                          message.network,
                                         ),
-                                        excludeFromSemantics: true,
-                                        child: Icon(
-                                          // An upload still on the wire, and one
-                                          // that failed, must not wear the same
-                                          // double tick a delivered message does.
-                                          switch (message.deliveryState) {
-                                            DeliveryState.sending =>
-                                              Icons.schedule_rounded,
-                                            DeliveryState.failed =>
-                                              Icons.error_outline_rounded,
-                                            _ => Icons.done_all_rounded,
-                                          },
-                                          size: 13,
-                                          color:
-                                              message.deliveryState ==
-                                                  DeliveryState.failed
-                                              ? context.colors.error
-                                              : palette.mutedOnBubble(
-                                                  true,
-                                                  alpha: 0.7,
-                                                ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 3),
                         ],
-                      ),
+                        // Inside the bubble, above everything: the quote is
+                        // part of what this message says, not chrome around it.
+                        if (replyPreview != null)
+                          ReplyChip(
+                            preview: replyPreview!,
+                            own: own,
+                            onTap: onJumpToReply == null
+                                ? null
+                                : () => onJumpToReply!(replyPreview!.eventId),
+                          ),
+                        if (content != null)
+                          content!
+                        // Before the attachment and voice branches, not after:
+                        // a redacted event keeps whatever `attachmentUrl` it
+                        // was mapped with, and a deleted photo that still drew
+                        // its own bubble would be a deletion that did nothing.
+                        else if (message.redacted)
+                          Text(
+                            'Message deleted',
+                            style: context.text.bodyMedium?.copyWith(
+                              fontStyle: FontStyle.italic,
+                              color: palette.mutedOnBubble(own),
+                            ),
+                          )
+                        else if (rendersAsAttachment(message))
+                          AttachmentBubble(
+                            message: message,
+                            own: own,
+                            onOpen: onOpen,
+                            transcribing: transcribing,
+                            onTranscribe: onTranscribe,
+                            onRetranscribe: onRetranscribe,
+                          )
+                        else if (message.kind == MessageKind.voice)
+                          _VoiceContent(
+                            message: message,
+                            own: own,
+                            transcribing: transcribing,
+                            onTranscribe: onTranscribe,
+                            onRetranscribe: onRetranscribe,
+                          )
+                        else
+                          RichTextView.message(
+                            message: message,
+                            baseStyle:
+                                context.text.bodyMedium?.copyWith(
+                                  color: own
+                                      ? palette.ownBubbleText
+                                      : palette.peerBubbleText,
+                                ) ??
+                                TextStyle(
+                                  color: own
+                                      ? palette.ownBubbleText
+                                      : palette.peerBubbleText,
+                                ),
+                            // Links and mention pills take the network's colour
+                            // on a peer bubble and the bubble's own ink on the
+                            // user's, where the accent would be invisible
+                            // against the primary fill it is derived from.
+                            accent: own ? palette.ownBubbleText : accent,
+                            onTapLink: onTapLink,
+                            onTapMention: onTapMention,
+                          ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (message.isEdited && !message.redacted) ...[
+                              _EditedMarker(
+                                message: message,
+                                own: own,
+                                onTap: onShowEditHistory,
+                              ),
+                              const SizedBox(width: WeftSpace.xs),
+                            ],
+                            // The time and the tick are one clause — "Sent
+                            // 14:32, Read" — rather than a bare number followed
+                            // by an unlabelled 13dp glyph whose only difference
+                            // between delivered and read is its colour.
+                            Semantics(
+                              container: true,
+                              excludeSemantics: true,
+                              label: _metaLabel,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    DateFormat.Hm().format(message.timestamp),
+                                    style: context.text.labelSmall?.copyWith(
+                                      fontSize: 10,
+                                      color: palette.mutedOnBubble(own),
+                                    ),
+                                  ),
+                                  if (own) ...[
+                                    const SizedBox(width: 3),
+                                    Tooltip(
+                                      message: deliveryStateLabel(
+                                        message.deliveryState,
+                                      ),
+                                      excludeFromSemantics: true,
+                                      child: Icon(
+                                        // An upload still on the wire, and one
+                                        // that failed, must not wear the same
+                                        // double tick a delivered message does.
+                                        switch (message.deliveryState) {
+                                          DeliveryState.sending =>
+                                            Icons.schedule_rounded,
+                                          DeliveryState.failed =>
+                                            Icons.error_outline_rounded,
+                                          _ => Icons.done_all_rounded,
+                                        },
+                                        size: 13,
+                                        color:
+                                            message.deliveryState ==
+                                                DeliveryState.failed
+                                            ? context.colors.error
+                                            : palette.mutedOnBubble(
+                                                true,
+                                                alpha: 0.7,
+                                              ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1566,38 +1650,34 @@ class _EditedMarker extends StatelessWidget {
     // a button either.
     final openable = message.editHistory.isNotEmpty && onTap != null;
 
-    return Semantics(
-      button: openable,
+    return Tooltip(
+      message: openable ? 'Show edit history' : 'This message was edited',
+      excludeFromSemantics: true,
       // Its own node, not a fragment merged into the words above it: it is a
       // control, and a control that shares a node with the message body cannot
-      // be reached separately from it.
-      container: true,
-      excludeSemantics: true,
-      onTap: openable ? onTap : null,
-      label: semanticsSentence([
-        editedAt == null
-            ? 'Edited'
-            : 'Edited at ${DateFormat.Hm().format(editedAt)}',
-        if (openable) 'show edit history',
-      ]),
-      child: Tooltip(
-        message: openable ? 'Show edit history' : 'This message was edited',
-        excludeFromSemantics: true,
-        child: GestureDetector(
-          onTap: openable ? onTap : null,
-          child: Text(
-            editedAt == null
-                ? 'edited'
-                : 'edited ${DateFormat.Hm().format(editedAt)}',
-            style: context.text.labelSmall?.copyWith(
-              fontSize: 10,
-              fontStyle: FontStyle.italic,
-              color: ink,
-              decoration: message.editHistory.isEmpty
-                  ? null
-                  : TextDecoration.underline,
-              decorationColor: ink,
-            ),
+      // be reached separately from it — by a reader or by Tab.
+      child: WeftFocusable(
+        button: openable,
+        onTap: openable ? onTap : null,
+        label: semanticsSentence([
+          editedAt == null
+              ? 'Edited'
+              : 'Edited at ${DateFormat.Hm().format(editedAt)}',
+          if (openable) 'show edit history',
+        ]),
+        borderRadius: WeftRadius.allXs,
+        child: Text(
+          editedAt == null
+              ? 'edited'
+              : 'edited ${DateFormat.Hm().format(editedAt)}',
+          style: context.text.labelSmall?.copyWith(
+            fontSize: 10,
+            fontStyle: FontStyle.italic,
+            color: ink,
+            decoration: message.editHistory.isEmpty
+                ? null
+                : TextDecoration.underline,
+            decorationColor: ink,
           ),
         ),
       ),
@@ -1744,6 +1824,7 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.chat,
     required this.controller,
+    required this.focusNode,
     required this.onSend,
     required this.onAttach,
     required this.onPickNetwork,
@@ -1753,6 +1834,9 @@ class _Composer extends StatelessWidget {
 
   final Chat chat;
   final TextEditingController controller;
+
+  /// Owned by the chat, so `FocusComposerIntent` can reach it from the inbox.
+  final FocusNode focusNode;
 
   /// The message being answered or rewritten, or null for an ordinary send.
   ///
@@ -1847,16 +1931,47 @@ class _Composer extends StatelessWidget {
                   child: Semantics(
                     label: _fieldLabel(sendNetwork),
                     textField: true,
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 5,
-                      autofocus: composing != null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSend(),
-                      decoration: InputDecoration(
-                        hintText: _fieldLabel(sendNetwork),
-                        isDense: true,
+                    // Around the field, so the key is resolved from the focused
+                    // node outward and marked handled before the platform's
+                    // text input ever sees it. That is what makes Shift+Enter
+                    // able to mean something other than Enter: with
+                    // `TextInputAction.send` alone the embedder called
+                    // `performAction` for both, so a five-line composer had no
+                    // reachable line two.
+                    child: Shortcuts(
+                      shortcuts: composerShortcuts,
+                      child: Actions(
+                        actions: <Type, Action<Intent>>{
+                          SendComposerIntent:
+                              CallbackAction<SendComposerIntent>(
+                                onInvoke: (_) {
+                                  onSend();
+                                  return null;
+                                },
+                              ),
+                          InsertComposerNewlineIntent:
+                              CallbackAction<InsertComposerNewlineIntent>(
+                                onInvoke: (_) {
+                                  insertComposerNewline(controller);
+                                  return null;
+                                },
+                              ),
+                        },
+                        child: TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          minLines: 1,
+                          maxLines: 5,
+                          // Kept for a soft keyboard, which sends no key events
+                          // at all: on a phone this is still what puts a send
+                          // glyph on the return key and what fires `onSend`.
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: InputDecoration(
+                            hintText: _fieldLabel(sendNetwork),
+                            isDense: true,
+                          ),
+                        ),
                       ),
                     ),
                   ),

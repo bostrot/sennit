@@ -672,6 +672,114 @@ additions to `media_viewer_test.dart` (2), `call_screen_test.dart` (3) and
 
 ---
 
+## Keyboard — resolved by task 5
+
+CROSS-3 was two findings sharing one number, and they needed different answers.
+
+**Half of the app was not focusable.** Seven controls were built on
+`GestureDetector`, which Tab does not stop on, while the `InkWell`-based
+controls beside them were reachable — so Tab appeared to work right up until it
+silently skipped the entire inbox. Tasks 3 and 4 had already given each of them
+a correct `Semantics` node, and that is exactly the trap: the semantics tree is
+what a screen reader walks and the focus tree is what Tab walks, and they are
+different trees. A labelled control nothing can land on is still unusable.
+
+**Nothing was bound, and the one key that was bound was wrong.** No shortcuts of
+any kind, and `textInputAction: TextInputAction.send` meant the embedder called
+`performAction` for Shift+Enter exactly as it did for Enter — so a `maxLines: 5`
+composer had no reachable second line.
+
+### What was built
+
+- **`packages/weft_design/lib/src/focus.dart` — `WeftFocusable`.** One widget
+  carrying all three things a control needs at once, because doing two of the
+  three is the failure mode: a `Focus` so Tab lands on it, a ring painted
+  *outside* its bounds in `palette.focusRing` so landing is visible, and
+  `ActivateIntent`/`ButtonActivateIntent` wired to the tap so landing does
+  something. It also owns the semantics recipe tasks 3 and 4 established —
+  `container: true`, `excludeSemantics: true`, tap and long-press restated —
+  because splitting that recipe across two widgets is how the next call site
+  gets one half of it.
+- **`apps/weft/lib/app/shortcuts.dart`.** The intents, the bindings table, the
+  app-wide `Shortcuts`/`Actions` scope installed above the navigator, the
+  composer's `Enter`/`Shift+Enter` map, and `ComposerHandle`.
+- **`apps/weft/lib/features/settings/shortcuts_sheet.dart`.** The sheet,
+  rendered from the same table that builds the map.
+
+### Findings closed
+
+| ID | Resolution |
+|---|---|
+| CROSS-3 (part 1) | All seven `GestureDetector` controls are now `WeftFocusable`: the inbox row (`chat_tile.dart`), every rail item and the All entry (`network_rail.dart`), every accent swatch (`appearance_sheet.dart`), the edited marker and the message bubble (`chat_view.dart`), the transcript block and every image/video/sticker bubble (`attachment_bubble.dart`) |
+| CROSS-3 (part 2) | Five app-wide bindings, three composer-local ones, a sheet listing all eight — see the table below |
+| KEY-01 | `_StaggeredIn` reads `context.motion`, so the inbox appears rather than marching in under `MediaQuery.disableAnimations` |
+| KEY-02 | Rail items are focusable and Tab reaches the network filter |
+| KEY-03 | Already closed by task 2 — `_RailEntry` was migrated to `context.motion` when the token layer landed, and the audit's line reference predates that. Verified, not re-fixed |
+| KEY-04 | `Shift+Enter` inserts a newline at the caret; `Enter` sends. Bound around the field so the framework marks the key handled and the embedder never forwards it, which is the only place the two can be told apart |
+| KEY-05 | `Escape` leaves reply and edit mode. Entering either now also puts the caret in the composer, which is what makes the key reachable at all |
+| A11Y-127 | Mention pills are `WeftFocusable`, so `@room` and every user mention is a tab stop as well as a node |
+
+### The bindings
+
+| Action | Keys | Where it is bound |
+|---|---|---|
+| Next conversation | `Alt+↓`, `Ctrl/Cmd+PageDown` | app-wide |
+| Previous conversation | `Alt+↑`, `Ctrl/Cmd+PageUp` | app-wide |
+| Search all conversations | `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | app-wide |
+| Write a message | `Ctrl/Cmd+Shift+M` | app-wide |
+| Keyboard shortcuts | `Ctrl/Cmd+/` | app-wide |
+| Send | `Enter` | the composer |
+| New line | `Shift+Enter` | the composer |
+| Cancel reply or edit | `Escape` | the conversation |
+
+### Five things later tasks must not get wrong
+
+- **The annotation goes *outside* the detector, not under it.** Both a screen
+  reader and `tester.getSemantics` resolve a node by walking *up* from a
+  widget's first render object, so a `Semantics` buried beneath
+  `FocusableActionDetector`'s `MouseRegion` is a node nothing asking about the
+  control ever finds — the label reads as absent while sitting right there in
+  the tree. Four `ChatTile` tests caught this; the first arrangement passed
+  analysis and failed every one of them.
+- **`onActivate` is not `onTap`.** A message bubble opens its action sheet on
+  long-press, and a keyboard has no long-press — but binding the sheet to
+  `onTap` so Enter would reach it puts a menu in front of everyone who touches
+  a message. The two are separate parameters for that one case, and the bubble
+  is the only caller that needs them apart.
+- **A shortcut that cannot act must report itself *disabled*, not do nothing.**
+  A disabled `Action` lets `Shortcuts` return the key as unhandled, so it
+  carries on to whoever else wants it. This is what keeps Escape over a dialog
+  closing the dialog rather than clearing a reply nobody can see, and what
+  keeps Alt+↓ on a one-pane window from being eaten by a pane that is not on
+  screen. `WeftGuardedAction` is the shared answer.
+- **Nothing app-wide may be bound to an unmodified key.** Enter and Escape are
+  Weft's, but they are bound *inside* the conversation and fall through when
+  they have nothing to do. `keyboard_test.dart` asserts this over the map
+  itself rather than by example, because the rule is what stops a future
+  binding from swallowing a character mid-sentence.
+- **Traversal is ordered, not reading order.** `OrderedTraversalPolicy` with
+  explicit `NumericFocusOrder`s — rail, list, detail, then composer — because
+  reading order is derived from where things sit on screen and would put the
+  rail last the moment task 6 puts the app into Arabic. Task 6 inherits this
+  working; it should not need to touch it.
+
+Two things the audit did not have. **Reply and edit never focused the composer**
+— `autofocus` on a `TextField` is read once, when its focus node first attaches,
+and the composer is on screen long before anyone long-presses a bubble, so
+flipping the flag to true did nothing at all. That was invisible until Escape
+needed the focus to be somewhere. And the media bubble carried *two* tap
+recognisers on the same pixels, one on the picture and one around the caption;
+the inner one is gone.
+
+One golden pair moved, `rich_reply_{dark,light}`: the composer in reply mode now
+has the caret in it, so the field wears its focus border. That is the change,
+drawn.
+
+Covered by `apps/weft/test/a11y/keyboard_test.dart` (15 tests) and
+`packages/weft_design/test/focus_test.dart` (6).
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1203,9 +1311,11 @@ findings**, **8 cross-cutting findings** — 234 in all.
 Closed so far: the token layer (task 2 — see
 [Resolved by task 2](#resolved-by-task-2)), the inbox, chat and composer
 semantics (task 3 — see
-[Semantics — resolved by task 3](#semantics--resolved-by-task-3)) and every
+[Semantics — resolved by task 3](#semantics--resolved-by-task-3)), every
 remaining screen (task 4 — see
-[Semantics — resolved by task 4](#semantics--resolved-by-task-4)).
+[Semantics — resolved by task 4](#semantics--resolved-by-task-4)) and the
+keyboard model (task 5 — see
+[Keyboard — resolved by task 5](#keyboard--resolved-by-task-5)).
 
 **All 140 semantics findings are now closed**, along with CROSS-2 and CROSS-8.
 One of them, **A11Y-08**, is closed for a screen reader and explicitly deferred
@@ -1213,11 +1323,15 @@ to design for its visual half; two more, **A11Y-97** and **A11Y-103**, are
 closed as already-mitigated and were left unchanged, since the state they encode
 in colour is stated in words beside the glyph.
 
-Still **open**: the keyboard model (CROSS-3, KEY-01…05), direction-agnostic
-layout (CROSS-1, RTL-01…42), the test suite's guideline sweep (TAP-01…15), and
-the golden variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed early in
-task 4 because it was one line from a change already being made). Task 9
-re-reads this file and marks each remaining one fixed or deferred with a reason.
+**All five keyboard findings and CROSS-3 are now closed**, along with A11Y-127.
+One of them, **KEY-03**, was already closed by task 2 and is recorded as
+verified rather than re-fixed.
+
+Still **open**: direction-agnostic layout (CROSS-1, RTL-01…42), the test
+suite's guideline sweep (TAP-01…15), and the golden variants (CROSS-7,
+SCALE-02…16 — less SCALE-13, fixed early in task 4 because it was one line from
+a change already being made). Task 9 re-reads this file and marks each remaining
+one fixed or deferred with a reason.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task

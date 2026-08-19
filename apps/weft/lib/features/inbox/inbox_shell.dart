@@ -7,6 +7,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
+import '../../app/shortcuts.dart';
 import '../bridges/bridges_screen.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
@@ -18,10 +19,8 @@ import '../settings/endpoints_screen.dart';
 import '../settings/link_previews_screen.dart';
 import '../settings/mcp_screen.dart';
 import '../settings/notifications_screen.dart';
+import '../settings/shortcuts_sheet.dart';
 import '../settings/sms_screen.dart';
-
-/// Width at which the inbox and the open conversation sit side by side.
-const double _twoPaneBreakpoint = 900;
 
 /// The app's home: network rail, inbox, and — when there's room — the open
 /// conversation beside it.
@@ -35,29 +34,57 @@ class InboxShell extends ConsumerWidget {
     final unread = ref.watch(unreadByNetworkProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
 
-    final wide = MediaQuery.sizeOf(context).width >= _twoPaneBreakpoint;
+    final wide = MediaQuery.sizeOf(context).width >= kTwoPaneBreakpoint;
 
+    // Ordered rather than reading order, which is what the default policy
+    // gives: reading order is derived from where things are on screen, so it
+    // flips with the text direction and would put the detail pane before the
+    // inbox under Arabic. Rail, then list, then detail is the order the panes
+    // *mean*, in any direction — and each pane is its own group, so Tab walks
+    // one to the end before entering the next instead of zig-zagging between
+    // them.
     return Scaffold(
-      body: Row(
-        children: [
-          NetworkRail(
-            networks: repository.availableNetworks,
-            selected: filter,
-            unreadByNetwork: unread,
-            onToggle: (n) => ref.read(networkFilterProvider.notifier).toggle(n),
-            onShowAll: () => ref.read(networkFilterProvider.notifier).clear(),
-          ),
-          Expanded(flex: wide ? 2 : 1, child: const _InboxPane()),
-          if (wide) ...[
-            VerticalDivider(width: 1, color: context.palette.border),
-            Expanded(
-              flex: 3,
-              child: selectedChatId == null
-                  ? const _EmptyDetail()
-                  : ChatView(chatId: selectedChatId),
+      body: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: Row(
+          children: [
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(1),
+              child: FocusTraversalGroup(
+                child: NetworkRail(
+                  networks: repository.availableNetworks,
+                  selected: filter,
+                  unreadByNetwork: unread,
+                  onToggle: (n) =>
+                      ref.read(networkFilterProvider.notifier).toggle(n),
+                  onShowAll: () =>
+                      ref.read(networkFilterProvider.notifier).clear(),
+                ),
+              ),
             ),
+            Expanded(
+              flex: wide ? 2 : 1,
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(2),
+                child: FocusTraversalGroup(child: const _InboxPane()),
+              ),
+            ),
+            if (wide) ...[
+              VerticalDivider(width: 1, color: context.palette.border),
+              Expanded(
+                flex: 3,
+                child: FocusTraversalOrder(
+                  order: const NumericFocusOrder(3),
+                  child: FocusTraversalGroup(
+                    child: selectedChatId == null
+                        ? const _EmptyDetail()
+                        : ChatView(chatId: selectedChatId),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -72,7 +99,7 @@ class _InboxPane extends ConsumerWidget {
     final filter = ref.watch(networkFilterProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
     final mediaHeaders = ref.watch(mediaHeadersProvider);
-    final wide = MediaQuery.sizeOf(context).width >= _twoPaneBreakpoint;
+    final wide = MediaQuery.sizeOf(context).width >= kTwoPaneBreakpoint;
 
     final selection = ref.watch(chatSelectionProvider);
     final selecting = selection.isNotEmpty;
@@ -292,6 +319,18 @@ class _InboxHeader extends ConsumerWidget {
 
   final Set<ChatNetwork> activeFilter;
 
+  /// The three platforms a physical keyboard is a given on.
+  ///
+  /// The shortcuts still work on a tablet with one attached — they are bound
+  /// app-wide — but an entry advertising them on a phone is a menu row that
+  /// opens a sheet full of keys the device does not have.
+  static bool get _hasKeyboard => switch (defaultTargetPlatform) {
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux => true,
+    _ => false,
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
@@ -385,6 +424,8 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const SmsScreen(),
                         ),
                       );
+                    case 'shortcuts':
+                      showShortcutsSheet(context);
                   }
                 },
                 itemBuilder: (_) => [
@@ -435,6 +476,17 @@ class _InboxHeader extends ConsumerWidget {
                     value: 'security',
                     child: Text('Encryption'),
                   ),
+                  // The other way into the shortcuts sheet, and the one that
+                  // matters: Ctrl/Cmd + / only helps someone who already knows
+                  // there is a keyboard model to look for. Stated as a
+                  // platform condition rather than read off a provider, the
+                  // same way the SMS entry above is — a phone with no keyboard
+                  // attached has nothing to show here.
+                  if (_hasKeyboard)
+                    const PopupMenuItem(
+                      value: 'shortcuts',
+                      child: Text('Keyboard shortcuts'),
+                    ),
                 ],
               ),
             ],
@@ -511,11 +563,17 @@ class _StaggeredIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final delay = WeftMotion.stagger * (index.clamp(0, 12));
+    // `context.motion`, not `WeftMotion`: the constants are the design
+    // durations and this is the app's single most motion-y list. Under
+    // `MediaQuery.disableAnimations` every duration below collapses to zero, so
+    // the inbox appears rather than marching in — which is what the setting is
+    // asking for.
+    final motion = context.motion;
+    final delay = motion.stagger * (index.clamp(0, 12));
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: WeftMotion.normal + delay,
-      curve: WeftMotion.enter,
+      duration: motion.normal + delay,
+      curve: motion.enter,
       builder: (context, t, child) => Opacity(
         opacity: t,
         child: Transform.translate(
