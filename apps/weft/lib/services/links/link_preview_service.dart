@@ -174,31 +174,15 @@ class LinkPreviewService {
   }
 }
 
-/// The stores, or null when nobody has opened them yet.
-///
-/// Deliberately `on Object` rather than `on StateError`. [storesProvider]
-/// throws a `StateError` the *first* time it is read before bootstrap; from
-/// then on it is a provider in an error state, and Riverpod rethrows that
-/// wrapped in a `ProviderException` to everyone after. Catching only the
-/// unwrapped form means the first reader degrades quietly and the second gets a
-/// red screen — which is exactly what a widget test pumping a chat view with no
-/// database saw, from a card whose whole job was to decide not to draw.
-WeftStores? _storesOrNull(Ref ref) {
-  try {
-    return ref.watch(storesProvider);
-  } on Object catch (_) {
-    return null;
-  }
-}
-
 /// The gate as the app reads it.
 ///
 /// Fails closed. Until the database is open nobody can say whether the user
 /// opted in, and the honest answer to that is "they did not" — the same reason
-/// [LinkPreviewSettings.off] is the default rather than a guess.
+/// [LinkPreviewSettings.off] is the default rather than a guess. See
+/// [storesOrNull] for why the read is guarded at all.
 final linkPreviewSettingsProvider = Provider<LinkPreviewSettings>((ref) {
   ref.watch(settingsRevisionProvider);
-  final stores = _storesOrNull(ref);
+  final stores = storesOrNull(ref);
   return stores == null
       ? LinkPreviewSettings.off
       : LinkPreviewSettings.fromStore(stores.settings);
@@ -215,7 +199,7 @@ final linkPreviewFetchProvider = Provider<LinkPreviewFetch?>((ref) {
 final linkPreviewServiceProvider = Provider<LinkPreviewService>((ref) {
   return LinkPreviewService(
     settings: ref.watch(linkPreviewSettingsProvider),
-    cache: _storesOrNull(ref)?.linkPreviews,
+    cache: storesOrNull(ref)?.linkPreviews,
     fetch: ref.watch(linkPreviewFetchProvider),
   );
 });

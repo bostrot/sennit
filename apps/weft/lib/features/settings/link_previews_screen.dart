@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
-import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
 import '../../app/providers.dart';
@@ -68,7 +67,7 @@ class LinkPreviewsScreen extends ConsumerWidget {
                   'nothing on the homeserver beyond their ciphertext.',
             ),
             for (final network in networks)
-              _NetworkRow(
+              NetworkToggleRow(
                 network: network,
                 allowed: !settings.excludedNetworks.contains(network.id),
                 onChanged: (allowed) => _write(
@@ -140,32 +139,6 @@ class LinkPreviewsScreen extends ConsumerWidget {
     showWeftMessage(
       context,
       removed == 1 ? 'Forgot 1 preview.' : 'Forgot $removed previews.',
-    );
-  }
-}
-
-/// One network, and whether its messages may be previewed.
-class _NetworkRow extends StatelessWidget {
-  const _NetworkRow({
-    required this.network,
-    required this.allowed,
-    required this.onChanged,
-  });
-
-  final ChatNetwork network;
-  final bool allowed;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      // The tile is one merged node, and the title beside the glyph is already
-      // the network's name — a labelled glyph here reads "WhatsApp, WhatsApp".
-      secondary: NetworkGlyph(network: network, size: 28, semanticsLabel: ''),
-      title: Text(network.label),
-      value: allowed,
-      onChanged: onChanged,
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

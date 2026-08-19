@@ -145,6 +145,48 @@ abstract final class WeftSettings {
   static const String linkPreviewExcludedNetworks =
       'privacy.link_preview_excluded';
 
+  /// Whether the inbox snapshot reaches home screen widgets.
+  ///
+  /// The third gate of this shape, under the same `privacy.` prefix as the
+  /// other two and off unless set, for the same reason. What it discloses is
+  /// larger than either of them: a widget row is conversation content written
+  /// *outside* the encrypted store, into a container the OS reads on its own
+  /// schedule and any device-level backup copies. See `SnapshotSettings` in
+  /// `apps/weft/lib/services/snapshot/snapshot_writer.dart`.
+  ///
+  /// **Deliberately no migration.** These five keys are rows in the generic
+  /// `settings` key/value table that has existed since v1, exactly like the two
+  /// link-preview keys above, which were added without one. A migration here
+  /// would be an empty statement bumping `user_version` for nothing, and the
+  /// rule this file's neighbours follow is that a migration exists when the
+  /// *schema* changes.
+  static const String snapshotWidgets = 'privacy.snapshot_widgets';
+
+  /// Whether the inbox snapshot reaches the watch companions.
+  ///
+  /// Separate from [snapshotWidgets] because they are separate disclosures: a
+  /// widget sits on a home screen anyone standing nearby can read, and a watch
+  /// is on a wrist. Someone may well want one and not the other, and a single
+  /// switch would make them decide for both.
+  static const String snapshotWatch = 'privacy.snapshot_watch';
+
+  /// Whether a snapshot row carries what the last message said.
+  static const String snapshotPreviews = 'privacy.snapshot_previews';
+
+  /// Whether a snapshot row carries the conversation's title, the last sender's
+  /// name and its avatar.
+  ///
+  /// Split from [snapshotPreviews] because "don't show what they said" and
+  /// "don't show who they are" are not the same worry — the split `weft_notify`
+  /// documents between Android's hide-sensitive-content and iOS's
+  /// hide-previews, made into two switches.
+  static const String snapshotSenderNames = 'privacy.snapshot_senders';
+
+  /// Networks that never reach a companion surface, as a JSON list of ids under
+  /// a `networks` key — the same shape as [linkPreviewExcludedNetworks], read
+  /// by the same kind of `fromStore`.
+  static const String snapshotExcludedNetworks = 'privacy.snapshot_excluded';
+
   static const String mcpEnabled = 'mcp.enabled';
   static const String mcpPort = 'mcp.port';
   static const String mcpTunnelEnabled = 'mcp.tunnel_enabled';

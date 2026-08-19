@@ -26,5 +26,14 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftCallManager") {
       WeftCallManager.register(with: registrar)
     }
+    // The companion surfaces' container. Registered on the launch path like the
+    // two above, and for a smaller version of the same reason: the first thing
+    // the app does once the session is ready is write a snapshot, and a channel
+    // registered lazily would answer that first write with
+    // `MissingPluginException` — which the Dart side reads as "this platform
+    // has no surfaces" and would not retry until the inbox next changed.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftSnapshotChannel") {
+      WeftSnapshotChannel.register(with: registrar)
+    }
   }
 }

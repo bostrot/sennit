@@ -27,6 +27,9 @@
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
+		5F40000000000000000000F3 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* ShareContainer.swift */; };
+		5F40000000000000000000F4 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* SnapshotContainer.swift */; };
+		5F40000000000000000000F5 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E5 /* SnapshotChannel.swift */; };
 		4E3DDB0A641A8E6ED6B1978F /* Pods_Runner_RunnerUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 403EE58911A408521E697E44 /* Pods_Runner_RunnerUITests.framework */; };
 		60ED0B637CFA529A232B2403 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C632A28421B0062E919090D1 /* Pods_RunnerTests.framework */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -84,6 +87,9 @@
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		33CC10F72044A3C60003C045 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Runner/Info.plist; sourceTree = "<group>"; };
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E3 /* ShareContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/ShareContainer.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E4 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/SnapshotContainer.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E5 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runner/SnapshotChannel.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -159,10 +165,22 @@
 			path = Configs;
 			sourceTree = "<group>";
 		};
+		5F40000000000000000000E6 /* Shared with iOS */ = {
+			isa = PBXGroup;
+			children = (
+				5F40000000000000000000E3 /* ShareContainer.swift */,
+				5F40000000000000000000E4 /* SnapshotContainer.swift */,
+				5F40000000000000000000E5 /* SnapshotChannel.swift */,
+			);
+			name = "Shared with iOS";
+			path = ../ios;
+			sourceTree = "<group>";
+		};
 		33CC10E42044A3C60003C045 = {
 			isa = PBXGroup;
 			children = (
 				33FAB671232836740065AC1E /* Runner */,
+				5F40000000000000000000E6 /* Shared with iOS */,
 				33CEB47122A05771004F2AC0 /* Flutter */,
 				331C80D6294CF71000263BE5 /* RunnerTests */,
 				33CC10EE2044A3C60003C045 /* Products */,
@@ -609,6 +627,9 @@
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
+				5F40000000000000000000F3 /* ShareContainer.swift in Sources */,
+				5F40000000000000000000F4 /* SnapshotContainer.swift in Sources */,
+				5F40000000000000000000F5 /* SnapshotChannel.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

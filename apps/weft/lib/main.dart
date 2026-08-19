@@ -13,6 +13,7 @@ import 'app/providers.dart';
 import 'app/session_providers.dart';
 import 'app/share_providers.dart';
 import 'app/shortcuts.dart';
+import 'app/snapshot_providers.dart';
 import 'app/stores.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
@@ -77,21 +78,26 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _shareTargets?.close();
+    _inboxSurfaces?.close();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    _refreshShareTargets();
+    _refreshInboxSurfaces();
     // The resume that matters most: the Share Extension runs while Weft is
     // backgrounded, so the share is already staged by the time the user comes
     // back to it — often by tapping Weft immediately afterwards.
     unawaited(_drainStagedShares());
   }
 
-  /// The inbox subscription that keeps the launcher's share targets current.
+  /// The inbox subscription that keeps every out-of-app surface current.
+  ///
+  /// One subscription for both of them — the launcher's share targets and the
+  /// companion-surface snapshot — because they are the same signal read two
+  /// ways, and a second `listenManual` on [chatsProvider] would be a second
+  /// listener on one stream with no second question to ask it.
   ///
   /// Held rather than declared with `ref.listen` in [build] for one reason:
   /// `ref.listen` subscribes on the first frame, and subscribing to
@@ -99,19 +105,30 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// session. Neither exists before the auth gate has passed, so the
   /// subscription starts when the session becomes ready and is closed when it
   /// stops being.
-  ProviderSubscription<AsyncValue<List<Chat>>>? _shareTargets;
+  ProviderSubscription<AsyncValue<List<Chat>>>? _inboxSurfaces;
 
   /// Follows the inbox for as long as there is one.
   ///
-  /// Every tick, and deliberately: [ShareShortcutService] is what decides
-  /// whether a tick is worth a launcher call, and it says no to nearly all of
-  /// them. Idempotent, because the session state stream re-emits `ready` on
-  /// every reconnection.
-  void _startShareTargets() {
-    _shareTargets ??= ref.listenManual(chatsProvider, (_, next) {
+  /// Every tick, and deliberately: [ShareShortcutService] and [SnapshotWriter]
+  /// each decide whether a tick is worth a platform call, and both say no to
+  /// nearly all of them. Idempotent, because the session state stream re-emits
+  /// `ready` on every reconnection.
+  ///
+  /// The gate is pushed at the writer before the first list arrives, because
+  /// `ref.listen` below only fires on *changes*: without this, a launch into an
+  /// app where widgets are already switched on would write the switched-off
+  /// payload until the user next touched the setting.
+  void _startInboxSurfaces() {
+    unawaited(
+      ref
+          .read(snapshotWriterProvider)
+          .applySettings(ref.read(snapshotSettingsProvider)),
+    );
+    _inboxSurfaces ??= ref.listenManual(chatsProvider, (_, next) {
       final chats = next.value;
       if (chats == null) return;
       unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
+      unawaited(ref.read(snapshotWriterProvider).refresh(chats));
       // A launch drain almost always arrives before the first chat list does,
       // and a share sheet with no conversations in it is not worth spending a
       // staged share on. This is where the inbox finally exists.
@@ -120,32 +137,39 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     unawaited(_drainStagedShares());
   }
 
-  /// Stops following the inbox and takes the names back off the launcher.
+  /// Stops following the inbox and takes back everything left outside the app.
   ///
   /// The subscription is closed *first*: a chat list emitted between the
   /// removal and the unsubscribe would republish everything that was just
   /// removed, which is the one ordering that leaks.
-  void _stopShareTargets() {
-    _shareTargets?.close();
-    _shareTargets = null;
+  ///
+  /// The snapshot is *deleted* rather than rewritten empty. A blank payload
+  /// says "switched off in Settings" and would leave a widget pointing at a
+  /// setting; an absent one says "nobody is signed in", which is what has
+  /// actually happened and what the surfaces render a sign-in prompt for.
+  void _stopInboxSurfaces() {
+    _inboxSurfaces?.close();
+    _inboxSurfaces = null;
     unawaited(ref.read(shareShortcutServiceProvider).clear());
+    unawaited(ref.read(snapshotWriterProvider).clear());
   }
 
-  /// Re-ranks and republishes the device's share targets.
+  /// Re-ranks the share targets and rewrites the snapshot.
   ///
-  /// Cheap to call on any signal: [ShareShortcutService] compares the ranked
-  /// slots against what it last published and does nothing at all when they
-  /// match, which is the common case.
-  void _refreshShareTargets() {
-    if (_shareTargets == null) return;
+  /// Cheap to call on any signal: both services compare what they would publish
+  /// against what they last published and do nothing at all when they match,
+  /// which is the common case.
+  void _refreshInboxSurfaces() {
+    if (_inboxSurfaces == null) return;
     final chats = ref.read(chatsProvider).value;
     if (chats == null) return;
     unawaited(ref.read(shareShortcutServiceProvider).refresh(chats));
+    unawaited(ref.read(snapshotWriterProvider).refresh(chats));
   }
 
   /// A drain was asked for before there was anywhere to put its result.
   ///
-  /// The two gates below are not the same gate. `_shareTargets` says the session
+  /// The two gates below are not the same gate. `_inboxSurfaces` says the session
   /// is ready; `chatsProvider.value` says the inbox has actually arrived, which
   /// is a frame or several later and is what [_handleShare] requires. A drain in
   /// between would delete the blob and hand the payload to a sheet that refuses
@@ -158,7 +182,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// call that answers with an empty list, or a [MissingPluginException] that
   /// [WeftStagedShares] reads as the same thing. Never throws.
   Future<void> _drainStagedShares() async {
-    if (_shareTargets == null || ref.read(chatsProvider).value == null) {
+    if (_inboxSurfaces == null || ref.read(chatsProvider).value == null) {
       _drainPending = true;
       return;
     }
@@ -300,18 +324,28 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       switch (next.value) {
         case WeftSessionState.ready:
           unawaited(_startNotifications());
-          _startShareTargets();
-        // Both signed-out states take the launcher's copy away. `softLoggedOut`
+          _startInboxSurfaces();
+        // Both signed-out states take the out-of-app copies away. `softLoggedOut`
         // is the server having invalidated the token, and until the user
         // re-auths this device is exactly as signed out as the other one —
-        // while the shortcuts it published are long-lived, sitting in every
-        // app's share sheet with contact names on them. They come back on the
-        // next publish, which costs a re-auth nothing.
+        // while the shortcuts it published and the snapshot it wrote are both
+        // long-lived, sitting in every app's share sheet and on a home screen
+        // with contact names on them. They come back on the next publish, which
+        // costs a re-auth nothing.
         case WeftSessionState.loggedOut || WeftSessionState.softLoggedOut:
-          _stopShareTargets();
+          _stopInboxSurfaces();
         case _:
           break;
       }
+    });
+
+    // The gate, pushed at the container the moment it changes rather than on
+    // the next inbox tick. The settings screen already tells the writer
+    // directly — this covers the other ways a gate can move, and is what makes
+    // "the switch and the file agree" a property of the app rather than of one
+    // screen remembering to call something.
+    ref.listen(snapshotSettingsProvider, (_, next) {
+      unawaited(ref.read(snapshotWriterProvider).applySettings(next));
     });
 
     return MaterialApp(

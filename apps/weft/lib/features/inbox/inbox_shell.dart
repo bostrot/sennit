@@ -21,6 +21,7 @@ import '../settings/mcp_screen.dart';
 import '../settings/notifications_screen.dart';
 import '../settings/shortcuts_sheet.dart';
 import '../settings/sms_screen.dart';
+import '../settings/surfaces_screen.dart';
 
 /// The app's home: network rail, inbox, and — when there's room — the open
 /// conversation beside it.
@@ -409,6 +410,12 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const LinkPreviewsScreen(),
                         ),
                       );
+                    case 'surfaces':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SurfacesScreen(),
+                        ),
+                      );
                     case 'mcp':
                       navigator.push(
                         MaterialPageRoute<void>(
@@ -470,6 +477,10 @@ class _InboxHeader extends ConsumerWidget {
                   const PopupMenuItem(
                     value: 'link_previews',
                     child: Text('Link previews'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'surfaces',
+                    child: Text('Widgets & watch'),
                   ),
                   const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
                   // The same condition `smsRepositoryProvider` is built under,

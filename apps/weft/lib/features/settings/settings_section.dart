@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
 
 /// The red box at the top of a screen that can send something off the device.
 ///
@@ -139,6 +140,39 @@ class SettingsSectionHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One network, and whether a privacy gate lets it through.
+///
+/// Every gate of this shape has the same escape hatch under it — previews for
+/// the group chat, nothing for the one conversation that must leave no trace —
+/// and the row was written twice before it was written here. The switch reads
+/// *allowed*, not *excluded*, because a list of switches where on means "no"
+/// is a list nobody parses correctly at a glance.
+class NetworkToggleRow extends StatelessWidget {
+  const NetworkToggleRow({
+    super.key,
+    required this.network,
+    required this.allowed,
+    required this.onChanged,
+  });
+
+  final ChatNetwork network;
+  final bool allowed;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      // The tile is one merged node, and the title beside the glyph is already
+      // the network's name — a labelled glyph here reads "WhatsApp, WhatsApp".
+      secondary: NetworkGlyph(network: network, size: 28, semanticsLabel: ''),
+      title: Text(network.label),
+      value: allowed,
+      onChanged: onChanged,
+      contentPadding: EdgeInsets.zero,
     );
   }
 }

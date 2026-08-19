@@ -19,6 +19,8 @@
 		5F30000000000000000000E4 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000E2 /* ShareContainer.swift */; };
 		5F30000000000000000000F1 /* ShareChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000F0 /* ShareChannel.swift */; };
 		5F30000000000000000000F3 /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000F2 /* CallManager.swift */; };
+		5F40000000000000000000F1 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
+		5F40000000000000000000F2 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E2 /* SnapshotChannel.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
@@ -107,6 +109,8 @@
 		5F30000000000000000000E5 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		5F30000000000000000000F0 /* ShareChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareChannel.swift; sourceTree = "<group>"; };
 		5F30000000000000000000F2 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E1 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotContainer.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E2 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotChannel.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -199,6 +203,7 @@
 			isa = PBXGroup;
 			children = (
 				5F30000000000000000000E2 /* ShareContainer.swift */,
+				5F40000000000000000000E1 /* SnapshotContainer.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -253,6 +258,7 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */,
 				5F30000000000000000000F0 /* ShareChannel.swift */,
+				5F40000000000000000000E2 /* SnapshotChannel.swift */,
 				5F30000000000000000000F2 /* CallManager.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				5F30000000000000000000E5 /* Runner.entitlements */,
@@ -522,6 +528,8 @@
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 				5F30000000000000000000E3 /* ShareContainer.swift in Sources */,
 				5F30000000000000000000F1 /* ShareChannel.swift in Sources */,
+				5F40000000000000000000F1 /* SnapshotContainer.swift in Sources */,
+				5F40000000000000000000F2 /* SnapshotChannel.swift in Sources */,
 				5F30000000000000000000F3 /* CallManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

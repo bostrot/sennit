@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.bostrot.weft.call.CallBridge
 import com.bostrot.weft.sms.SmsBridge
+import com.bostrot.weft.widget.WeftSnapshotChannel
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -128,6 +129,13 @@ class MainActivity : FlutterActivity() {
         // `CallBridge` holds that answer until an engine exists, which is why it
         // is a singleton rather than a `when` arm here.
         CallBridge.attach(this, flutterEngine)
+        // The companion-surface snapshot, on a channel of its own for the
+        // reason `WeftSnapshotChannel` documents: the same channel name has to
+        // exist on iOS and macOS, where `/intents` does not exist at all, and
+        // nothing on it touches state anything above shares. No `attach`/`detach`
+        // pair because it holds nothing — every call is a `SharedPreferences`
+        // write against the application context.
+        WeftSnapshotChannel.register(this, flutterEngine)
 
         intent?.let { handleIntent(it, replay = true) }
     }

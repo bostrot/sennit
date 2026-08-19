@@ -80,6 +80,7 @@ dependencies:
   weft_search: ^0.1.0
   weft_share: ^0.1.0
   weft_sms: ^0.1.0
+  weft_snapshot: ^0.1.0
   weft_store: ^0.1.0
   weft_transcribe: ^0.1.0
 
