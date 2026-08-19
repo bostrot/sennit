@@ -33,6 +33,22 @@ default-SMS role prompt — no `flutter test` can reach any of them, because non
 of them is drawn by Flutter. Patrol can, because its native automator drives
 UIAutomator and XCUITest alongside the Dart test process.
 
+M10's other half is [[A11y-Audit]], which comes at the same app from the
+opposite direction: every screen read line by line, nothing on a device. Between
+them they are this phase's whole quality track — one audits what cannot be
+executed, the other executes what cannot be audited — and neither has yet met
+the thing it is really about. The audit has never been heard through a screen
+reader; this suite has never run a row of the matrix below.
+
+One area is outside this matrix on purpose: **calling**. [[Calling]] records
+what Phase 07 established — a real 1:1 call placed between two accounts on this
+same local Synapse, invite through hangup, in an encrypted room — and the one
+thing it could not: no media has ever crossed a peer connection, because the
+connection is a fake in every test. A Patrol scenario would not change that.
+Two devices with real microphones and a TURN server would, and there is no
+`call_test.dart` under `patrol/` because neither is here. `integration_test/
+call_test.dart`'s three tests remain where calling's coverage is.
+
 ---
 
 ## What this phase inherits
@@ -316,8 +332,10 @@ unauthenticated one, and the audit entries; the tunnel is asserted to be
 
 ## The scenarios
 
-Thirteen files under `apps/weft/integration_test/patrol/`, plus a shared
-`patrol/support/`. Each is independently runnable and cleans up the rooms it
+Thirteen files under `apps/weft/integration_test/patrol/`, holding **39
+scenarios** between them, plus a shared `patrol/support/` and a
+`harness_test.dart` that is not a scenario — it is the two checks that answer
+"is any of this real". Each file is independently runnable and cleans up the rooms it
 made — a failed run must not poison the next one, which on a shared homeserver
 means leaving no room and no lingering device behind.
 
@@ -652,6 +670,12 @@ surfaces, the share sheet) and `scenario.dart` (the app-plus-peer-plus-room
 opening that the first three files each had a private copy of, now written once
 and used by all five).
 
+[[Share-Surfaces]] is the architecture these three exercise from the outside:
+the Android `SEND`/`SEND_MULTIPLE` filters, the staged copy a `content://` URI
+is streamed into, the share-target sheet, and the iOS Share Extension that does
+not exist yet — which is skip reason ② and the reason `share_in_test` is an
+Android-only file.
+
 **None of them has been executed**, for the reasons already recorded: no
 `patrol_cli` on this host and no runnable matrix row. What *was* run here is
 [below](#what-was-verified-for-these-scenarios).
@@ -755,11 +779,26 @@ Two constraints the scenarios are shaped around:
 
 ## The notification and deep-link scenarios
 
-Eight scenarios across `notification_test.dart`, `notification_mute_test.dart`
-and `deeplink_test.dart`, over the same `support/`, which grew two files:
-`verification.dart` — how this device becomes trusted, which turns out to be the
-precondition for posting anything at all — and `shade.dart`, the notification
-shade itself. Nothing here was executed.
+Nine scenarios across `notification_test.dart` (3),
+`notification_mute_test.dart` (2) and `deeplink_test.dart` (4), over the same
+`support/`, which grew two files: `verification.dart` — how this device becomes
+trusted, which turns out to be the precondition for posting anything at all —
+and `shade.dart`, the notification shade itself. Nothing here was executed.
+
+[[Notifications]] is what these nine assert against: the pusher registration,
+the sync-and-push pipeline, the per-network channels, `MessagingStyle` and the
+conversation shortcut, the decision layer's suppression rules, and the tap
+routing that has to survive a merged chat. Everything in that document is
+covered by 61 + 78 unit and widget tests and by one hand-driven session on a
+device; what these scenarios add is the half only the OS can answer — that the
+shade really received it, that a tap really routed, that a reply typed into the
+shade really became an encrypted event. **None of that has run.**
+
+> [!NOTE]
+> **Count corrected, 2026-08-19.** This section said "eight scenarios"; the
+> three files hold **nine** `patrolTest` bodies. The tree is the authority, and
+> the [Results](#results) table below is built by reading it rather than by
+> adding up the prose.
 
 ### The finding that reshaped the whole task
 
@@ -1497,47 +1536,188 @@ Four findings, two of them fixed here and verified against the device.
 | The devices-list scroll fix works | the verification scenario passed twice after failing twice, with no other change |
 | The file-store fix works | `chat_actions_test`: two `weft.sqlite-journal` failures before, zero after; one scenario converted from fail to pass |
 | Nothing regressed | `flutter analyze` clean, `dart format --set-exit-if-changed` clean, `dart analyze integration_test/patrol` clean, and the unit suites — see the commit |
-| **Not** checked | every one of the eleven matrix rows; nineteen of the thirty-two scenarios, nine files of which have never run anywhere; any iOS anything; the macOS row past the automation handshake; whether findings ③, ⑤ and ⑥ are app defects or suite defects |
+| **Not** checked | every one of the eleven matrix rows; 27 of the 39 scenarios, nine files of which have never run anywhere; any iOS anything; the macOS row past the automation handshake; whether findings ③, ⑤ and ⑥ are app defects or suite defects |
 
 That last cell is the honest headline. This task moved the suite from *nothing
-executed* to *thirteen scenarios executed on an off-matrix Android emulator*, and
+executed* to *twelve scenarios executed on an off-matrix Android emulator*, and
 found four defects doing it — two of them in Weft, one of them a data-loss
 hazard. It did not establish that the matrix passes, on any row.
+
+> [!NOTE]
+> **Counts corrected, 2026-08-19, closing the phase.** This section originally
+> said "thirteen scenarios executed … nineteen not executed" out of
+> "thirty-two". Counted against the tree — 41 `patrolTest` bodies, of which 2
+> are `harness_test`'s — the suite holds **39 scenarios**, of which **12** ran
+> and **27** did not. The earlier figures counted the two-check `harness_test`
+> as a single scenario and undercounted the files nobody reached. The pass and
+> fail *results* above are unchanged and are what the device printed; only the
+> arithmetic around them moved. Every table in [Results](#results) is generated
+> from the tree.
 
 ---
 
 ## Results
 
-To be filled in by the last task of Phase 09. Every cell of the matrix table
-below is still **not executed**: the run above happened on an **API 36** phone
-emulator, which is not one of the eleven rows, and its per-scenario results are
-recorded as [A36-P](#a36-p-per-scenario) rather than smuggled into an A35 cell.
-The reasons per platform are now specific rather than shared — Android has no
-28/33/35 system image installed, iOS has no simulator runtime and no signing
-identity, and macOS is one interactive Accessibility grant away from running.
-Every scenario is written; what that means, file group by file group, is
-recorded above for the
-[core three](#what-was-verified-and-what-was-not), the
-[media three](#what-was-verified-for-these-scenarios), the
-[notification and deep-link three](#what-was-verified-for-these-scenarios-1) and
-the [merge, search, bridge and MCP four](#what-was-verified-for-these-scenarios-2).
+Filled in 2026-08-19, closing Phase 09. This is the table the whole document was
+built to be able to fill in honestly, and the honest answer is that **not one of
+the eleven matrix rows has been executed**. Twelve of the 39 scenarios ran, all
+of them on an **API 36** phone emulator that is not a row of this matrix, and
+they are reported in their own **A36-P** column rather than written into an A35
+cell.
 
-| Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| `login_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `messaging_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `chat_actions_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `attachment_test` | · | · | · | · | · | · | · | · | · | · | n/a |
-| `share_in_test` | · | · | · | · | · | · | n/a | n/a | n/a | n/a | n/a |
-| `permissions_test` | · | · | · | · | · | · | · | · | · | · | n/a |
-| `notification_test` | · | · | · | · | · | · | · | · | · | · | n/a |
-| `notification_mute_test` | · | · | · | · | · | · | · | · | · | · | n/a |
-| `deeplink_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `merge_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `search_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `bridges_test` | · | · | · | · | · | · | · | · | · | · | · |
-| `mcp_test` | · | · | · | · | · | · | · | · | · | · | · |
+Legend: **pass** executed and passed · **fail** executed and failed, keyed to a
+reason below · **·** not executed, keyed to what is missing per row ·
+**n/a** platform-inapplicable, keyed to the [skip reasons](#applicability).
 
-Legend for the filled table: **pass** executed and passed · **fail** executed
-and failed, with the reason · **·** not executed, with what is missing ·
-**n/a** platform-inapplicable per the skip reasons above.
+The last column is off-matrix and is not part of the eleven. It is here because
+a scenario that fails on a real Android device with the real automator, the real
+Synapse and real encryption is almost certainly broken on A35 too — and because
+leaving it out would make the table look like nothing has ever been run, which
+is also untrue.
+
+### Per scenario, per row
+
+| # | Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC | A36-P |
+|--:|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| | **`login_test`** | | | | | | | | | | | | |
+| 1 | refuses a wrong password on the screen, then signs in | · | · | · | · | · | · | · | · | · | · | · | **pass** |
+| 2 | verifies this device against another session of the same account | · | · | · | · | · | · | · | · | · | · | · | **pass** |
+| 3 | signing this device out leaves no session behind | · | · | · | · | · | · | · | · | · | · | · | **fail** Ⓐ |
+| | **`messaging_test`** | | | | | | | | | | | | |
+| 4 | an encrypted message reaches the peer and settles as delivered | · | · | · | · | · | · | · | · | · | · | · | **fail** Ⓑ |
+| 5 | a message from the peer is read, and the peer sees the receipt | · | · | · | · | · | · | · | · | · | · | · | **pass** |
+| 6 | the inbox reorders when an older conversation gets the newest message | · | · | · | · | · | · | · | · | · | · | · | **pass** |
+| | **`chat_actions_test`** | | | | | | | | | | | | |
+| 7 | a reply quotes the peer's message on the peer's timeline | · | · | · | · | · | · | · | · | · | · | · | **fail** Ⓒ |
+| 8 | a reaction reaches the peer as an annotation on the right event | · | · | · | · | · | · | · | · | · | · | · | **pass** |
+| 9 | an edit replaces the words on the peer's timeline | · | · | · | · | · | · | · | · | · | · | · | **fail** Ⓒ |
+| 10 | a redaction removes the message for the peer as well | · | · | · | · | · | · | · | · | · | · | · | **fail** Ⓒ |
+| | **`attachment_test`** | | | | | | | | | | | | |
+| 11 | a photo picked from the device gallery reaches the peer encrypted | · | · | · | · | · | · | · | · | · | · | n/a ① | **fail** Ⓓ |
+| 12 | the sent photo opens full screen and can be handed back to the platform | · | · | · | · | · | · | · | · | · | · | n/a ① | **fail** Ⓓ |
+| 13 | a photo shares the conversation with the text around it | · | · | · | · | · | · | · | · | · | · | n/a ① | · Ⓔ |
+| | **`share_in_test`** | | | | | | | | | | | | |
+| 14 | a file shared from outside arrives on the peer as an image | · | · | · | · | · | · | n/a ② | n/a ② | n/a ② | n/a ② | n/a ② | · Ⓔ |
+| 15 | `SEND_MULTIPLE` arrives as one event per file, in the order shared | · | · | · | · | · | · | n/a ② | n/a ② | n/a ② | n/a ② | n/a ② | · Ⓔ |
+| 16 | a shared file can be sent with a caption typed on the way | · | · | · | · | · | · | n/a ② | n/a ② | n/a ② | n/a ② | n/a ② | · Ⓔ |
+| | **`permissions_test`** | | | | | | | | | | | | |
+| 17 | picking from the gallery asks for no permission at all | · | · | · | · | · | · | · | · | · | · | n/a ① | · Ⓔ |
+| 18 | the camera permission is denied, the app survives it, then granted | · | · | · | · | · | · | · ⓘ | · ⓘ | · ⓘ | · ⓘ | n/a ① | · Ⓔ |
+| | **`notification_test`** | | | | | | | | | | | | |
+| 19 | a backgrounded Weft posts to the shade, and the tap opens that chat | · ④ | · ④ | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
+| 20 | a reply typed into the shade reaches the peer | · | · | · | · | · | · | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ① | · Ⓔ |
+| 21 | marking read from the shade posts a receipt and clears the notification | · | · | · | · | · | · | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ① | · Ⓔ |
+| | **`notification_mute_test`** | | | | | | | | | | | | |
+| 22 | a muted conversation stays out of the shade while an unmuted one does not | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
+| 23 | mentions-only silences the chatter and lets a mention through | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
+| | **`deeplink_test`** | | | | | | | | | | | | |
+| 24 | `weft://chat/<id>` fired by the OS opens that conversation | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 25 | `weft://search?q=` fired by the OS opens search on that query | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 26 | `weft://user/<id>` is delivered and pushes nothing, which is the app today | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 27 | a link for a conversation this account is not in says so | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| | **`merge_test`** | | | | | | | | | | | | |
+| 28 | a suggestion names both handles and shows the evidence behind it | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 29 | accepting a suggestion collapses both chats into one ordered thread | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 30 | unmerging gives both conversations back | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 31 | "Not the same person" retires a suggestion for good | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| | **`search_test`** | | | | | | | | | | | | |
+| 32 | a message becomes findable once its conversation has been opened | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 33 | a voice message is findable by words that were only ever spoken | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 34 | semantic search returns a message containing none of the typed words | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| | **`bridges_test`** | | | | | | | | | | | | |
+| 35 | a bridge that is not a bridge reports what the server actually said | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 36 | a reachable bridge renders its network and the state of each login | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
+| 37 | the QR login shows a scannable code and a payload that can be copied | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
+| | **`mcp_test`** | | | | | | | | | | | | |
+| 38 | the server answers a key it knows, refuses one it does not, and logs one | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
+| 39 | a key is refused by scope, logged as denied, and dead once revoked | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
+
+`harness_test.dart` is not in the table because it is not a scenario. Its two
+checks — the bundle runs on the device, and the platform automator answers
+outside the Flutter view — both **passed** on A36-P and have not been run
+anywhere else. They are the reason anything above them can be believed.
+
+**Three refinements the per-scenario table earns**, all of which the file-level
+[applicability table](#applicability) had to state as a `◐`:
+
+- **Skip reason ⑤ splits.** `shade.dart` declares `shadeIsReachable` (Android
+  and iOS) separately from `shadeActionsAreReachable` (Android only), so on the
+  four iOS rows scenario 19 applies and scenarios 20 and 21 are **n/a** — Patrol's
+  automator has no gesture that expands a banner to reach an action button. The
+  ⑤ still marked on 19 and on 22–23 is the other half of that reason: no APNs
+  push in this repository, so what runs on iOS is the locally-posted path only.
+- **Skip reason ⑥ is not a macOS reason.** It is a reason about *cold start*,
+  and cold start is unreachable on **every** row, because `PatrolJUnitRunner`
+  launches the app once and every Dart test runs in that process. All four
+  deep-link scenarios are `✓` on macOS — `Process.run('open', …)` gives a real
+  OS-routed link — and all four are warm-start-only everywhere.
+- **Skip reason ③ attaches to no scenario.** It was written about API 28 having
+  no `POST_NOTIFICATIONS`, and marked `permissions_test` `◐` for it — but
+  neither of that file's two scenarios touches the notification permission.
+  `shade.dart`'s `osPredatesNotificationPermission` reads the API level off the
+  device and handles it inside the notification files. Both `permissions_test`
+  scenarios apply in full on A28.
+
+**ⓘ** Scenario 18 needs a camera. `permissions_test` skips it when the device is
+an iOS *simulator*, which has none and whose `UIImagePickerController` refuses
+the camera source outright — so on the four iOS rows as CI runs them (simulators)
+it will report skipped rather than passed. On a physical iPhone or iPad it
+applies. The Android rows are unaffected: `e2e.yaml` sets
+`-camera-back emulated` for exactly this.
+
+### Why each cell is not executed
+
+| Rows | What is missing | Who can supply it |
+|---|---|---|
+| **A28-P, A28-T, A33-P, A33-T, A35-P, A35-T** | An Android system image for API 28, 33 and 35, and a ≥900 dp AVD profile for the three tablet rows. The only image installed on this host is **API 36**. | A CI run. `.github/workflows/e2e.yaml` provisions all six rows through `reactivecircus/android-emulator-runner`; it has **never been dispatched** and never run on its nightly. One push and six runners answers all six rows. |
+| **I16-P, I16-T, I17-P, I17-T** | An **iOS simulator runtime** — `xcrun simctl list runtimes` is empty on this host, so there is nothing to boot. A **signing identity** for the `RunnerUITests` bundle is the second requirement and is what [ADR-002](../decisions/adr-002-ios-signing-handoff.md) now carries; on a *simulator* it is probably not needed, and that "probably" is untested here for want of a runtime to try it on. On a physical iPhone or iPad it certainly is. | The runtime, a CI run or `xcodebuild -downloadPlatform iOS`; the identity, whoever holds the Apple Developer account. The `ios` job is `continue-on-error` precisely so these four report instead of blocking. |
+| **MAC** | One **interactive Accessibility grant** for `RunnerUITests-Runner`, and nothing else. The build works, the `.xctestrun` is produced, the TCC file-access hang is fixed; XCTest then dies on *"Timed out while enabling automation mode"* with `kTCCServiceAccessibility` reading `Auth:Unknown (None)`. | A human at this keyboard, once: run `./tooling/scripts/e2e.sh --device macos --subset macos` and allow the prompt, or add the runner under *System Settings → Privacy & Security → Accessibility*. Expect the nightly's macOS job to need the same on its runner. |
+| **A36-P**, scenarios 13–39 | Nothing but time. The run was stopped after scenario 12 rather than spend ~50 more minutes watching six media scenarios re-demonstrate the hang in Ⓓ. | A re-run, once Ⓓ is diagnosed. |
+
+Two things are missing from **every** row, and no device supplies them:
+
+- **Ⓕ A real bridge account.** `bridges_test` scenarios 36 and 37 talk to a
+  `BridgeStub` — an `HttpServer` in the app's own process speaking the mautrix
+  provisioning API — because `tooling/docker` runs no bridge and nobody here has
+  a WhatsApp, Signal or Telegram account to bridge. What is asserted is that
+  Weft reads a well-formed provisioning response correctly. **That a real
+  mautrix bridge answers in that shape is not tested anywhere in this
+  repository.** Scenario 35 is the exception and is the more honest of the
+  three: it probes the *real* Synapse, which is not a bridge, and asserts Weft
+  reports what the server actually said.
+- **The push gateway leg.** Skip reason ⑤'s second half. Weft has no push
+  gateway URL and no Firebase config in this repository, so every notification
+  scenario on every row exercises the locally-posted path. A notification that
+  arrives on a *suspended* app, through Sygnal and APNs/FCM, is not-executed
+  everywhere and is recorded as such rather than inferred from the tests that
+  pass.
+
+### What ran, and why the seven failures failed
+
+Twelve scenarios, **5 pass / 7 fail**, plus `harness_test` 2/2. Full timings and
+diagnosis are in [The run](#the-run); this is the key the table above points at.
+
+| Key | Scenarios | Failure | Where it stands |
+|---|---|---|---|
+| **Ⓐ** | 3 | `deleteDevices` revokes the running client's own token, the sync loop hits `M_UNKNOWN_TOKEN`, and `_handleSoftLogout` **rethrows** into an unawaited future. | **App defect, open.** The devices screen's *Sign out* on **This device** is Weft's entire sign-out flow — `WeftMatrixSession.logout()` has no caller in `lib/` — so every user meets it. A fix was written, run and reverted: it removes the exception and the app still does not reach the login screen, which is a second defect behind the first. Both belong in one follow-up. |
+| **Ⓑ** | 4 | The bubble reaches `Sent` and never `Delivered` — the homeserver accepted the event but did not echo it back down `/sync` within 60 s, on a local Synapse, while the peer received it perfectly well in the same scenario. | **Undiagnosed.** Ran immediately after Ⓐ, so the same disturbed sync loop is the first suspect. Not a weakened assertion: `DeliveryState.delivered` is what `_deliveryFor` maps `EventStatus.synced` to, and that is the right thing to assert. |
+| **Ⓒ** | 7, 9, 10 | A reply could not open the conversation at all (`openChat` never found the inbox row for a room the peer had just created); an edit never made the bubble admit it was edited; a redaction never made the message disappear. | **Undiagnosed, and the reason this track cannot yet claim Phase 05's chat actions work end to end.** Three of `chat_actions_test`'s four. The fourth (8) passes, so the file's shared setup is not the explanation. |
+| **Ⓓ** | 11, 12 | Both hung for their full **eight-minute** timeout after the native pick succeeded. DocumentsUI opens, the seeded photo is there, the tap lands — then nothing. | **Undiagnosed.** Whether the picker never returns to Weft or the upload bubble never appears needs a screenshot at the moment of the hang. First thing to do next. |
+| **Ⓔ** | 13–39 | — | **Not executed on any device, anywhere.** Nine files have never run: `share_in`, `permissions`, `notification`, `notification_mute`, `deeplink`, `merge`, `search`, `bridges`, `mcp`. |
+
+Two failures found earlier in the same session were **fixed and re-run green**,
+and are not in the table because they are no longer failures: the devices-list
+scroll bug in the suite (finding 1 of [What the run found](#what-the-run-found))
+and Weft aiming the SDK's file-store garbage collector at its own database
+(finding 4) — the second a data-loss hazard for a dormant account, found only
+because a device ran the code.
+
+### Coverage, in one paragraph
+
+39 scenarios exist. 12 have been executed, all on one off-matrix emulator; 5 of
+those passed. **0 of 11 matrix rows** have been executed. 9 of the 13 scenario
+files have never run on any device. The suite has found 4 defects, 2 of which
+were fixed and verified on the device, and it has not yet demonstrated that any
+row of this matrix passes. Everything needed to change that is either a CI
+dispatch (Android), a signing identity plus a runtime (iOS), or one click at a
+keyboard (macOS).

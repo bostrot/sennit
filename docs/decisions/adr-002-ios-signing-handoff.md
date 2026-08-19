@@ -12,6 +12,7 @@ tags:
 related:
   - '[[Share-Surfaces]]'
   - '[[Notifications]]'
+  - '[[E2E-Matrix]]'
 ---
 
 # ADR-002: iOS signing handoff
@@ -75,6 +76,7 @@ profiles. This document is the exact list.
 | `ShareExtension` | `com.bostrot.weft.ShareExtension` | Share extension (`com.apple.share-services`) | **Yes** | `ios/ShareExtension/ShareExtension.entitlements` |
 | `NotificationService` | `com.bostrot.weft.NotificationService` | Notification service extension (`com.apple.usernotifications.service`) | **No** | none, deliberately |
 | `RunnerTests` | `com.bostrot.weft.RunnerTests` | Unit test bundle | No | none |
+| `RunnerUITests` | `com.bostrot.weft.RunnerUITests` | UI test bundle (XCUITest), added Phase 09 | No | none |
 
 Three App IDs and **two** profiles carrying the App Group, not three.
 `NotificationService` has no entitlements file on purpose: it does not read the
@@ -275,8 +277,9 @@ compile despite all of the above.
 
 ## Added by later phases
 
-Phases 09 and 10 still append here — the Patrol UI-test target, WidgetKit and
-watchOS. Add a `### Phase NN — <capability>` section and a row to
+Phase 10 still appends here — WidgetKit and watchOS. Phase 09 has appended: the
+Patrol UI-test target is [below](#phase-09--the-patrol-ui-test-target-and-why-it-is-a-fourth-app-id).
+Add a `### Phase NN — <capability>` section and a row to
 [Targets and bundle ids](#targets-and-bundle-ids) rather than editing what is
 above.
 
@@ -380,3 +383,79 @@ calling added Swift to `Runner` for the first time since:
 Both `flutter build macos` and `flutter build apk` succeed. So the one platform
 without a whole-app build remains iOS, for the two reasons above this section,
 neither of which is calling's.
+
+### Phase 09 — the Patrol UI-test target, and why it is a fourth App ID
+
+Phase 09 added a device end-to-end suite driven by [Patrol](https://patrol.leancode.co),
+which needs an **XCUITest bundle** in `Runner.xcodeproj` the way `flutter test`
+needs nothing at all. The target is authored, wired through the Podfile and
+committed; it has **never been compiled**, because this machine has no iOS
+simulator runtime and no signing identity. See
+[the device matrix](../quality/e2e-matrix.md) for what it is for and
+[Results](../quality/e2e-matrix.md#results) for the four iOS rows it gates.
+
+What is in the repository:
+
+| | |
+|---|---|
+| Target | `RunnerUITests`, a `com.apple.product-type.bundle.ui-testing` native target |
+| Bundle id | `com.bostrot.weft.RunnerUITests` |
+| Source | `ios/RunnerUITests/RunnerUITests.m` — `@import patrol;` and one macro expansion, which is the whole file |
+| Host | `TEST_TARGET_NAME = Runner` |
+| Deployment target | `IPHONEOS_DEPLOYMENT_TARGET = 13.0`, `TARGETED_DEVICE_FAMILY = "1,2"` — iPhone and iPad, because the matrix has tablet rows |
+| Signing | `CODE_SIGN_STYLE = Automatic`, **no `DEVELOPMENT_TEAM`**, no entitlements file |
+| Pods | `inherit! :complete` in the Podfile — not `:search_paths`, because unlike `RunnerTests` this target *links* patrol |
+| App Group | **No.** It reads no Matrix store and shares no container. |
+
+**Why this is a fourth App ID rather than a test bundle that rides along.** An
+XCUITest bundle is not injected into the app the way a unit-test bundle is. At
+run time Xcode builds and installs a *second application* —
+`com.bostrot.weft.RunnerUITests.xctrunner`, generated from the bundle id above by
+appending `.xctrunner` — which drives the app under test from outside its
+process. That runner is an app, it installs on the device, and on a physical
+device it must be signed like one. `RunnerTests` needs no profile because it
+signs against its host; `RunnerUITests` cannot, because at the moment it runs it
+*has* no host.
+
+#### Checklist, for whoever holds the signing identity
+
+Shorter than the Phase 07 one, and none of it is a distribution concern — this
+bundle is never uploaded to App Store Connect and never shipped. It is a
+development-signing job only.
+
+- [ ] **Select the team on `RunnerUITests`** in Xcode, the same as
+      [step 3](#3-select-a-team-in-xcode-for-every-target) does for the other
+      four targets. Automatic signing will then create the App ID and the
+      development profile for both `com.bostrot.weft.RunnerUITests` **and** the
+      `.xctrunner` app it generates.
+- [ ] **Register the test device** in *Devices* on the portal, if the rows are
+      to run on a physical iPhone or iPad. Automatic signing does this from
+      Xcode; a CI runner needs it done in advance.
+- [ ] **Nothing on the App Group.** Do not add `group.com.bostrot.weft` to this
+      App ID. An unused entitlement is one more capability to keep in sync for no
+      behaviour, which is the same reason `NotificationService` has none.
+
+**On a simulator this may all be unnecessary.** Simulator builds are not signed
+against a profile — `CODE_SIGN_IDENTITY[sdk=iphoneos*]` is scoped to the device
+SDK and does not apply — so `patrol test -d <simulator>` has a fair chance of
+running with no team selected at all, which would make the four iOS matrix rows
+a question of a *runtime* rather than of an identity. That is a reasoned
+expectation and **not a verified one**: `xcrun simctl list runtimes` is empty on
+the machine this was written on, so there was nothing to try it against. The
+first person with a runtime settles it in one command. A physical device is not
+in question — that needs the checklist above.
+
+**Unverified for the same reason, and worth knowing before the first build:**
+that `@import patrol;` resolves under `use_frameworks!` without
+`use_modular_headers!`. Patrol's own iOS guide adds that directive; it is
+deliberately omitted here, because `use_frameworks!` already builds every pod as
+a module and turning it on would change how this project's whole verified pod
+graph is built. If the first `pod install`-and-build says otherwise, that is the
+line to add — and it is a Podfile change, not a signing one.
+
+For the record, **macOS needed none of this.** Phase 09 also added a
+`RunnerUITests` target to `macos/Runner.xcodeproj` with the same bundle id, and
+it builds and signs *Sign to Run Locally* with no identity at all. macOS's
+blocker is an interactive Accessibility grant instead, which is
+[recorded with the matrix](../quality/e2e-matrix.md#results) rather than here —
+it is not a signing question and this document does not own it.
