@@ -124,7 +124,7 @@ cancel-in-progress concurrency group:
 | `unit` | ubuntu | `dart test` over 12 pure packages, named explicitly |
 | `widget` | ubuntu | `flutter test` for `weft_matrix`, `weft_store`, `weft_design`, then the app |
 | `a11y` | ubuntu | `test/a11y`, `test/goldens`, `weft_design` — a deliberate subset of `widget`, for the report |
-| `integration` | ubuntu | Synapse + Linux desktop toolchain + `xvfb-run flutter test integration_test -d linux` |
+| `integration` | ubuntu | Synapse + Linux desktop toolchain + `xvfb-run flutter test integration_test/*_test.dart -d linux` |
 
 Conventions the new `e2e.yaml` should keep rather than reinvent: the
 `FLUTTER_VERSION` env pin, `subosito/flutter-action@v2` with `cache: true`,
@@ -390,6 +390,99 @@ Not a scenario, but the thing that will break first. `localhost:8008` means the
 Weft resolves a bare host to `http` for loopback (`matrix_session_test.dart:63-68`
 asserts it); `10.0.2.2` is not loopback by that rule, so the scheme handling
 needs checking on the first Android run rather than assuming.
+
+---
+
+## The harness
+
+Landed 2026-08-19. Six pieces, listed with what was verified and — where it was
+not — what would verify it.
+
+| Piece | Where | Verified by |
+|---|---|---|
+| `patrol` dev dependency | `apps/weft/pubspec.yaml` | `flutter pub get`, `flutter analyze` |
+| Patrol config | `apps/weft/pubspec.yaml`, `patrol:` block | read against `patrol_cli`'s own `pubspec_reader.dart` |
+| Dart suite root | `apps/weft/integration_test/patrol/` | `flutter analyze` clean |
+| Android instrumentation | `android/app/src/androidTest/…/MainActivityTest.java`, `android/app/build.gradle.kts` | **not built here** — needs a Gradle instrumentation build |
+| iOS UI-test target | `ios/Runner.xcodeproj`, `ios/RunnerUITests/RunnerUITests.m`, `ios/Podfile` | `xcodebuild -list` sees the target; **not compiled** — no simulator runtime, no signing identity |
+| One-command runner | `tooling/scripts/e2e.sh` | run end to end against the live container with a stubbed `patrol` |
+
+### Resolved versions
+
+`patrol` added no version pressure at all: five packages entered the lock and
+**not one existing package changed version**. The `analyzer` conflict that cost
+this workspace ObjectBox and Drift did not recur, and the reason it did not is
+structural rather than lucky — `patrol`'s closure contains no analyzer, and
+`patrol_cli`, which does contain a command-line toolchain, is a global
+executable that must never appear in a pubspec.
+
+| Package | Version | How it arrived |
+|---|---|---|
+| `patrol` | 4.9.0 | direct dev dependency |
+| `patrol_finders` | 3.6.0 | via `patrol` |
+| `patrol_log` | 0.10.1 | via `patrol` / `patrol_finders` |
+| `dispose_scope` | 2.1.0 | via `patrol_log` |
+| `equatable` | 2.1.0 | via `patrol` and `patrol_log` |
+| `patrol_cli` | 4.7.0 | **global tool**, `dart pub global activate patrol_cli` — not installed on this host |
+
+`patrol` 4.9.0 wants `sdk >=3.8.0 <4.0.0` and `flutter >=3.32.0`; this project is
+Dart 3.12.0 / Flutter 3.44.0, so both are satisfied with room. `patrol_cli`
+4.7.0 wants the same SDK range.
+
+### Three decisions worth knowing about
+
+**The suite is not in `patrol_cli`'s default directory.** `patrol_cli` 4.7.0
+defaults `test_directory` to a top-level `patrol_test/`; the pubspec sets it to
+`integration_test/patrol` instead. That keeps the device suite beside the
+integration tests it descends from, and — the load-bearing half — out of reach
+of `flutter test integration_test`, which the `integration` CI job already runs
+and which cannot execute a Patrol test. Because the directory is not one of
+`patrol_cli`'s known roots it also generates an entrypoint proxy at
+`integration_test/patrol_test_bundle.dart`; that name does not end in
+`_test.dart`, so `flutter test` skips it. Both generated files are gitignored.
+
+**CocoaPods, not Swift Package Manager.** `patrol_cli` 4.7.0's headline feature
+is SPM support and its iOS setup guide leads with it. This project has SPM
+disabled — `flutter_vodozemac`'s xcframework loses its `Versions/Current`
+symlink through the SPM path and code signing breaks — so `RunnerUITests` is
+wired through the Podfile with `inherit! :complete`. `:complete` and not
+`:search_paths` because, unlike `RunnerTests`, this target *links* patrol:
+`RunnerUITests.m` is `@import patrol;` and a macro expansion. Patrol's guide also
+adds `use_modular_headers!`; it is deliberately omitted, because `use_frameworks!`
+already builds every pod as a module and turning it on would change how the
+whole verified pod graph is built.
+
+**The existing `integration` job had to change.** `flutter test integration_test`
+recurses, so the new directory would have been swept into the job that already
+runs on every push — and a Patrol test cannot survive that. `patrolTest` calls
+`PatrolBinding.ensureInitialized` while the file is being *loaded*, and that is a
+Live binding; the automated binding `flutter test` installs cannot coexist with
+it. The failure is a binding conflict at load time, so it takes the whole run
+down rather than one file, and `--exclude-tags` cannot prevent it because
+registration has already happened by then. `ci.yaml` now runs
+`integration_test/*_test.dart`, which is the same three files and picks up new
+top-level ones without further edits. The same glob is now in `README.md` and in
+`matrix_session_test.dart`'s header, because the old command is broken as
+written.
+
+`patrol` does offer a `PATROL_TEST_DISCOVERY` dart-define that turns every test
+body into a no-op so a host run can register them. It is deliberately not used:
+it would make thirteen device scenarios report **green** on a Linux CI runner
+that executed none of them, which is precisely the failure mode this document
+exists to prevent.
+
+### What the iOS target still needs
+
+Authored and unsigned, per Phase 09's own instruction. `RunnerUITests` carries no
+`DEVELOPMENT_TEAM`, and a UI-test bundle needs its **own** provisioning profile —
+distinct from the app's and from the two extensions' — because it installs as a
+second application alongside the app under test. Until that exists the four iOS
+rows are *not executed* rather than failing, and no amount of harness work moves
+them. See [ADR-002](../decisions/adr-002-ios-signing-handoff.md).
+
+Also unverified for the same reason: that `@import patrol;` resolves under
+`use_frameworks!` without `use_modular_headers!`. It is the reasoned choice, not
+a compiled one, and the first `pod install` on a machine with an SDK will say.
 
 ---
 

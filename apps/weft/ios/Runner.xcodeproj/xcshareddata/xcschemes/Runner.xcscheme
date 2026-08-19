@@ -67,6 +67,24 @@
                ReferencedContainer = "container:Runner.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <!-- Patrol's XCUITest bundle. It has to be listed here, and not only
+              exist as a target, because `patrol test` runs
+              `xcodebuild build-for-testing -scheme Runner` — a target absent
+              from the scheme's test action is simply not built, and the failure
+              reads as a missing .xctestrun rather than a missing target.
+              `parallelizable = "NO"`: every scenario shares one homeserver and
+              two accounts, so two running at once is a race, not a speed-up. -->
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "685E5C8AC5099835509AD548"
+               BuildableName = "RunnerUITests.xctest"
+               BlueprintName = "RunnerUITests"
+               ReferencedContainer = "container:Runner.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

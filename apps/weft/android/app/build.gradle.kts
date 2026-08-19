@@ -31,6 +31,25 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Patrol's runner, not AndroidX's default. It starts the app under
+        // instrumentation, stands up the native automator that drives
+        // UIAutomator outside the Flutter view, and enumerates the Dart tests
+        // in the bundle so each becomes its own JUnit case. See
+        // `src/androidTest/.../MainActivityTest.java`.
+        testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
+        // Every Dart test is a separate instrumentation invocation, so app
+        // state — the sqflite session database above all — would otherwise
+        // survive from one scenario into the next. `docs/quality/e2e-matrix.md`
+        // requires each test to be independently runnable; this is the half of
+        // that promise the harness can keep on its own.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
+    }
+
+    testOptions {
+        // `clearPackageData` is an orchestrator argument: without the
+        // orchestrator it is silently ignored, and the tests leak state into
+        // each other in a way that only shows up as a second run failing.
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
     buildTypes {
@@ -58,6 +77,12 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     // The other half of `isCoreLibraryDesugaringEnabled` above.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // The other half of `execution = "ANDROIDX_TEST_ORCHESTRATOR"`. It is an
+    // APK installed alongside the test APK rather than a library linked into
+    // it, which is why it is `androidTestUtil` and not
+    // `androidTestImplementation`. The Patrol runtime itself arrives through
+    // the `patrol` Flutter plugin's own Gradle module and is not declared here.
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
 }
 
 flutter {

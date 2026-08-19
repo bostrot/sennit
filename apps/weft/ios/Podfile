@@ -34,6 +34,24 @@ target 'Runner' do
   target 'RunnerTests' do
     inherit! :search_paths
   end
+
+  # Patrol's XCUITest bundle. `:complete` rather than `:search_paths` — unlike
+  # the unit tests above, this target *links* the patrol pod: `RunnerUITests.m`
+  # is `@import patrol;` and a macro expansion, so headers alone are not enough.
+  #
+  # Patrol's own setup guide leads with Swift Package Manager, which this
+  # project has disabled (`flutter config --no-enable-swift-package-manager`)
+  # because `flutter_vodozemac`'s xcframework loses its `Versions/Current`
+  # symlink through the SPM path and code signing breaks. The CocoaPods path is
+  # still supported and is the one taken here.
+  #
+  # No `use_modular_headers!`: the patrol guide adds it, but `use_frameworks!`
+  # above already builds every pod as a module, and turning it on would change
+  # how the whole existing pod graph is built for a target that has been
+  # verified to link as it stands.
+  target 'RunnerUITests' do
+    inherit! :complete
+  end
 end
 
 # The Share Extension is integrated with no pods, deliberately.

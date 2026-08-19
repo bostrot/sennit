@@ -90,7 +90,35 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  # The device suite. Patrol wraps `integration_test` and adds a native
+  # automator (UIAutomator on Android, XCUITest on iOS) so a test can touch the
+  # share sheet, a permission dialog or the notification shade — the surfaces
+  # `flutter test` cannot see. See `docs/quality/e2e-matrix.md`.
+  #
+  # The counterpart CLI, `patrol_cli`, is deliberately *not* here: it is a
+  # global executable (`dart pub global activate patrol_cli`), and putting it in
+  # a pubspec would drag a whole command-line toolchain into the workspace's
+  # single resolution unit — the same way ObjectBox and Drift were lost to
+  # `analyzer` conflicts. `tooling/scripts/e2e.sh` checks for it on PATH.
+  patrol: ^4.9.0
   riverpod_generator: ^4.0.4
 
 flutter:
   uses-material-design: true
+
+# Patrol's own configuration, read by `patrol_cli`, not by pub. The ids must
+# match the built artefacts or the CLI installs one app and instruments another:
+# `applicationId` in `android/app/build.gradle.kts` and
+# `PRODUCT_BUNDLE_IDENTIFIER` for the `Runner` target.
+patrol:
+  app_name: Weft
+  # `patrol_cli` 4.7.0 defaults this to a top-level `patrol_test/`. Weft keeps
+  # the device suite next to the integration tests it descends from, and — more
+  # to the point — outside the reach of `flutter test integration_test`, which
+  # CI already runs and which cannot execute a Patrol test. The generated
+  # `test_bundle.dart` lands in this directory and is gitignored.
+  test_directory: integration_test/patrol
+  android:
+    package_name: com.bostrot.weft
+  ios:
+    bundle_id: com.bostrot.weft

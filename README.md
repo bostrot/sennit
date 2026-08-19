@@ -137,11 +137,24 @@ cd apps/weft && flutter test
 Against the local homeserver (see [tooling/docker](tooling/docker/README.md)):
 
 ```bash
-cd apps/weft && flutter test integration_test -d macos
+cd apps/weft && flutter test integration_test/*_test.dart -d macos
 ```
 
 These cover a real login, a real encrypted round trip between two accounts, and
 the mapping of decrypted events onto Weft's domain model.
+
+The glob rather than the bare directory: `integration_test/patrol/` holds the
+Patrol device suite, which `flutter test` cannot load — it drives native UI
+outside the Flutter view and needs its own runner. One command runs it:
+
+```bash
+./tooling/scripts/e2e.sh
+```
+
+It brings the homeserver up, seeds the accounts, runs `patrol test` on the
+attached device and tears down. It needs `patrol_cli` on `PATH`
+(`dart pub global activate patrol_cli`). The device matrix, and what each row
+can actually run, is [docs/quality/e2e-matrix.md](docs/quality/e2e-matrix.md).
 
 `integration_test/call_test.dart` runs there too, and places a real call between
 `@alice` and `@bob` in an encrypted room: invite, ring, answer, ICE candidates in

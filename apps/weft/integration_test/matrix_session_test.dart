@@ -11,7 +11,11 @@ import 'package:weft_matrix/weft_matrix.dart';
 ///
 ///   docker compose -f tooling/docker/compose.yaml up -d --wait
 ///   ./tooling/docker/seed.sh
-///   cd apps/weft && flutter test integration_test -d macos
+///   cd apps/weft && flutter test integration_test/*_test.dart -d macos
+///
+/// The glob, not the bare directory: `integration_test/patrol/` holds the
+/// device suite, and a Patrol test cannot be loaded by `flutter test` — see
+/// that directory's README. It runs from `tooling/scripts/e2e.sh`.
 ///
 /// These exercise the parts that cannot be unit tested: a real login, real
 /// E2EE key upload, and a real encrypted round trip between two accounts.

@@ -4,7 +4,7 @@
 # with registration wide open and no TLS. Never point it at anything real.
 #
 #   docker compose -f tooling/docker/compose.yaml up -d
-#   ./tooling/docker/seed.sh          # creates @alice / @bob and a shared room
+#   ./tooling/docker/seed.sh          # creates @alice / @bob
 #
 # Weft then connects to http://localhost:8008.
 

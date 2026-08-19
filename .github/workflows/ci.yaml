@@ -185,10 +185,21 @@ jobs:
       # WEFT_DEMO is what `attachment_flow_test` drives the app in; the
       # homeserver tests build their own session and never read it, so one run
       # covers both.
+      #
+      # `integration_test/*_test.dart` and not `integration_test`: the glob is
+      # what keeps `integration_test/patrol/` out. Those are Patrol tests, and
+      # `patrolTest` calls `PatrolBinding.ensureInitialized` while the file is
+      # being *loaded* — a Live binding, which the automated binding
+      # `flutter test` installs cannot coexist with. The failure is a binding
+      # conflict at load, so it takes the whole run down rather than one file,
+      # and `--exclude-tags` cannot prevent it because registration has already
+      # happened by then. The device suite runs from `e2e.yaml` via
+      # `tooling/scripts/e2e.sh`. New top-level integration tests are picked up
+      # by the glob without touching this line.
       - name: Run integration tests
         working-directory: apps/weft
         run: >-
-          xvfb-run -a flutter test integration_test -d linux
+          xvfb-run -a flutter test integration_test/*_test.dart -d linux
           --dart-define=WEFT_DEMO=true
       - name: Homeserver logs on failure
         if: failure()

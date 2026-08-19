@@ -24,8 +24,17 @@ Synapse listens on `http://localhost:8008`.
 ./tooling/docker/seed.sh
 ```
 
-Creates `@alice:localhost` and `@bob:localhost` (password `weft-test-password`)
-and a shared encrypted room, which is what the E2EE round-trip tests expect.
+Creates `@alice:localhost` and `@bob:localhost` (password `weft-test-password`).
+No room: every test creates and cleans up its own, because a test that shares a
+fixture room with the next one cannot leave the homeserver as it found it.
+
+## Running the device suite
+
+`tooling/scripts/e2e.sh` does all of the above and then runs Patrol on a device
+— generating the config if it is missing, raising `rc_login` so a suite that
+logs two accounts in per test does not trip the limiter, and tearing the
+container down afterwards. See
+[`docs/quality/e2e-matrix.md`](../../docs/quality/e2e-matrix.md).
 
 ## Resetting
 
