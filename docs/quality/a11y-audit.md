@@ -55,8 +55,10 @@ therefore reports zero hits in both. The first pass of this audit missed
 corrected `-a` sweeps. Anything that greps this codebase for a compliance check
 — including the CI step task 9 adds — must pass `-a` or it will quietly under-report.
 
-Nothing here has been run against a real screen reader yet. That is the phase's
-last task, and this document gets a `Verified with` section then.
+Nothing in the findings below was run against a real screen reader — they are
+what reading the code and running the suite found. What a screen reader found on
+a device is in [Verified with](#verified-with), which is the phase's last task
+and which contradicts this half of the document in five places.
 
 ## Headline
 
@@ -1897,3 +1899,257 @@ A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task
 claiming it. They were fixed there and the row corrected. CROSS-8 moved to task
 3 too, since it asked for one app-wide answer and task 3 is where the first call
 site needed it; task 4 closed its remaining eight call sites.
+
+## Verified with
+
+Everything above this section was established by reading code and by running
+tests. This section is the phase's last task and a different kind of evidence:
+the app built, installed and driven on a device, with a real screen reader
+running, and the answers written down whether or not they agree with the tests.
+
+They did not entirely agree. **Five defects were found here that the whole
+suite — 2 500 tests, four accessibility guidelines swept over six screens in
+two themes, sixty golden images — could not see**, and one of them made a
+conversation unusable by touch exploration. All five are fixed, with the fixes
+re-verified on the same device; each has a regression test that fails against
+the bug it names. The reason the suite was blind to them is worth as much as
+the defects: see [Why the suite could not see
+these](#why-the-suite-could-not-see-these).
+
+### What was tested, with what
+
+| | |
+| --- | --- |
+| **Device** | Android emulator `Medium_Phone_API_36.1` — Android 16 (API 36), 1080×2400 at 420 dpi (2.625×), Google APIs image, unrooted |
+| **Build** | `flutter build apk --debug --dart-define=WEFT_DEMO=true`, installed with `adb install -r -t` |
+| **Screen reader** | TalkBack (Android Accessibility Suite `com.google.android.marvin.talkback`), enabled with `settings put secure enabled_accessibility_services …` and confirmed bound in `dumpsys accessibility` |
+| **What was read** | The exported `AccessibilityNodeInfo` tree — `adb shell uiautomator dump` — which is the tree TalkBack composes its speech from, plus TalkBack's own focus rectangle located in screenshots by its colour (`#64C040`/`#6BC840`) |
+| **Locales** | `cmd locale set-app-locales com.bostrot.weft --locales ar`, then `he`, then cleared |
+| **Screens reached** | Inbox, a merged three-network conversation, a single-network conversation, search with a query and its filters, the merge screen |
+| **macOS** | Built and launched (`flutter build macos --debug --dart-define=WEFT_DEMO=true`); **VoiceOver not run** — see [macOS, not verified](#macos-not-verified) |
+
+Three limits of the method, stated because they bound what the passes below are
+worth:
+
+- **TalkBack's speech was not captured as text.** It is not in logcat at the
+  default level, and raising TalkBack's own log level needs its private
+  preferences, which an unrooted Play-image emulator will not hand over. What
+  is quoted below is the node tree TalkBack reads, not a recording of it
+  speaking.
+- **Linear navigation could not be driven.** Injected events — `input swipe`,
+  `input keycombination 57 22` (Alt+→) — bypass TalkBack's gesture and key
+  interception; eighteen consecutive swipes left the focus rectangle exactly
+  where it started. So **reading order below is the exported tree's order**,
+  which is what TalkBack's linear navigation follows, rather than a walk
+  observed gesture by gesture. Touch exploration was likewise unavailable:
+  injected taps activate controls directly instead of focusing them.
+- **The emulator needed 6 GB.** At the AVD's stock memory, enabling TalkBack
+  put SystemUI into a repeating ANR within minutes and left a phantom dialog
+  window that `uiautomator` kept returning instead of the app. `-memory 6144
+  -cores 4` on a cold boot ended it. Anyone repeating this should start there
+  rather than spend an hour, as this did, concluding the app was at fault.
+
+### What failed, and is now fixed
+
+Five findings, in the order they surfaced. Each one was reproduced as a failing
+test before being fixed, and each fix was re-verified on the device.
+
+**DEV-1 — the chat view announced the whole conversation as an edit box.**
+The exported tree had a single `android.widget.EditText` at `[0,231][1080,2400]`
+— the entire body below the app bar — with hint `Message via Signal`, holding
+the scroll view, every bubble and the send and attach buttons as its children.
+Touch exploration anywhere in the thread landed on "Message via Signal, edit
+box".
+
+The cause is one line, repeated at seven call sites:
+`Semantics(label: …, textField: true, child: TextField(…))`. A `Semantics` with
+the default `container: false` does not make a node — it merges its label and
+its flags into the nearest *enclosing* node, and for a composer at the bottom of
+a screen that is the screen. `WeftLabelledField` in `weft_design` is the fix
+(`container: true`) and all seven fields use it: the composer, the search field,
+the share sheet's chat filter, the bridge dialog's URL field and login's three.
+Only the composer was doing real damage — in a dialog or an app bar the nearest
+ancestor is about the size of the field anyway — but the shape was identical
+everywhere and the difference was luck. Re-verified: the composer's nodes are
+now `[326,2180][902,2306]` and nothing else on the screen is a text field.
+
+**DEV-2 — the send-network chip put its name and its tap on the conversation.**
+Visible only once DEV-1 was fixed: the same body-sized node came back as
+`View 'Send via Signal'`, `clickable`, still `[0,231][1080,2400]`. Everything
+the chip paints is deliberately silent — a `NetworkGlyph` with
+`semanticsLabel: ''` because the tooltip already names the network, and a bare
+chevron — so the `Tooltip` and `InkWell` that `PopupMenuButton` wraps around it
+had no node of their own to annotate and merged upwards for the same reason
+DEV-1 did. A `MergeSemantics` around the chip gives them a boundary the size of
+the chip. Re-verified: `[32,2180][179,2306]`, which is 56×48 dp.
+
+**DEV-3 — the same chip was 56×36 dp, under the 48 dp minimum.** Found by the
+existing guideline sweep the moment DEV-2 was fixed, and unfindable before it:
+a control whose tap action lives on a screen-sized node passes a tap-target
+check trivially. `WeftTapTarget` now, which is the mechanism task 7 built for
+TAP-01…15. **Eighteen golden images moved** and the diff in each is confined to
+a 56×42 box at the chip.
+
+**DEV-4 — a merged bubble said its network three times.** The tree read
+`'Anna Maven, on WhatsApp'` → `'WhatsApp'` → `'WhatsApp'` → the body → the time,
+for every bubble in a merged thread: the group node names the leg, and then the
+caption row above the text contributes both its glyph's label and its own text.
+`ExcludeSemantics` around that row — it is how a *sighted* reader learns the
+leg, and a reader who has just been told does not need it twice more. The chat's
+node count fell from 78 to 61.
+
+**DEV-5 — search's network filters said it twice**, `'WhatsApp\nWhatsApp'`: a
+`FilterChip` whose label is the network's name with a `NetworkGlyph` avatar that
+says it again. `semanticsLabel: ''`, which is what `NetworkGlyph`'s own
+documentation asks for and what two other call sites already did. The same
+reading of the code found two more — the bridges screen's detected-bridge tile
+and its bridge card, both with the network's name in the text beside the glyph.
+The glyph is left speaking where it is the only thing that names the network:
+the reply chip, and the merge screen's handle rows, where the text beside it is
+a person's name.
+
+### What passed
+
+Read off the same trees, on the device, in the same session:
+
+- **A chat tile is one node and one sentence.** `Anna Maven, merged across 3
+  networks: WhatsApp, Signal, Telegram, pinned, Can you send the clinical trial
+  summary?, 16:40, 3 unread` — and `Sofia Martinez, Telegram, Read, Let me know
+  when it's done, 15:12`, `Dr. James Anderson, Instagram, muted, …`. Eleven
+  rows, eleven nodes, every one of them carrying both `clickable` and
+  `long-clickable`.
+- **The rail states counts and selection.** `WhatsApp, 4 unread`,
+  `Matrix, 5 unread`, `Instagram` with no count, and
+  `All conversations, 27 unread` carrying `selected`.
+- **Disabled controls say why they are disabled**, which is the half of a
+  disabled control that is usually missing: `Search in conversation — not
+  available yet`, and `WhatsApp, Signal and Telegram can't carry calls — Weft
+  calls over Matrix.`
+- **A bubble names its sender and its leg, once**, with the delivery state in
+  the same clause as the time: `Sent 15:51, Read` on own messages, `Sent 15:14`
+  on the peer's. On a **single-network** chat the same bubbles are `Konrad
+  Majewski` and `You` with no leg named — the distinction the audit's *Verified
+  correct* section asks for, holding on a device.
+- **The composer states its mode**: hint `Message via Signal` on the merged
+  chat, and it is on the composer's own node.
+- **Day dividers are headings**: `Messages from Aug 15`.
+- **TalkBack's focus rectangle paints**, and moves to the newly-opened screen's
+  first control on a navigation — observed on the back button of the merge
+  screen and of a conversation.
+- The emoji in a tile's preview reach the label intact (`🎙 Hey, are we still on
+  for Thursday?`), which is [[Rich-Content]]'s side of the inbox row.
+
+### RTL, on the device
+
+Set with `cmd locale set-app-locales`, per app, since an unrooted emulator will
+not take a system locale. Checked in **Arabic** and **Hebrew**, against
+`a11y_inbox_rtl_*` and `a11y_chat_mixed_rtl_*`.
+
+**The device agrees with the goldens, and shows one thing they cannot.** The
+goldens render every Arabic and Hebrew word as a placeholder box, because the
+SDK's test font has no glyphs for either — task 8 recorded that as deliberate.
+On the device the dates are real words: `الجمعة`, `الخميس`, `الأربعاء` in
+Arabic, `יום ו׳`, `יום ה׳`, `יום ד׳` in Hebrew. That is `initializeDateFormatting`
+and `Intl.defaultLocale` working end to end on a real platform, which is the one
+part of task 6's locale work no test in the repository actually proves.
+
+The layout: rail on the right, avatars on the right, timestamps and unread
+badges on the left, the merged chip and its glyph row mirrored, the search
+field's magnifier on the right. In a conversation, own bubbles sit at the end
+(left) and the peer's at the start (right), the tails and ticks follow them, the
+back arrow points right and the send glyph points left — both mirrored by the
+SDK, as task 6's *Verified correct* note predicted. Timestamps stay
+left-to-right inside a right-to-left row.
+
+**The known English-chrome effect is there and is not a layout defect.** The app
+bar subtitle reads `…Merged · WhatsApp, S` with the ellipsis at the left of the
+run. That is the bidi algorithm laying out an English sentence correctly inside a
+right-to-left paragraph, exactly as task 8 described for `.Every network, one
+thread`. What fixes it is the deferred string extraction, and nothing else
+should be done about it.
+
+### Still open
+
+**DEV-6 — the rail is split by the header in reading order.** The exported order
+on the inbox is: `All conversations, 27 unread`, then `Conversations`, then
+`Appearance` and `More`, then the *other* seven rail items, then the search
+field, then the list. A reader meets the first rail entry, leaves the rail for
+the title and the two app-bar buttons, and comes back to it.
+
+This is not the keyboard order — task 5's `OrderedTraversalPolicy` governs where
+Tab goes, and a semantics traversal order is a different ordering, set with
+`SemanticsSortKey`, that nothing in Weft sets. So the two are consistent by
+accident on every screen where they agree, and disagree here. **Left open
+deliberately**: the fix is `Semantics(sortKey: OrdinalSortKey(…))` on the rail,
+the header, the search field and the list, and it wants a device pass of its own
+rather than a change made at the end of a phase and verified by a widget test
+that, as DEV-1 shows, would not necessarily see the difference. Recorded with
+the shape of the fix so it starts from here.
+
+**Surfaces not reached on the device.** The device pass covered the inbox, two
+conversations, search and merge. It did **not** reach the attachment surfaces
+([[Attachment-Pipeline]]), the media viewer, the call screens, the settings
+screens or the share sheet — all of which have semantics closed against tests
+in tasks 3 and 4, none of which has now been read by a screen reader on a
+device. Nothing here suggests they are wrong; the point is that DEV-1 through
+DEV-5 were all found in the first two screens looked at, so the rate is not
+zero and the remaining surfaces should get the same treatment.
+
+### macOS, not verified
+
+The macOS app builds and runs — `flutter build macos --debug
+--dart-define=WEFT_DEMO=true`, launched, process alive, quit cleanly. **VoiceOver
+was not run**, and the reason is a permission rather than a defect:
+
+- `osascript` cannot reach `System Events`: *"Keine Berechtigung zum Senden von
+  Apple-Events an System Events. (-1743)"* — the Automation consent is a dialog,
+  and this session has no one to answer it.
+- `screencapture` returns *"could not create image from display"* — Screen
+  Recording consent, same problem.
+- Starting VoiceOver without those two permissions would have been a one-way
+  door: `open /System/Library/CoreServices/VoiceOver.app` turns it on, and
+  turning it off again, or driving it with VO+arrow keys, needs exactly the key
+  injection that is refused. Leaving somebody's Mac speaking with no way to stop
+  it is a worse outcome than an unfinished check, so it was not attempted.
+
+For whoever has a keyboard in front of them, it is about ten minutes:
+`flutter run -d macos --dart-define=WEFT_DEMO=true`, Cmd+F5, then VO+→ through
+the inbox, into a conversation and into the composer. **DEV-1 and DEV-2 are the
+two to look for first** — both are platform-independent, both were invisible to
+every test, and VoiceOver on the Mac would have reported them the same way
+TalkBack did.
+
+### Why the suite could not see these
+
+Worth stating plainly, because the same blindness will hide the next one.
+
+The natural way to assert a field's name is
+`tester.getSemantics(find.byType(TextField))`. That walks **up** from the render
+object to the first semantics node it meets — so when an annotation has leaked
+into an ancestor, the leaked node *is* what it returns, with the right label on
+it. The assertion passes on the strength of the bug. Every check written for
+this section starts at the root, walks down, and asserts about the node's
+**rect**, which is the part that was wrong.
+
+Three tests now cover the shape rather than the instances:
+
+- `apps/weft/test/a11y/semantics_test.dart` — *no control is the size of its
+  screen*, over the same six screens as the guideline sweep plus a merged chat
+  (the send chip only exists on one), using `oversizedControlsIn` in
+  `test/support/semantics_probe.dart`. It fails at `"Send via Telegram" is
+  1400×836` and `"Message via Signal" is 1400×836` against the old code.
+- `packages/weft_design/test/labelled_field_test.dart` — `WeftLabelledField` is
+  named, is no bigger than its field, keeps its name after typing, and does not
+  swallow a button in the decoration. The last one is why the fix is
+  `container: true` and not `MergeSemantics`: merging folds the clear-search and
+  change-server buttons into the field.
+- `apps/weft/test/chat_semantics_test.dart` — a merged bubble's labels contain
+  `Anna Maven, on Telegram` and do **not** contain a bare `Telegram`.
+
+### The run
+
+`dart analyze` from the root: *No issues found*. **2 525 tests pass** — 1 026 in
+the twelve pure packages, 278 in `weft_matrix`, 44 in `weft_store`, 262 in
+`weft_design` (+3) and 915 in `apps/weft` (+8), against task 9's 2 514. Sixty
+golden images, eighteen of them regenerated for DEV-3 and inspected; the rest
+byte-identical.

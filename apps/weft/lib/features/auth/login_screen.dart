@@ -125,9 +125,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // The hint is the field's whole name, and a hint is gone at the
                 // first keystroke — so on a form of three fields, a reader who
                 // typed into all three had three fields left called nothing.
-                Semantics(
+                WeftLabelledField(
                   label: 'Server address',
-                  textField: true,
                   child: TextField(
                     controller: _homeserver,
                     enabled: !_busy && !_serverResolved,
@@ -158,9 +157,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 if (_serverResolved && _supportsPassword) ...[
                   const SizedBox(height: WeftSpace.lg),
-                  Semantics(
+                  WeftLabelledField(
                     label: 'Username',
-                    textField: true,
                     child: TextField(
                       controller: _username,
                       enabled: !_busy,
@@ -173,9 +171,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: WeftSpace.sm),
-                  Semantics(
+                  WeftLabelledField(
                     label: 'Password',
-                    textField: true,
                     child: TextField(
                       controller: _password,
                       enabled: !_busy,

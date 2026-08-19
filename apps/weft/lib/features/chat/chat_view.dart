@@ -1442,27 +1442,44 @@ class _MessageBubble extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (showNetwork && !groupedWithPrevious) ...[
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              NetworkGlyph(network: message.network, size: 12),
-                              const SizedBox(width: WeftSpace.xs),
-                              Text(
-                                message.network.label,
-                                style: context.text.labelSmall?.copyWith(
-                                  // The label is text and owes 4.5:1; the
-                                  // hairline beside it is a graphic and owes
-                                  // 3:1, which is why they are two tokens.
-                                  color: own
-                                      ? palette.mutedOnBubble(true, alpha: 0.8)
-                                      : palette.networkTextColor(
-                                          message.network,
-                                        ),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 10,
+                          // Silent, all of it. The bubble's group node opens
+                          // with "Anna Maven, on WhatsApp"; the glyph carries
+                          // the network's name and the caption beside it
+                          // repeats the same word, so on a device a merged
+                          // thread announced every leg three times over —
+                          // "Anna Maven, on WhatsApp. WhatsApp. WhatsApp."
+                          // This row is how a *sighted* reader learns which
+                          // network a bubble came from, and a reader who has
+                          // already been told does not need it twice more.
+                          ExcludeSemantics(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                NetworkGlyph(
+                                  network: message.network,
+                                  size: 12,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: WeftSpace.xs),
+                                Text(
+                                  message.network.label,
+                                  style: context.text.labelSmall?.copyWith(
+                                    // The label is text and owes 4.5:1; the
+                                    // hairline beside it is a graphic and owes
+                                    // 3:1, which is why they are two tokens.
+                                    color: own
+                                        ? palette.mutedOnBubble(
+                                            true,
+                                            alpha: 0.8,
+                                          )
+                                        : palette.networkTextColor(
+                                            message.network,
+                                          ),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 3),
                         ],
@@ -1927,9 +1944,8 @@ class _Composer extends StatelessWidget {
                   // typed — so a reader who started replying and then typed had
                   // no way left to find out that the next send is a reply. The
                   // label says it whether the field is empty or not.
-                  child: Semantics(
+                  child: WeftLabelledField(
                     label: _fieldLabel(sendNetwork),
-                    textField: true,
                     // Around the field, so the key is resolved from the focused
                     // node outward and marked handled before the platform's
                     // text input ever sees it. That is what makes Shift+Enter

@@ -94,6 +94,15 @@ void main() {
       final labels = labelsIn(tester);
       expect(labels, contains('Anna Maven, on Telegram'));
       expect(labels, contains('You, on Signal'));
+
+      // Once each, not three times. The bubble also paints the network as a
+      // glyph and a caption above the text, and both of those carried the same
+      // word — so on a device a merged thread read "Anna Maven, on Telegram.
+      // Telegram. Telegram." for every message in it. The caption is how a
+      // sighted reader learns the leg; a reader who has just been told it does
+      // not need it twice more.
+      expect(labels, isNot(contains('Telegram')));
+      expect(labels, isNot(contains('Signal')));
       handle.dispose();
     });
 

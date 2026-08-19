@@ -115,6 +115,53 @@ String? focusedNameIn(WidgetTester tester) {
   return found;
 }
 
+/// Every control bigger than [maxHeight], described well enough to find it.
+///
+/// A control the size of the screen is not a design decision, it is an
+/// annotation that has merged into an ancestor. `Semantics(…)` with the default
+/// `container: false` does not make a node — it adds its label and its flags to
+/// the nearest *enclosing* node, and when the thing it wraps paints no
+/// semantics of its own (a chip whose only content is two silent glyphs) or
+/// sits alone at the bottom of a screen, that enclosing node is the screen.
+///
+/// TalkBack found the first of these on a device: the chat view exported the
+/// whole conversation as one edit box named after the composer. No assertion in
+/// the suite could see it, because the natural way to check a field's name is
+/// `tester.getSemantics(find.byType(TextField))` — and that walks *up* from the
+/// render object to the first node it meets, which when the label has leaked
+/// **is** the leaked node. So the check passed on the strength of the bug.
+/// This one starts at the root, walks down, and looks at rects.
+///
+/// A control is a node offering a tap or holding text, which is what makes the
+/// scroll view enclosing a list — properly the size of the screen — not one.
+List<String> oversizedControlsIn(
+  WidgetTester tester, {
+  required double maxHeight,
+}) {
+  final found = <String>[];
+  void walk(SemanticsNode node) {
+    final data = node.getSemanticsData();
+    final control =
+        data.hasAction(SemanticsAction.tap) || data.flagsCollection.isTextField;
+    if (control && node.rect.height > maxHeight) {
+      final name = [
+        data.label,
+        data.tooltip,
+      ].firstWhere((part) => part.isNotEmpty, orElse: () => '<unnamed>');
+      found.add(
+        '"$name" is ${node.rect.width.round()}×${node.rect.height.round()}',
+      );
+    }
+    node.visitChildren((child) {
+      walk(child);
+      return true;
+    });
+  }
+
+  walk(_root(tester));
+  return found;
+}
+
 /// The node tree's root, or a failure saying why there isn't one.
 SemanticsNode _root(WidgetTester tester) {
   // The root owner holds no nodes of its own — the view's owner does, and it is

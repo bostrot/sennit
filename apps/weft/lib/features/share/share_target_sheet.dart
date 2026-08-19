@@ -420,9 +420,8 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                 WeftSpace.xl,
                 WeftSpace.sm,
               ),
-              child: Semantics(
+              child: WeftLabelledField(
                 label: 'Search chats',
-                textField: true,
                 child: TextField(
                   controller: _search,
                   onChanged: (value) =>

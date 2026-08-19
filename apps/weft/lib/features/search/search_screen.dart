@@ -92,9 +92,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         // The hint is the field's only name, and a hint disappears at the first
         // keystroke — so a reader who typed had nothing left telling them what
         // this field was. The label says it either way.
-        title: Semantics(
+        title: WeftLabelledField(
           label: 'Search all conversations',
-          textField: true,
           child: TextField(
             controller: _controller,
             autofocus: true,
@@ -134,7 +133,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               children: [
                 for (final network in repository.availableNetworks)
                   FilterChip(
-                    avatar: NetworkGlyph(network: network, size: 16),
+                    // The chip's own label is the network's name; a glyph that
+                    // says it again turns every filter into "WhatsApp,
+                    // WhatsApp, not selected".
+                    avatar: NetworkGlyph(
+                      network: network,
+                      size: 16,
+                      semanticsLabel: '',
+                    ),
                     label: Text(network.label),
                     selected: _networkFilter.contains(network),
                     onSelected: (_) {

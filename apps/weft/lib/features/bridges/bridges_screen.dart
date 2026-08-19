@@ -134,9 +134,8 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
               'https://bridge.example.org/_matrix/provision',
             ),
             const SizedBox(height: WeftSpace.md),
-            Semantics(
+            WeftLabelledField(
               label: 'Provisioning URL',
-              textField: true,
               child: TextField(
                 controller: url,
                 autofocus: true,
@@ -296,7 +295,13 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                   for (final found in _detected)
                     if (!_bridges.any((b) => b.networkId == found.network.id))
                       ListTile(
-                        leading: NetworkGlyph(network: found.network, size: 30),
+                        // The tile's title is the network's name — same
+                        // duplication the chat bubble had.
+                        leading: NetworkGlyph(
+                          network: found.network,
+                          size: 30,
+                          semanticsLabel: '',
+                        ),
                         title: Text(found.network.label),
                         subtitle: Text(
                           '${found.roomCount} bridged chat(s)'
@@ -375,13 +380,15 @@ class _BridgeCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                NetworkGlyph(network: network, size: 32),
+                NetworkGlyph(network: network, size: 32, semanticsLabel: ''),
                 const SizedBox(width: WeftSpace.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
+                        // Names the network in words, which is why the glyph
+                        // beside it is silent.
                         whoami?.networkName ?? network.label,
                         style: context.text.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,

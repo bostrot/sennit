@@ -23,6 +23,7 @@ import '../support/attachment_fixtures.dart';
 import '../support/call_fixtures.dart';
 import '../support/golden_harness.dart' show loadGoldenFonts;
 import '../support/seeded_repository.dart';
+import '../support/semantics_probe.dart';
 
 /// The four guidelines Flutter ships, swept over the screens Weft is actually
 /// used on.
@@ -212,6 +213,86 @@ void main() {
       }
     });
   }
+
+  /// Nothing on a screen may *be* the screen.
+  ///
+  /// The four guidelines above are Flutter's and they do not ask this. It is
+  /// here because TalkBack asked it on a device and the answer was no: the chat
+  /// view exported the whole conversation as one edit box called "Message via
+  /// Signal", and the send-network chip — whose only visible content is two
+  /// silent glyphs — put its tap and its name on the same node. Both are the
+  /// same mistake, an annotation with no node of its own merging into the
+  /// nearest one that has, and the fix for both is `container: true`.
+  ///
+  /// Swept at one brightness: a rect is the same in both themes.
+  ///
+  /// See [oversizedControlsIn] for why no test that starts from a `find` can
+  /// catch this.
+  group('no control is the size of its screen', () {
+    for (final scene in scenes.entries) {
+      testWidgets(scene.key, (tester) async {
+        final handle = tester.ensureSemantics();
+        await scene.value(tester, Brightness.dark);
+        // A third of the pumped 900, which is far above anything real — the
+        // composer grows to five lines and the leaked node was 836.
+        expect(oversizedControlsIn(tester, maxHeight: 300), isEmpty);
+        handle.dispose();
+      });
+    }
+
+    /// The merged chat, which the scene above is not.
+    ///
+    /// It has to be its own case because the send-network chip only exists on a
+    /// conversation with more than one leg, and the chip is half the finding:
+    /// its visible content is a silenced glyph and a chevron, so it paints no
+    /// semantics of its own for its tooltip and its tap to attach to, and both
+    /// went to the screen instead.
+    testWidgets('chat, merged across two networks', (tester) async {
+      final handle = tester.ensureSemantics();
+      final repository = SeededChatRepository(
+        demo,
+        messages: [
+          seededMessage(
+            eventId: r'$tg',
+            body: 'Where are we meeting?',
+            network: ChatNetwork.telegram,
+            roomId: '!tg:example.org',
+            minutesAgo: 10,
+          ),
+          seededMessage(
+            eventId: r'$sig',
+            body: 'the usual place',
+            isOwn: true,
+            network: ChatNetwork.signal,
+            roomId: '!sig:example.org',
+            minutesAgo: 5,
+          ),
+        ],
+      );
+      await pumpScreen(
+        tester,
+        ChatView(chatId: repository.chatId),
+        repository: repository,
+        stores: stores,
+      );
+
+      expect(oversizedControlsIn(tester, maxHeight: 300), isEmpty);
+      // And the chip still says which leg the next send goes out on, which is
+      // the one fact it exists to state.
+      expect(controlNamesIn(tester), contains('Send via Telegram'));
+      handle.dispose();
+    });
+
+    testWidgets('and the composer is still named', (tester) async {
+      final handle = tester.ensureSemantics();
+      await scenes['chat']!(tester, Brightness.dark);
+      // The leak was one half of the finding. A fix that dropped the label to
+      // close it would trade this defect for the one the annotation was added
+      // for: a field whose name vanishes at the first keystroke.
+      expect(labelsIn(tester), contains(startsWith('Message via')));
+      handle.dispose();
+    });
+  });
 
   /// The surfaces the audit's touch-target register names that are not screens.
   ///
