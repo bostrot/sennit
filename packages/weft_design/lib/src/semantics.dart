@@ -35,6 +35,32 @@ String deliveryStateLabel(DeliveryState? state) => switch (state) {
   null => '',
 };
 
+/// A code said one character at a time, in groups.
+///
+/// Weft shows the user two strings they have to reproduce exactly and can never
+/// see again: an MCP API key, and the recovery key that is the only way back
+/// into their message history. Both are drawn as one monospace run, which a
+/// screen reader announces as a single unpronounceable word — so the one screen
+/// whose entire purpose is "write this down" is the one screen a blind user
+/// cannot use.
+///
+/// Spaces between characters is what makes an engine spell rather than
+/// pronounce. [groupSize] then inserts a comma every few characters, which is
+/// what turns forty-eight spoken letters into something a person can actually
+/// keep up with — and gives them somewhere to resume from when they lose their
+/// place. Whitespace already in [code] is dropped rather than spelled: the
+/// recovery key arrives pre-grouped, and "space" read aloud twelve times is
+/// twelve chances to write one down.
+String spelledOut(String code, {int groupSize = 4}) {
+  final characters = code.replaceAll(RegExp(r'\s+'), '').split('');
+  if (characters.isEmpty) return '';
+  final groups = <String>[];
+  for (var i = 0; i < characters.length; i += groupSize) {
+    groups.add(characters.skip(i).take(groupSize).join(' '));
+  }
+  return groups.join(', ');
+}
+
 /// What a message *is*, for a reader who cannot see the bubble.
 ///
 /// The preview text answers "what does it say"; this answers "what kind of

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../../app/a11y.dart';
 import '../../app/session_providers.dart';
 import 'settings_section.dart';
 
@@ -92,9 +93,25 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   };
 
   void _say(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    // "Recovery key saved", "Restored" and every failure below reach the user
+    // through this and nothing else — the screen just goes back to its status
+    // page looking exactly as it did before.
+    showWeftMessage(context, message);
+  }
+
+  /// Moves to [next] and says where the user now is.
+  ///
+  /// Each stage replaces the whole body with a different one — a key to write
+  /// down, a field to type it back into, a field to restore from. Nothing about
+  /// that swap is announced, so a reader who pressed a button is left on a page
+  /// that has silently become a different page, with the focus wherever the old
+  /// one left it. [heading] is the sentence the new stage would have led with.
+  void _goTo(_Stage next, String heading, {VoidCallback? also}) {
+    setState(() {
+      _stage = next;
+      also?.call();
+    });
+    announce(context, heading);
   }
 
   Future<void> _setUp({required bool replaceExisting}) async {
@@ -130,12 +147,15 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             replaceExisting: replaceExisting,
           );
       if (!mounted) return;
-      setState(() {
-        _newKey = key;
-        _stepError = null;
-        _stage = _Stage.showKey;
-        _entry.clear();
-      });
+      _goTo(
+        _Stage.showKey,
+        'Your recovery key. Write it down now — it cannot be shown again.',
+        also: () {
+          _newKey = key;
+          _stepError = null;
+          _entry.clear();
+        },
+      );
     } catch (error) {
       if (mounted) _say(_sentence(error));
     } finally {
@@ -289,11 +309,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           FilledButton.icon(
             onPressed: _busy
                 ? null
-                : () => setState(() {
-                    _stage = _Stage.restore;
-                    _stepError = null;
-                    _entry.clear();
-                  }),
+                : () => _goTo(
+                    _Stage.restore,
+                    'Enter your recovery key or passphrase.',
+                    also: () {
+                      _stepError = null;
+                      _entry.clear();
+                    },
+                  ),
             icon: const Icon(Icons.lock_open_rounded, size: 18),
             label: const Text('Enter your recovery key'),
           ),
@@ -333,12 +356,24 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             color: context.colors.surfaceContainerHigh,
             borderRadius: WeftRadius.allMd,
           ),
-          child: SelectableText(
-            formatRecoveryKey(key),
-            key: const Key('recovery-key'),
-            style: context.text.titleMedium?.copyWith(
-              fontFamily: 'monospace',
-              letterSpacing: 1.2,
+          // Spelled out. This is the one string in Weft a user has to
+          // reproduce character for character and will never be shown again,
+          // and as a single monospace run a screen reader announced it as one
+          // word — which makes the screen whose entire purpose is "write this
+          // down" the screen a blind user cannot complete. `letterSpacing` is
+          // the sighted half of the same intent.
+          child: Semantics(
+            label:
+                'Recovery key. Copy it with the button below, or write it '
+                'down: ${spelledOut(formatRecoveryKey(key))}',
+            excludeSemantics: true,
+            child: SelectableText(
+              formatRecoveryKey(key),
+              key: const Key('recovery-key'),
+              style: context.text.titleMedium?.copyWith(
+                fontFamily: 'monospace',
+                letterSpacing: 1.2,
+              ),
             ),
           ),
         ),
@@ -356,11 +391,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         ),
         const SizedBox(height: WeftSpace.lg),
         FilledButton(
-          onPressed: () => setState(() {
-            _stage = _Stage.confirmKey;
-            _stepError = null;
-            _entry.clear();
-          }),
+          onPressed: () => _goTo(
+            _Stage.confirmKey,
+            'Type the recovery key back in to confirm you have it.',
+            also: () {
+              _stepError = null;
+              _entry.clear();
+            },
+          ),
           child: const Text('I have saved it'),
         ),
       ],
@@ -396,10 +434,11 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         FilledButton(onPressed: _confirmSaved, child: const Text('Confirm')),
         const SizedBox(height: WeftSpace.sm),
         TextButton(
-          onPressed: () => setState(() {
-            _stage = _Stage.showKey;
-            _stepError = null;
-          }),
+          onPressed: () => _goTo(
+            _Stage.showKey,
+            'Your recovery key, shown again.',
+            also: () => _stepError = null,
+          ),
           child: const Text('Show it again'),
         ),
       ],
@@ -441,11 +480,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         TextButton(
           onPressed: _busy
               ? null
-              : () => setState(() {
-                  _stage = _Stage.status;
-                  _stepError = null;
-                  _entry.clear();
-                }),
+              : () => _goTo(
+                  _Stage.status,
+                  'Cancelled. Back to your encryption settings.',
+                  also: () {
+                    _stepError = null;
+                    _entry.clear();
+                  },
+                ),
           child: const Text('Cancel'),
         ),
       ],
@@ -586,17 +628,26 @@ class _Note extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info_outline_rounded,
-            size: 20,
-            color: context.colors.onSurfaceVariant,
+          ExcludeSemantics(
+            child: Icon(
+              Icons.info_outline_rounded,
+              size: 20,
+              color: context.colors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(width: WeftSpace.md),
           Expanded(
-            child: Text(
-              message,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
+            child: Semantics(
+              // Named as advice rather than left as prose: the grey box and the
+              // info glyph are the whole signal that this is a suggestion, and
+              // both are invisible to a reader.
+              label: 'Suggestion. $message',
+              excludeSemantics: true,
+              child: Text(
+                message,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -613,6 +664,14 @@ class _ErrorBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Live: this box is how a mistyped recovery key is reported, and it appears
+    // in place with the focus still on the field or the button that produced
+    // it. Without it the user presses Confirm, hears nothing, and has no reason
+    // to think anything but that the button is broken.
+    return Semantics(liveRegion: true, child: _box(context));
+  }
+
+  Widget _box(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(WeftSpace.md),
       decoration: BoxDecoration(

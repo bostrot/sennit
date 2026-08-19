@@ -122,25 +122,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 Text('Server', style: context.text.labelLarge),
                 const SizedBox(height: WeftSpace.sm),
-                TextField(
-                  controller: _homeserver,
-                  enabled: !_busy && !_serverResolved,
-                  autocorrect: false,
-                  keyboardType: TextInputType.url,
-                  onSubmitted: (_) => _resolveServer(),
-                  decoration: InputDecoration(
-                    hintText: 'example.org',
-                    prefixIcon: const Icon(Icons.dns_outlined, size: 20),
-                    suffixIcon: _serverResolved
-                        ? IconButton(
-                            tooltip: 'Change server',
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            onPressed: () => setState(() {
-                              _discovery = null;
-                              _flows = const [];
-                            }),
-                          )
-                        : null,
+                // The hint is the field's whole name, and a hint is gone at the
+                // first keystroke — so on a form of three fields, a reader who
+                // typed into all three had three fields left called nothing.
+                Semantics(
+                  label: 'Server address',
+                  textField: true,
+                  child: TextField(
+                    controller: _homeserver,
+                    enabled: !_busy && !_serverResolved,
+                    autocorrect: false,
+                    keyboardType: TextInputType.url,
+                    onSubmitted: (_) => _resolveServer(),
+                    decoration: InputDecoration(
+                      hintText: 'example.org',
+                      prefixIcon: const Icon(Icons.dns_outlined, size: 20),
+                      suffixIcon: _serverResolved
+                          ? IconButton(
+                              tooltip: 'Change server',
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              onPressed: () => setState(() {
+                                _discovery = null;
+                                _flows = const [];
+                              }),
+                            )
+                          : null,
+                    ),
                   ),
                 ),
 
@@ -151,25 +158,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 if (_serverResolved && _supportsPassword) ...[
                   const SizedBox(height: WeftSpace.lg),
-                  TextField(
-                    controller: _username,
-                    enabled: !_busy,
-                    autocorrect: false,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Username',
-                      prefixIcon: Icon(Icons.person_outline, size: 20),
+                  Semantics(
+                    label: 'Username',
+                    textField: true,
+                    child: TextField(
+                      controller: _username,
+                      enabled: !_busy,
+                      autocorrect: false,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'Username',
+                        prefixIcon: Icon(Icons.person_outline, size: 20),
+                      ),
                     ),
                   ),
                   const SizedBox(height: WeftSpace.sm),
-                  TextField(
-                    controller: _password,
-                    enabled: !_busy,
-                    obscureText: true,
-                    onSubmitted: (_) => _signIn(),
-                    decoration: const InputDecoration(
-                      hintText: 'Password',
-                      prefixIcon: Icon(Icons.lock_outline, size: 20),
+                  Semantics(
+                    label: 'Password',
+                    textField: true,
+                    child: TextField(
+                      controller: _password,
+                      enabled: !_busy,
+                      obscureText: true,
+                      onSubmitted: (_) => _signIn(),
+                      decoration: const InputDecoration(
+                        hintText: 'Password',
+                        prefixIcon: Icon(Icons.lock_outline, size: 20),
+                      ),
                     ),
                   ),
                 ],
@@ -180,19 +195,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
 
                 const SizedBox(height: WeftSpace.xl),
-                FilledButton(
-                  onPressed: _busy
-                      ? null
+                // The spinner *replaces* the label while the request is in
+                // flight, so for the seconds that matter most the button had no
+                // name at all — a reader who came back to it was told only
+                // "button". The label outlives the text it is made of.
+                Semantics(
+                  label: _busy
+                      ? 'Working'
                       : _serverResolved
-                      ? _signIn
-                      : _resolveServer,
-                  child: _busy
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_serverResolved ? 'Sign in' : 'Continue'),
+                      ? 'Sign in'
+                      : 'Continue',
+                  excludeSemantics: true,
+                  button: true,
+                  child: FilledButton(
+                    onPressed: _busy
+                        ? null
+                        : _serverResolved
+                        ? _signIn
+                        : _resolveServer,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_serverResolved ? 'Sign in' : 'Continue'),
+                  ),
                 ),
 
                 if (_serverResolved && _supportsSso) ...[
@@ -313,30 +341,40 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(WeftSpace.md),
-      decoration: BoxDecoration(
-        color: context.colors.errorContainer,
-        borderRadius: WeftRadius.allMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.error_outline_rounded,
-            size: 18,
-            color: context.colors.onErrorContainer,
-          ),
-          const SizedBox(width: WeftSpace.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onErrorContainer,
+    // Live, and named as a failure. A sign-in that did not work leaves the user
+    // on the same form with the same fields; this banner appearing above the
+    // button is the entire difference, and it appears while the focus is still
+    // on the button that has apparently just done nothing.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: 'Sign-in failed. $message',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(WeftSpace.md),
+        decoration: BoxDecoration(
+          color: context.colors.errorContainer,
+          borderRadius: WeftRadius.allMd,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 18,
+              color: context.colors.onErrorContainer,
+            ),
+            const SizedBox(width: WeftSpace.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onErrorContainer,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

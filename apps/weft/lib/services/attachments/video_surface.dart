@@ -116,7 +116,15 @@ class _VideoSurfaceState extends State<VideoSurface> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: VideoProgressIndicator(controller, allowScrubbing: true),
+              // A draggable control with no name and no value: a reader found
+              // an unlabelled thing at the bottom of the picture, and dragging
+              // it seeks the video.
+              child: Semantics(
+                label: 'Video position',
+                slider: true,
+                value: _positionLabel(controller.value),
+                child: VideoProgressIndicator(controller, allowScrubbing: true),
+              ),
             ),
           ],
         ),
@@ -199,3 +207,14 @@ final videoSurfaceProvider = Provider<VideoSurfaceBuilder>(
   (ref) =>
       (context, file) => VideoSurface(file: file),
 );
+
+/// Where the playhead is, in the words a person would use.
+String _positionLabel(VideoPlayerValue value) {
+  String clock(Duration d) {
+    final minutes = d.inMinutes;
+    final seconds = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  return '${clock(value.position)} of ${clock(value.duration)}';
+}

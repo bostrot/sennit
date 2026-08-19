@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/a11y.dart';
 import '../../app/providers.dart';
 import '../../app/stores.dart';
 import '../../services/links/link_preview_service.dart';
@@ -41,7 +42,12 @@ class LinkPreviewsScreen extends ConsumerWidget {
           const SizedBox(height: WeftSpace.lg),
 
           SwitchListTile(
-            title: const Text('Show link previews'),
+            title: const PrivacyGatedTitle(
+              title: 'Show link previews',
+              warning:
+                  'Turning this on tells your homeserver every link you are '
+                  'sent, including links inside encrypted chats.',
+            ),
             subtitle: const Text(
               'Off means no link in any message is ever looked up. Nothing is '
               'requested until you switch this on.',
@@ -128,12 +134,12 @@ class LinkPreviewsScreen extends ConsumerWidget {
     final removed = ref.read(storesProvider).linkPreviews.count;
     ref.read(storesProvider).linkPreviews.clear();
     ref.read(settingsRevisionProvider.notifier).bump();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          removed == 1 ? 'Forgot 1 preview.' : 'Forgot $removed previews.',
-        ),
-      ),
+    // The count is the entire confirmation that anything happened — the button
+    // looks identical before and after — and a bare snackbar said it to nobody
+    // who was not watching.
+    showWeftMessage(
+      context,
+      removed == 1 ? 'Forgot 1 preview.' : 'Forgot $removed previews.',
     );
   }
 }
@@ -153,7 +159,9 @@ class _NetworkRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SwitchListTile(
-      secondary: NetworkGlyph(network: network, size: 28),
+      // The tile is one merged node, and the title beside the glyph is already
+      // the network's name — a labelled glyph here reads "WhatsApp, WhatsApp".
+      secondary: NetworkGlyph(network: network, size: 28, semanticsLabel: ''),
       title: Text(network.label),
       value: allowed,
       onChanged: onChanged,

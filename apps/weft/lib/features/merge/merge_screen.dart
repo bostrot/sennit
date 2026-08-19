@@ -4,6 +4,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
+import '../../app/a11y.dart';
 import '../../app/providers.dart';
 
 /// Merge management: what the scorer proposes, and what is already merged.
@@ -19,6 +20,19 @@ class MergeScreen extends ConsumerStatefulWidget {
 }
 
 class _MergeScreenState extends ConsumerState<MergeScreen> {
+  /// Applies [action] and then says what it did.
+  ///
+  /// Every decision on this screen reports itself the same way: the card the
+  /// user acted on disappears. That is a complete report for someone watching
+  /// the list and no report at all for someone listening to it — the reader is
+  /// simply left on whatever moved up into the gap.
+  Future<void> _decide(Future<void> Function() action, String outcome) async {
+    await action();
+    if (!mounted) return;
+    setState(() {});
+    announce(context, outcome);
+  }
+
   @override
   Widget build(BuildContext context) {
     final repository = ref.watch(chatRepositoryProvider);
@@ -45,12 +59,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
             ),
           ),
           const SizedBox(height: WeftSpace.xl),
-          Text(
-            'Suggestions',
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          _SectionTitle('Suggestions'),
           const SizedBox(height: WeftSpace.sm),
           if (suggestions.isEmpty)
             Text(
@@ -64,25 +73,22 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
             for (final candidate in suggestions)
               _SuggestionCard(
                 candidate: candidate,
-                onMerge: () async {
-                  await repository.mergeHandles(candidate.a.id, candidate.b.id);
-                  if (mounted) setState(() {});
-                },
-                onReject: () async {
-                  await repository.rejectSuggestion(
+                onMerge: () => _decide(
+                  () => repository.mergeHandles(candidate.a.id, candidate.b.id),
+                  'Merged ${handleLabel(candidate.a)} with '
+                  '${handleLabel(candidate.b)}. They are now one conversation.',
+                ),
+                onReject: () => _decide(
+                  () => repository.rejectSuggestion(
                     candidate.a.id,
                     candidate.b.id,
-                  );
-                  if (mounted) setState(() {});
-                },
+                  ),
+                  '${handleLabel(candidate.a)} and ${handleLabel(candidate.b)} '
+                  'kept separate. This suggestion will not come back.',
+                ),
               ),
           const SizedBox(height: WeftSpace.xl),
-          Text(
-            'Merged',
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          _SectionTitle('Merged'),
           const SizedBox(height: WeftSpace.sm),
           if (merged.isEmpty)
             Text(
@@ -95,10 +101,10 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
             for (final contact in merged)
               _MergedCard(
                 contact: contact,
-                onUnmerge: (handleId) async {
-                  await repository.unmergeHandle(handleId);
-                  if (mounted) setState(() {});
-                },
+                onUnmerge: (handle) => _decide(
+                  () => repository.unmergeHandle(handle.id),
+                  '${handleLabel(handle)} is a separate conversation again.',
+                ),
               ),
         ],
       ),
@@ -128,56 +134,88 @@ class _SuggestionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                _HandleChip(handle: candidate.a),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: WeftSpace.sm),
-                  child: Icon(
-                    Icons.merge_rounded,
-                    size: 18,
-                    color: palette.mergedAccent,
+            // The proposal is one statement, not seven nodes. Two handles, a
+            // percentage and a row of evidence chips read in isolation are the
+            // parts of a sentence with the sentence taken out — and the two
+            // buttons below act on the whole of it.
+            Semantics(
+              container: true,
+              excludeSemantics: true,
+              label: _proposalLabel(candidate),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _HandleChip(handle: candidate.a),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: WeftSpace.sm,
+                        ),
+                        child: Icon(
+                          Icons.merge_rounded,
+                          size: 18,
+                          color: palette.mergedAccent,
+                        ),
+                      ),
+                      _HandleChip(handle: candidate.b),
+                      const Spacer(),
+                      Text(
+                        '${(candidate.score * 100).round()}%',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                _HandleChip(handle: candidate.b),
-                const Spacer(),
-                Text(
-                  '${(candidate.score * 100).round()}%',
-                  style: context.text.labelSmall?.copyWith(
-                    color: context.colors.onSurfaceVariant,
+                  const SizedBox(height: WeftSpace.sm),
+                  // The evidence, verbatim from the scorer.
+                  Wrap(
+                    spacing: WeftSpace.xs,
+                    runSpacing: WeftSpace.xs,
+                    children: [
+                      for (final signal in candidate.signals)
+                        Chip(
+                          label: Text(signal.explanation),
+                          labelStyle: context.text.labelSmall,
+                          visualDensity: VisualDensity.compact,
+                          side: BorderSide.none,
+                          backgroundColor: context.colors.surfaceContainerHigh,
+                        ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: WeftSpace.sm),
-            // The evidence, verbatim from the scorer.
-            Wrap(
-              spacing: WeftSpace.xs,
-              runSpacing: WeftSpace.xs,
-              children: [
-                for (final signal in candidate.signals)
-                  Chip(
-                    label: Text(signal.explanation),
-                    labelStyle: context.text.labelSmall,
-                    visualDensity: VisualDensity.compact,
-                    side: BorderSide.none,
-                    backgroundColor: context.colors.surfaceContainerHigh,
-                  ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: WeftSpace.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
+                // Both buttons name whom they act on and what happens. On a
+                // screen with four suggestions, four buttons reading "Merge"
+                // are four ways to merge the wrong two people.
+                NamedButton(
+                  label:
+                      'Not the same person: keep '
+                      '${handleLabel(candidate.a)} and '
+                      '${handleLabel(candidate.b)} separate',
                   onPressed: onReject,
-                  child: const Text('Not the same person'),
+                  child: TextButton(
+                    onPressed: onReject,
+                    child: const Text('Not the same person'),
+                  ),
                 ),
                 const SizedBox(width: WeftSpace.sm),
-                FilledButton.icon(
+                NamedButton(
+                  label:
+                      'Merge ${handleLabel(candidate.a)} with '
+                      '${handleLabel(candidate.b)} into one conversation',
                   onPressed: onMerge,
-                  icon: const Icon(Icons.merge_rounded, size: 18),
-                  label: const Text('Merge'),
+                  child: FilledButton.icon(
+                    onPressed: onMerge,
+                    icon: const Icon(Icons.merge_rounded, size: 18),
+                    label: const Text('Merge'),
+                  ),
                 ),
               ],
             ),
@@ -192,7 +230,7 @@ class _MergedCard extends StatelessWidget {
   const _MergedCard({required this.contact, required this.onUnmerge});
 
   final UnifiedContact contact;
-  final ValueChanged<String> onUnmerge;
+  final ValueChanged<NetworkHandle> onUnmerge;
 
   @override
   Widget build(BuildContext context) {
@@ -237,14 +275,61 @@ class _MergedCard extends StatelessWidget {
                       style: context.text.bodySmall,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => onUnmerge(handle.id),
-                    child: const Text('Unmerge'),
+                  // Same problem as Merge, one row down: a contact with three
+                  // legs has three buttons reading "Unmerge".
+                  NamedButton(
+                    label:
+                        'Unmerge ${handleLabel(handle)} from '
+                        '${contact.displayName}',
+                    onPressed: () => onUnmerge(handle),
+                    child: TextButton(
+                      onPressed: () => onUnmerge(handle),
+                      child: const Text('Unmerge'),
+                    ),
                   ),
                 ],
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A person and the network they are that person on.
+///
+/// Every label on this screen needs it, and the two halves are never useful
+/// apart: "Anna" appears twice in a suggestion, and it is the network that says
+/// which Anna is which.
+@visibleForTesting
+String handleLabel(NetworkHandle handle) =>
+    '${handle.displayName ?? handle.remoteId} on ${handle.network.label}';
+
+/// The suggestion as one sentence: who, how sure, and on what evidence.
+String _proposalLabel(MergeCandidate candidate) => semanticsSentence([
+  '${handleLabel(candidate.a)} and ${handleLabel(candidate.b)} may be the '
+      'same person',
+  '${(candidate.score * 100).round()}% confident',
+  if (candidate.signals.isNotEmpty)
+    'because ${candidate.signals.map((s) => s.explanation).join(', ')}',
+]);
+
+/// A section title that a screen reader can jump between.
+///
+/// "Suggestions" and "Merged" divide this screen into its two halves, and a
+/// reader navigating by heading found neither.
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Text(
+        title,
+        style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }

@@ -76,13 +76,14 @@ void main() {
   ) async {
     await pump(tester);
 
-    final titles = tester
-        .widgetList<ListTile>(find.byType(ListTile))
-        .map((tile) => ((tile.title! as Row).children.first as Flexible).child)
-        .map((text) => (text as Text).data)
-        .toList();
+    // Vertical position rather than widget structure. What this test is about
+    // is the order three sessions are listed in; reaching through the tile's
+    // title slot to find out made it fail the first time that slot gained a
+    // wrapper, which is a rebuild of the assertion rather than of the list.
+    double y(String label) => tester.getTopLeft(find.text(label)).dy;
 
-    expect(titles, ['Weft on Pixel', 'Weft on laptop', 'OLDPHONE']);
+    expect(y('Weft on Pixel'), lessThan(y('Weft on laptop')));
+    expect(y('Weft on laptop'), lessThan(y('OLDPHONE')));
   });
 
   testWidgets('only an unverified device offers Verify', (tester) async {

@@ -10,6 +10,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_share/weft_share.dart';
 
+import '../../app/a11y.dart';
 import '../../app/intents.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
@@ -191,15 +192,16 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
       _ when delivered == targets.length => 'Sent to ${targets.length} chats',
       _ => 'Sent to $delivered of ${targets.length} chats',
     };
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          problems.isEmpty
-              ? headline
-              : [if (delivered > 0) '$headline.', ...problems].join('\n'),
-        ),
-      ),
-    );
+    final report = problems.isEmpty
+        ? headline
+        : [if (delivered > 0) '$headline.', ...problems].join('\n');
+    messenger.showSnackBar(SnackBar(content: Text(report)));
+    // Announced from here rather than through `showWeftMessage`, because the
+    // sheet is about to pop and take its `ScaffoldMessenger` with it — the
+    // messenger was captured above for exactly that reason. This is the only
+    // report that a share went anywhere, and a share is a fire-and-forget
+    // gesture: there is no screen left afterwards to check.
+    if (mounted) announce(context, report);
     navigator.pop();
   }
 
@@ -347,13 +349,20 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                   ),
                 ),
                 const SizedBox(height: WeftSpace.xs),
-                Text(
-                  _summary(text, resolved),
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.colors.onSurfaceVariant,
+                // Live: this line says "Reading 3 files…" and then, some
+                // seconds later, what those files turned out to be. Both the
+                // wait and its end were silent, on the one screen where what is
+                // about to be sent is the only thing worth knowing.
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _summary(text, resolved),
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 if (resolved != null && resolved.sources.isNotEmpty)
                   _SharedFileStrip(sources: resolved.sources),
@@ -411,27 +420,31 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                 WeftSpace.xl,
                 WeftSpace.sm,
               ),
-              child: TextField(
-                controller: _search,
-                onChanged: (value) =>
-                    setState(() => _query = value.trim().toLowerCase()),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Search chats',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear search',
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          onPressed: () {
-                            _search.clear();
-                            setState(() => _query = '');
-                          },
-                        ),
-                  border: const OutlineInputBorder(
-                    borderRadius: WeftRadius.pill,
+              child: Semantics(
+                label: 'Search chats',
+                textField: true,
+                child: TextField(
+                  controller: _search,
+                  onChanged: (value) =>
+                      setState(() => _query = value.trim().toLowerCase()),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Search chats',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () {
+                              _search.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    border: const OutlineInputBorder(
+                      borderRadius: WeftRadius.pill,
+                    ),
                   ),
                 ),
               ),
@@ -584,10 +597,13 @@ class _TargetList extends ConsumerWidget {
               WeftSpace.xl,
               WeftSpace.xs,
             ),
-            child: Text(
-              'Cannot carry this share',
-              style: context.text.labelMedium?.copyWith(
-                color: context.colors.onSurfaceVariant,
+            child: Semantics(
+              header: true,
+              child: Text(
+                'Cannot carry this share',
+                style: context.text.labelMedium?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ),
           );
@@ -638,6 +654,32 @@ class _TargetTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subtitle = reason ?? _lastActivity(chat);
+    // One node for the row. A tile with an `onTap` *and* a `Checkbox` presents
+    // a reader with two adjacent targets doing different things — open, and
+    // add to the selection — neither of which said which chat it belonged to.
+    // The blocked rows matter more: `enabled: false` lets a reader skip the
+    // tile outright, so the reason it cannot take this share, which is the only
+    // useful thing on it, never arrives.
+    return Semantics(
+      container: true,
+      enabled: enabled,
+      checked: reason != null ? null : selected,
+      label: semanticsSentence([
+        chat.title,
+        chat.networks.map((n) => n.label).join(' and '),
+        reason == null ? null : 'cannot take this share: $reason',
+        reason != null ? null : subtitle,
+      ]),
+      excludeSemantics: true,
+      // Restated: excluding the subtree excludes the tile's own actions with
+      // it, and the long-press is how multi-select is entered at all.
+      onTap: enabled ? onTap : null,
+      onLongPress: enabled && !selecting ? onToggle : null,
+      child: _tile(context, ref, subtitle),
+    );
+  }
+
+  Widget _tile(BuildContext context, WidgetRef ref, String? subtitle) {
     return ListTile(
       enabled: enabled,
       selected: selected,
@@ -664,9 +706,18 @@ class _TargetTile extends ConsumerWidget {
       // mentions is a feature only its author finds.
       trailing: reason != null
           ? null
-          : Checkbox(
-              value: selected,
-              onChanged: enabled ? (_) => onToggle() : null,
+          // Kept reachable as its own node under the row's group label: adding
+          // a target and opening one are different acts, and a reader needs
+          // both. It is the *unlabelled* pair of them that was the bug.
+          : NamedButton(
+              label: selected
+                  ? 'Remove ${chat.title} from this share'
+                  : 'Also send to ${chat.title}',
+              onPressed: enabled ? onToggle : null,
+              child: Checkbox(
+                value: selected,
+                onChanged: enabled ? (_) => onToggle() : null,
+              ),
             ),
       onTap: enabled ? onTap : null,
       onLongPress: enabled && !selecting ? onToggle : null,
@@ -933,7 +984,10 @@ class _SharedFileStrip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: WeftSpace.sm),
       child: SizedBox(
-        height: 88,
+        // Scaled with the caption under each thumbnail. At 2.0x the label alone
+        // is around 24dp, and a fixed 88 put the name through the bottom of the
+        // strip.
+        height: 64 + WeftSpace.xxs + MediaQuery.textScalerOf(context).scale(16),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: sources.length,
@@ -942,27 +996,31 @@ class _SharedFileStrip extends StatelessWidget {
             final source = sources[i];
             return SizedBox(
               width: 64,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AttachmentSourceThumbnail(
-                    source: source,
-                    // The same sniff the plan will run, so the icon here and the
-                    // bubble that follows cannot disagree about what this is.
-                    kind: messageKindFor(sniffMimeType(source)),
-                    size: 64,
-                  ),
-                  const SizedBox(height: WeftSpace.xxs),
-                  Text(
-                    source.basename,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: context.text.labelSmall?.copyWith(
-                      color: context.colors.onSurfaceVariant,
+              // One node per file: a thumbnail with no label and a name beneath
+              // it were two nodes, and only one of them said anything.
+              child: MergeSemantics(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AttachmentSourceThumbnail(
+                      source: source,
+                      // The same sniff the plan will run, so the icon here and the
+                      // bubble that follows cannot disagree about what this is.
+                      kind: messageKindFor(sniffMimeType(source)),
+                      size: 64,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: WeftSpace.xxs),
+                    Text(
+                      source.basename,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: context.text.labelSmall?.copyWith(
+                        color: context.colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },

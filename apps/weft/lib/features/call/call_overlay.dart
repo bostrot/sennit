@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_call/weft_call.dart';
 import 'package:weft_design/weft_design.dart';
 
+import 'package:flutter/semantics.dart';
+
+import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
 import '../../app/providers.dart';
 import '../../services/call/call_service.dart';
@@ -67,8 +70,24 @@ class _CallOverlayState extends ConsumerState<CallOverlay> {
       return;
     }
 
-    // Ringing is the incoming surface's business, and it is drawn inline.
-    if (call.state == CallState.ringing) return;
+    // Ringing is the incoming surface's business, and it is drawn inline —
+    // which is the problem worth fixing here rather than there. Nothing pushes
+    // a route, so nothing moves the reader's focus: the sheet simply appears
+    // over whatever they were reading, and the first they hear of a call is the
+    // ringtone with no statement of who it is from. An assertive announcement
+    // is what a route change would have given them.
+    if (call.state == CallState.ringing) {
+      if (call.isIncoming && before?.callId != call.callId) {
+        announce(
+          context,
+          '${call.peer.label} is calling. '
+          '${call.videoEnabled ? 'Video call' : 'Voice call'}. '
+          'Accept or decline below.',
+          level: Assertiveness.assertive,
+        );
+      }
+      return;
+    }
     if (_opened == call.callId) return;
 
     // Either an outgoing call just went out, or a ringing one was answered.
@@ -215,49 +234,62 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
       color: background,
       child: SafeArea(
         bottom: false,
-        child: InkWell(
-          onTap: widget.onOpen,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.lg,
-              vertical: WeftSpace.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.phone_in_talk_rounded, size: 18, color: foreground),
-                const SizedBox(width: WeftSpace.md),
-                Expanded(
-                  child: Text(
-                    '${session.peer.label} · '
-                    '${callStatusLabel(widget.state, now: clock.now())}',
-                    style: context.text.labelLarge?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        // The bar itself opens the call screen, and said so nowhere: a reader
+        // found a row of text and a hang-up button, with no sign that the row
+        // was the way back into the call.
+        child: Semantics(
+          button: true,
+          label:
+              'Open the call with ${session.peer.label}, '
+              '${callStatusLabel(widget.state, now: clock.now())}',
+          child: InkWell(
+            onTap: widget.onOpen,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: WeftSpace.lg,
+                vertical: WeftSpace.sm,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.phone_in_talk_rounded,
+                    size: 18,
+                    color: foreground,
                   ),
-                ),
-                const SizedBox(width: WeftSpace.md),
-                // Labelled rather than tooltipped: this bar is drawn above the
-                // navigator, where there is no [Overlay] for a tooltip to
-                // appear in.
-                Semantics(
-                  button: true,
-                  label: 'Hang up',
-                  child: InkResponse(
-                    onTap: widget.controls.hangUp,
-                    child: Padding(
-                      padding: const EdgeInsets.all(WeftSpace.xs),
-                      child: Icon(
-                        Icons.call_end_rounded,
-                        size: 20,
+                  const SizedBox(width: WeftSpace.md),
+                  Expanded(
+                    child: Text(
+                      '${session.peer.label} · '
+                      '${callStatusLabel(widget.state, now: clock.now())}',
+                      style: context.text.labelLarge?.copyWith(
                         color: foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: WeftSpace.md),
+                  // Labelled rather than tooltipped: this bar is drawn above the
+                  // navigator, where there is no [Overlay] for a tooltip to
+                  // appear in.
+                  Semantics(
+                    button: true,
+                    label: 'Hang up',
+                    child: InkResponse(
+                      onTap: widget.controls.hangUp,
+                      child: Padding(
+                        padding: const EdgeInsets.all(WeftSpace.xs),
+                        child: Icon(
+                          Icons.call_end_rounded,
+                          size: 20,
+                          color: foreground,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

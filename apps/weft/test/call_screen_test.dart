@@ -10,6 +10,7 @@ import 'package:weft/services/call/call_service.dart';
 import 'package:weft_call/weft_call.dart';
 
 import 'support/call_fixtures.dart';
+import 'support/semantics_probe.dart';
 
 /// The call screen, in each state a call can put it in.
 ///
@@ -675,6 +676,89 @@ void main() {
       expect(callAudioRouteLabel(CallAudioRoute.speaker), 'Speaker');
       expect(callAudioRouteLabel(CallAudioRoute.wiredHeadset), 'Headphones');
       expect(callAudioRouteLabel(CallAudioRoute.bluetooth), 'Bluetooth');
+    });
+  });
+
+  group('what a call says out loud', () {
+    testWidgets('mute, camera and the audio route are announced when they '
+        'change', (tester) async {
+      final handle = tester.ensureSemantics();
+      final connected = callSession(
+        state: CallState.connected,
+        video: true,
+        connectedAt: t0,
+      );
+      await pumpCallScreen(tester, serviceState(connected));
+      final announced = watchAnnouncements(tester);
+
+      // A control button announces its new name only to whoever happens to be
+      // focused on it, and the one thing worth knowing about a muted
+      // microphone is that it is muted while you are talking into it.
+      await pumpCallScreen(
+        tester,
+        serviceState(
+          callSession(
+            state: CallState.connected,
+            video: true,
+            muted: true,
+            cameraOn: false,
+            connectedAt: t0,
+          ),
+          audio: const CallAudioState(route: CallAudioRoute.speaker),
+        ),
+      );
+      await tester.pump();
+
+      expect(announced, contains('Microphone muted'));
+      expect(announced, contains('Camera off'));
+      expect(announced, contains('Audio on Speaker'));
+      handle.dispose();
+    });
+
+    testWidgets('the running duration is not announced sixty times a minute', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final connected = serviceState(
+        callSession(state: CallState.connected, connectedAt: t0),
+      );
+      await pumpCallScreen(tester, connected);
+      final announced = watchAnnouncements(tester);
+
+      // The status line carries the call's length and is rebuilt every second.
+      // A live region on it would drown every other thing this screen has to
+      // say, which is why the announcements are keyed to state instead.
+      await tester.pump(const Duration(seconds: 3));
+      expect(announced, isEmpty);
+      handle.dispose();
+    });
+
+    testWidgets('the audio-route button inside its menu has a name', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpCallScreen(
+        tester,
+        serviceState(
+          callSession(state: CallState.connected, connectedAt: t0),
+          // Three or more routes turns the button into a popup menu, and the
+          // button *inside* the menu was built with a null tooltip — an
+          // unlabelled control in a bar where everything else is named.
+          audio: const CallAudioState(
+            available: {
+              CallAudioRoute.earpiece,
+              CallAudioRoute.speaker,
+              CallAudioRoute.bluetooth,
+            },
+          ),
+        ),
+      );
+
+      expect(
+        labelsIn(tester).where((l) => l.startsWith('Audio output —')),
+        isNotEmpty,
+      );
+      handle.dispose();
     });
   });
 }

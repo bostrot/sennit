@@ -17,6 +17,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/a11y.dart';
 import '../../app/providers.dart';
 import '../../services/attachments/media_exporter.dart';
 import '../../services/attachments/media_store.dart';
@@ -216,9 +217,11 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
 
   void _report(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    // Save and Share report themselves *only* here, and a bare `SnackBar` sets
+    // no live region and is gone in four seconds — so "Could not save this
+    // file" reached a reader who happened to be elsewhere in the tree as
+    // silence, and then as nothing to navigate back to.
+    showWeftMessage(context, message);
   }
 
   @override
@@ -238,15 +241,21 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
         title: _ViewerTitle(message: message),
         actions: [
           if (busy)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: WeftSpace.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: WeftSpace.md),
               child: Center(
                 child: SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+                  // A live region, because this spinner is the only sign that
+                  // Save is waiting on a download rather than ignoring the tap.
+                  child: Semantics(
+                    liveRegion: true,
+                    label: 'Downloading this attachment',
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -280,6 +289,17 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
             // pulling neighbours the moment the viewer opened.
             onPageChanged: (index) {
               setState(() => _index = index);
+              // A swipe replaces the whole screen and says nothing. Position
+              // first, because "4 of 9" is the fact a swipe is asking about;
+              // the app bar's title node carries who and when for anyone who
+              // navigates up to it.
+              announce(
+                context,
+                semanticsSentence([
+                  '${index + 1} of ${widget.items.length}',
+                  mediaLabel(widget.items[index]),
+                ]),
+              );
               unawaited(_stage(widget.items[index]));
             },
             itemBuilder: (context, index) {
@@ -296,7 +316,10 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: _CaptionBar(caption: caption),
+              // Excluded rather than labelled: the caption is already the tail
+              // of the picture's own label, and a second node over the photo
+              // saying the same words is the duplicate this replaces.
+              child: ExcludeSemantics(child: _CaptionBar(caption: caption)),
             ),
         ],
       ),
@@ -311,6 +334,17 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
   }
 }
 
+/// What this item is, for a reader who cannot see it.
+///
+/// Kind, sender and caption in that order: on a black screen holding one
+/// picture, "Photo" is the first thing there is to say and the caption is the
+/// only thing that describes *this* photo rather than any photo.
+String mediaLabel(WeftMessage message) => semanticsSentence([
+  messageKindLabel(message.kind),
+  message.isOwn ? 'from you' : 'from ${message.senderName}',
+  attachmentCaption(message),
+]);
+
 /// Who sent it and when, in the app bar.
 class _ViewerTitle extends StatelessWidget {
   const _ViewerTitle({required this.message});
@@ -319,24 +353,28 @@ class _ViewerTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          message.isOwn ? 'You' : message.senderName,
-          style: context.text.titleSmall?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+    // One node: a name and a date read as two nodes are two stops on the way
+    // out of the app bar, and neither half is useful without the other.
+    return MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            message.isOwn ? 'You' : message.senderName,
+            style: context.text.titleSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          DateFormat.yMMMd().add_Hm().format(message.timestamp),
-          style: context.text.labelSmall?.copyWith(color: Colors.white70),
-        ),
-      ],
+          Text(
+            DateFormat.yMMMd().add_Hm().format(message.timestamp),
+            style: context.text.labelSmall?.copyWith(color: Colors.white70),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -418,7 +456,12 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
     final file = widget.file;
 
     if (failure != null) {
-      return _Message(icon: Icons.error_outline_rounded, text: failure);
+      // The picture the user tapped never arrives and the screen stays black.
+      // A live region is the only thing that says why.
+      return Semantics(
+        liveRegion: true,
+        child: _Message(icon: Icons.error_outline_rounded, text: failure),
+      );
     }
 
     // Video only becomes playable once the whole file is down, so until then the
@@ -445,31 +488,42 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
         : null;
 
     if (image == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+      return Center(
+        child: Semantics(
+          label: '${messageKindLabel(message.kind)} loading',
+          child: const CircularProgressIndicator(color: Colors.white),
+        ),
       );
     }
 
-    return Hero(
-      tag: mediaHeroTag(message),
-      child: InteractiveViewer(
-        // Panning is only meaningful once zoomed, and `clipBehavior: none`
-        // would let a dragged photo spill over the app bar.
-        minScale: 1,
-        maxScale: 5,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox.expand(child: image),
-            // Still buffering the file: say the video is coming rather than
-            // leaving a play badge that does nothing when tapped.
-            if (message.kind == MessageKind.video)
-              const SizedBox(
-                width: 44,
-                height: 44,
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-          ],
+    return Semantics(
+      image: true,
+      container: true,
+      // The caption is drawn as an overlay by the viewer above; it belongs to
+      // this picture, so it is said as part of it rather than as a second node
+      // floating over a picture that had nothing to say for itself.
+      label: mediaLabel(message),
+      child: Hero(
+        tag: mediaHeroTag(message),
+        child: InteractiveViewer(
+          // Panning is only meaningful once zoomed, and `clipBehavior: none`
+          // would let a dragged photo spill over the app bar.
+          minScale: 1,
+          maxScale: 5,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(child: image),
+              // Still buffering the file: say the video is coming rather than
+              // leaving a play badge that does nothing when tapped.
+              if (message.kind == MessageKind.video)
+                const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+            ],
+          ),
         ),
       ),
     );

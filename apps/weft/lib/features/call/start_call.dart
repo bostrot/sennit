@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_call/weft_call.dart';
 
+import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
 import 'call_labels.dart';
 
@@ -23,10 +24,11 @@ Future<void> startCall(
   CallTarget target, {
   bool video = false,
 }) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-
-  void say(String message) =>
-      messenger?.showSnackBar(SnackBar(content: Text(message)));
+  // A call that could not be placed is reported here and nowhere else: nothing
+  // appears on screen, no call screen opens, and the button the user pressed
+  // looks exactly as it did. A snackbar alone made that report to whoever
+  // happened to be watching the bottom of the screen for four seconds.
+  void say(String message) => showWeftMessage(context, message);
 
   final service = ref.read(callServiceProvider);
   if (service == null) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../../app/a11y.dart';
 import '../../app/session_providers.dart';
 import '../components/qr_card.dart';
 import '../components/qr_scanner.dart';
@@ -65,7 +66,17 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         return;
       }
       verification.onUpdate = () {
-        if (mounted) setState(() {});
+        if (!mounted) return;
+        setState(() {});
+        // Every step of this flow replaces the body with a different one, and
+        // several of the transitions are driven by the *other* device rather
+        // than by anything the user here did. Without this, a screen-reader
+        // user watching for emoji to compare is given a page that quietly
+        // became the emoji page while they were still on the previous one.
+        final next = verification.state;
+        if (next == _announcedState) return;
+        _announcedState = next;
+        announce(context, verificationStateLabel(next));
       };
       setState(() => _verification = verification);
     } on Exception catch (e) {
@@ -81,6 +92,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   /// the keys inside the payload against what we already hold, so a code from
   /// the wrong device fails here rather than after a user has confirmed
   /// something.
+  /// The step last spoken, so a rebuild that changes nothing stays quiet.
+  KeyVerificationState? _announcedState;
+
   Future<void> _scan(KeyVerification verification) async {
     final bytes = await ref.read(qrScannerProvider).scan(context);
     // Null is a cancelled scan, not a failure — nothing has been sent.
@@ -319,7 +333,17 @@ class _Choice extends StatelessWidget {
             style: context.text.bodyMedium,
           ),
           const SizedBox(height: WeftSpace.md),
-          QrCard.bytes(qrBytes),
+          // Unlike the bridge flow there is no text fallback to point at: the
+          // payload is two ed25519 keys and a shared secret, and rendering it
+          // as characters would be a string nobody can read out and nothing can
+          // scan. The honest label says so and names the path that does work.
+          QrCard.bytes(
+            qrBytes,
+            semanticsLabel:
+                'QR code for verifying this device. It can only be scanned by '
+                'a camera. If you cannot scan it, use Compare emoji instead — '
+                'it ends in the same place.',
+          ),
           const SizedBox(height: WeftSpace.lg),
         ],
         if (choices.contains(VerificationChoice.scanQr)) ...[
@@ -422,11 +446,16 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
         ),
         if (_error case final message?) ...[
           const SizedBox(height: WeftSpace.sm),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.error,
+          // Live: a wrong recovery key leaves the field, the button and the
+          // whole screen exactly as they were apart from this line.
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
           ),
         ],
@@ -473,29 +502,38 @@ class _EmojiCompare extends StatelessWidget {
           spacing: WeftSpace.md,
           runSpacing: WeftSpace.md,
           children: [
-            for (final emoji in emojis)
-              Container(
-                width: 74,
-                padding: const EdgeInsets.symmetric(
-                  vertical: WeftSpace.sm,
-                  horizontal: WeftSpace.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: context.colors.surfaceContainerHigh,
-                  borderRadius: WeftRadius.allMd,
-                ),
-                child: Column(
-                  children: [
-                    Text(emoji.emoji, style: const TextStyle(fontSize: 30)),
-                    const SizedBox(height: WeftSpace.xs),
-                    Text(
-                      emoji.name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.labelSmall,
-                    ),
-                  ],
+            for (final (index, emoji) in emojis.indexed)
+              Semantics(
+                container: true,
+                // Position and name as one node. Seven emoji and seven captions
+                // were fourteen nodes, and the *order* is half of what the user
+                // is being asked to check — "do these appear, in this order" is
+                // a question a reader could not answer.
+                label: '${index + 1} of ${emojis.length}, ${emoji.name}',
+                excludeSemantics: true,
+                child: Container(
+                  width: 74,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: WeftSpace.sm,
+                    horizontal: WeftSpace.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.colors.surfaceContainerHigh,
+                    borderRadius: WeftRadius.allMd,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(emoji.emoji, style: const TextStyle(fontSize: 30)),
+                      const SizedBox(height: WeftSpace.xs),
+                      Text(
+                        emoji.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.labelSmall,
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -633,3 +671,28 @@ class _Result extends StatelessWidget {
     );
   }
 }
+
+/// Where the verification has got to, in one sentence.
+///
+/// Public so the announcement and any future banner say the same thing: this
+/// flow has nine states, several of which look almost identical on screen, and
+/// two descriptions of the same step is how a user ends up comparing emoji they
+/// were told to scan.
+String verificationStateLabel(KeyVerificationState state) => switch (state) {
+  KeyVerificationState.askAccept =>
+    'Your other device wants to verify this one.',
+  KeyVerificationState.waitingAccept =>
+    'Waiting for your other device to accept.',
+  KeyVerificationState.askChoice => 'Choose how to verify.',
+  KeyVerificationState.askSSSS =>
+    'Enter your recovery key or passphrase to unlock verification.',
+  KeyVerificationState.askSas || KeyVerificationState.waitingSas =>
+    'Compare the emoji shown here with the ones on your other device.',
+  KeyVerificationState.showQRSuccess =>
+    'That code checked out. Confirm it on your other device.',
+  KeyVerificationState.confirmQRScan =>
+    'Your other device says it scanned this code. Confirm what it shows.',
+  KeyVerificationState.done =>
+    'This device is verified. Your history is unlocking now.',
+  KeyVerificationState.error => 'Verification failed or was cancelled.',
+};

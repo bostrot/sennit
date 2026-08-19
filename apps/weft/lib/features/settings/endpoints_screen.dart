@@ -149,7 +149,12 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 'device does the work and nothing is sent anywhere.',
           ),
           SwitchListTile(
-            title: const Text('Enable embeddings'),
+            title: const PrivacyGatedTitle(
+              title: 'Enable embeddings',
+              warning:
+                  'Turning this on sends the text of your messages to the '
+                  'endpoint below.',
+            ),
             value: _embeddingEnabled,
             onChanged: (v) => setState(() => _embeddingEnabled = v),
             contentPadding: EdgeInsets.zero,
@@ -175,7 +180,12 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 'over anything configured here.',
           ),
           SwitchListTile(
-            title: const Text('Enable transcription'),
+            title: const PrivacyGatedTitle(
+              title: 'Enable transcription',
+              warning:
+                  'Turning this on sends the audio of your voice messages to '
+                  'the endpoint below.',
+            ),
             value: _sttEnabled,
             onChanged: (v) => setState(() => _sttEnabled = v),
             contentPadding: EdgeInsets.zero,

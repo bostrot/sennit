@@ -205,28 +205,41 @@ class _StatusRow extends StatelessWidget {
         ? context.palette.online
         : context.colors.onSurfaceVariant;
 
-    return Row(
-      children: [
-        Icon(
-          ready ? Icons.check_circle_rounded : Icons.sms_failed_outlined,
-          size: 20,
-          color: color,
-        ),
-        const SizedBox(width: WeftSpace.sm),
-        Text(
-          switch (status.availability) {
-            SmsAvailability.ready => 'On',
-            SmsAvailability.notDefault => 'Off',
-            SmsAvailability.unsupported => 'Not available',
-          },
-          style: context.text.titleSmall?.copyWith(
+    // "On" is a word with no subject. It qualifies *SMS*, and the only thing
+    // saying so is a lettermark at the far end of the same row — which is 22dp
+    // of nothing to a reader, and reads as "Sm" to one that tries.
+    return Semantics(
+      container: true,
+      label: switch (status.availability) {
+        SmsAvailability.ready => 'SMS is on. Weft is your messaging app.',
+        SmsAvailability.notDefault =>
+          'SMS is off. Weft is not your messaging app.',
+        SmsAvailability.unsupported => 'SMS is not available on this device.',
+      },
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          Icon(
+            ready ? Icons.check_circle_rounded : Icons.sms_failed_outlined,
+            size: 20,
             color: color,
-            fontWeight: FontWeight.w700,
           ),
-        ),
-        const Spacer(),
-        NetworkGlyph(network: ChatNetwork.sms, size: 22),
-      ],
+          const SizedBox(width: WeftSpace.sm),
+          Text(
+            switch (status.availability) {
+              SmsAvailability.ready => 'On',
+              SmsAvailability.notDefault => 'Off',
+              SmsAvailability.unsupported => 'Not available',
+            },
+            style: context.text.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          NetworkGlyph(network: ChatNetwork.sms, size: 22),
+        ],
+      ),
     );
   }
 }

@@ -150,7 +150,9 @@ class _Answer extends StatelessWidget {
           onPressed: onPressed,
         ),
         const SizedBox(height: WeftSpace.sm),
-        Text(label, style: context.text.labelMedium),
+        // The button above already carries this word as its accessible name;
+        // the caption is there for a sighted user who does not read a glyph.
+        ExcludeSemantics(child: Text(label, style: context.text.labelMedium)),
       ],
     );
   }

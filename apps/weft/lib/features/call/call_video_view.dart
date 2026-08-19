@@ -135,10 +135,17 @@ class _CallVideoViewState extends State<CallVideoView> {
     if (renderer == null || _attached == null) {
       return widget.placeholder ?? const _NoPicture();
     }
-    return rtc.RTCVideoView(
-      renderer,
-      mirror: widget.mirror,
-      objectFit: widget.fit,
+    // `RTCVideoView` contributes no semantics of its own, so a video call was
+    // a screen-sized region a reader could find nothing in at all. There is
+    // nothing useful to say about the *picture* — this says what the region is,
+    // which is what stops it being a hole in the screen.
+    return Semantics(
+      label: widget.mirror ? 'Your camera' : 'Video from the other person',
+      child: rtc.RTCVideoView(
+        renderer,
+        mirror: widget.mirror,
+        objectFit: widget.fit,
+      ),
     );
   }
 }
@@ -149,13 +156,17 @@ class _NoPicture extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.colors.surfaceContainerHighest,
-      child: Center(
-        child: Icon(
-          Icons.videocam_off_rounded,
-          size: 28,
-          color: context.colors.onSurfaceVariant,
+    return Semantics(
+      label: 'No picture yet',
+      excludeSemantics: true,
+      child: ColoredBox(
+        color: context.colors.surfaceContainerHighest,
+        child: Center(
+          child: Icon(
+            Icons.videocam_off_rounded,
+            size: 28,
+            color: context.colors.onSurfaceVariant,
+          ),
         ),
       ),
     );

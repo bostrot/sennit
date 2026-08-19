@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/providers.dart';
@@ -13,6 +12,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 
+import 'support/semantics_probe.dart';
 import 'support/seeded_repository.dart';
 
 /// What the conversation says to a screen reader.
@@ -54,49 +54,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     return repository;
-  }
-
-  /// Every semantics label on screen.
-  List<String> labelsIn(WidgetTester tester) {
-    final labels = <String>[];
-    void walk(SemanticsNode node) {
-      if (node.label.isNotEmpty) labels.add(node.label);
-      node.visitChildren((child) {
-        walk(child);
-        return true;
-      });
-    }
-
-    walk(tester.getSemantics(find.byType(MaterialApp)));
-    return labels;
-  }
-
-  /// Collects everything the app sends to the platform's announcement channel.
-  ///
-  /// An announcement has no widget to find, which is the whole reason it is
-  /// used — for a message that arrived below the fold there is no node to point
-  /// a live region at. The channel is the only place it is observable.
-  List<String> watchAnnouncements(WidgetTester tester) {
-    final announced = <String>[];
-    tester.binding.defaultBinaryMessenger.setMockDecodedMessageHandler(
-      SystemChannels.accessibility,
-      (message) async {
-        final map = message! as Map<Object?, Object?>;
-        if (map['type'] == 'announce') {
-          final data = map['data']! as Map<Object?, Object?>;
-          announced.add(data['message']! as String);
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger
-          .setMockDecodedMessageHandler<Object?>(
-            SystemChannels.accessibility,
-            null,
-          ),
-    );
-    return announced;
   }
 
   /// Long-presses the bubble carrying [text] and picks the first quick

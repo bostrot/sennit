@@ -52,6 +52,52 @@ void announce(BuildContext context, String message, {Assertiveness? level}) {
   );
 }
 
+/// A control renamed to say what it acts on, and still operable.
+///
+/// Six suggestion cards give six buttons reading "Merge"; a contact with three
+/// legs gives three reading "Unmerge"; five model cards give five reading
+/// "Download", one of which is a 1.5 GB file. The word on the button is right
+/// for someone who can see which row it is in and useless to everyone else.
+///
+/// A bare `Semantics(label:)` around a button does **not** reliably replace its
+/// name: a Material button forms its own semantics node from its own child, so
+/// depending on the button an annotation above it is either dropped or left
+/// speaking beside the label it was meant to replace — which is a control that
+/// announces itself twice, in two different words. Owning the node means
+/// excluding the subtree, and excluding the subtree takes the button's tap
+/// action with it. Restating that action is the part every hand-written copy of
+/// this would eventually forget, so it lives here once.
+class NamedButton extends StatelessWidget {
+  const NamedButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    required this.child,
+  });
+
+  /// What the button does, and to what.
+  final String label;
+
+  /// The child's own callback, restated on the node that replaces it. Null
+  /// renders the node disabled, matching a button with no callback.
+  final VoidCallback? onPressed;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: onPressed != null,
+      label: label,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: child,
+    );
+  }
+}
+
 /// A `SnackBar` that a screen reader also hears.
 ///
 /// Both, rather than one or the other: a sighted user needs the bar, and a

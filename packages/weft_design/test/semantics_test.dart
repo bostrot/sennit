@@ -302,4 +302,30 @@ void main() {
       expect(semanticsSentence([null, '']), '');
     });
   });
+
+  group('spelledOut', () {
+    test('says a code one character at a time, in groups', () {
+      // Spaces between characters is what makes an engine spell rather than
+      // pronounce; the comma every four is what makes forty-eight spoken
+      // letters something a person can keep up with, and gives them somewhere
+      // to resume from when they lose their place.
+      expect(spelledOut('EsTr7k92'), 'E s T r, 7 k 9 2');
+    });
+
+    test('does not read the grouping the string already has', () {
+      // A recovery key arrives pre-grouped. "Space" read aloud eleven times is
+      // eleven chances to write one down as part of the key.
+      expect(spelledOut('EsTr 7k92'), spelledOut('EsTr7k92'));
+    });
+
+    test('a partial last group is still said', () {
+      expect(spelledOut('abcdef'), 'a b c d, e f');
+    });
+
+    test('nothing to spell is nothing said', () {
+      // Dropped by `semanticsSentence` rather than announced as a pause.
+      expect(spelledOut(''), '');
+      expect(spelledOut('   '), '');
+    });
+  });
 }

@@ -9,6 +9,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/a11y.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../components/qr_card.dart';
@@ -93,6 +94,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   }
 
   Future<void> _probe(_StoredBridge bridge) async {
+    final name = ChatNetwork.fromId(bridge.networkId).label;
     try {
       final whoami = await _clientFor(bridge).whoami();
       if (!mounted) return;
@@ -100,12 +102,21 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
         _health[bridge.id] = whoami;
         _errors.remove(bridge.id);
       });
+      // A probe finishing is a progress bar vanishing and a sentence taking its
+      // place, in a card that may be well off screen — and this screen exists
+      // to answer "is it working?", so the answer is the one thing that has to
+      // be said out loud.
+      announce(
+        context,
+        '${whoami.networkName ?? name}: ${_reachedLabel(whoami)}',
+      );
     } on BridgeException catch (e) {
       if (!mounted) return;
       setState(() {
         _health[bridge.id] = null;
         _errors[bridge.id] = e.message;
       });
+      announce(context, '$name bridge could not be reached. ${e.message}');
     }
   }
 
@@ -123,12 +134,16 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
               'https://bridge.example.org/_matrix/provision',
             ),
             const SizedBox(height: WeftSpace.md),
-            TextField(
-              controller: url,
-              autofocus: true,
-              autocorrect: false,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(hintText: 'Provisioning URL'),
+            Semantics(
+              label: 'Provisioning URL',
+              textField: true,
+              child: TextField(
+                controller: url,
+                autofocus: true,
+                autocorrect: false,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(hintText: 'Provisioning URL'),
+              ),
             ),
           ],
         ),
@@ -152,11 +167,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     if (added == null || added.isEmpty) return;
     final parsed = Uri.tryParse(added);
     if (parsed == null || parsed.host.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('That is not a URL.')));
-      }
+      if (mounted) showWeftMessage(context, 'That is not a URL.');
       return;
     }
 
@@ -202,11 +213,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     try {
       flows = await client.loginFlows();
     } on BridgeException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (mounted) showWeftMessage(context, e.message);
       return;
     }
     if (!mounted || flows.isEmpty) return;
@@ -320,6 +327,23 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   }
 }
 
+/// What a completed health probe found, in one clause.
+///
+/// The card draws this as a progress bar giving way to a row of dots and
+/// sentences. Neither of those is an answer to "did it work?", which is the
+/// only question this screen is ever open for.
+String _reachedLabel(BridgeWhoami whoami) {
+  if (whoami.logins.isEmpty) return 'reachable, but not signed in yet';
+  final active = whoami.logins.where((l) => l.isActive).length;
+  final total = whoami.logins.length;
+  if (active == total) {
+    return total == 1
+        ? 'connected as ${whoami.logins.single.label}'
+        : 'connected, $total accounts';
+  }
+  return '$active of $total accounts connected';
+}
+
 class _BridgeCard extends StatelessWidget {
   const _BridgeCard({
     required this.bridge,
@@ -373,6 +397,12 @@ class _BridgeCard extends StatelessWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
+                  // Material's default is "Show menu", which on a screen with
+                  // four bridge cards is four identical buttons for four
+                  // different bridges — and the one action behind it deletes.
+                  tooltip:
+                      'Actions for the '
+                      '${whoami?.networkName ?? network.label} bridge',
                   onSelected: (choice) {
                     if (choice == 'remove') onRemove();
                   },
@@ -387,26 +417,40 @@ class _BridgeCard extends StatelessWidget {
             ),
             const SizedBox(height: WeftSpace.md),
             if (error != null)
-              Row(
-                children: [
-                  Icon(
-                    Icons.cloud_off_rounded,
-                    size: 16,
-                    color: context.colors.error,
-                  ),
-                  const SizedBox(width: WeftSpace.sm),
-                  Expanded(
-                    child: Text(
-                      error!,
-                      style: context.text.bodySmall?.copyWith(
+              // One node, and the glyph is decoration: a red cloud says
+              // "unreachable" to someone who can see it and nothing at all
+              // otherwise, so the state is named in the sentence.
+              MergeSemantics(
+                child: Row(
+                  children: [
+                    ExcludeSemantics(
+                      child: Icon(
+                        Icons.cloud_off_rounded,
+                        size: 16,
                         color: context.colors.error,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: WeftSpace.sm),
+                    Expanded(
+                      child: Semantics(
+                        label: 'Not reachable. ${error!}',
+                        excludeSemantics: true,
+                        child: Text(
+                          error!,
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.colors.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               )
             else if (whoami == null)
-              const LinearProgressIndicator(minHeight: 2)
+              Semantics(
+                label: 'Checking the ${network.label} bridge',
+                child: const LinearProgressIndicator(minHeight: 2),
+              )
             else if (whoami!.logins.isEmpty)
               Text(
                 'Not signed in to ${whoami!.networkName ?? network.label} yet.',
@@ -418,14 +462,19 @@ class _BridgeCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: WeftSpace.xs),
                   child: Row(
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: login.isActive
-                              ? palette.online
-                              : context.colors.error,
+                      // The dot is the colour-only half of a state the sentence
+                      // beside it already spells out; it says nothing a reader
+                      // has not already been told.
+                      ExcludeSemantics(
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: login.isActive
+                                ? palette.online
+                                : context.colors.error,
+                          ),
                         ),
                       ),
                       const SizedBox(width: WeftSpace.sm),
@@ -436,9 +485,16 @@ class _BridgeCard extends StatelessWidget {
                           style: context.text.bodySmall,
                         ),
                       ),
-                      TextButton(
+                      // Three accounts on one bridge is three buttons reading
+                      // "Sign out", and signing out of the wrong one costs a
+                      // full re-pairing.
+                      NamedButton(
+                        label: 'Sign out of ${login.label}',
                         onPressed: () => onLogout(login.id),
-                        child: const Text('Sign out'),
+                        child: TextButton(
+                          onPressed: () => onLogout(login.id),
+                          child: const Text('Sign out'),
+                        ),
                       ),
                     ],
                   ),
@@ -595,7 +651,16 @@ class _BridgeLoginScreenState extends State<BridgeLoginScreen> {
         ],
         if (step.displayData != null) ...[
           if (step.displayType == 'qr') ...[
-            QrCard.data(step.displayData!),
+            // The code and its text form are two nodes with nothing joining
+            // them: a reader who finds the square is told it is a square, and
+            // has no reason to think the answer is one node further on.
+            QrCard.data(
+              step.displayData!,
+              semanticsLabel:
+                  'QR code for ${widget.flow.name}. Scan it with the other '
+                  'device, or use the pairing code just below, which can be '
+                  'copied.',
+            ),
             const SizedBox(height: WeftSpace.md),
           ],
           // The raw payload stays available under the image: some networks
@@ -621,16 +686,31 @@ class _BridgeLoginScreenState extends State<BridgeLoginScreen> {
           ),
           const SizedBox(height: WeftSpace.lg),
         ],
-        const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        const SizedBox(height: WeftSpace.md),
-        Text(
-          'Waiting for the other side…',
-          style: context.text.bodySmall?.copyWith(
-            color: context.colors.onSurfaceVariant,
+        // One live node over the spinner and its caption. This step ends when
+        // the *other* device does something, so the user is waiting on an
+        // event they cannot see coming — and every transition out of here
+        // replaces the whole body.
+        Semantics(
+          liveRegion: true,
+          container: true,
+          label: 'Waiting for the other side to confirm',
+          excludeSemantics: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(height: WeftSpace.md),
+              Text(
+                'Waiting for the other side…',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
         TextButton(
@@ -645,41 +725,60 @@ class _BridgeLoginScreenState extends State<BridgeLoginScreen> {
   }
 
   Widget _done(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.check_circle_rounded,
-          size: 48,
-          color: context.palette.online,
-        ),
-        const SizedBox(height: WeftSpace.lg),
-        const Text(
-          'Signed in. The bridge is syncing your chats now — '
-          'they will appear in the inbox as they arrive.',
-        ),
-        const SizedBox(height: WeftSpace.lg),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
-        ),
-      ],
+    // Live, because the step before it was "waiting for something you cannot
+    // see", and this is that something having happened.
+    return Semantics(
+      liveRegion: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(
+            child: Icon(
+              Icons.check_circle_rounded,
+              size: 48,
+              color: context.palette.online,
+            ),
+          ),
+          const SizedBox(height: WeftSpace.lg),
+          const Text(
+            'Signed in. The bridge is syncing your chats now — '
+            'they will appear in the inbox as they arrive.',
+          ),
+          const SizedBox(height: WeftSpace.lg),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _failed(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.error_rounded, size: 48, color: context.colors.error),
-        const SizedBox(height: WeftSpace.lg),
-        Text(_session.error ?? 'Sign-in failed.', textAlign: TextAlign.center),
-        const SizedBox(height: WeftSpace.lg),
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
+    return Semantics(
+      liveRegion: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(
+            child: Icon(
+              Icons.error_rounded,
+              size: 48,
+              color: context.colors.error,
+            ),
+          ),
+          const SizedBox(height: WeftSpace.lg),
+          Text(
+            _session.error ?? 'Sign-in failed.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: WeftSpace.lg),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 }

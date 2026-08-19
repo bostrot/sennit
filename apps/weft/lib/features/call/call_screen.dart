@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_call/weft_call.dart';
 import 'package:weft_design/weft_design.dart';
 
+import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
 import '../../app/providers.dart';
 import '../../services/call/call_audio.dart';
@@ -145,6 +146,43 @@ class _CallScreenBodyState extends State<CallScreenBody> {
     if (!now) {
       _askAboutVideo = false;
       _videoIsMine = false;
+    }
+
+    _announceChanges(old.state, widget.state);
+  }
+
+  /// Says what changed about the call, and only what changed.
+  ///
+  /// Deliberately not a live region on the status line: `callStatusLabel`
+  /// carries the running duration and is rebuilt by [_ticker] once a second, so
+  /// a live node there would announce the call's length sixty times a minute
+  /// and drown everything else. Every fact below changes rarely and matters
+  /// immediately — a call connecting, a microphone going dead, the audio moving
+  /// to the loudspeaker in a room with other people in it.
+  void _announceChanges(CallServiceState old, CallServiceState now) {
+    final before = old.session;
+    final after = now.session;
+    final peer = after?.peer.label ?? 'the call';
+
+    if (after != null && before?.state != after.state) {
+      announce(context, '$peer: ${callStatusLabel(now, now: clock.now())}');
+    }
+    if (after != null && (before?.muted ?? false) != after.muted) {
+      announce(context, after.muted ? 'Microphone muted' : 'Microphone on');
+    }
+    if (after != null && (before?.cameraOn ?? false) != after.cameraOn) {
+      announce(context, after.cameraOn ? 'Camera on' : 'Camera off');
+    }
+    if (old.audio.route != now.audio.route) {
+      announce(context, 'Audio on ${callAudioRouteLabel(now.audio.route)}');
+    }
+    if (old.reconnecting != now.reconnecting) {
+      announce(
+        context,
+        now.reconnecting
+            ? 'Weak connection — trying to recover'
+            : 'Connection recovered',
+      );
     }
   }
 
@@ -414,20 +452,25 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: WeftSpace.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 14, color: colour),
-          const SizedBox(width: WeftSpace.xs),
-          Expanded(
-            child: Text(
-              text,
-              style: context.text.labelSmall?.copyWith(color: colour),
+    // One node, and the glyph is decoration — a 14dp warning triangle beside a
+    // 11dp line is not a second thing to say. `_announceChanges` speaks the
+    // reconnect; this is what a reader finds when they navigate here to check.
+    return MergeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.only(top: WeftSpace.xs),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(child: Icon(icon, size: 14, color: colour)),
+            const SizedBox(width: WeftSpace.xs),
+            Expanded(
+              child: Text(
+                text,
+                style: context.text.labelSmall?.copyWith(color: colour),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -493,45 +536,55 @@ class _VideoRequestPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: WeftSpace.lg,
-        vertical: WeftSpace.sm,
-      ),
-      child: Material(
-        color: context.colors.surfaceContainerHigh,
-        borderRadius: WeftRadius.allLg,
-        child: Padding(
-          padding: const EdgeInsets.all(WeftSpace.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$peer turned on video',
-                style: context.text.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: WeftSpace.xs),
-              Text(
-                'Your camera is on as well.',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: WeftSpace.sm),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: onRefuse,
-                    child: const Text('Turn mine off'),
+    // Live: this appears mid-call, in response to something the far end did,
+    // while the user's attention is on the conversation rather than the screen
+    // — and the thing it is asking about is whether this device keeps sending
+    // a picture of the room they are in.
+    return Semantics(
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.lg,
+          vertical: WeftSpace.sm,
+        ),
+        child: Material(
+          color: context.colors.surfaceContainerHigh,
+          borderRadius: WeftRadius.allLg,
+          child: Padding(
+            padding: const EdgeInsets.all(WeftSpace.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$peer turned on video',
+                  style: context.text.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: WeftSpace.sm),
-                  FilledButton(onPressed: onKeep, child: const Text('Keep it')),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: WeftSpace.xs),
+                Text(
+                  'Your camera is on as well.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: WeftSpace.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: onRefuse,
+                      child: const Text('Turn mine off'),
+                    ),
+                    const SizedBox(width: WeftSpace.sm),
+                    FilledButton(
+                      onPressed: onKeep,
+                      child: const Text('Keep it'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -676,7 +729,11 @@ class _AudioRouteButton extends StatelessWidget {
             ),
         ],
         child: CallActionButton(
-          tooltip: null,
+          // The popup above carries the name; this is the button *inside* it,
+          // and `null` here produced `Semantics(button: true, label: null)` —
+          // an unlabelled control in a bar where every other one is named.
+          // `absorbing: false` means the popup still takes the tap.
+          tooltip: 'Audio output — ${callAudioRouteLabel(audio.route)}',
           icon: iconFor(audio.route),
           active: audio.isSpeakerOn,
           onPressed: null,

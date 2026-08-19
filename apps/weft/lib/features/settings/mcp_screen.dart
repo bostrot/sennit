@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_mcp/weft_mcp.dart';
 
+import '../../app/a11y.dart';
 import '../../app/mcp_service.dart';
 
 /// The MCP server: on/off, API keys, tunnel, audit log.
@@ -123,9 +124,19 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                 color: context.colors.surfaceContainerHigh,
                 borderRadius: WeftRadius.allMd,
               ),
-              child: SelectableText(
-                generated.secret,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              // "This is the only time the key is shown" is a promise the
+              // screen could not keep for a reader: 43 characters of base64 in
+              // one run is announced as one word nobody can transcribe. Spelled
+              // out, and with Copy named as the shorter road.
+              child: Semantics(
+                label:
+                    'API key. Copy it with the Copy button, or write it down: '
+                    '${spelledOut(generated.secret)}',
+                excludeSemantics: true,
+                child: SelectableText(
+                  generated.secret,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
               ),
             ),
           ],
@@ -215,12 +226,19 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                 subtitle: Text(
                   '${key.id} · ${key.scopes.map((s) => s.name).join(", ")}',
                 ),
-                trailing: TextButton(
+                trailing: NamedButton(
+                  label: 'Revoke the key named ${key.label}',
                   onPressed: () {
                     service.revokeKey(key.id);
                     setState(() {});
                   },
-                  child: const Text('Revoke'),
+                  child: TextButton(
+                    onPressed: () {
+                      service.revokeKey(key.id);
+                      setState(() {});
+                    },
+                    child: const Text('Revoke'),
+                  ),
                 ),
               ),
           const Divider(height: WeftSpace.xl),
@@ -245,6 +263,12 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                 padding: const EdgeInsets.only(bottom: WeftSpace.xs),
                 child: Text(
                   '$entry',
+                  // Allowed and denied differ by colour and by nothing else, on
+                  // the log whose whole job is to show an agent being refused.
+                  // The word goes first because that is the one a reader
+                  // skimming thirty rows is listening for.
+                  semanticsLabel:
+                      '${entry.allowed ? 'Allowed' : 'Denied'}: $entry',
                   style: context.text.bodySmall?.copyWith(
                     fontFamily: 'monospace',
                     fontSize: 11,
@@ -276,11 +300,15 @@ class _TunnelTile extends StatelessWidget {
 
         return ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            Icons.cloud_outlined,
-            color: state == TunnelState.running
-                ? context.palette.online
-                : context.colors.onSurfaceVariant,
+          // The glyph's colour is the state; the subtitle beside it says the
+          // state in words, so the glyph has nothing left to contribute.
+          leading: ExcludeSemantics(
+            child: Icon(
+              Icons.cloud_outlined,
+              color: state == TunnelState.running
+                  ? context.palette.online
+                  : context.colors.onSurfaceVariant,
+            ),
           ),
           title: const Text('Cloudflare tunnel'),
           subtitle: Text(switch (state) {

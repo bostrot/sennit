@@ -23,33 +23,78 @@ class PrivacyNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(WeftSpace.md),
-      decoration: BoxDecoration(
-        color: context.colors.errorContainer.withValues(alpha: 0.5),
-        borderRadius: WeftRadius.allMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.privacy_tip_outlined,
-            size: 20,
-            color: context.colors.onErrorContainer,
-          ),
-          const SizedBox(width: WeftSpace.md),
-          Expanded(
-            child: Text(
-              message,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onErrorContainer,
+    return Semantics(
+      container: true,
+      // Named as a warning rather than left as a paragraph. The red box and the
+      // shield glyph are the entire signal that this is not more explanatory
+      // copy, and both are invisible to a reader — who otherwise hears four
+      // sentences of prose indistinguishable from the section blurbs below it.
+      label: 'Privacy warning. $message',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(WeftSpace.md),
+        decoration: BoxDecoration(
+          color: context.colors.errorContainer.withValues(alpha: 0.5),
+          borderRadius: WeftRadius.allMd,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.privacy_tip_outlined,
+              size: 20,
+              color: context.colors.onErrorContainer,
+            ),
+            const SizedBox(width: WeftSpace.md),
+            Expanded(
+              child: Text(
+                message,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onErrorContainer,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A switch's title, with the cost of turning it on attached to it.
+///
+/// A [PrivacyNotice] and the control it gates are unrelated siblings in a
+/// `ListView`: the warning is read first only by someone who arrives at the top
+/// and walks down. A reader who lands on the switch directly — by a heading
+/// jump, by touch exploration, by returning to a screen they have used before —
+/// is offered a toggle that undoes end-to-end encryption and told nothing at
+/// all.
+///
+/// Given as the tile's `title` rather than wrapped *around* the tile, and that
+/// is the whole reason this is a widget rather than a line at each call site: a
+/// `SwitchListTile` forms its own semantics node, so an annotation above it
+/// becomes a second node a reader meets separately from the switch it
+/// qualifies. Inside the tile it merges, and the warning arrives with the
+/// control it is about.
+///
+/// A hint rather than a longer label because that is what a hint is for: a
+/// screen reader says the name and the state first, then what acting on it
+/// means. Keep [warning] to the one sentence that would stop someone — the
+/// full text is still above, and a hint read on every focus change has to be
+/// short enough that it is not skipped by the third visit.
+class PrivacyGatedTitle extends StatelessWidget {
+  const PrivacyGatedTitle({
+    super.key,
+    required this.title,
+    required this.warning,
+  });
+
+  final String title;
+  final String warning;
+
+  @override
+  Widget build(BuildContext context) =>
+      Semantics(hint: warning, child: Text(title));
 }
 
 /// A settings section's title and the sentence explaining when to use it.
@@ -65,25 +110,34 @@ class SettingsSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+    // One header node carrying both lines. A settings screen is a list of
+    // sections, and heading navigation is how a reader skips the six they did
+    // not come for — which needs the title to *be* a heading, not a bold run.
+    return Semantics(
+      header: true,
+      container: true,
+      label: '$title. $subtitle',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: context.text.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

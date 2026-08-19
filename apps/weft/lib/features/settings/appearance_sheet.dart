@@ -49,7 +49,7 @@ class _AppearanceSheet extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.xl),
 
-            Text('Theme', style: context.text.labelLarge),
+            _SheetHeading('Theme'),
             const SizedBox(height: WeftSpace.sm),
             SegmentedButton<WeftThemeMode>(
               segments: const [
@@ -79,7 +79,7 @@ class _AppearanceSheet extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.xl),
 
-            Text('Accent', style: context.text.labelLarge),
+            _SheetHeading('Accent'),
             const SizedBox(height: WeftSpace.md),
             Wrap(
               spacing: WeftSpace.md,
@@ -112,22 +112,49 @@ class _AppearanceSheet extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.lg),
 
-            Text('Density', style: context.text.labelLarge),
+            _SheetHeading('Density'),
             Slider(
               value: appearance.densityScale,
               min: -2,
               max: 2,
               divisions: 4,
-              label: switch (appearance.densityScale) {
-                <= -1 => 'Compact',
-                >= 1 => 'Comfortable',
-                _ => 'Default',
-              },
+              label: _densityLabel(appearance.densityScale),
+              // Without this a reader hears "minus two" through "two", which
+              // are not the units the setting is in — the human words exist
+              // already and lived only in the visual value indicator, the one
+              // place a reader cannot go.
+              semanticFormatterCallback: _densityLabel,
               onChanged: notifier.setDensity,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The three words the density slider is actually in.
+String _densityLabel(double scale) => switch (scale) {
+  <= -1 => 'Compact',
+  >= 1 => 'Comfortable',
+  _ => 'Default',
+};
+
+/// A group label inside the sheet, reachable by heading navigation.
+///
+/// "Theme", "Accent" and "Density" are what divide this sheet into its three
+/// settings, and as bold runs of body text they divided it for one kind of user
+/// only.
+class _SheetHeading extends StatelessWidget {
+  const _SheetHeading(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Text(title, style: context.text.labelLarge),
     );
   }
 }

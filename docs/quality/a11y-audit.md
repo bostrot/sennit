@@ -513,6 +513,165 @@ task 9 should carry it forward rather than closing it.
 
 ---
 
+## Semantics — resolved by task 4
+
+Everything outside the conversation: settings, bridges, merge, search, share,
+auth, the media viewer and the surfaces a call puts on top of the app. Eighty
+findings, and between them only two failures repeated over and over.
+
+**A button that does not say what it acts on.** Four suggestion cards give four
+buttons reading "Merge"; a contact with three legs gives three reading
+"Unmerge"; five model cards give five reading "Download", one of which is a
+1.5 GB file; six sessions give six popup menus called "Device actions" over a
+menu whose last item signs one out. The word is right for someone who can see
+which row it is in and useless to everyone else.
+
+**A result nobody is told about.** A merge, a health probe, a verification step,
+a share and a stage change all report themselves by redrawing a list. That is a
+complete report for someone watching and no report at all for someone
+listening — the reader is left standing on whatever moved up into the gap.
+
+Two pieces of shared plumbing came out of them, which is the reason this is one
+task rather than eighty:
+
+- **`NamedButton`** (`apps/weft/lib/app/a11y.dart`). A bare
+  `Semantics(label:)` around a Material button does *not* reliably rename it:
+  the button forms its own node from its own child, so depending on the button
+  the annotation is either dropped or left speaking beside the label it was
+  meant to replace. Owning the node means excluding the subtree, and excluding
+  the subtree takes the tap action with it. Restating that action is the part a
+  hand-written copy eventually forgets, so it lives in one widget. This was
+  found by a failing test, not by reading: the first pass wrapped six buttons
+  and renamed four of them.
+- **`PrivacyGatedTitle`** (`features/settings/settings_section.dart`). Same
+  shape, other direction: a `SwitchListTile` forms its own node, so a hint
+  wrapped *around* the tile becomes a second node the reader meets separately
+  from the switch it qualifies. Given as the tile's `title` it merges, and the
+  cost of the toggle arrives with the toggle.
+
+`spelledOut` joined `weft_design`'s semantics vocabulary for the two strings the
+app shows once and never again — the MCP API key and the recovery key. Both were
+one monospace run, which an engine announces as a single unpronounceable word,
+so the two screens whose entire purpose is *write this down* were the two a
+blind user could not complete.
+
+| ID | Resolution |
+|---|---|
+| A11Y-48 | The picture is one `image` node — kind, sender, caption — and the caption bar overlaid on it is `ExcludeSemantics`, since those words are now the tail of the picture's own label |
+| A11Y-49 | A swipe announces "3 of 8" and what landed. Position first: it is the fact a swipe is asking about |
+| A11Y-50 | The staging spinner is a live region ("Downloading this attachment"); a staging failure is a live region in place of the picture that never arrived |
+| A11Y-51 | `MergeSemantics` — a name and a date are not two stops on the way out of an app bar |
+| A11Y-52 | A visible summary line above the list, and it is the live region. Visible rather than a bare announcement because there *is* something to point at, and a user who missed it can navigate back to it. It is also the empty case, which is why the list draws nothing then — a summary line *and* a centred "Nothing matched" is one sentence for a sighted user and two announcements for a reader |
+| A11Y-53 | `Semantics(label: 'Search all conversations', textField: true)`, the same pattern as the composer: a hint is gone at the first keystroke |
+| A11Y-54 | "Searching" |
+| A11Y-55 | The tag's sentence is in the result's label, and in a `Tooltip` for the sighted user. "meaning" qualifies the *match*, and nothing on the row said so |
+| A11Y-56 | One node per result: chat, sender, network, body, date and how it was found. **This needed a data change** — `SearchResult` gained `senderName` and `chatTitle`, both of which had been on the index row since it was written and read back by nobody. The row showed a message with no statement of who said it or where, and the sender is now visible in the subtitle as well |
+| A11Y-57 | Silenced with `semanticsLabel: ''`; the network is named in the sentence |
+| A11Y-58 | Already good; unchanged |
+| A11Y-59 | The proposal is one statement — both handles, the confidence and the evidence — over two buttons that stay their own nodes |
+| A11Y-60 | `NamedButton`: "Merge Anna Maven on WhatsApp with Anna on Signal into one conversation", and the rejection says what keeping them separate means |
+| A11Y-61 | Likewise, per leg, naming the contact it leaves |
+| A11Y-62 | `_SectionTitle` is a `header` node |
+| A11Y-63 | Inside the proposal's merged node; the handle's name and network are in the sentence |
+| A11Y-64 | `_decide` announces the outcome after every merge, rejection and unmerge |
+| A11Y-65 | "Actions for the WhatsApp bridge" |
+| A11Y-66 | `_probe` announces what it found — `_reachedLabel` turns a probe into "connected as +44…", "reachable, but not signed in yet", "2 of 3 accounts connected". This screen is only ever open to answer "is it working?" |
+| A11Y-67 | The card's label names the flow and points at the copyable code below it, which is the part that actually works |
+| A11Y-68 | "Checking the WhatsApp bridge" |
+| A11Y-69 | Labelled |
+| A11Y-70 | Already good; unchanged |
+| A11Y-71 | One live node over the spinner and its caption, and `_done` / `_failed` are live too — this step ends when the *other* device does something |
+| A11Y-72 | Two halves. `PrivacyNotice` is one node prefixed "Privacy warning", because the red box and the shield glyph are the entire signal that this is not more explanatory copy. And `PrivacyGatedTitle` puts the one sentence that would stop someone onto the switch itself, as a hint — a reader who lands on the toggle directly never passes the notice at the top of the list |
+| A11Y-73 | One `header` node carrying title and subtitle |
+| A11Y-75 | Each segment announces "WhatsApp: Muted". Nine loose segments reading On/Muted/Off, and no way to tell which three belong to the row you are in |
+| A11Y-76 | `_SectionHeader` was a byte-identical private copy of `SettingsSectionHeader` — **deleted**, and its six call sites now use the shared one. Fixing the same finding twice in two places is how the two drift |
+| A11Y-77 | `_QuietHourTile`: label "Quiet hours start", value "22:00", hint "change the time". "From 22:00" read as a label is a statement about the screen rather than something a reader knows they can change |
+| A11Y-78 | Both are live regions, and `_TestResult` says "Delivered" or "Blocked" in words — the two differ by a tick and a panel colour otherwise |
+| A11Y-79 | Already good; the pattern the rest of settings copies |
+| A11Y-80 | Already good; unchanged |
+| A11Y-81 | `PrivacyGatedTitle` on both switches, naming what each one sends |
+| A11Y-82 | `Semantics(value: '43%')` on the bar — a *value*, not a live region, since a download reports progress many times a second. The **end** is what is announced: installed and failed are both live |
+| A11Y-83 | "Search model" / "Speech model" |
+| A11Y-84 | `spelledOut`, with Copy named as the shorter road |
+| A11Y-85 | Every row is prefixed "Allowed" or "Denied". The word goes first because that is the one a reader skimming thirty rows is listening for, on the log whose whole job is to show an agent being refused |
+| A11Y-86 | The colour-coded glyph is `ExcludeSemantics`; the sentence beside it already carries the state |
+| A11Y-87 | Already good; unchanged |
+| A11Y-88 | Silenced — the tile is one merged node and the title beside the glyph is already the network's name, so a labelled glyph read "WhatsApp, WhatsApp" |
+| A11Y-89 | One node: "SMS is on. Weft is your messaging app." "On" was a word with no subject, and the only thing supplying one was a 22dp lettermark at the far end of the row |
+| A11Y-90 | `semanticFormatterCallback` — the human words existed already and lived only in the visual value indicator, the one place a reader cannot go |
+| A11Y-91 | Already good; unchanged |
+| A11Y-92 | `_SheetHeading` — `header` nodes |
+| A11Y-93 | One node per session, in the order the facts matter: name, whether it is this device, trust, then last-seen. `explicitChildNodes` is *not* used — the shown text is excluded piece by piece so the popup menu stays its own reachable node |
+| A11Y-94 | Glyph excluded; `trustLabel` carries the state |
+| A11Y-95 | "Actions for Weft on Pixel" |
+| A11Y-96 | `spelledOut`. This is the one string in Weft a user must reproduce character for character and will never be shown again |
+| A11Y-97 | Unchanged, and still mitigated: `backupLabel` sits beside the glyph in words |
+| A11Y-98 | `_goTo` moves the stage *and* says where the user now is. Each stage replaces the whole body, and the focus stays wherever the old one left it |
+| A11Y-99 | `_ErrorBox` is a live region — a mistyped recovery key leaves the field, the button and the screen exactly as they were apart from this box. `_Note` is named "Suggestion", since the grey box and the info glyph are the whole signal that it is advice |
+| A11Y-100 | All three labelled |
+| A11Y-101 | Live, and named "Sign-in failed" — the banner appears while the focus is still on the button that has apparently just done nothing |
+| A11Y-102 | The label outlives the text it is made of: the spinner replaces the button's child, so for the seconds that matter most it was announced as "button" |
+| A11Y-103 | Unchanged; mitigated |
+| A11Y-104 | One node per cell, with its position: "3 of 7, Dog". The order is half of what the user is being asked to check, and "do these appear, in this order" was a question a reader could not answer |
+| A11Y-105 | Labelled, and the label steers to emoji comparison. Unlike the bridge flow there is no text fallback to point at — the payload is two ed25519 keys and a shared secret — so the honest label names the path that works instead of pretending this one does |
+| A11Y-106 | `verificationStateLabel` for all nine states, announced from `onUpdate`. Several of the transitions are driven by the *other* device rather than by anything the user here did |
+| A11Y-107 | Live |
+| A11Y-108 | "Starting Weft". A slow start was a blank screen with an unlabelled spinner, which is a screen with nothing on it at all |
+| A11Y-109 | One node for the row, with the checkbox kept reachable and named — "Also send to Anna" / "Remove Anna from this share". Adding a target and opening one are different acts and a reader needs both; it was the *unlabelled* pair of them that was the bug |
+| A11Y-110 | The reason is in the row's label, so `enabled: false` skipping the tile no longer skips the only useful thing on it |
+| A11Y-111 | Labelled |
+| A11Y-112 | `MergeSemantics` per file — a thumbnail with no label and a name beneath it were two nodes and only one said anything |
+| A11Y-113 | The summary line is a live region, so both "Reading 3 files…" and what those files turned out to be arrive |
+| A11Y-114 | `header` |
+| A11Y-115 | Already good; the pattern for buttons above the navigator |
+| A11Y-116 | The button inside the audio-route popup was built with `tooltip: null`, producing `Semantics(button: true, label: null)`. It now carries the route |
+| A11Y-117 | Announced **on state transition**, not as a live region. `callStatusLabel` carries the running duration and is rebuilt once a second; a live node there would announce the call's length sixty times a minute and drown everything else. A test pins that it stays quiet while the ticker runs |
+| A11Y-118 | `_announceChanges` — mute, camera and audio route, each said once when it changes. The button's changing label reached only whoever happened to be focused on it, and the one thing worth knowing about a muted microphone is that it is muted while you are talking into it |
+| A11Y-119 | Reconnecting and recovered are announced; `_Note` is one node with its glyph excluded |
+| A11Y-120 | Live. It appears mid-call, because of something the far end did, and asks whether this device keeps sending a picture of the room you are in |
+| A11Y-121 | The caption under the button is `ExcludeSemantics` — the button already carries the word |
+| A11Y-122 | Already good; unchanged |
+| A11Y-123 | The bar is a button: "Open the call with Anna, 1:04". It was the way back into the call and said so nowhere |
+| A11Y-124 | An assertive announcement naming the caller and the call's kind, fired from `CallOverlay` when a call starts ringing. **Not focus management**, which is the honest answer: the sheet is drawn inline rather than pushed, so there is no route change to move focus with, and moving focus by hand into a surface the user has not asked for is its own bug. The announcement is what a route change would have given them |
+| A11Y-125 | `slider` with a value — "0:14 of 1:32". A draggable control with no name at the bottom of a video |
+| A11Y-126 | One optional `semanticsLabel` on the shared card, defaulted rather than required so a caller cannot leave a code silent by forgetting it — which is how it was silent before |
+| A11Y-133 | `RTCVideoView` contributes no semantics at all, so a video call was a screen-sized hole. Labelled "Your camera" / "Video from the other person"; `_NoPicture` says "No picture yet" |
+| A11Y-134 | Routed through `showWeftMessage` |
+| A11Y-135 | Already correct; unchanged |
+| CROSS-2 (rest) | Live regions on the search summary, the bridge login wait and its two outcomes, push status, the test-notification result, model install and failure, the sign-in banner, the unlock error, the recovery-key error, the share summary and the video-request prompt. Announcements for merges, probes, verification steps, media page changes, call state, and an incoming call |
+| CROSS-8 | **Closed.** The remaining eight call sites — media viewer, devices, security, bridges (×2), share, link previews and `startCall` — all go through `showWeftMessage` now. The share sheet is the one exception to the letter of it: it pops as it reports, so it keeps its captured `ScaffoldMessenger` and announces separately |
+
+One finding from another task was fixed here because it was one line away:
+**SCALE-13**, the share sheet's `SizedBox(height: 88)` holding a 64dp thumbnail
+and a caption that scales — it is now measured from `textScalerOf`.
+
+Four things later tasks should know:
+
+- **A `Semantics` wrapper does not rename a Material button.** Use
+  `NamedButton`. This is not a style preference: the first pass here wrapped six
+  buttons in `Semantics(label:)` and a test found that four of them kept their
+  old name, one gained a second node saying both, and one lost the label
+  entirely. The behaviour depends on how the particular button builds its child.
+- **A hint on a `SwitchListTile` has to go *inside* it.** Same cause. Use
+  `PrivacyGatedTitle`, or put the annotation in a slot the tile merges.
+- **Task 5's keyboard pass inherits three group nodes** — the device tile, the
+  share target row and the merge proposal — that use a label over children kept
+  deliberately reachable. Those children are what Tab has to land on; a pass
+  that converts them to `excludeSemantics` for tidiness would make three screens
+  unusable by keyboard.
+- **`test/support/semantics_probe.dart` is where the assertions live now.**
+  `labelsIn`, `liveRegionsIn` and `watchAnnouncements`, extracted from
+  `chat_semantics_test.dart` and used by four suites. `liveRegionsIn` matters
+  more than it looks: "the words are on screen" and "the words will be read out
+  when they change" are different claims, and only the second is what a live
+  region is for.
+
+Covered by `apps/weft/test/screen_semantics_test.dart` (14 tests) plus
+additions to `media_viewer_test.dart` (2), `call_screen_test.dart` (3) and
+`packages/weft_design/test/semantics_test.dart` (4).
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1042,17 +1201,26 @@ findings**, **8 cross-cutting findings** — 234 in all.
 ## Status
 
 Closed so far: the token layer (task 2 — see
-[Resolved by task 2](#resolved-by-task-2)) and the inbox, chat and composer
+[Resolved by task 2](#resolved-by-task-2)), the inbox, chat and composer
 semantics (task 3 — see
-[Semantics — resolved by task 3](#semantics--resolved-by-task-3)). One finding,
-**A11Y-08**, is closed for a screen reader and explicitly deferred to design for
-its visual half.
+[Semantics — resolved by task 3](#semantics--resolved-by-task-3)) and every
+remaining screen (task 4 — see
+[Semantics — resolved by task 4](#semantics--resolved-by-task-4)).
 
-Everything else is **open**. Task 9 re-reads this file and marks each remaining
-one fixed or deferred with a reason.
+**All 140 semantics findings are now closed**, along with CROSS-2 and CROSS-8.
+One of them, **A11Y-08**, is closed for a screen reader and explicitly deferred
+to design for its visual half; two more, **A11Y-97** and **A11Y-103**, are
+closed as already-mitigated and were left unchanged, since the state they encode
+in colour is stated in words beside the glyph.
+
+Still **open**: the keyboard model (CROSS-3, KEY-01…05), direction-agnostic
+layout (CROSS-1, RTL-01…42), the test suite's guideline sweep (TAP-01…15), and
+the golden variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed early in
+task 4 because it was one line from a change already being made). Task 9
+re-reads this file and marks each remaining one fixed or deferred with a reason.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task
-claiming it. They were fixed here and the row corrected. CROSS-8 moved to task 3
-too, since it asked for one app-wide answer and task 3 is where the first call
-site needed it.
+claiming it. They were fixed there and the row corrected. CROSS-8 moved to task
+3 too, since it asked for one app-wide answer and task 3 is where the first call
+site needed it; task 4 closed its remaining eight call sites.

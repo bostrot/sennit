@@ -14,6 +14,7 @@ import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../../services/notifications/push_registration.dart';
+import 'settings_section.dart';
 
 /// What the policy says about one network, as a single choice rather than two
 /// sets.
@@ -218,7 +219,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
           if (policy.enabled) ...[
             const Divider(height: WeftSpace.xl),
-            const _SectionHeader(
+            const SettingsSectionHeader(
               title: 'Networks',
               subtitle:
                   'Muted still lets a mention through, if the setting below '
@@ -240,7 +241,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
 
             const Divider(height: WeftSpace.xl),
-            const _SectionHeader(
+            const SettingsSectionHeader(
               title: 'What gets through',
               subtitle:
                   'Applies everywhere. A single chat can disagree with this '
@@ -279,7 +280,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
 
             const Divider(height: WeftSpace.xl),
-            const _SectionHeader(
+            const SettingsSectionHeader(
               title: 'Quiet hours',
               subtitle:
                   'A time of day that recurs, stored with your UTC offset so a '
@@ -295,24 +296,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               contentPadding: EdgeInsets.zero,
             ),
             if (quiet != null) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.bedtime_outlined),
-                title: const Text('From'),
-                trailing: Text(
-                  _formatMinute(context, quiet.startMinute),
-                  style: context.text.titleMedium,
-                ),
+              // A time is a *value*, and "From 22:00" read as a label is a
+              // statement rather than something a reader knows they can change.
+              // The hint is what makes the row an editable setting instead of a
+              // fact about the screen.
+              _QuietHourTile(
+                icon: Icons.bedtime_outlined,
+                label: 'Quiet hours start',
+                value: _formatMinute(context, quiet.startMinute),
+                title: 'From',
                 onTap: () => _pickQuietHour(start: true),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.wb_sunny_outlined),
-                title: const Text('Until'),
-                trailing: Text(
-                  _formatMinute(context, quiet.endMinute),
-                  style: context.text.titleMedium,
-                ),
+              _QuietHourTile(
+                icon: Icons.wb_sunny_outlined,
+                label: 'Quiet hours end',
+                value: _formatMinute(context, quiet.endMinute),
+                title: 'Until',
                 onTap: () => _pickQuietHour(start: false),
               ),
               SwitchListTile(
@@ -346,7 +345,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ],
 
             const Divider(height: WeftSpace.xl),
-            const _SectionHeader(
+            const SettingsSectionHeader(
               title: 'Muted chats',
               subtitle:
                   'Everything currently silenced, whichever way it was muted. '
@@ -357,7 +356,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ],
 
           const Divider(height: WeftSpace.xl),
-          const _SectionHeader(
+          const SettingsSectionHeader(
             title: 'Push',
             subtitle:
                 'How this device is woken when Weft is not running. Weft hosts '
@@ -388,7 +387,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
 
           const Divider(height: WeftSpace.xl),
-          const _SectionHeader(
+          const SettingsSectionHeader(
             title: 'Check it works',
             subtitle:
                 'Runs a message Weft made up through the same rules, the same '
@@ -413,6 +412,48 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 }
 
+/// One end of the quiet-hours window, as a value a reader can act on.
+class _QuietHourTile extends StatelessWidget {
+  const _QuietHourTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+
+  /// The accessible name. "From" is only meaningful next to "Until", which is
+  /// exactly the relationship a reader landing on one row does not have.
+  final String label;
+  final String value;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      button: true,
+      label: label,
+      value: value,
+      hint: 'change the time',
+      excludeSemantics: true,
+      // Restated because excluding the subtree excludes the `ListTile`'s own
+      // tap action with it.
+      onTap: onTap,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon),
+        title: Text(title),
+        trailing: Text(value, style: context.text.titleMedium),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
 /// One network, and the three things the policy can say about it.
 class _NetworkRow extends StatelessWidget {
   const _NetworkRow({
@@ -429,7 +470,9 @@ class _NetworkRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: NetworkGlyph(network: network, size: 28),
+      // The title beside it is the network's name; a labelled glyph is that
+      // name a second time.
+      leading: NetworkGlyph(network: network, size: 28, semanticsLabel: ''),
       title: Text(network.label),
       // The control sits in the subtitle rather than the trailing slot so it
       // gets the tile's full width: three segments plus a network name does not
@@ -444,7 +487,19 @@ class _NetworkRow extends StatelessWidget {
             style: const ButtonStyle(visualDensity: VisualDensity.compact),
             segments: [
               for (final option in _NetworkMode.values)
-                ButtonSegment(value: option, label: Text(option.label)),
+                ButtonSegment(
+                  value: option,
+                  // Each segment names its network. A tile announcing
+                  // "WhatsApp" and then three loose buttons reading "On",
+                  // "Muted", "Off" leaves a reader on a screen of nine
+                  // identical words and no way to tell which three belong to
+                  // the row they are in.
+                  label: Semantics(
+                    label: '${network.label}: ${option.label}',
+                    excludeSemantics: true,
+                    child: Text(option.label),
+                  ),
+                ),
             ],
             selected: {mode},
             onSelectionChanged: (s) => onChanged(s.first),
@@ -569,8 +624,11 @@ class _PushStatus extends ConsumerWidget {
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon),
-      title: Text(text),
+      leading: ExcludeSemantics(child: Icon(icon)),
+      // Live: this line is the answer to "did Retry do anything?", and Retry
+      // leaves the button, the row and the glyph looking exactly as they were
+      // apart from the sentence.
+      title: Semantics(liveRegion: true, child: Text(text)),
       trailing: TextButton(
         onPressed: () => ref.invalidate(pushRegistrationProvider),
         child: const Text('Retry'),
@@ -601,59 +659,37 @@ class _TestResult extends StatelessWidget {
         'Nothing was posted. ${_suppressionLabel(reason)}',
     };
 
-    return Container(
-      padding: const EdgeInsets.all(WeftSpace.md),
-      decoration: BoxDecoration(
-        color: delivered
-            ? context.colors.surfaceContainerHigh
-            : context.colors.errorContainer.withValues(alpha: 0.5),
-        borderRadius: WeftRadius.allMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            delivered ? Icons.check_circle_outline : Icons.block_outlined,
-            size: 20,
-            color: delivered
-                ? context.palette.online
-                : context.colors.onErrorContainer,
-          ),
-          const SizedBox(width: WeftSpace.md),
-          Expanded(child: Text(text, style: context.text.bodySmall)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+    // This box is the whole result of pressing "Send test notification", and it
+    // appears below the fold on a phone. Live, and the delivered/blocked state
+    // is said in words rather than left to a green tick and a red panel — the
+    // two differ only in colour otherwise.
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: '${delivered ? 'Delivered' : 'Blocked'}. $text',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(WeftSpace.md),
+        decoration: BoxDecoration(
+          color: delivered
+              ? context.colors.surfaceContainerHigh
+              : context.colors.errorContainer.withValues(alpha: 0.5),
+          borderRadius: WeftRadius.allMd,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              delivered ? Icons.check_circle_outline : Icons.block_outlined,
+              size: 20,
+              color: delivered
+                  ? context.palette.online
+                  : context.colors.onErrorContainer,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
-            ),
-          ),
-        ],
+            const SizedBox(width: WeftSpace.md),
+            Expanded(child: Text(text, style: context.text.bodySmall)),
+          ],
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../../app/a11y.dart';
 import '../../app/session_providers.dart';
 import '../auth/verification_screen.dart';
 import 'settings_section.dart';
@@ -80,9 +81,10 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   }
 
   void _say(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    // The only report that a rename, a verify or a sign-out did anything —
+    // the list simply refetches and redraws underneath. A snackbar alone said
+    // it to whoever was looking at that corner of the screen.
+    showWeftMessage(context, message);
   }
 
   static String _sentence(Object error) => switch (error) {
@@ -322,67 +324,97 @@ class _DeviceTile extends StatelessWidget {
       ?device.lastSeenIp,
     ].join(' · ');
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(_icon(device.trust), color: _color(context, device.trust)),
-      title: Row(
-        children: [
-          Flexible(
-            child: Text(
-              device.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.text.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+    // One session, one node, in the order the facts matter: what it is, whether
+    // it can be trusted, and only then when it was last seen. Five nodes read
+    // in layout order put "Verified" after the name but the device id and the
+    // last-seen IP after that, which is the wrong end of the sentence to make a
+    // sign-out decision from.
+    return Semantics(
+      container: true,
+      label: semanticsSentence([
+        device.label,
+        if (device.isCurrent) 'this device',
+        trustLabel(device.trust),
+        detail,
+      ]),
+      // A group rather than an exclusion: everything *shown* is excluded
+      // individually below, but the popup menu in the trailing slot has to stay
+      // its own reachable node — a session you can hear about and not act on is
+      // not an improvement.
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        // Colour-coded, and the word beside it is in the subtitle already.
+        leading: ExcludeSemantics(
+          child: Icon(
+            _icon(device.trust),
+            color: _color(context, device.trust),
+          ),
+        ),
+        title: ExcludeSemantics(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  device.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+              if (device.isCurrent) ...[
+                const SizedBox(width: WeftSpace.sm),
+                _Chip(label: 'This device', color: context.palette.online),
+              ],
+            ],
           ),
-          if (device.isCurrent) ...[
-            const SizedBox(width: WeftSpace.sm),
-            _Chip(label: 'This device', color: context.palette.online),
+        ),
+        subtitle: ExcludeSemantics(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                trustLabel(device.trust),
+                style: context.text.labelMedium?.copyWith(
+                  color: _color(context, device.trust),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        isThreeLine: true,
+        trailing: PopupMenuButton<String>(
+          // Named, because a list of six sessions is six buttons reading
+          // "Device actions" over a menu whose last item signs one out.
+          tooltip: 'Actions for ${device.label}',
+          enabled: enabled,
+          onSelected: (choice) {
+            switch (choice) {
+              case 'rename':
+                onRename();
+              case 'verify':
+                onVerify?.call();
+              default:
+                onSignOut();
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'rename', child: Text('Rename')),
+            if (onVerify != null)
+              const PopupMenuItem(value: 'verify', child: Text('Verify')),
+            const PopupMenuItem(value: 'signout', child: Text('Sign out')),
           ],
-        ],
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            trustLabel(device.trust),
-            style: context.text.labelMedium?.copyWith(
-              color: _color(context, device.trust),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Text(
-            detail,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-      isThreeLine: true,
-      trailing: PopupMenuButton<String>(
-        tooltip: 'Device actions',
-        enabled: enabled,
-        onSelected: (choice) {
-          switch (choice) {
-            case 'rename':
-              onRename();
-            case 'verify':
-              onVerify?.call();
-            default:
-              onSignOut();
-          }
-        },
-        itemBuilder: (_) => [
-          const PopupMenuItem(value: 'rename', child: Text('Rename')),
-          if (onVerify != null)
-            const PopupMenuItem(value: 'verify', child: Text('Verify')),
-          const PopupMenuItem(value: 'signout', child: Text('Sign out')),
-        ],
+        ),
       ),
     );
   }

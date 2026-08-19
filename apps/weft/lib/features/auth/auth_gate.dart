@@ -97,10 +97,15 @@ class _Splash extends StatelessWidget {
               ),
             ),
             const SizedBox(height: WeftSpace.xl),
-            const SizedBox(
+            SizedBox(
               height: 20,
               width: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              // A slow start is a blank screen with a spinner on it, and a
+              // spinner with no label is a screen with nothing on it at all.
+              child: Semantics(
+                label: 'Starting Weft',
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           ],
         ),

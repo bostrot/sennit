@@ -21,6 +21,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/attachment_fixtures.dart';
+import 'support/semantics_probe.dart';
 
 /// Records what it was asked to fetch and writes fixture bytes at the target.
 class _FakeTransport implements ModelDownloadTransport {
@@ -610,6 +611,50 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('the next morning'), findsOneWidget);
+    });
+
+    testWidgets('a swipe says where in the gallery it landed', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpViewer(
+        tester,
+        items: [
+          media(kind: MessageKind.image, eventId: r'$a'),
+          media(
+            kind: MessageKind.image,
+            eventId: r'$b',
+            body: 'the next morning',
+          ),
+        ],
+      );
+      await tester.pump();
+      final announced = watchAnnouncements(tester);
+
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+      await tester.pumpAndSettle();
+
+      // A swipe replaces the whole screen and said nothing at all. Position
+      // first: "2 of 2" is the fact a swipe is asking about.
+      expect(announced, hasLength(1));
+      expect(announced.single, startsWith('2 of 2'));
+      expect(announced.single, contains('the next morning'));
+      handle.dispose();
+    });
+
+    testWidgets('the picture itself says what it is and whose it is', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpViewer(
+        tester,
+        items: [media(kind: MessageKind.image, body: 'on the beach')],
+      );
+      await tester.pump();
+
+      // A full-screen photo with no label is a black screen with nothing on
+      // it, and the caption was a separate node floating over the top of it —
+      // so it is said as part of the picture and drawn as one node, not two.
+      expect(labelsIn(tester), contains('Photo, from Anna Maven, on the beach'));
+      handle.dispose();
     });
 
     // Eighty photos in a conversation must not become eighty downloads the

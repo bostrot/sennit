@@ -98,6 +98,8 @@ class SearchResult {
     required this.kind,
     required this.body,
     required this.score,
+    this.senderName = '',
+    this.chatTitle = '',
     this.snippet,
     this.matchedKeyword = false,
     this.matchedSemantic = false,
@@ -111,6 +113,17 @@ class SearchResult {
   final DateTime timestamp;
   final MessageKind kind;
   final String body;
+
+  /// Who said it and where, in the words the user already knows them by.
+  ///
+  /// Both have been stored on the index row since it was written, and neither
+  /// was ever read back: a result row therefore showed a message with no
+  /// statement of which conversation it came from or who said it, and announced
+  /// the same nothing to a screen reader. Blank for a row indexed before the
+  /// writer supplied them, which the caller must treat as "unknown" rather than
+  /// rendering an empty clause.
+  final String senderName;
+  final String chatTitle;
 
   /// Fused score. Comparable within one result set only.
   final double score;

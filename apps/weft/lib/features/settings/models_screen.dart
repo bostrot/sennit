@@ -6,6 +6,7 @@ import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/a11y.dart';
 import '../../app/stores.dart';
 import '../../services/models/model_catalog.dart';
 import '../../services/models/model_installer.dart';
@@ -144,11 +145,19 @@ class _ModelCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  spec.capability == ModelCapability.embedding
-                      ? Icons.psychology_outlined
-                      : Icons.graphic_eq_rounded,
-                  size: 20,
+                // The glyph is the only thing on the card distinguishing a
+                // model that does search from one that does speech, and one
+                // squiggle is not distinguishable from another by ear.
+                Semantics(
+                  label: spec.capability == ModelCapability.embedding
+                      ? 'Search model'
+                      : 'Speech model',
+                  child: Icon(
+                    spec.capability == ModelCapability.embedding
+                        ? Icons.psychology_outlined
+                        : Icons.graphic_eq_rounded,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: WeftSpace.sm),
                 Expanded(
@@ -174,7 +183,15 @@ class _ModelCard extends StatelessWidget {
               ModelPhase.downloading => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  LinearProgressIndicator(value: progress),
+                  // A value, not a live region: a download reports progress
+                  // many times a second, and a live bar would say all of it.
+                  // The user asks "how far along?" by navigating here; the
+                  // *end* of the download is what gets announced, below.
+                  Semantics(
+                    label: 'Downloading ${spec.displayName}',
+                    value: '${(progress * 100).round()}%',
+                    child: LinearProgressIndicator(value: progress),
+                  ),
                   const SizedBox(height: WeftSpace.sm),
                   Row(
                     children: [
@@ -183,9 +200,13 @@ class _ModelCard extends StatelessWidget {
                         style: context.text.labelSmall,
                       ),
                       const Spacer(),
-                      TextButton(
+                      NamedButton(
+                        label: 'Cancel downloading ${spec.displayName}',
                         onPressed: onCancel,
-                        child: const Text('Cancel'),
+                        child: TextButton(
+                          onPressed: onCancel,
+                          child: const Text('Cancel'),
+                        ),
                       ),
                     ],
                   ),
@@ -196,17 +217,33 @@ class _ModelCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.check_circle_rounded,
-                        size: 18,
-                        color: context.palette.online,
+                      // Live: a download ending is a progress bar disappearing,
+                      // which is nothing at all if you were not watching it.
+                      Semantics(
+                        liveRegion: true,
+                        label: '${spec.displayName} installed',
+                        excludeSemantics: true,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 18,
+                              color: context.palette.online,
+                            ),
+                            const SizedBox(width: WeftSpace.sm),
+                            const Text('Installed'),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: WeftSpace.sm),
-                      const Text('Installed'),
                       const Spacer(),
-                      TextButton(
+                      NamedButton(
+                        label: 'Delete ${spec.displayName}',
                         onPressed: onDelete,
-                        child: const Text('Delete'),
+                        child: TextButton(
+                          onPressed: onDelete,
+                          child: const Text('Delete'),
+                        ),
                       ),
                     ],
                   ),
@@ -226,25 +263,44 @@ class _ModelCard extends StatelessWidget {
               ModelPhase.failed => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    state.error ?? 'Download failed',
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.colors.error,
+                  Semantics(
+                    liveRegion: true,
+                    label:
+                        '${spec.displayName} failed to download. '
+                        '${state.error ?? ''}',
+                    excludeSemantics: true,
+                    child: Text(
+                      state.error ?? 'Download failed',
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.colors.error,
+                      ),
                     ),
                   ),
                   const SizedBox(height: WeftSpace.sm),
-                  FilledButton.tonal(
+                  NamedButton(
+                    label: 'Retry downloading ${spec.displayName}',
                     onPressed: onInstall,
-                    child: const Text('Retry (resumes)'),
+                    child: FilledButton.tonal(
+                      onPressed: onInstall,
+                      child: const Text('Retry (resumes)'),
+                    ),
                   ),
                 ],
               ),
+              // Five cards, five buttons reading "Download", one of which is a
+              // 1.5 GB file.
               ModelPhase.notInstalled => Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton.tonalIcon(
+                child: NamedButton(
+                  label:
+                      'Download ${spec.displayName}, '
+                      '${_mb(spec.totalBytes)}',
                   onPressed: onInstall,
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: const Text('Download'),
+                  child: FilledButton.tonalIcon(
+                    onPressed: onInstall,
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text('Download'),
+                  ),
                 ),
               ),
             },

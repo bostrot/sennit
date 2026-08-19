@@ -338,6 +338,8 @@ class SearchStore implements SearchBackend {
           orElse: () => MessageKind.text,
         ),
         body: row['body'] as String,
+        senderName: (row['sender_name'] as String?) ?? '',
+        chatTitle: (row['chat_title'] as String?) ?? '',
         score: hit.score,
         matchedKeyword: hit.keywordRank != null,
         matchedSemantic: hit.vectorRank != null,
