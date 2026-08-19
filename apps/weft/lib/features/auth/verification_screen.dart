@@ -503,38 +503,11 @@ class _EmojiCompare extends StatelessWidget {
           runSpacing: WeftSpace.md,
           children: [
             for (final (index, emoji) in emojis.indexed)
-              Semantics(
-                container: true,
-                // Position and name as one node. Seven emoji and seven captions
-                // were fourteen nodes, and the *order* is half of what the user
-                // is being asked to check — "do these appear, in this order" is
-                // a question a reader could not answer.
-                label: '${index + 1} of ${emojis.length}, ${emoji.name}',
-                excludeSemantics: true,
-                child: Container(
-                  width: 74,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: WeftSpace.sm,
-                    horizontal: WeftSpace.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.colors.surfaceContainerHigh,
-                    borderRadius: WeftRadius.allMd,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(emoji.emoji, style: const TextStyle(fontSize: 30)),
-                      const SizedBox(height: WeftSpace.xs),
-                      Text(
-                        emoji.name,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.labelSmall,
-                      ),
-                    ],
-                  ),
-                ),
+              SasEmojiCell(
+                emoji: emoji.emoji,
+                name: emoji.name,
+                index: index,
+                total: emojis.length,
               ),
           ],
         ),
@@ -558,6 +531,81 @@ class _EmojiCompare extends StatelessWidget {
         ),
         const SizedBox(height: WeftSpace.lg),
       ],
+    );
+  }
+}
+
+/// One cell of the SAS comparison: an emoji over the name it goes by.
+///
+/// Public, and a widget rather than a closure inside [_EmojiCompare], because
+/// it is the only way this box is measurable. A [KeyVerification] cannot be
+/// built without an `Encryption` and a live client, so the screen around it
+/// cannot be pumped in a widget test at all — and SCALE-11 is a question about
+/// this box and nothing else.
+class SasEmojiCell extends StatelessWidget {
+  const SasEmojiCell({
+    super.key,
+    required this.emoji,
+    required this.name,
+    required this.index,
+    required this.total,
+  });
+
+  final String emoji;
+  final String name;
+  final int index;
+  final int total;
+
+  /// The design width at 1.0×, before the text scaler.
+  static const double extent = 74;
+
+  @override
+  Widget build(BuildContext context) {
+    // SCALE-11. The cell holds two runs of real text — a 30dp emoji and a
+    // caption — so it is a box around text and scales with it. Left at 74 the
+    // caption had 66dp of content width to hold two lines of 22dp type at
+    // 2.0×, which ellipsised most of the names the SAS table can produce; the
+    // reader is being asked to compare *these words* against another screen,
+    // and "screwdri…" is not a word they can compare.
+    //
+    // Clamped at 1.6× rather than unclamped: the cells sit in a `Wrap` seven
+    // across, and past that the row breaks into a column on a phone, which
+    // loses the left-to-right order the question depends on.
+    final scaler = MediaQuery.textScalerOf(context);
+    final width = extent * (scaler.scale(extent) / extent).clamp(1.0, 1.6);
+
+    return Semantics(
+      container: true,
+      // Position and name as one node. Seven emoji and seven captions were
+      // fourteen nodes, and the *order* is half of what the user is being
+      // asked to check — "do these appear, in this order" is a question a
+      // reader could not answer.
+      label: '${index + 1} of $total, $name',
+      excludeSemantics: true,
+      child: Container(
+        width: width,
+        padding: const EdgeInsets.symmetric(
+          vertical: WeftSpace.sm,
+          horizontal: WeftSpace.xs,
+        ),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceContainerHigh,
+          borderRadius: WeftRadius.allMd,
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 30)),
+            const SizedBox(height: WeftSpace.xs),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.labelSmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

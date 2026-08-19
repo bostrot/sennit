@@ -64,16 +64,17 @@ Six numbers, from the sweeps:
 
 | Thing | Count |
 |---|---|
-| `Semantics` widgets in the whole app | **6** |
-| `liveRegion` / `SemanticsService.announce` | **0** |
+| `Semantics` widgets in the whole app | **6** — closed by tasks 3 and 4 |
+| `liveRegion` / `SemanticsService.announce` | **0** — closed by tasks 3 and 4 |
 | `EdgeInsetsDirectional` / `AlignmentDirectional` / `PositionedDirectional` | **0** — closed by task 6 |
 | `FocusTraversalGroup` / `Shortcuts` / `Actions` / `FocusNode` | **0** — closed by task 5 |
 | `supportedLocales` / `localizationsDelegates` / `flutter_localizations` | **0** — closed by task 6 |
-| `MediaQuery.textScaler` / `.highContrast` / `.disableAnimations` reads | **0** |
+| `MediaQuery.textScaler` / `.highContrast` / `.disableAnimations` reads | **0** — closed by tasks 2, 8 and 9 |
 
 `packages/weft_design/test/` exists and is empty — the design system that owns
 every colour pair in the app has no test at all, so there is nothing today that
-would notice a token regressing below AA.
+would notice a token regressing below AA. It holds **259 tests** now, and task 9
+put the package into CI, where it had never run.
 
 The single most consequential finding was **CROSS-1**: the app declared no
 locales and no localisation delegates, so `Directionality` was unconditionally
@@ -1137,6 +1138,137 @@ Covered by `apps/weft/test/goldens/a11y_golden_test.dart` (20 tests, 40 images),
 
 ---
 
+## Closed — task 9
+
+The whole tree run, the last three findings measured, and the audit's status
+column filled in. **Every one of the 234 findings is now fixed, verified
+correct, or deferred with a stated blocker**; the four deferrals are listed at
+the end of this section, and none of them is an accessibility defect left
+standing.
+
+### The run
+
+| Suite | Result |
+|---|---|
+| `dart test` × 12 pure packages | **1026 pass** |
+| `flutter test` — `weft_design` | **259 pass** |
+| `flutter test` — `weft_matrix` | **278 pass** |
+| `flutter test` — `weft_store` | **44 pass** |
+| `flutter test` — `apps/weft` | **907 pass** (889 before this task) |
+| `dart analyze` from the root | **No issues found** |
+| `dart format --set-exit-if-changed .` | **3 files changed** — see below |
+| `apps/weft/test/goldens` | **42 pass**, all 60 images byte-identical |
+
+**2514 tests**, and `analyze` was clean before anything here was touched.
+
+`dart format` was not. Three files task 8 added or edited —
+`test/goldens/a11y_golden_test.dart`, `test/support/golden_harness.dart` and
+`packages/weft_design/test/text_scale_test.dart` — were unformatted, which is a
+red `analyze` job on the next push and nothing to do with accessibility. They
+are formatted. Worth stating because the phase has run eight tasks without CI
+seeing any of them: **`dart format` is a CI gate here and the local loop is
+`flutter test`, so drift accumulates silently between pushes.**
+
+### The last three text-scale findings
+
+Task 8 left SCALE-8, SCALE-11 and SCALE-16 open and named the shape that closes
+them: rect assertions rather than three more golden scenes. They are in
+`apps/weft/test/a11y/text_scale_test.dart` — **18 tests**, four scales
+(0.85×, 1.0×, 1.3×, 2.0×) over each.
+
+Not in `packages/weft_design/test/text_scale_test.dart`, where task 8 pointed:
+all three boxes live in `apps/weft/lib/features/`, and `weft_design` cannot see
+them. Same file name, same shape, the other side of the dependency edge.
+
+| ID | Resolution |
+|---|---|
+| SCALE-8 | **Verified correct, and the register's diagnosis was wrong.** The waveform is `Flexible` and the duration label is not, so the `Row` gives the label its full natural width *first* and the bars absorb what is left — the `maxWidth - 60` is slack subtracted from a width the label had already been taken out of. Measured at 2.0× in a 360dp window with the widest string `formatMediaDuration` produces (`70:10`, 58dp): nothing truncates, nothing overflows. Pinned rather than fixed |
+| SCALE-11 | **Fixed.** The 74dp cell gave its caption 66dp for two lines; at 2.0× that is 22dp type, and the longest names the SAS table holds — `Strawberry`, `Light Bulb`, `Headphones`, all ten characters — ellipsised. The user is being asked to compare *those words* against another screen, so `Headphon…` is the verification step failing, not a cosmetic clip. The cell now scales with the text, clamped at 1.6× |
+| SCALE-16 | **Fixed, and it was a real clip at every scale above 1.4×.** The ordered marker's gutter was a fixed 26dp: `10.` needs 40dp at 2.0×, so a list wrapped its own numbers onto a second line — `10` over `.` — from the tenth item down. The gutter is `textScaler.scale(26 | 16)` now, unclamped, since there is nothing behind it to cover |
+
+Both fixes were checked by reverting them: without the scaled gutter,
+`10.` lays out 80dp tall where one line is 40; without the scaled cell,
+`Headphones` reports `didExceedMaxLines`. A test that passes against the bug it
+names is the failure mode worth spending two runs to rule out.
+
+**`SasEmojiCell` is public now**, extracted from `_EmojiCompare`. Not tidiness:
+a `KeyVerification` needs an `Encryption` and a live client, so the verification
+screen cannot be pumped in a widget test at all, and SCALE-11 is a question
+about that one box. `pumpScreen` in `test/support/a11y_harness.dart` gained a
+`textScale` seam for the same reason — the voice bubble is private inside
+`chat_view.dart` and is only reachable by pumping the screen that owns it.
+
+Two things a later reader should not undo:
+
+- **The measurement is worthless without real fonts.** `flutter_test`
+  substitutes a fixed-width placeholder face, under which the marker `8.` needs
+  28.5dp where Roboto needs 11 — so an unfixed suite reports a clip no device
+  has and stays quiet about the one it does. `setUpAll(loadGoldenFonts)`, in
+  every file that measures a width.
+- **`StubChatRepository` must be given `uploads: const []`, not null.**
+  `DemoChatRepository` otherwise drives its own upload simulation on a
+  zero-duration tick and `pumpAndSettle` never returns — a two-minute timeout
+  whose message says nothing about uploads.
+
+### CI
+
+Three named steps in a new `a11y` job, plus one real hole closed in an old one.
+
+**`packages/weft_design` was in no CI job at all.** Not in `unit` — it is a
+Flutter package and cannot run under `dart test` — and not in `widget`, whose
+list was written when the package had no tests. Its whole suite has been unrun
+on every push of this phase, `contrast_test.dart` included: 194 assertions over
+seven themes, and the only thing in the repository that would notice a token
+dropping below WCAG AA. It is in the `widget` job's Flutter-package loop now,
+beside `weft_matrix` and `weft_store`.
+
+The new `a11y` job runs `apps/weft/test/a11y`, `apps/weft/test/goldens` and
+`packages/weft_design`, and uploads golden diffs on failure. It is a subset of
+what `widget` already covers, deliberately: the overlap costs under a minute and
+buys a red check that reads *Accessibility & RTL* without anyone opening a log.
+
+**No grep step, on purpose.** Task 6 asked for this and it is worth restating:
+`rtl_test.dart` sweeps the source for physical-edge layout APIs by reading the
+tree's bytes, and it is a test rather than a shell step because both BSD and GNU
+`grep` classify two files in this workspace as binary and drop their matches
+*silently* — see the [Method](#method) note, which is how the first pass of this
+audit missed `rich_text_view.dart` entirely. A grep step in CI would be a second
+compliance check that disagrees with the first and is wrong more often.
+
+### Deferred, with what blocks each
+
+Four, and the reason matters more than the count.
+
+1. **String extraction — ~400 Dart literals into ARB catalogues.** Blocked by
+   scope: it is a phase of its own, not a task. It is *not* blocking the phase's
+   stated criterion — "`intl` message lookup falls back cleanly for untranslated
+   strings rather than showing keys" — because Weft has no catalogue, so there
+   are no keys to leak and nothing to fall back from. What it does block is the
+   displaced punctuation in the RTL goldens (`.Every network, one thread`),
+   which is the bidi algorithm being correct about English text in an Arabic
+   paragraph. Pinning those strings to LTR would be wrong the day they are
+   translated. **First** thing M11 should pick up.
+2. **A11Y-08's visual half — read and delivered are the same double tick in two
+   colours.** Closed for a screen reader in task 3 (named in the label and in
+   the tooltip) and open for a sighted user with a colour vision deficiency.
+   Blocked on design, not on code: telling them apart means changing the mark,
+   and which mark is not this phase's call. The one place in the app where
+   colour is still the sole signal — see
+   [Verified correct](#verified-correct) item 7 for the four places that got it
+   right.
+3. **SCALE-9 — the bubble's 520dp `maxWidth`.** Judged in task 8 and left: at
+   2.0× the cap makes a narrow column of large text, which is what every
+   messenger does, and the alternative is a full-width 32dp line that is worse
+   to read. Not blocked — decided.
+4. **Real assistive technology.** VoiceOver, TalkBack and a device in an RTL
+   locale are **task 10**, and this document gets its `Verified with` section
+   there. Everything above is `SemanticsTester`, `meetsGuideline` and rects:
+   nothing in this phase has yet been heard out loud, and a label that reads
+   correctly in a tree can still be announced in the wrong order by a real
+   screen reader.
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1571,6 +1703,19 @@ needs a 2.0× golden before and after.
 | SCALE-16 | List marker `SizedBox(width: 26 \| 16)` | `rich_text_view.dart:382-383` |
 | SCALE-9 | Bubble `maxWidth: 520` (needs judgement, not necessarily a fix) | `chat_view.dart:1197` |
 
+**All sixteen closed** — twelve by the 2.0× goldens (task 8, see
+[What the images show](#what-the-images-show)), SCALE-13 by task 4, and
+SCALE-8, SCALE-11 and SCALE-16 by rect assertions in task 9 (see
+[The last three text-scale findings](#the-last-three-text-scale-findings)).
+Read this register the way the touch-target one above is read: it was written
+off the source and it guessed wrong about which boxes actually clip. Seven
+entries were already correct; SCALE-2 and SCALE-7 pass by SDK mechanisms it did
+not know about; SCALE-8's diagnosis was wrong in the other direction — the box
+it names does not clip, and the arithmetic it points at is measuring something
+else. **Two of the sixteen were real clipping and both were the same defect
+written twice** (SCALE-4 and SCALE-5), plus SCALE-11 and SCALE-16 found later
+by measuring rather than by reading.
+
 ### RTL register — summary counts
 
 | Pattern | Count | Notes |
@@ -1665,7 +1810,7 @@ Findings mapped to the phase's remaining tasks, so nothing here is orphaned.
 | 6 — direction-agnostic layout | CROSS-1, RTL-01…42 |
 | 7 — test suite | CROSS-6, TAP-01…15 (via the tap-target guidelines) |
 | 8 — golden variants | CROSS-7, SCALE-2…16 |
-| 9 — run everything, close the audit | this document's status column |
+| 9 — run everything, close the audit | SCALE-8, SCALE-11, SCALE-16, and this document's status column |
 | 10 — real assistive technology | the `Verified with` section, appended then |
 
 Totals: **140 semantics findings**, **42 RTL findings**, **16 text-scale
@@ -1674,16 +1819,31 @@ findings**, **8 cross-cutting findings** — 234 in all.
 
 ## Status
 
-Closed so far: the token layer (task 2 — see
+**Closed. All 234 findings are fixed, verified correct, or deferred with a
+stated blocker**, and the four deferrals are enumerated under
+[Deferred, with what blocks each](#deferred-with-what-blocks-each). None of them
+is an accessibility defect left standing: one is a translation phase, one is a
+design decision about a glyph, one is a judgement already made, and one is task
+10's device pass. 2514 tests pass across the workspace, `dart analyze` is clean,
+and the suites that prove all of this now run in CI — including
+`packages/weft_design`, which ran in no job at all until task 9.
+
+What was closed, by task: the token layer (task 2 — see
 [Resolved by task 2](#resolved-by-task-2)), the inbox, chat and composer
 semantics (task 3 — see
 [Semantics — resolved by task 3](#semantics--resolved-by-task-3)), every
 remaining screen (task 4 — see
 [Semantics — resolved by task 4](#semantics--resolved-by-task-4)), the
 keyboard model (task 5 — see
-[Keyboard — resolved by task 5](#keyboard--resolved-by-task-5)) and
+[Keyboard — resolved by task 5](#keyboard--resolved-by-task-5)),
 direction-agnostic layout (task 6 — see
-[Direction — resolved by task 6](#direction--resolved-by-task-6)).
+[Direction — resolved by task 6](#direction--resolved-by-task-6)), the test
+suite and touch targets (task 7 — see
+[Test suite — resolved by task 7](#test-suite--resolved-by-task-7)), the golden
+variants (task 8 — see
+[Golden variants — resolved by task 8](#golden-variants--resolved-by-task-8))
+and the last three text-scale findings, the full-tree run and the CI steps
+(task 9 — see [Closed — task 9](#closed--task-9)).
 
 **All 140 semantics findings are now closed**, along with CROSS-2 and CROSS-8.
 One of them, **A11Y-08**, is closed for a screen reader and explicitly deferred
@@ -1723,13 +1883,14 @@ Two were real clipping — SCALE-4 and SCALE-5, the same defect twice, now one
 in the 2.0× images, two of them (SCALE-2, SCALE-7) by a mechanism the register
 did not know about and had guessed wrong.
 
-Still **open**: SCALE-8, SCALE-11 and SCALE-16 — the waveform's duration
-allowance, the verification screen's emoji cell and the list marker in a
-formatted body. What blocks them is scope, not difficulty: none appears in any
-of the five scenes the phase names, and none is a golden question. Three rect
-assertions in `packages/weft_design/test/text_scale_test.dart`, in the shape
-SCALE-1, 4 and 5 already use there, close them. Task 9 re-reads this file and
-marks each remaining finding fixed or deferred with a reason.
+**The last three — SCALE-8, SCALE-11 and SCALE-16 — are closed by task 9**, as
+rect assertions rather than as three more golden scenes (see
+[The last three text-scale findings](#the-last-three-text-scale-findings)).
+Two were real: the SAS emoji cell ellipsised the names the user is being asked
+to compare, and the list marker's gutter wrapped `10.` onto a second line inside
+its own box. SCALE-8 was not — the waveform's `Flexible` already reserves the
+duration's full width, and the register's `maxWidth - 60` diagnosis pointed at
+arithmetic that measures something else. It is pinned rather than fixed.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task

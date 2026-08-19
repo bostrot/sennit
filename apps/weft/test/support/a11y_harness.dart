@@ -16,6 +16,11 @@ import 'package:weft/data/chat_repository.dart';
 /// The two seams below are what the screens actually need to build without a
 /// homeserver: what is in the rooms, and what the settings say.
 ///
+/// [textScale] is the third, and it is why `text_scale_test.dart` measures the
+/// real screens rather than a rebuilt copy of the box under test: the fixed
+/// boxes in the text-scale register are all private widgets inside a feature,
+/// reachable only by pumping the screen that owns them.
+///
 /// Deliberately *not* `pumpWeft` from `golden_harness.dart`. That one exists to
 /// make a deterministic image — it loads fonts, settles animations and forces a
 /// theme — and it returns nothing, whereas these tests need the container to
@@ -32,6 +37,7 @@ Future<ProviderContainer> pumpScreen(
   ChatRepository? repository,
   WeftStores? stores,
   Brightness brightness = Brightness.dark,
+  double textScale = 1.0,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -60,6 +66,16 @@ Future<ProviderContainer> pumpScreen(
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: WeftTheme.build(brightness: brightness),
+        // The scaler goes in the app's `builder`, not in a `MediaQuery` above
+        // `MaterialApp`: `MediaQuery.fromView` rebuilds the data from the view
+        // and would drop anything set over it. Same placement the golden
+        // harness uses, for the same reason.
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: home,
       ),
     ),

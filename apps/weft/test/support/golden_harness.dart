@@ -290,10 +290,10 @@ Future<void> pumpWeft(
         locale: variant.locale,
         localizationsDelegates: weftLocalizationsDelegates,
         supportedLocales: weftSupportedLocales,
-        theme: WeftAppearance(mode: mode, seed: seed).themeFor(
-          Brightness.dark,
-          highContrast: variant.highContrast,
-        ),
+        theme: WeftAppearance(
+          mode: mode,
+          seed: seed,
+        ).themeFor(Brightness.dark, highContrast: variant.highContrast),
         // Under the navigator rather than over the app, which is where the app
         // itself reads these: a `MediaQuery` above `MaterialApp` is rebuilt
         // from the view by `MediaQuery.fromView`, so a text scaler set there

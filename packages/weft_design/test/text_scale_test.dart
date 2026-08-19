@@ -90,7 +90,9 @@ void main() {
           );
 
           final pill = tester.getRect(find.byType(WeftUnreadBadge));
-          final digits = tester.getRect(find.text(count > 99 ? '99+' : '$count'));
+          final digits = tester.getRect(
+            find.text(count > 99 ? '99+' : '$count'),
+          );
 
           expect(
             pill.inflate(0.5).contains(digits.topLeft) &&
@@ -128,10 +130,7 @@ void main() {
           border: border == null ? null : Border.all(color: border, width: 2),
         ),
         alignment: Alignment.center,
-        child: Text(
-          '27',
-          style: TextStyle(fontSize: fontSize, height: 1),
-        ),
+        child: Text('27', style: TextStyle(fontSize: fontSize, height: 1)),
       );
 
       for (final (badge, old) in [

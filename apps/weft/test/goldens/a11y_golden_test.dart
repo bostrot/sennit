@@ -184,95 +184,101 @@ void main() {
   /// `pumpWidget` reuses the first run's `State`, so the light image of the
   /// composer scene would be taken with the dark run's reply mode still open:
   /// a golden of the wrong thing that never fails.
-  final scenes = <
-    ({
-      String name,
-      Finder target,
-      Future<void> Function(WidgetTester, WeftThemeMode, WeftGoldenVariant, Key)
-      pump,
-    })
-  >[
-    (
-      name: 'inbox',
-      target: find.byType(InboxShell),
-      pump: (tester, mode, variant, key) async {
-        await pumpWeft(
-          tester,
-          InboxShell(key: key),
-          size: inboxWindow,
-          mode: mode,
-          variant: variant,
-          repository: demo,
-          stores: freshStores(),
-        );
-      },
-    ),
-    (
-      name: 'chat_mixed',
-      target: find.byType(ChatView),
-      pump: (tester, mode, variant, key) async {
-        final repository = mixedThread();
-        await pumpWeft(
-          tester,
-          ChatView(key: key, chatId: repository.chatId),
-          size: chatWindow,
-          mode: mode,
-          variant: variant,
-          repository: repository,
-        );
-      },
-    ),
-    (
-      name: 'composer_reply',
-      target: find.byType(ChatView),
-      pump: (tester, mode, variant, key) async {
-        final repository = mixedThread();
-        await pumpWeft(
-          tester,
-          ChatView(key: key, chatId: repository.chatId),
-          size: chatWindow,
-          mode: mode,
-          variant: variant,
-          repository: repository,
-        );
-        // The Arabic bubble on purpose: the reply chip then has to hold a
-        // right-to-left preview inside a composer whose own chrome follows the
-        // reader, which is the bar's hardest case and the one the phase's
-        // "bidirectional text" bullet is about.
-        await openReply(tester, 'أنا في الطريق، خمس دقائق');
-      },
-    ),
-    (
-      name: 'search',
-      target: find.byType(SearchScreen),
-      pump: (tester, mode, variant, key) async {
-        await pumpWeft(
-          tester,
-          SearchScreen(key: key, initialQuery: 'roof'),
-          size: screenWindow,
-          mode: mode,
-          variant: variant,
-          repository: demo,
-          stores: indexedStores(),
-        );
-      },
-    ),
-    (
-      name: 'settings',
-      target: find.byType(EndpointsScreen),
-      pump: (tester, mode, variant, key) async {
-        await pumpWeft(
-          tester,
-          EndpointsScreen(key: key),
-          size: screenWindow,
-          mode: mode,
-          variant: variant,
-          repository: demo,
-          stores: freshStores(),
-        );
-      },
-    ),
-  ];
+  final scenes =
+      <
+        ({
+          String name,
+          Finder target,
+          Future<void> Function(
+            WidgetTester,
+            WeftThemeMode,
+            WeftGoldenVariant,
+            Key,
+          )
+          pump,
+        })
+      >[
+        (
+          name: 'inbox',
+          target: find.byType(InboxShell),
+          pump: (tester, mode, variant, key) async {
+            await pumpWeft(
+              tester,
+              InboxShell(key: key),
+              size: inboxWindow,
+              mode: mode,
+              variant: variant,
+              repository: demo,
+              stores: freshStores(),
+            );
+          },
+        ),
+        (
+          name: 'chat_mixed',
+          target: find.byType(ChatView),
+          pump: (tester, mode, variant, key) async {
+            final repository = mixedThread();
+            await pumpWeft(
+              tester,
+              ChatView(key: key, chatId: repository.chatId),
+              size: chatWindow,
+              mode: mode,
+              variant: variant,
+              repository: repository,
+            );
+          },
+        ),
+        (
+          name: 'composer_reply',
+          target: find.byType(ChatView),
+          pump: (tester, mode, variant, key) async {
+            final repository = mixedThread();
+            await pumpWeft(
+              tester,
+              ChatView(key: key, chatId: repository.chatId),
+              size: chatWindow,
+              mode: mode,
+              variant: variant,
+              repository: repository,
+            );
+            // The Arabic bubble on purpose: the reply chip then has to hold a
+            // right-to-left preview inside a composer whose own chrome follows the
+            // reader, which is the bar's hardest case and the one the phase's
+            // "bidirectional text" bullet is about.
+            await openReply(tester, 'أنا في الطريق، خمس دقائق');
+          },
+        ),
+        (
+          name: 'search',
+          target: find.byType(SearchScreen),
+          pump: (tester, mode, variant, key) async {
+            await pumpWeft(
+              tester,
+              SearchScreen(key: key, initialQuery: 'roof'),
+              size: screenWindow,
+              mode: mode,
+              variant: variant,
+              repository: demo,
+              stores: indexedStores(),
+            );
+          },
+        ),
+        (
+          name: 'settings',
+          target: find.byType(EndpointsScreen),
+          pump: (tester, mode, variant, key) async {
+            await pumpWeft(
+              tester,
+              EndpointsScreen(key: key),
+              size: screenWindow,
+              mode: mode,
+              variant: variant,
+              repository: demo,
+              stores: freshStores(),
+            );
+          },
+        ),
+      ];
 
   for (final scene in scenes) {
     group(scene.name, () {

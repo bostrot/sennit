@@ -68,14 +68,20 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      # These two depend on the Flutter SDK — weft_matrix on `compute` and the
-      # SDK's own Flutter-only bindings, weft_store on sqflite — so they cannot
-      # run under `dart test` in the unit job above, and belong here instead of
-      # going unrun. The upload transport lives in weft_matrix.
-      - name: Test weft_matrix, weft_store
+      # These three depend on the Flutter SDK — weft_matrix on `compute` and the
+      # SDK's own Flutter-only bindings, weft_store on sqflite, weft_design on
+      # the widget layer it is made of — so they cannot run under `dart test` in
+      # the unit job above, and belong here instead of going unrun. The upload
+      # transport lives in weft_matrix.
+      #
+      # weft_design was absent from both lists until M10 and its whole suite went
+      # unrun in CI, `contrast_test.dart` included — which is the one test that
+      # would notice a token dropping below WCAG AA, i.e. exactly the regression
+      # nobody sees by looking.
+      - name: Test weft_matrix, weft_store, weft_design
         run: |
           set -e
-          for pkg in weft_matrix weft_store; do
+          for pkg in weft_matrix weft_store weft_design; do
             echo "::group::$pkg"
             (cd "packages/$pkg" && flutter test)
             echo "::endgroup::"
@@ -89,6 +95,52 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: golden-failures
+          path: apps/weft/test/**/failures/**
+          if-no-files-found: ignore
+
+  a11y:
+    name: Accessibility & RTL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # A subset of what the `widget` job already runs, on purpose. Two reasons
+      # it is worth the overlap, both about the report rather than the coverage:
+      # a red X reading "Accessibility & RTL" says what broke without anyone
+      # opening a log, and these suites finish in well under a minute, so they
+      # fail while the full widget run is still going.
+      #
+      # `test/a11y` is also where the *source sweep* lives. `rtl_test.dart` reads
+      # the tree's bytes looking for physical-edge layout APIs —
+      # `EdgeInsets.only(left:)`, `Alignment.centerLeft`, `Positioned(right:)` —
+      # which is deliberately a test and not a `grep` step here: BSD and GNU grep
+      # classify two files in this workspace as binary and drop their matches
+      # *silently*, so a grep-based compliance check under-reports without
+      # saying so. See the audit's Method note. Adding one here would give two
+      # checks that disagree.
+      - name: Semantics, keyboard, RTL, contrast and tap targets
+        working-directory: apps/weft
+        run: flutter test test/a11y
+      # The accessibility golden variants — Arabic, 0.85×, 2.0× and high
+      # contrast over five scenes in both themes, 40 images. Separate from the
+      # suite above because a golden failure is diagnosed from the artifact
+      # below rather than from the log.
+      - name: Golden variants (RTL, text scale, high contrast)
+        working-directory: apps/weft
+        run: flutter test test/goldens
+      - name: Token contrast, tap targets and bidi
+        working-directory: packages/weft_design
+        run: flutter test
+      - name: Upload golden failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-golden-failures
           path: apps/weft/test/**/failures/**
           if-no-files-found: ignore
 
