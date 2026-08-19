@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart' show Intl;
 import 'package:path/path.dart' as p;
 import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_matrix/weft_matrix.dart' show DeviceManager, KeyBackup;
 import 'package:weft_richtext/weft_richtext.dart' show LinkPreviewFetch;
 
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/session_providers.dart';
 import 'package:weft/app/settings.dart';
@@ -141,6 +144,68 @@ String? _flutterRoot() {
       : null;
 }
 
+/// An accessibility condition a golden is captured under.
+///
+/// Three of Weft's four accessibility knobs are things a *user* turns on and a
+/// widget test never sees unless it says so: the device's locale, the system
+/// text scale and the platform's high-contrast switch. Each one is a whole
+/// class of layout failure that no other test in the suite can catch, because
+/// every one of them is a question about pixels — a right-to-left screen with
+/// one row still anchored to the physical left, a label clipped at 2.0×, a
+/// hairline that vanishes when the palette is pushed apart.
+///
+/// Held as a value rather than as three parameters so a suite can iterate the
+/// set. [name] is the golden filename's middle segment, which is why the
+/// variants are snake_case: `a11y_inbox_large_text_dark.png` sorts next to its
+/// siblings in a directory listing and in a review diff.
+@immutable
+class WeftGoldenVariant {
+  const WeftGoldenVariant({
+    required this.name,
+    this.locale = const Locale('en'),
+    this.textScale = 1.0,
+    this.highContrast = false,
+  });
+
+  /// Filename segment, and the test description.
+  final String name;
+
+  /// The locale the app is put into — which is what resolves [Directionality],
+  /// and the only thing that does. See `app/localisation.dart`.
+  final Locale locale;
+
+  /// Multiplier for `MediaQuery.textScaler`.
+  final double textScale;
+
+  /// `MediaQuery.highContrast`, fed to both the theme and the subtree — the app
+  /// root reads it from the query and folds it into the theme, so a golden that
+  /// set only one of the two would be an image of a state the app cannot be in.
+  final bool highContrast;
+}
+
+/// The default condition: English, unscaled, ordinary contrast.
+///
+/// Every golden written before this phase is captured under it, and it is
+/// deliberately the default of [pumpWeft] so that none of them moved.
+const weftGoldenBaseline = WeftGoldenVariant(name: 'baseline');
+
+/// The four conditions Phase 08 pins.
+///
+/// `ar` rather than `he` for the right-to-left case: Arabic is right-to-left
+/// *and* joining *and* has its own digits, so it exercises strictly more of the
+/// layout than Hebrew does. Hebrew's own case is covered by content — the
+/// mixed-direction thread carries it — rather than by chrome.
+///
+/// 2.0× and 0.85× are the ends of the range the phase names. The large end is
+/// where clipping and overflow live; the small end is where a container sized
+/// for its text stops being tall enough to hold a 48dp tap target.
+const weftAccessibilityVariants = <WeftGoldenVariant>[
+  WeftGoldenVariant(name: 'rtl', locale: Locale('ar')),
+  WeftGoldenVariant(name: 'large_text', textScale: 2.0),
+  WeftGoldenVariant(name: 'small_text', textScale: 0.85),
+  WeftGoldenVariant(name: 'high_contrast', highContrast: true),
+];
+
 /// Pumps [child] inside a themed [ProviderScope] at a fixed logical size.
 ///
 /// [repository] and [fileReader] are named rather than a general overrides list
@@ -164,12 +229,17 @@ String? _flutterRoot() {
 /// to state what the homeserver would have said — which is also the only way to
 /// pin a scene the account cannot be put into on demand, like "no backup and
 /// nowhere else signed in".
+///
+/// [variant] is the accessibility condition — locale, text scale and contrast.
+/// It defaults to [weftGoldenBaseline], which is what every golden taken before
+/// Phase 08 was captured under.
 Future<void> pumpWeft(
   WidgetTester tester,
   Widget child, {
   Size size = const Size(1400, 900),
   WeftThemeMode mode = WeftThemeMode.dark,
   Color seed = WeftTheme.defaultSeed,
+  WeftGoldenVariant variant = weftGoldenBaseline,
   ChatRepository? repository,
   AttachmentBytesLoader? fileReader,
   WeftStores? stores,
@@ -180,6 +250,7 @@ Future<void> pumpWeft(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
+  await _applyLocale(variant.locale);
 
   await tester.pumpWidget(
     ProviderScope(
@@ -193,8 +264,14 @@ Future<void> pumpWeft(
         ),
         if (fileReader != null)
           attachmentFileReaderProvider.overrideWithValue(fileReader),
-        if (stores != null)
+        // Both faces of the same store. `storesProvider` is the synchronous one
+        // and throws while the bootstrap future is pending, so a screen that
+        // reads settings in `initState` — search and every settings screen do —
+        // needs the value override as well as the future.
+        if (stores != null) ...[
+          storesProvider.overrideWithValue(stores),
           storesBootstrapProvider.overrideWith((ref) async => stores),
+        ],
         // The provider this replaces reaches for a live Matrix session, so a
         // scene that wants a card has to bring its own answers rather than let
         // the real one be read.
@@ -206,7 +283,29 @@ Future<void> pumpWeft(
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: WeftAppearance(mode: mode, seed: seed).themeFor(Brightness.dark),
+        // The three lines `main.dart` carries, for the reason it carries them:
+        // `Directionality` has no other source, so without the delegates a
+        // golden asked for in Arabic would be an English-looking image with an
+        // Arabic filename — a passing test of nothing.
+        locale: variant.locale,
+        localizationsDelegates: weftLocalizationsDelegates,
+        supportedLocales: weftSupportedLocales,
+        theme: WeftAppearance(mode: mode, seed: seed).themeFor(
+          Brightness.dark,
+          highContrast: variant.highContrast,
+        ),
+        // Under the navigator rather than over the app, which is where the app
+        // itself reads these: a `MediaQuery` above `MaterialApp` is rebuilt
+        // from the view by `MediaQuery.fromView`, so a text scaler set there
+        // reaches the tree only by the platform-data back door and a route
+        // pushed later would not see it at all.
+        builder: (context, app) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(variant.textScale),
+            highContrast: variant.highContrast,
+          ),
+          child: app ?? const SizedBox.shrink(),
+        ),
         home: child,
       ),
     ),
@@ -215,6 +314,26 @@ Future<void> pumpWeft(
   // Settle the entry animations rather than capturing them mid-flight, which
   // would make every golden non-deterministic.
   await tester.pumpAndSettle(const Duration(milliseconds: 50));
+}
+
+/// Points `intl` at [locale] for the duration of one test.
+///
+/// Every `DateFormat` in Weft is built without a locale and reads
+/// `Intl.defaultLocale`, which `main` sets from the resolved locale — so a
+/// golden that mirrored the layout and left the clock in English would be an
+/// image of a screen the app never draws. [applyFormattingLocale] is the app's
+/// own function, and it is guarded on the symbol data having been loaded:
+/// `main` awaits [initializeDateFormatting] and a widget test does not, so the
+/// load happens here.
+///
+/// Restored on teardown because `Intl.defaultLocale` is global. A suite that
+/// left it at `ar` would hand the next file's goldens Arabic-Indic timestamps,
+/// and the failure would land in whichever test happened to run next.
+Future<void> _applyLocale(Locale locale) async {
+  await initializeDateFormatting(locale.languageCode);
+  final previous = Intl.defaultLocale;
+  addTearDown(() => Intl.defaultLocale = previous);
+  applyFormattingLocale(locale);
 }
 
 /// Decodes [provider] into the shared image cache before a golden is pumped.

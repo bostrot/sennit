@@ -1037,6 +1037,106 @@ Covered by `apps/weft/test/a11y/semantics_test.dart` (72),
 
 ---
 
+## Golden variants — resolved by task 8
+
+`pumpWeft` takes a `WeftGoldenVariant` now — a locale, a text scale and a
+high-contrast flag — and `weftAccessibilityVariants` is the four the phase
+names: `ar`, 2.0×, 0.85× and high contrast. `apps/weft/test/goldens/a11y_golden_test.dart`
+runs five scenes through all four in both themes: **40 new images**, named
+`a11y_<scene>_<variant>_<theme>.png`. The pre-existing 20 pairs are byte-identical —
+the scaler is applied at 1.0× as well, and the arithmetic is the identity there.
+
+The harness also gained the app's own `localizationsDelegates` and
+`supportedLocales`, and calls `applyFormattingLocale` with the variant's locale.
+Both are load-bearing rather than tidiness: without the delegates `Directionality`
+resolves left-to-right for every locale, so an image asked for in Arabic would be
+an English-looking screen with an Arabic filename — a passing test of nothing.
+
+### What the images show
+
+| ID | Resolution |
+|---|---|
+| CROSS-7 | Closed. Four variants in the harness, five scenes, both themes |
+| SCALE-2 | **Verified correct in the 2.0× image.** `InputDecorator` sizes its container to the *hint* when `isEmpty` is true, so the fake field grows and the placeholder wraps to two lines. The `SizedBox(height: 20)` is the notional input, and it is never the taller of the two |
+| SCALE-3 | Verified correct — icon-only box, as the register said |
+| SCALE-4 | **Fixed.** `height: 20` around an 11dp count: at 2.0× the digits are 22dp and the badge drew them with the tops and bottoms sliced off. Now `WeftUnreadBadge`, whose minimum is `textScaler.scale(extent)` on both axes |
+| SCALE-5 | **Fixed**, same defect and now the same widget — `height: 18` around a 10dp count. Clamped to 1.3× on the rail alone: see below |
+| SCALE-6 | Verified correct — glyph-sized, as the register said |
+| SCALE-7 | **Verified correct in the 2.0× image, by a mechanism the register did not know about.** `AppBar` clamps its toolbar's text scaling, so `titleMedium` + `labelSmall` never exceed ~44dp inside the fixed 64. The clamp is the SDK's, applies to every Flutter app, and overriding it would make Weft's app bar the odd one out |
+| SCALE-8 | **Not exercised.** The waveform's 60dp allowance needs a voice message, and none of the five scenes has one — see below |
+| SCALE-9 | **Judged, not changed.** At 2.0× a 520dp bubble is a narrow column of large text, which is what every messenger does with a width cap; the alternative is a full-width line at 32dp, which is worse to read. The 600dp chat window makes the cap non-binding in these images anyway |
+| SCALE-10 | Verified correct — decoration, as the register said |
+| SCALE-11 | **Not exercised.** The verification screen is not one of the five scenes |
+| SCALE-12 | Verified correct — icon-only, as the register said |
+| SCALE-13 | Closed by task 4 |
+| SCALE-14 | Verified correct — ellipsised, as the register said |
+| SCALE-15 | Verified correct — a video surface, as the register said |
+| SCALE-16 | **Not exercised.** A list marker needs a formatted body with a list in it, and the mixed-direction thread is plain text |
+
+**SCALE-8, SCALE-11 and SCALE-16 are open**, and what blocks them is scope
+rather than difficulty: the phase names five scenes — inbox, mixed-direction
+chat, composer in reply mode, search and settings — and those three findings
+live on a voice bubble, the verification screen and a formatted body, none of
+which appears in any of them. None is a golden question. Each is "does this box
+still hold its text at 2.0×", which
+`packages/weft_design/test/text_scale_test.dart` already answers for SCALE-1, 4
+and 5 by measuring rects — three assertions in that shape close them, and task 9
+should write them there rather than add three more scenes.
+
+### Two findings this document did not have
+
+- **A search result took the locale's direction rather than its own.** Visible
+  in `a11y_search_rtl_light.png` as `?did the roof people ever send the quote` —
+  the bidi algorithm correctly laying out an English sentence in a right-to-left
+  paragraph, given a paragraph it should never have been in. A result snippet is
+  message content, so it resolves its own direction the way a bubble and a chat
+  tile already do; the attribution line under it does too, since a Hebrew sender
+  in an English UI is the same bug mirrored. Pinned in `rtl_test.dart` rather
+  than only by the image, because a golden diff is an unreadable way to report a
+  misplaced question mark.
+- **Fixing SCALE-5 made the rail badge swallow the icon it counts for.** The
+  first fix let the pill grow with the text; at 2.0× that is 36dp of badge over
+  a 36dp brand glyph in a 76dp rail, neither of which scales — a clipped number
+  traded for an unidentifiable network. The rail's badge is clamped to 1.3×,
+  which is the only clamp in the app and is stated at the call site. The chat
+  row's badge has a column of its own and is deliberately unclamped.
+
+### Three things later tasks must not get wrong
+
+- **A `MediaQuery` above `MaterialApp` is not where a text scaler goes.**
+  `MediaQuery.fromView` rebuilds the data from the view, so a scaler set above
+  the app reaches the tree only through the platform-data back door and a route
+  pushed later does not see it at all. `pumpWeft` sets it in the app's
+  `builder`, which is where the app itself reads these.
+- **`Intl.defaultLocale` is global and the harness restores it.** A suite that
+  left it at `ar` would hand the *next* file's goldens Arabic-Indic timestamps,
+  and the failure would land in whichever test happened to run next. Anything
+  that adds a locale-varying golden must keep the teardown.
+- **The right-to-left images have no right-to-left glyphs, on purpose.** The
+  SDK's Roboto covers zero of the 112 Hebrew codepoints and zero of the 256
+  Arabic ones, so every RTL word draws as a placeholder box — the same trade
+  `rich_content_golden_test.dart` makes for emoji, and for the same reason:
+  reaching for a host font would make the images depend on which machine took
+  them. Bidi resolution happens before shaping, so direction is still legible in
+  the boxes' *arrangement*, which is the whole claim. Reading the words is
+  **task 10's** device pass, not something to "fix" by vendoring a font.
+
+### The one thing an RTL image shows that is not being fixed
+
+Weft's untranslated English chrome renders with displaced punctuation under an
+RTL locale — `.Every network, one thread`, `results 3`, `.Keyword search only…`.
+This is the bidi algorithm being correct: an English sentence in a right-to-left
+paragraph puts its trailing full stop on the left. Pinning those strings to LTR
+would un-mirror their alignment and would be wrong the day they are translated,
+so the fix is the string extraction task 6 deferred, and this is one more reason
+to do it. Recorded here so task 9 does not read the images as a layout defect.
+
+Covered by `apps/weft/test/goldens/a11y_golden_test.dart` (20 tests, 40 images),
+`packages/weft_design/test/text_scale_test.dart` (13 new) and
+`apps/weft/test/a11y/rtl_test.dart` (1 new).
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1615,10 +1715,21 @@ One, **TAP-15**, is resolved by moving the affordance rather than growing it,
 since a 10dp run inside a metadata line cannot reach 48dp without pushing every
 edited bubble apart; the edit history is a row in the message actions sheet now.
 
-Still **open**: the golden variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed
-early in task 4 because it was one line from a change already being made). Task
-9 re-reads this file and marks each remaining one fixed or deferred with a
-reason.
+**CROSS-7 and twelve of the fifteen remaining text-scale findings are now
+closed** by the golden variants (task 8 — see
+[Golden variants — resolved by task 8](#golden-variants--resolved-by-task-8)).
+Two were real clipping — SCALE-4 and SCALE-5, the same defect twice, now one
+`WeftUnreadBadge`; SCALE-9 was judged and deliberately left; the other nine pass
+in the 2.0× images, two of them (SCALE-2, SCALE-7) by a mechanism the register
+did not know about and had guessed wrong.
+
+Still **open**: SCALE-8, SCALE-11 and SCALE-16 — the waveform's duration
+allowance, the verification screen's emoji cell and the list marker in a
+formatted body. What blocks them is scope, not difficulty: none appears in any
+of the five scenes the phase names, and none is a golden question. Three rect
+assertions in `packages/weft_design/test/text_scale_test.dart`, in the shape
+SCALE-1, 4 and 5 already use there, close them. Task 9 re-reads this file and
+marks each remaining finding fixed or deferred with a reason.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task

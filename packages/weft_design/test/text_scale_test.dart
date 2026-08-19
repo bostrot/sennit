@@ -68,6 +68,110 @@ void main() {
     }
   });
 
+  group('the unread badge grows with the count inside it', () {
+    // The mirror image of the group above, and the reason both are worth
+    // pinning: a *mark* sized from its box must not scale, and a *number* must,
+    // along with the pill around it. The two badges were the same defect twice
+    // — `height: 20` on the chat row, `height: 18` on the rail — which at 2.0×
+    // put 22dp and 20dp of digits in boxes that had not moved and sliced the
+    // tops and bottoms off both. That is SCALE-4 and SCALE-5, and it was found
+    // by looking at `a11y_inbox_large_text_dark.png`.
+    for (final scale in [0.85, 1.0, 1.3, 2.0]) {
+      for (final count in [3, 27, 128]) {
+        testWidgets('$count at ${scale}x', (tester) async {
+          await pump(
+            tester,
+            WeftUnreadBadge(
+              count: count,
+              color: const Color(0xFFB9A3FF),
+              ink: const Color(0xFF1B1140),
+            ),
+            scale,
+          );
+
+          final pill = tester.getRect(find.byType(WeftUnreadBadge));
+          final digits = tester.getRect(find.text(count > 99 ? '99+' : '$count'));
+
+          expect(
+            pill.inflate(0.5).contains(digits.topLeft) &&
+                pill.inflate(0.5).contains(digits.bottomRight),
+            isTrue,
+            reason: 'digits $digits escaped the badge $pill at ${scale}x',
+          );
+          // Still a pill rather than a squashed oval: the minimum is square, so
+          // a one-digit count is a circle at every scale.
+          expect(pill.width, greaterThanOrEqualTo(pill.height - 0.5));
+        });
+      }
+    }
+
+    testWidgets('and is pixel-identical at 1.0× to the box it replaced', (
+      tester,
+    ) async {
+      // The scaler is applied at 1.0× too, so this asserts the arithmetic is
+      // the identity there — which is what keeps every inbox golden taken
+      // before this widget existed unmoved. Measured against the recipe the two
+      // call sites carried, rebuilt here, rather than against numbers typed out
+      // of the old source: the width depends on the font, so a literal would be
+      // a different assertion on a machine with a different Roboto.
+      Widget legacy({
+        required double extent,
+        required double fontSize,
+        required double horizontal,
+        Color? border,
+      }) => Container(
+        constraints: BoxConstraints(minWidth: extent),
+        height: extent,
+        padding: EdgeInsets.symmetric(horizontal: horizontal),
+        decoration: BoxDecoration(
+          borderRadius: WeftRadius.pill,
+          border: border == null ? null : Border.all(color: border, width: 2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '27',
+          style: TextStyle(fontSize: fontSize, height: 1),
+        ),
+      );
+
+      for (final (badge, old) in [
+        (
+          const WeftUnreadBadge(
+            count: 27,
+            color: Color(0xFFB9A3FF),
+            ink: Color(0xFF1B1140),
+          ),
+          legacy(extent: 20, fontSize: 11, horizontal: 6),
+        ),
+        (
+          const WeftUnreadBadge(
+            count: 27,
+            color: Color(0xFFB9A3FF),
+            ink: Color(0xFF1B1140),
+            extent: 18,
+            fontSize: 10,
+            horizontalPadding: 5,
+            borderColor: Color(0xFF101014),
+          ),
+          legacy(
+            extent: 18,
+            fontSize: 10,
+            horizontal: 5,
+            border: const Color(0xFF101014),
+          ),
+        ),
+      ]) {
+        // A `Row` because that is what both call sites are underneath, and it
+        // is what leaves the badge's width unbounded — the constraint the old
+        // `Container(alignment:)` silently depended on.
+        await pump(tester, Row(children: [badge]), 1);
+        final now = tester.getSize(find.byType(WeftUnreadBadge));
+        await pump(tester, Row(children: [old]), 1);
+        expect(now, tester.getSize(find.byType(Container).last));
+      }
+    });
+  });
+
   testWidgets('real text still scales — only the marks opt out', (
     tester,
   ) async {

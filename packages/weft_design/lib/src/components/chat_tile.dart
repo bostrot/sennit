@@ -7,6 +7,7 @@ import '../semantics.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'network_glyph.dart';
+import 'unread_badge.dart';
 import 'weft_avatar.dart';
 
 /// One conversation in the inbox.
@@ -283,24 +284,10 @@ class _ChatTileState extends State<ChatTile> {
           ),
         const SizedBox(height: WeftSpace.sm),
         if (chat.unreadCount > 0)
-          Container(
-            constraints: const BoxConstraints(minWidth: 20),
-            height: 20,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              color: palette.unreadDot,
-              borderRadius: WeftRadius.pill,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              chat.unreadCount > 99 ? '99+' : '${chat.unreadCount}',
-              style: TextStyle(
-                color: context.colors.onPrimary,
-                fontSize: 11,
-                height: 1,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          WeftUnreadBadge(
+            count: chat.unreadCount,
+            color: palette.unreadDot,
+            ink: context.colors.onPrimary,
           ),
       ],
     );

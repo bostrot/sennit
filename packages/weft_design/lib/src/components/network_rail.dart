@@ -5,6 +5,7 @@ import '../focus.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'network_glyph.dart';
+import 'unread_badge.dart';
 
 /// The left rail: which networks' conversations the inbox shows.
 ///
@@ -344,31 +345,25 @@ class _UnreadBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    return AnimatedSwitcher(
-      duration: context.motion.fast,
-      transitionBuilder: (child, animation) =>
-          ScaleTransition(scale: animation, child: child),
-      child: Container(
-        key: ValueKey(count),
-        constraints: const BoxConstraints(minWidth: 18),
-        height: 18,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        decoration: BoxDecoration(
-          color: colors.error,
-          borderRadius: WeftRadius.pill,
-          border: Border.all(color: context.palette.railBackground, width: 2),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          count > 99 ? '99+' : '$count',
-          style: TextStyle(
-            color: colors.onError,
-            fontSize: 10,
-            height: 1,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    // Clamped, and the only badge in the app that is. This one is an overlay on
+    // a 36dp brand glyph inside a 76dp rail, and neither of those grows with
+    // text — so an unclamped pill at 2.0× is 36dp and covers the icon it is
+    // counting for completely, which trades a clipped number for an
+    // unidentifiable network. 1.3× is a little over half the growth and still
+    // leaves the glyph readable underneath. The chat row's badge has a column
+    // of its own and is deliberately not clamped.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: WeftUnreadBadge(
+        count: count,
+        color: context.colors.error,
+        ink: context.colors.onError,
+        extent: 18,
+        fontSize: 10,
+        horizontalPadding: 5,
+        // The badge overlaps the icon it counts for; without the ring a red
+        // pill over a red brand glyph has no edge.
+        borderColor: context.palette.railBackground,
       ),
     );
   }

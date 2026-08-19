@@ -8,13 +8,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart' show DateFormat, Intl;
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_domain/weft_domain.dart';
+
 import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
+import 'package:weft/app/stores.dart';
 import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft/features/inbox/inbox_shell.dart';
+import 'package:weft/features/search/search_screen.dart';
 
 import '../support/seeded_repository.dart';
 
@@ -49,6 +53,7 @@ void main() {
     Widget home, {
     required Locale locale,
     ChatRepository? repository,
+    WeftStores? stores,
     Size size = const Size(1000, 900),
   }) async {
     tester.view.physicalSize = size;
@@ -59,6 +64,13 @@ void main() {
       ProviderScope(
         overrides: [
           chatRepositoryProvider.overrideWithValue(repository ?? demo),
+          // Both faces of the same store: `storesProvider` throws while the
+          // bootstrap future is pending, and search reads it on its first
+          // build.
+          if (stores != null) ...[
+            storesProvider.overrideWithValue(stores),
+            storesBootstrapProvider.overrideWith((ref) async => stores),
+          ],
         ],
         child: MaterialApp(
           theme: WeftTheme.build(),
@@ -194,6 +206,46 @@ void main() {
       );
 
       expect(paintedDirection(tester, 'on my way'), TextDirection.ltr);
+    });
+
+    testWidgets('and so does a search result listing one', (tester) async {
+      // A result snippet is message content, not chrome, and it was the one
+      // place still taking the locale's direction — found by looking at
+      // `a11y_search_rtl_*.png`, where an English snippet listed in an Arabic
+      // UI rendered as "?did the roof people ever send the quote". The bidi
+      // algorithm was right and the paragraph it was given was wrong.
+      final stores = WeftStores.inMemory();
+      addTearDown(stores.dispose);
+      stores.search.indexMessage(
+        WeftMessage(
+          eventId: r'$quote',
+          roomId: '!room:example.org',
+          network: ChatNetwork.telegram,
+          senderId: '@lena:example.org',
+          senderName: 'Lena Okafor',
+          timestamp: DateTime(2026, 8, 18, 14, 32),
+          kind: MessageKind.text,
+          isOwn: false,
+          body: 'did the roof people ever send the quote?',
+        ),
+        chatId: 'merged:anna',
+        chatTitle: 'The Thursday plan',
+      );
+
+      await pumpIn(
+        tester,
+        const SearchScreen(initialQuery: 'roof'),
+        locale: const Locale('ar'),
+        stores: stores,
+      );
+
+      expect(
+        paintedDirection(tester, 'did the roof people ever send the quote?'),
+        TextDirection.ltr,
+      );
+      // The attribution line under it is content too — a Hebrew sender in an
+      // English UI has the same problem in the other direction.
+      expect(paintedDirection(tester, 'Lena Okafor'), TextDirection.ltr);
     });
   });
 

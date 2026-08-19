@@ -204,6 +204,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       itemBuilder: (context, i) {
         final result = _results[i];
         final when = DateFormat.yMMMd().add_Hm().format(result.timestamp);
+        final attribution = result.senderName.trim().isEmpty
+            ? when
+            : '${result.senderName} · $when';
         void open() {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
@@ -233,8 +236,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               // here is noise.
               semanticsLabel: '',
             ),
+            // A result is message content, so it resolves its own direction the
+            // way a bubble and a chat tile do — not the locale's. An English
+            // snippet listed in an Arabic UI otherwise reads
+            // "?did the roof people ever send the quote", which is the bidi
+            // algorithm correctly laying out an English sentence in a
+            // right-to-left paragraph and is not what the sender wrote.
             title: Text(
               result.body,
+              textDirection: textDirectionOf(result.body),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -245,9 +255,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 // to understand.
                 Flexible(
                   child: Text(
-                    result.senderName.trim().isEmpty
-                        ? when
-                        : '${result.senderName} · $when',
+                    attribution,
+                    textDirection: textDirectionOf(attribution),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
