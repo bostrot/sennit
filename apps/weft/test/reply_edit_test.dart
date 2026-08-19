@@ -354,10 +354,15 @@ void main() {
 
       expect(find.textContaining('edited'), findsOneWidget);
 
-      await tester.tap(find.textContaining('edited'));
-      await tester.pumpAndSettle();
+      // Through the action sheet, not through the marker. The marker used to
+      // be the only door to the history and it is a 10dp italic run — TAP-15,
+      // the smallest tap target in the app, and one a line of running text
+      // cannot be grown out of. It says where the versions went; the sheet
+      // holds them, beside every other operation on a message.
+      await longPressBubble(tester, 'Sounds great');
+      await chooseAction(tester, 'Edit history');
 
-      expect(find.text('Edit history'), findsOneWidget);
+      expect(find.text('Edit history'), findsWidgets);
       expect(find.text('Original'), findsOneWidget);
       expect(find.text('Current'), findsOneWidget);
       // Both versions are in the sheet: the words that were replaced exist

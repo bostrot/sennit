@@ -395,6 +395,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
         await _transcribe(message);
       case MessageAction.retranscribe:
         await _retranscribe(message);
+      case MessageAction.editHistory:
+        if (mounted) await showEditHistorySheet(context, message: message);
     }
   }
 
@@ -711,10 +713,6 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                     tally: tally,
                                     nameFor: _nameFor,
                                   ),
-                              onShowEditHistory: () => showEditHistorySheet(
-                                context,
-                                message: message,
-                              ),
                               onTapLink: _openLink,
                               onTapMention: _openMention,
                               showNetwork: chat.isMerged,
@@ -1288,7 +1286,6 @@ class _MessageBubble extends StatelessWidget {
     this.onToggleReaction,
     this.onAddReaction,
     this.onShowReactionSenders,
-    this.onShowEditHistory,
     this.onTapLink,
     this.onTapMention,
   });
@@ -1310,9 +1307,6 @@ class _MessageBubble extends StatelessWidget {
   final ValueChanged<ReactionTally>? onToggleReaction;
   final VoidCallback? onAddReaction;
   final ValueChanged<ReactionTally>? onShowReactionSenders;
-
-  /// Tap-through on the "edited" marker.
-  final VoidCallback? onShowEditHistory;
 
   final void Function(String url, String label)? onTapLink;
   final void Function(RichMention mention)? onTapMention;
@@ -1541,11 +1535,7 @@ class _MessageBubble extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             if (message.isEdited && !message.redacted) ...[
-                              _EditedMarker(
-                                message: message,
-                                own: own,
-                                onTap: onShowEditHistory,
-                              ),
+                              _EditedMarker(message: message, own: own),
                               const SizedBox(width: WeftSpace.xs),
                             ],
                             // The time and the tick are one clause — "Sent
@@ -1643,39 +1633,42 @@ class _MessageBubble extends StatelessWidget {
 /// marker rather than an added icon: the row it sits in is already the busiest
 /// eight pixels of the bubble.
 class _EditedMarker extends StatelessWidget {
-  const _EditedMarker({required this.message, required this.own, this.onTap});
+  const _EditedMarker({required this.message, required this.own});
 
   final WeftMessage message;
   final bool own;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final ink = palette.mutedOnBubble(own);
     final editedAt = message.editedAt;
-    // Only when there is history to show. A message mapped outside an open
-    // timeline knows it was edited and has no versions to open — offering the
-    // sheet there would open an empty one, so there is nothing to announce as
-    // a button either.
-    final openable = message.editHistory.isNotEmpty && onTap != null;
+    final hasHistory = message.editHistory.isNotEmpty;
 
     return Tooltip(
-      message: openable ? 'Show edit history' : 'This message was edited',
+      message: hasHistory
+          ? 'Edited — the versions are in the message actions'
+          : 'This message was edited',
       excludeFromSemantics: true,
-      // Its own node, not a fragment merged into the words above it: it is a
-      // control, and a control that shares a node with the message body cannot
-      // be reached separately from it — by a reader or by Tab.
-      child: WeftFocusable(
-        button: openable,
-        onTap: openable ? onTap : null,
+      // A statement, not a control. It used to open the edit history on tap,
+      // which made a 10dp italic run the entire target for the operation
+      // (TAP-15) — and a run of text inside a metadata line cannot be grown to
+      // 48dp without pushing the bubble apart. The history moved to the
+      // message actions sheet, where the other eight operations on a message
+      // already are and where the keyboard can reach it.
+      //
+      // Still its own node rather than a fragment merged into the words above
+      // it: "edited at 13:58" qualifies the message, and a reader who meets it
+      // inside the paragraph cannot tell it apart from something that was said.
+      child: Semantics(
+        container: true,
+        excludeSemantics: true,
         label: semanticsSentence([
           editedAt == null
               ? 'Edited'
               : 'Edited at ${DateFormat.Hm().format(editedAt)}',
-          if (openable) 'show edit history',
+          if (hasHistory) 'versions in the message actions',
         ]),
-        borderRadius: WeftRadius.allXs,
         child: Text(
           editedAt == null
               ? 'edited'
@@ -1684,10 +1677,6 @@ class _EditedMarker extends StatelessWidget {
             fontSize: 10,
             fontStyle: FontStyle.italic,
             color: ink,
-            decoration: message.editHistory.isEmpty
-                ? null
-                : TextDecoration.underline,
-            decorationColor: ink,
           ),
         ),
       ),

@@ -484,7 +484,10 @@ class _NetworkRow extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: SegmentedButton<_NetworkMode>(
             showSelectedIcon: false,
-            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+            // No compact density. It took 8dp off each axis of the segments'
+            // tap targets, leaving three 40dp buttons — three adjacent choices
+            // where the neighbour of "Muted" is "Off", and a miss silences a
+            // network rather than quieting it.
             segments: [
               for (final option in _NetworkMode.values)
                 ButtonSegment(

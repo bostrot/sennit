@@ -21,6 +21,16 @@ enum MessageAction {
   delete,
   transcribe,
   retranscribe,
+
+  /// The versions of a message that has been edited.
+  ///
+  /// Here rather than only on the "edited" marker under the bubble. That marker
+  /// is a 10dp italic run inside a metadata line — TAP-15, the smallest target
+  /// in the app by a distance — and a line of running text cannot be grown to
+  /// 48dp without pushing the bubble apart. So the affordance moved to where
+  /// every other operation on a message already lives, which also makes it the
+  /// first one reachable from a keyboard.
+  editHistory,
 }
 
 /// The sheet's answer: what to do, and for [MessageAction.react], with what.
@@ -130,15 +140,21 @@ class _MessageActionsSheet extends StatelessWidget {
                           label: 'React with $key',
                           excludeSemantics: true,
                           onTap: () => choose(MessageAction.react, emoji: key),
-                          child: InkWell(
-                            onTap: () =>
-                                choose(MessageAction.react, emoji: key),
-                            borderRadius: WeftRadius.pill,
-                            child: Padding(
-                              padding: const EdgeInsets.all(WeftSpace.sm),
-                              child: Text(
-                                key,
-                                style: const TextStyle(fontSize: 24),
+                          // A glyph plus 8dp of padding is 50dp tall and 27dp
+                          // wide — tall enough and half as wide as it needs to
+                          // be, in a row of six identical neighbours where the
+                          // cost of missing is sending the wrong reaction.
+                          child: WeftTapTarget(
+                            child: InkWell(
+                              onTap: () =>
+                                  choose(MessageAction.react, emoji: key),
+                              borderRadius: WeftRadius.pill,
+                              child: Padding(
+                                padding: const EdgeInsets.all(WeftSpace.sm),
+                                child: Text(
+                                  key,
+                                  style: const TextStyle(fontSize: 24),
+                                ),
                               ),
                             ),
                           ),
@@ -174,6 +190,12 @@ class _MessageActionsSheet extends StatelessWidget {
                   title: const Text('Forward'),
                   onTap: () => choose(MessageAction.forward),
                 ),
+                if (message.editHistory.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.history_rounded),
+                    title: const Text('Edit history'),
+                    onTap: () => choose(MessageAction.editHistory),
+                  ),
                 if (canTranscribe && !hasTranscript)
                   ListTile(
                     leading: const Icon(Icons.graphic_eq_rounded),

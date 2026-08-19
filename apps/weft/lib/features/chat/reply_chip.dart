@@ -74,67 +74,72 @@ class ReplyChip extends StatelessWidget {
           'on ${preview.network!.label}',
         preview.isStub ? 'not loaded yet' : _body,
       ]),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: WeftSpace.xs),
-        child: Material(
-          color: ink.withValues(alpha: 0.10),
-          borderRadius: WeftRadius.allSm,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Container(
-              constraints: BoxConstraints(maxWidth: compact ? 640 : 496),
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                WeftSpace.sm,
-                WeftSpace.xs,
-                WeftSpace.sm,
-                WeftSpace.xs,
-              ),
-              decoration: BoxDecoration(
-                border: BorderDirectional(
-                  start: BorderSide(color: accent, width: 3),
+      // Four dp short of the guideline on a one-line quote, and the chip is
+      // the only way back to the message being answered — so it is the target
+      // someone chasing a thread hits most often and misses most often.
+      child: WeftTapTarget(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+          child: Material(
+            color: ink.withValues(alpha: 0.10),
+            borderRadius: WeftRadius.allSm,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Container(
+                constraints: BoxConstraints(maxWidth: compact ? 640 : 496),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  WeftSpace.sm,
+                  WeftSpace.xs,
+                  WeftSpace.sm,
+                  WeftSpace.xs,
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (preview.network != null) ...[
-                        NetworkGlyph(network: preview.network!, size: 11),
-                        const SizedBox(width: WeftSpace.xs),
-                      ],
-                      Flexible(
-                        child: Text(
-                          _title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.text.labelSmall?.copyWith(
-                            color: preview.isStub
-                                ? palette.muted(ink, fill, alpha: 0.6)
-                                : titleInk,
-                            fontWeight: FontWeight.w700,
+                decoration: BoxDecoration(
+                  border: BorderDirectional(
+                    start: BorderSide(color: accent, width: 3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (preview.network != null) ...[
+                          NetworkGlyph(network: preview.network!, size: 11),
+                          const SizedBox(width: WeftSpace.xs),
+                        ],
+                        Flexible(
+                          child: Text(
+                            _title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.text.labelSmall?.copyWith(
+                              color: preview.isStub
+                                  ? palette.muted(ink, fill, alpha: 0.6)
+                                  : titleInk,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    _body,
-                    maxLines: compact ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodySmall?.copyWith(
-                      color: palette.muted(
-                        ink,
-                        fill,
-                        alpha: preview.isStub ? 0.55 : 0.8,
-                      ),
-                      fontStyle: _placeholder ? FontStyle.italic : null,
+                      ],
                     ),
-                  ),
-                ],
+                    Text(
+                      _body,
+                      maxLines: compact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodySmall?.copyWith(
+                        color: palette.muted(
+                          ink,
+                          fill,
+                          alpha: preview.isStub ? 0.55 : 0.8,
+                        ),
+                        fontStyle: _placeholder ? FontStyle.italic : null,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

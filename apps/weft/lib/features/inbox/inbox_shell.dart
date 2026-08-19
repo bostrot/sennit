@@ -535,25 +535,39 @@ class _SearchField extends StatelessWidget {
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const SearchScreen()));
 
-    return Semantics(
-      button: true,
-      // Excluding the subtree is what removes the phantom text field, and it
-      // takes the `InkWell`'s tap action with it — so the action is restated
-      // on the node that replaces it.
-      excludeSemantics: true,
+    // `WeftFocusable` rather than a bare `Semantics`, because excluding the
+    // subtree — which is what removes the phantom text field — takes the
+    // `InkWell`'s *focus* semantics with it as well as its tap. Tab still
+    // stopped here and the node it stopped on had no name, so the one control
+    // between the rail and the list was a silent stop on the way past. The
+    // shared widget carries the label, the focus node, the ring and
+    // Enter/Space together, which is the point of it.
+    return WeftFocusable(
       onTap: open,
       label: 'Search all conversations',
+      borderRadius: WeftRadius.allMd,
       child: Tooltip(
         message: 'Search all conversations',
         excludeFromSemantics: true,
         child: InkWell(
           borderRadius: WeftRadius.allMd,
+          // The ripple stays; the focus does not. Two focusables over the same
+          // box would be two Tab stops on one control, and the ring belongs to
+          // the one that carries the name.
+          canRequestFocus: false,
           onTap: open,
           child: InputDecorator(
             decoration: const InputDecoration(
               hintText: 'Search all conversations',
               prefixIcon: Icon(Icons.search_rounded, size: 20),
             ),
+            // Without this the hint is never painted: `isEmpty` defaults to
+            // false, which tells the decorator the field it is dressing has
+            // content, and a hint over content would be unreadable. There is no
+            // field and no content, so the box drew a magnifier and nothing
+            // else — the placeholder was in the tree at zero opacity, which is
+            // why the contrast sweep found a run of 16dp text at 1:1.
+            isEmpty: true,
             child: const SizedBox(height: 20),
           ),
         ),

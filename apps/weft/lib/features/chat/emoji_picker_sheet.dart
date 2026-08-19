@@ -130,8 +130,6 @@ class _EmojiWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: WeftSpace.xs,
-      runSpacing: WeftSpace.xs,
       children: [
         for (final key in emoji)
           // `button: true` is the whole of it: the cell was an `InkWell` over a
@@ -142,12 +140,18 @@ class _EmojiWrap extends StatelessWidget {
             label: key,
             excludeSemantics: true,
             onTap: () => onPick(key),
-            child: InkWell(
-              onTap: () => onPick(key),
-              borderRadius: WeftRadius.allSm,
-              child: Padding(
-                padding: const EdgeInsets.all(WeftSpace.xs),
-                child: Text(key, style: const TextStyle(fontSize: 26)),
+            // 20dp wide before this, in a grid of hundreds where every
+            // neighbour is a different reaction. The glyph still paints at 26;
+            // what grows is the box around it, and the `Wrap`'s own spacing is
+            // dropped below because the padding now provides it.
+            child: WeftTapTarget(
+              child: InkWell(
+                onTap: () => onPick(key),
+                borderRadius: WeftRadius.allSm,
+                child: Padding(
+                  padding: const EdgeInsets.all(WeftSpace.xs),
+                  child: Text(key, style: const TextStyle(fontSize: 26)),
+                ),
               ),
             ),
           ),

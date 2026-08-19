@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +55,64 @@ List<String> liveRegionsIn(WidgetTester tester) {
 
   walk(_root(tester));
   return labels;
+}
+
+/// Every control on screen, by the name a screen reader would give it.
+///
+/// A control is a node offering a tap — the same definition
+/// [LabeledTapTargetGuideline] uses, and for the same reason: it is what the
+/// platform's accessibility layer will let a user activate. Text fields are
+/// left out because they are reached and operated differently, and links
+/// because they are reached through the text they sit in.
+///
+/// The name falls back to the tooltip, which is where an `IconButton` puts it.
+List<String> controlNamesIn(WidgetTester tester) {
+  final names = <String>[];
+  void walk(SemanticsNode node) {
+    final data = node.getSemanticsData();
+    final interactive =
+        data.hasAction(SemanticsAction.tap) && !data.flagsCollection.isLink;
+    final hidden =
+        node.isInvisible ||
+        data.flagsCollection.isHidden ||
+        data.flagsCollection.isTextField ||
+        // A control that says it is off is not one a keyboard has to reach.
+        data.flagsCollection.isEnabled == Tristate.isFalse;
+    final name = data.label.isNotEmpty ? data.label : data.tooltip;
+    if (interactive && !hidden && name.isNotEmpty) names.add(name);
+    node.visitChildren((child) {
+      walk(child);
+      return true;
+    });
+  }
+
+  walk(_root(tester));
+  return names;
+}
+
+/// The name of the node the framework currently reports as focused.
+///
+/// Read off the semantics tree rather than off [FocusManager], because the two
+/// answer different questions: the focus tree knows *a node* has focus and the
+/// semantics tree knows what that node is called. A control Tab lands on and a
+/// control a screen reader can name are not automatically the same control —
+/// which was the whole of the audit's CROSS-3.
+String? focusedNameIn(WidgetTester tester) {
+  String? found;
+  void walk(SemanticsNode node) {
+    final data = node.getSemanticsData();
+    if (found == null && data.flagsCollection.isFocused == Tristate.isTrue) {
+      final name = data.label.isNotEmpty ? data.label : data.tooltip;
+      if (name.isNotEmpty) found = name;
+    }
+    node.visitChildren((child) {
+      walk(child);
+      return true;
+    });
+  }
+
+  walk(_root(tester));
+  return found;
 }
 
 /// The node tree's root, or a failure saying why there isn't one.

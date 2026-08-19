@@ -51,24 +51,24 @@ class ReactionBar extends StatelessWidget {
     return Semantics(
       container: true,
       label: people == 1 ? '1 reaction' : '$people reactions',
-      child: Padding(
-        padding: const EdgeInsets.only(top: WeftSpace.xs),
-        child: Wrap(
-          spacing: WeftSpace.xs,
-          runSpacing: WeftSpace.xs,
-          alignment: own ? WrapAlignment.end : WrapAlignment.start,
-          children: [
-            for (final tally in tallies)
-              ReactionChip(
-                tally: tally,
-                onTap: () => onToggle(tally),
-                onLongPress: onShowSenders == null
-                    ? null
-                    : () => onShowSenders!(tally),
-              ),
-            if (onAdd != null) _AddReactionChip(onTap: onAdd!),
-          ],
-        ),
+      // No padding of its own any more. Every chip below carries a 48dp tap
+      // target around a pill that still paints at its old size, so the gap this
+      // used to add is now inside the chips — spare height that is live rather
+      // than dead, since a tap anywhere in it reaches the chip.
+      child: Wrap(
+        spacing: WeftSpace.xs,
+        alignment: own ? WrapAlignment.end : WrapAlignment.start,
+        children: [
+          for (final tally in tallies)
+            ReactionChip(
+              tally: tally,
+              onTap: () => onToggle(tally),
+              onLongPress: onShowSenders == null
+                  ? null
+                  : () => onShowSenders!(tally),
+            ),
+          if (onAdd != null) _AddReactionChip(onTap: onAdd!),
+        ],
       ),
     );
   }
@@ -95,50 +95,62 @@ class ReactionChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: mine,
+      // The `InkWell` builds a node of its own from the emoji and the count —
+      // "👍\n2", the pill's size, with the tap on it — so without this the
+      // chip is two nodes, and the inner one is the 28dp target the outer one
+      // exists to replace. Excluding it takes the tap with it, hence the
+      // restatement below.
+      excludeSemantics: true,
+      onTap: onTap,
       // The long-press — who reacted — was an action a screen reader had no way
       // to discover. Naming it puts it in the actions rotor beside the tap.
       onLongPress: onLongPress,
       onLongPressHint: onLongPress == null ? null : 'see who reacted',
       label: '${tally.key} ${tally.count}',
-      child: Material(
-        color: mine
-            ? accent.withValues(alpha: 0.22)
-            : context.colors.surfaceContainerHighest,
-        borderRadius: WeftRadius.pill,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: AnimatedContainer(
-            duration: WeftMotion.fast,
-            curve: WeftMotion.standard,
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.sm,
-              vertical: 3,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: WeftRadius.pill,
-              // The reader's own reaction is outlined as well as tinted:
-              // colour alone is the one difference a colour-blind reader
-              // cannot use to tell "I reacted" from "someone did".
-              border: Border.all(
-                color: mine ? accent : Colors.transparent,
-                width: 1.5,
+      // Inside the annotation, so the node the reader touches and the box the
+      // guideline measures are both the grown one. A 28dp pill is comfortable
+      // to read and roughly half of what a thumb can be asked to find.
+      child: WeftTapTarget(
+        child: Material(
+          color: mine
+              ? accent.withValues(alpha: 0.22)
+              : context.colors.surfaceContainerHighest,
+          borderRadius: WeftRadius.pill,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: AnimatedContainer(
+              duration: WeftMotion.fast,
+              curve: WeftMotion.standard,
+              padding: const EdgeInsets.symmetric(
+                horizontal: WeftSpace.sm,
+                vertical: 3,
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(tally.key, style: const TextStyle(fontSize: 13)),
-                const SizedBox(width: WeftSpace.xs),
-                Text(
-                  '${tally.count}',
-                  style: context.text.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: mine ? accent : context.colors.onSurfaceVariant,
-                  ),
+              decoration: BoxDecoration(
+                borderRadius: WeftRadius.pill,
+                // The reader's own reaction is outlined as well as tinted:
+                // colour alone is the one difference a colour-blind reader
+                // cannot use to tell "I reacted" from "someone did".
+                border: Border.all(
+                  color: mine ? accent : Colors.transparent,
+                  width: 1.5,
                 ),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(tally.key, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(width: WeftSpace.xs),
+                  Text(
+                    '${tally.count}',
+                    style: context.text.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: mine ? accent : context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -161,24 +173,26 @@ class _AddReactionChip extends StatelessWidget {
       label: 'Add reaction',
       excludeSemantics: true,
       onTap: onTap,
-      child: Tooltip(
-        message: 'Add reaction',
-        excludeFromSemantics: true,
-        child: Material(
-          color: context.colors.surfaceContainerHighest,
-          borderRadius: WeftRadius.pill,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: WeftSpace.sm,
-                vertical: 4,
-              ),
-              child: Icon(
-                Icons.add_reaction_outlined,
-                size: 14,
-                color: context.colors.onSurfaceVariant,
+      child: WeftTapTarget(
+        child: Tooltip(
+          message: 'Add reaction',
+          excludeFromSemantics: true,
+          child: Material(
+            color: context.colors.surfaceContainerHighest,
+            borderRadius: WeftRadius.pill,
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: WeftSpace.sm,
+                  vertical: 4,
+                ),
+                child: Icon(
+                  Icons.add_reaction_outlined,
+                  size: 14,
+                  color: context.colors.onSurfaceVariant,
+                ),
               ),
             ),
           ),

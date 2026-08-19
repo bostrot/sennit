@@ -276,14 +276,20 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
                   Semantics(
                     button: true,
                     label: 'Hang up',
-                    child: InkResponse(
-                      onTap: widget.controls.hangUp,
-                      child: Padding(
-                        padding: const EdgeInsets.all(WeftSpace.xs),
-                        child: Icon(
-                          Icons.call_end_rounded,
-                          size: 20,
-                          color: foreground,
+                    // 28dp, and the one control in the app where a miss is
+                    // expensive twice over: the neighbouring target is the bar
+                    // itself, so a thumb that falls short of hanging up opens
+                    // the call screen instead.
+                    child: WeftTapTarget(
+                      child: InkResponse(
+                        onTap: widget.controls.hangUp,
+                        child: Padding(
+                          padding: const EdgeInsets.all(WeftSpace.xs),
+                          child: Icon(
+                            Icons.call_end_rounded,
+                            size: 20,
+                            color: foreground,
+                          ),
                         ),
                       ),
                     ),

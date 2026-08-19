@@ -113,6 +113,57 @@ class SeededChatRepository extends RecordingChatRepository {
       calls.add(RecordedCall('redact', eventId: eventId));
 }
 
+/// A seeded chat a message can land in after the timeline is already open.
+///
+/// [SeededChatRepository] serves a fixed past, which is exactly right for
+/// asserting what a bubble says and useless for the one thing a live region is
+/// for. The shape is the demo repository's: the source overrides [loaded] to
+/// prepend whatever has arrived since, so the timeline the view already holds
+/// re-derives with it rather than needing to be rebuilt.
+///
+/// Shared because two suites need it — `chat_semantics_test.dart` asks what the
+/// arrival *says*, and `a11y/live_region_test.dart` asks how many times it says
+/// it — and a second copy would be the place the two quietly diverge.
+class GrowingChatRepository extends SeededChatRepository {
+  GrowingChatRepository(super.inner, {required super.messages});
+
+  final List<WeftMessage> _arrived = [];
+
+  /// Puts [message] at the head of the room's history.
+  void arrive(WeftMessage message) => _arrived.add(message);
+
+  @override
+  Future<MergedTimeline> timelineFor(String id) async => MergedTimeline(
+    sources: [
+      for (final source in chat.sources)
+        _GrowingSource(
+          roomId: source.roomId,
+          network: source.network,
+          history: messages
+              .where((m) => m.roomId == source.roomId)
+              .toList(growable: false),
+          arrived: () => _arrived
+              .where((m) => m.roomId == source.roomId)
+              .toList(growable: false),
+        ),
+    ],
+  );
+}
+
+class _GrowingSource extends InMemoryTimelineSource {
+  _GrowingSource({
+    required super.roomId,
+    required super.network,
+    required super.history,
+    required this.arrived,
+  }) : super(pageSize: 200);
+
+  final List<WeftMessage> Function() arrived;
+
+  @override
+  List<WeftMessage> get loaded => [...arrived().reversed, ...super.loaded];
+}
+
 /// A seeded message, with the fields these tests actually vary.
 WeftMessage seededMessage({
   required String eventId,

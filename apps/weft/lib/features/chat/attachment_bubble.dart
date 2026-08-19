@@ -774,7 +774,10 @@ class UploadProgressBubble extends StatelessWidget {
             const SizedBox(width: WeftSpace.sm),
             IconButton(
               onPressed: onCancel,
-              visualDensity: VisualDensity.compact,
+              // No `VisualDensity.compact`: it takes 4dp off each axis of the
+              // tap target Material otherwise pads this out to, leaving a 40dp
+              // box — and the glyph is already held down to 18 by `iconSize`,
+              // so the density was buying nothing the size did not.
               iconSize: 18,
               // Named, because a timeline can hold several uploads at once and
               // "Cancel upload" three times over is three identical buttons

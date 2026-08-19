@@ -193,11 +193,14 @@ class _SwatchButton extends StatelessWidget {
       // the swatch rather than over it, because a ring drawn on top of a
       // saturated accent is measured against the wrong colour.
       shape: BoxShape.circle,
+      // 48 rather than 44: the swatches sit in a `Wrap` with room to spare, so
+      // the guideline is met by making the control the size it should be
+      // instead of padding a smaller one out to it.
       child: AnimatedContainer(
         duration: context.motion.fast,
         curve: context.motion.spring,
-        width: 44,
-        height: 44,
+        width: kWeftMinTapTarget,
+        height: kWeftMinTapTarget,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,

@@ -10,7 +10,6 @@ import 'package:weft/features/chat/unverified_devices_banner.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
-import 'package:weft_merge/weft_merge.dart';
 
 import 'support/semantics_probe.dart';
 import 'support/seeded_repository.dart';
@@ -169,7 +168,9 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('mark the edited marker as the button it is', (tester) async {
+    testWidgets('say when a message was edited, and where the versions are', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       await pumpChat(tester, [
         seededMessage(
@@ -192,8 +193,53 @@ void main() {
         ),
       ]);
 
-      expect(labelsIn(tester), contains('Edited at 14:35, show edit history'));
+      // An annotation now, not a control. It was the whole tap target for
+      // opening the edit history and it is a 10dp italic run inside a metadata
+      // line — TAP-15, the smallest target in the app — which cannot be grown
+      // to 48dp without pushing the bubble apart. So it says where the versions
+      // went instead of being the only way to them.
+      expect(
+        labelsIn(tester),
+        contains('Edited at 14:35, versions in the message actions'),
+      );
       handle.dispose();
+    });
+
+    testWidgets('offer the edit history where the other actions are', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        seededMessage(
+          eventId: r'$edited',
+          body: 'quarter past, not half',
+          isOwn: true,
+          editedAt: DateTime(2026, 8, 18, 14, 35),
+          editHistory: [
+            EditRecord(
+              eventId: r'$edited',
+              body: 'half past',
+              timestamp: DateTime(2026, 8, 18, 14, 30),
+            ),
+            EditRecord(
+              eventId: r'$edit1',
+              body: 'quarter past, not half',
+              timestamp: DateTime(2026, 8, 18, 14, 35),
+            ),
+          ],
+        ),
+      ]);
+
+      await tester.longPress(
+        find.text('quarter past, not half', findRichText: true).first,
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit history'));
+      await tester.pumpAndSettle();
+
+      // The sheet the marker used to be the only door to. Reachable from a
+      // keyboard for the first time, since the bubble's action sheet is Enter.
+      expect(find.text('half past'), findsOneWidget);
     });
 
     testWidgets('day dividers are headings, not bare dates', (tester) async {
@@ -345,7 +391,7 @@ void main() {
       tester,
     ) async {
       final announced = watchAnnouncements(tester);
-      final repository = _GrowingRepository(
+      final repository = GrowingChatRepository(
         demo,
         messages: [seededMessage(eventId: r'$one', body: 'Where are we?')],
       );
@@ -386,7 +432,7 @@ void main() {
 
     testWidgets('the reader own send is not news to them', (tester) async {
       final announced = watchAnnouncements(tester);
-      final repository = _GrowingRepository(
+      final repository = GrowingChatRepository(
         demo,
         messages: [seededMessage(eventId: r'$one', body: 'Where are we?')],
       );
@@ -448,51 +494,4 @@ void main() {
       handle.dispose();
     });
   });
-}
-
-/// A seeded chat a message can land in after the timeline is already open.
-///
-/// [SeededChatRepository] serves a fixed past, which is exactly right for
-/// everything else in this file and useless for the one thing a live region is
-/// for. The shape is the demo repository's: the source overrides [loaded] to
-/// prepend whatever has arrived since, so the timeline the view already holds
-/// re-derives with it rather than needing to be rebuilt.
-class _GrowingRepository extends SeededChatRepository {
-  _GrowingRepository(super.inner, {required super.messages});
-
-  final List<WeftMessage> _arrived = [];
-
-  /// Puts [message] at the head of the room's history.
-  void arrive(WeftMessage message) => _arrived.add(message);
-
-  @override
-  Future<MergedTimeline> timelineFor(String id) async => MergedTimeline(
-    sources: [
-      for (final source in chat.sources)
-        _GrowingSource(
-          roomId: source.roomId,
-          network: source.network,
-          history: messages
-              .where((m) => m.roomId == source.roomId)
-              .toList(growable: false),
-          arrived: () => _arrived
-              .where((m) => m.roomId == source.roomId)
-              .toList(growable: false),
-        ),
-    ],
-  );
-}
-
-class _GrowingSource extends InMemoryTimelineSource {
-  _GrowingSource({
-    required super.roomId,
-    required super.network,
-    required super.history,
-    required this.arrived,
-  }) : super(pageSize: 200);
-
-  final List<WeftMessage> Function() arrived;
-
-  @override
-  List<WeftMessage> get loaded => [...arrived().reversed, ...super.loaded];
 }

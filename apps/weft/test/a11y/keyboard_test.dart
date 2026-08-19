@@ -16,6 +16,7 @@ import 'package:weft/features/search/search_screen.dart';
 import 'package:weft/features/settings/shortcuts_sheet.dart';
 
 import '../support/recording_repository.dart';
+import '../support/semantics_probe.dart';
 
 /// Weft from a keyboard alone.
 ///
@@ -85,17 +86,11 @@ void main() {
     return container;
   }
 
-  /// Presses the first key combination bound to [description].
-  ///
-  /// Looked up rather than written out, which is the point: a binding that is
-  /// renamed, re-keyed or dropped fails here instead of quietly passing
-  /// against a key nobody uses any more.
-  Future<void> press(WidgetTester tester, String description) async {
-    final binding = weftKeyBindings().firstWhere(
-      (b) => b.description == description,
-      orElse: () => fail('No binding called "$description"'),
-    );
-    final activator = binding.activators.first;
+  /// Sends [activator] as a real key sequence, modifiers and all.
+  Future<void> pressActivator(
+    WidgetTester tester,
+    SingleActivator activator,
+  ) async {
     final modifiers = <LogicalKeyboardKey>[
       if (activator.control) LogicalKeyboardKey.control,
       if (activator.meta) LogicalKeyboardKey.meta,
@@ -111,6 +106,20 @@ void main() {
     }
     await tester.pumpAndSettle();
   }
+
+  /// The binding called [description], or a failure naming it.
+  WeftKeyBinding bindingFor(String description) => weftKeyBindings().firstWhere(
+    (b) => b.description == description,
+    orElse: () => fail('No binding called "$description"'),
+  );
+
+  /// Presses the first key combination bound to [description].
+  ///
+  /// Looked up rather than written out, which is the point: a binding that is
+  /// renamed, re-keyed or dropped fails here instead of quietly passing
+  /// against a key nobody uses any more.
+  Future<void> press(WidgetTester tester, String description) =>
+      pressActivator(tester, bindingFor(description).activators.first);
 
   /// The label of whatever focusable currently holds focus, or null when focus
   /// is on something `weft_design` did not build.
@@ -131,6 +140,67 @@ void main() {
     }
     return seen;
   }
+
+  /// Tabs [limit] times, collecting the name of every node it lands on.
+  ///
+  /// Named from the semantics tree rather than from [WeftFocusable], so a
+  /// Material button, an `InkWell` and one of Weft's own controls all count the
+  /// same way — the question this answers is "can a keyboard reach it", and the
+  /// widget it happens to be built from is not part of it.
+  Future<Set<String>> tabAcross(WidgetTester tester, {int limit = 150}) async {
+    final reached = <String>{};
+    for (var i = 0; i < limit; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final name = focusedNameIn(tester);
+      if (name != null) reached.add(name);
+    }
+    return reached;
+  }
+
+  group('every control is reachable by Tab alone', () {
+    /// Asserts that everything on screen when it opens is reached by Tab.
+    ///
+    /// The set is snapshotted *before* tabbing rather than after: traversal
+    /// scrolls, so a list can grow controls that were not on screen when the
+    /// user started pressing Tab, and demanding those too would make the
+    /// assertion depend on how far a long list happened to scroll.
+    Future<void> expectAllReachable(WidgetTester tester) async {
+      final controls = controlNamesIn(tester).toSet();
+      expect(controls, isNotEmpty, reason: 'nothing to reach — wrong screen?');
+
+      final reached = await tabAcross(tester);
+      final missed = controls.difference(reached);
+      expect(
+        missed,
+        isEmpty,
+        reason:
+            'a screen reader can name these and a keyboard cannot reach them:\n'
+            '${missed.join('\n')}',
+      );
+    }
+
+    testWidgets('on the inbox', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpApp(tester);
+      await expectAllReachable(tester);
+      handle.dispose();
+    });
+
+    testWidgets('in a conversation', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpApp(tester, home: const ChatView(chatId: 'merged:anna'));
+      await expectAllReachable(tester);
+      handle.dispose();
+    });
+
+    testWidgets('on search', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpApp(tester, home: const SearchScreen(initialQuery: 'the'));
+      await expectAllReachable(tester);
+      handle.dispose();
+    });
+  });
 
   group('traversal', () {
     testWidgets('Tab reaches the rail and every inbox row', (tester) async {
@@ -209,6 +279,88 @@ void main() {
           });
       expect(painted, isTrue);
     });
+  });
+
+  /// What each app-wide binding must be seen to do, and how to set it up.
+  ///
+  /// Keyed by description and checked against the bindings table below, so a
+  /// binding added without an expectation fails here rather than shipping
+  /// untested — which is the failure this group exists to make impossible.
+  /// Every entry runs against *every* activator the binding carries: Weft
+  /// binds two keys to four of its five commands, and a per-binding test that
+  /// only pressed the first one would have left half the table unexercised.
+  final effects =
+      <
+        String,
+        ({
+          Future<void> Function(WidgetTester, ProviderContainer) arrange,
+          void Function(WidgetTester, ProviderContainer) expectFired,
+        })
+      >{
+        'Next conversation': (
+          arrange: (tester, container) async {},
+          expectFired: (tester, container) => expect(
+            container.read(selectedChatProvider),
+            container.read(visibleChatsProvider).first.id,
+          ),
+        ),
+        'Previous conversation': (
+          arrange: (tester, container) async {},
+          // From nowhere, "previous" is the bottom of the list: the user has
+          // not been anywhere yet, so there is nothing to be before.
+          expectFired: (tester, container) => expect(
+            container.read(selectedChatProvider),
+            container.read(visibleChatsProvider).last.id,
+          ),
+        ),
+        'Search all conversations': (
+          arrange: (tester, container) async {},
+          expectFired: (tester, container) =>
+              expect(find.byType(SearchScreen), findsOneWidget),
+        ),
+        'Write a message': (
+          arrange: (tester, container) async {
+            container.read(selectedChatProvider.notifier).select('merged:anna');
+            await tester.pumpAndSettle();
+          },
+          expectFired: (tester, container) => expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'Weft composer',
+          ),
+        ),
+        'Keyboard shortcuts': (
+          arrange: (tester, container) async {},
+          expectFired: (tester, container) =>
+              expect(find.text('New line'), findsOneWidget),
+        ),
+      };
+
+  group('every shortcut fires its action', () {
+    test('the expectations below cover every app-wide binding', () {
+      final bound = weftKeyBindings()
+          .where((b) => b.intent != null)
+          .map((b) => b.description)
+          .toSet();
+      // Both directions. A missing expectation is an untested command; a stale
+      // one is an expectation about a key nobody can press any more.
+      expect(effects.keys.toSet(), bound);
+    });
+
+    for (final entry in effects.entries) {
+      // One test per key rather than a loop inside one, so the second
+      // combination is proved to do the thing rather than proved to find it
+      // already done by the first — and so a failure names the key.
+      for (final activator in bindingFor(entry.key).activators) {
+        testWidgets('${entry.key} — ${describeShortcut(activator)}', (
+          tester,
+        ) async {
+          final container = await pumpApp(tester);
+          await entry.value.arrange(tester, container);
+          await pressActivator(tester, activator);
+          entry.value.expectFired(tester, container);
+        });
+      }
+    }
   });
 
   group('shortcuts', () {

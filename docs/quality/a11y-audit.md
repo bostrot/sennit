@@ -910,6 +910,133 @@ source sweeps) and `packages/weft_design/test/bidi_test.dart` (11).
 
 ---
 
+## Test suite — resolved by task 7
+
+The four suites the phase asks for, and the fifteen touch-target findings the
+tap-target guidelines were always going to be the arbiter of.
+
+The rest of the a11y suite asserts particular sentences — that a bubble says who
+spoke, that a merge says what it merged. Those tests are precise and blind: they
+see only what somebody thought to write an expectation for. `meetsGuideline`
+walks the *whole* semantics tree and reports every node that breaks a rule, so
+it is the half that catches what nobody thought of — and it caught three things
+this document did not have, listed at the end.
+
+### What was built
+
+- **`apps/weft/test/a11y/semantics_test.dart`** — 72 tests. Four guidelines
+  (`labeledTapTargetGuideline`, `androidTapTargetGuideline`,
+  `iOSTapTargetGuideline`, `textContrastGuideline`) over the six screens the
+  phase names — inbox, chat, search, settings, bridges, merge — in **both**
+  themes, plus a geometry-only sweep of the seven surfaces the touch-target
+  register names that are not screens: the message actions sheet, the emoji
+  picker, the appearance sheet, an incoming call, the minimised call bar, the
+  composer of a merged chat, and a chat with an upload in flight and a voice
+  message unplayed. Every one of those is reached by *driving* the app rather
+  than by pumping the private widget behind it, because a sheet built by hand is
+  a sheet with the test's own padding in it.
+- **`apps/weft/test/a11y/live_region_test.dart`** — 8 tests. The two events the
+  phase names, and the part a per-screen test cannot see: **how often**. A live
+  region that re-announces on every rebuild is worse than none, because it talks
+  over whatever the user is reading.
+- **`apps/weft/test/a11y/keyboard_test.dart`** — extended from 18 tests to 27.
+  Two additions: a sweep asserting that **every** control on the inbox, in a
+  conversation and on search is reachable by Tab alone, taken from the semantics
+  tree rather than from `WeftFocusable` so a Material button and one of Weft's
+  own controls count the same way; and a table-driven group that fires **every**
+  activator of **every** app-wide binding — Weft binds two keys to four of its
+  five commands, and the old `press` helper only ever pressed the first.
+- **`packages/weft_design/lib/src/tap_target.dart` — `WeftTapTarget`**, with
+  `packages/weft_design/test/tap_target_test.dart` (7 tests). Material's own
+  `_InputPadding` mechanism, which is private to `material/`: it grows the
+  *interactive* box to a minimum, paints the child centred at its own size, and
+  forwards a hit anywhere in the grown box to the child's centre.
+- **`apps/weft/test/support/a11y_harness.dart`** — one way to put a screen on
+  the glass, so a sweep that ran one screen at 1400×900 and another at the
+  default 800×600 cannot report on the window instead of the widget.
+  `controlNamesIn` and `focusedNameIn` joined `semantics_probe.dart`;
+  `GrowingChatRepository` moved into `seeded_repository.dart` from
+  `chat_semantics_test.dart`, where the live-region suite would have been the
+  second copy.
+
+### Why the tap target takes layout space
+
+The tempting version of every fix below is to make the number a test reads go up
+without making the control any easier to hit, and there are two ways to do it:
+report a larger semantics rect than the box, or expand only the hit test. The
+second is not available — a `RenderBox` never receives a pointer outside its own
+bounds, because `RenderBox.hitTest` rejects it before the child is consulted —
+and the first moves what a guideline measures without moving what a thumb has to
+find. So `WeftTapTarget` takes the space, exactly as a Material `Checkbox` does:
+18dp painted, 48dp occupied. Where the extra height was already there as a
+margin, the call site gives the margin back.
+
+### Findings closed
+
+| ID | Resolution |
+|---|---|
+| CROSS-6 | Closed by task 2 and **verified here**: `contrast_test.dart` asserts every foreground/background pair over seven themes — light, dark and AMOLED, each with and without high contrast, plus a second seed — which is the phase's "light, dark and high-contrast" and two more. 194 assertions, unchanged |
+| TAP-01 | **Verified correct, not changed.** `minimumSize: Size(0, 28)` shrinks what a `TextButton` *paints*; `ButtonStyleButton` wraps its `Semantics` around an `_InputPadding` that still reports 48dp, and the guideline passes it in both themes |
+| TAP-02 | **Verified correct**, same mechanism as TAP-01 |
+| TAP-03 | Fixed: `VisualDensity.compact` took 4dp off each axis of the padded target, leaving 40dp. Dropped — `iconSize: 18` already holds the glyph down, so the density was buying nothing the size did not |
+| TAP-04 | Fixed: `WeftTapTarget` around the pill, which still paints at 28dp. The chip also carried a *second* node — the `InkWell`'s, labelled "👍\n2" at the old size — so the annotation now excludes its subtree and restates the tap |
+| TAP-05 | Fixed: `WeftTapTarget`. The reaction bar's own top padding is gone, since the spare height inside the chips replaces it and is live rather than dead space |
+| TAP-06 | Fixed: `WeftTapTarget`. Measured 44dp rather than the register's 31 — four short, on the only way back to the message being answered |
+| TAP-07 | Fixed: `WeftTapTarget`. Measured 27dp **wide** by 50 tall, so the register's single number was hiding which axis was short — six identical neighbours where a miss sends the wrong reaction |
+| TAP-08 | Fixed: `WeftTapTarget` on each cell, and the `Wrap`'s `spacing`/`runSpacing` dropped because the padding now provides it |
+| TAP-09 | **Verified correct.** Swept through the composer of a merged chat, which is the only place the chip is drawn, and it passes both guidelines |
+| TAP-10 | **Verified correct.** `FilterChip` defaults to `MaterialTapTargetSize.padded`; the 32dp in the register is the painted height, not the target |
+| TAP-11 | Fixed: `VisualDensity.compact` dropped from the `SegmentedButton` style. Three adjacent choices where the neighbour of "Muted" is "Off", and a miss silences a network rather than quieting it |
+| TAP-12 | Fixed: the swatch is 48dp rather than 44. It sits in a `Wrap` with room to spare, so the guideline is met by making the control the size it should be instead of padding a smaller one out to it |
+| TAP-13 | Fixed: `WeftTapTarget` around the hang-up `InkResponse`. The one control in the app where a miss is expensive twice over, since the neighbouring target is the bar itself and a thumb that falls short opens the call screen |
+| TAP-14 | **Verified correct.** The banner's `CallActionButton`s measure 48dp in the sweep; the register's 44 is the `size` argument, and the button pads around it |
+| TAP-15 | Resolved by moving the affordance, not by growing it. A 10dp italic run inside a metadata line cannot reach 48dp without pushing every edited bubble 33dp taller, so **Edit history is now a row in the message actions sheet** — where the other eight operations on a message already are, and where a keyboard can reach it for the first time. The marker stays as an annotation that says where the versions went |
+
+### Three findings this document did not have
+
+- **The inbox's search placeholder was never painted.** `InputDecorator`
+  defaults `isEmpty` to false, which tells the decorator the field it is
+  dressing has content — so "Search all conversations" sat in the tree at zero
+  opacity and the box drew a magnifier and nothing else. `textContrastGuideline`
+  found it as a run of 16dp text at 1:1, which is what a colour histogram of a
+  region with no glyphs in it reports. Every inbox golden shows the text now.
+- **`WeftFocusable` emitted a duplicate, unlabelled node on every group.** The
+  `GestureDetector` inside it declared the same long-press the annotation above
+  it declares; two configurations that conflict cannot be folded together, so
+  the framework gave the detector a node of its own — an unlabelled control the
+  size of the message bubble. Invisible under `excludeSemantics: true` and
+  therefore invisible on every control; visible on the one case that is a
+  *group*, which is the bubble. Fixed with `excludeFromSemantics: true` on the
+  detector plus `explicitChildNodes` on the annotation, which the group needed
+  anyway — without it the bubble's links and mention pills fold into its label.
+- **The inbox search field was a silent Tab stop.** `excludeSemantics: true`
+  removes the phantom text field an `InputDecorator` announces, and it takes the
+  `InkWell`'s *focus* semantics with it as well as its tap — so Tab stopped on a
+  node with no name. It is a `WeftFocusable` now. This is task 5's lesson one
+  layer along: a `Semantics` node is not a focus node, and excluding a subtree
+  removes more than the label it was aimed at.
+
+### Two things later tasks must not get wrong
+
+- **`WeftTapTarget` goes *inside* the annotation, never outside it.** A node's
+  rect is the size of the render object under the `Semantics`, so a tap target
+  added above the label leaves the node exactly as small as it was — which is
+  both what touch exploration lands in and what the guideline measures. The
+  widget's own test pins this.
+- **The guideline sweep is the arbiter, and it disagrees with the register in
+  both directions.** Four of the fifteen entries pass untouched because Material
+  pads a target the style only shrank the paint of; two of the ones that fail
+  fail on an axis the register does not name. **Task 9 should quote the sweep
+  rather than the register** when it writes the status column, and task 8 should
+  expect the scale variants to move the same numbers again.
+
+Covered by `apps/weft/test/a11y/semantics_test.dart` (72),
+`apps/weft/test/a11y/live_region_test.dart` (8),
+`apps/weft/test/a11y/keyboard_test.dart` (27, up from 18) and
+`packages/weft_design/test/tap_target_test.dart` (7).
+
+---
+
 ## Per-screen findings
 
 ### Inbox shell — `features/inbox/inbox_shell.dart`
@@ -1316,6 +1443,15 @@ Everything measured under 48dp, ordered by severity. Android's guideline is
 `_EditedMarker` (TAP-15) is the worst of them: a 10dp italic text run is the
 entire tap target for opening the edit history.
 
+**All closed by task 7** — see
+[Findings closed](#findings-closed-2) there for the per-entry resolutions. Read
+the sizes above as *approximate and sometimes of the wrong thing*: they were
+measured off the source, and the tap-target guidelines that later swept these
+screens disagreed with five of them. TAP-01, TAP-02, TAP-09, TAP-10 and TAP-14
+measure the painted control while Material pads the target around it, and pass
+untouched; TAP-06 was 44dp rather than 31; TAP-07 was short on width, not
+height.
+
 ### Text scale register
 
 Fixed boxes around text that grows with `MediaQuery.textScaler`. Everything here
@@ -1469,10 +1605,20 @@ its own, and with no catalogue there are no keys to leak, so the phase's
 "falls back cleanly rather than showing keys" criterion is met today. The
 locales buy direction and date formatting, which is what M10 needs.
 
-Still **open**: the test suite's guideline sweep (TAP-01…15) and the golden
-variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed early in task 4 because it
-was one line from a change already being made). Task 9 re-reads this file and
-marks each remaining one fixed or deferred with a reason.
+**All 15 touch-target findings are now closed** by the test suite (task 7 — see
+[Test suite — resolved by task 7](#test-suite--resolved-by-task-7)), along with
+CROSS-6, which task 2 fixed and task 7 verified. Four of the fifteen — TAP-01,
+TAP-02, TAP-09, TAP-10 and TAP-14 — pass the guidelines untouched and are
+recorded as verified rather than re-fixed: in each case the register measured
+what the control *paints* and Material was already padding the target around it.
+One, **TAP-15**, is resolved by moving the affordance rather than growing it,
+since a 10dp run inside a metadata line cannot reach 48dp without pushing every
+edited bubble apart; the edit history is a row in the message actions sheet now.
+
+Still **open**: the golden variants (CROSS-7, SCALE-02…16 — less SCALE-13, fixed
+early in task 4 because it was one line from a change already being made). Task
+9 re-reads this file and marks each remaining one fixed or deferred with a
+reason.
 
 The work list's task 3 row originally read "A11Y-01…31, 34…47", which orphaned
 A11Y-32 and A11Y-33 — the link preview card, a chat surface with no other task

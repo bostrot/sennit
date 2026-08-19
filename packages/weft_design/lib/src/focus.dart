@@ -161,6 +161,13 @@ class _WeftFocusableState extends State<WeftFocusable> {
     return Semantics(
       container: true,
       excludeSemantics: widget.excludeSemantics,
+      // A group's children are the point of it being a group: the links and
+      // mention pills inside a bubble stay individually reachable, which they
+      // only do as nodes of their own. Without this they fold into the group's
+      // label and a bubble announces its network twice and its body inside its
+      // own name. (A control excludes its subtree, so there is nothing to be
+      // explicit about.)
+      explicitChildNodes: !widget.excludeSemantics,
       button: widget.button,
       image: widget.image,
       selected: widget.selected,
@@ -209,6 +216,15 @@ class _WeftFocusableState extends State<WeftFocusable> {
           onTap: widget.onTap,
           onLongPress: widget.onLongPress,
           behavior: HitTestBehavior.opaque,
+          // The annotation above already declares both actions, and a detector
+          // that declares them again is not free: the two configurations
+          // conflict, so the framework cannot fold the detector into the node
+          // above it and gives it one of its own — an unlabelled sibling
+          // carrying the same long-press, which a reader meets as a second
+          // control with nothing to say. Invisible under
+          // `excludeSemantics: true`; on a *group*, which is the bubble, it is
+          // a bare "long press available" node the size of the message.
+          excludeFromSemantics: true,
           child: _ringed(context, widget.child),
         ),
       ),
