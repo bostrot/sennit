@@ -283,9 +283,11 @@ foreground/backgrounded-with-app-alive path that
 without the gateway leg. The gateway leg is not-executed everywhere, on every
 row, and is recorded as such rather than as a pass.
 
-⑥ **macOS deep links, warm start only.** See above: fired with `open`, delivered
-by the OS, asserted in the Flutter view. Cold start is not reachable because the
-test process is the app process.
+⑥ **macOS runs the deep links and nothing else of this group.** Fired with
+`open`, delivered by Launch Services, asserted in the Flutter view. Warm start —
+but that is not a macOS limitation: the test process is the app process on
+*every* row, so cold start is unreachable throughout and the `◐` here is about
+the shade scenarios macOS cannot run at all, not about the links.
 
 ⑦ **The MCP tunnel is desktop-only; the loopback server is not.**
 `McpHttpServer.start` binds `InternetAddress.loopbackIPv4` via `shelf_io.serve`,
@@ -351,21 +353,30 @@ silently-failed upload renders a perfectly convincing local bubble.
 
 ### Notifications and deep links
 
+Written up in
+[The notification and deep-link scenarios](#the-notification-and-deep-link-scenarios),
+which records the precondition none of this had before — that a device has to be
+*cross-signed*, not merely verified, before Weft posts anything at all.
+
 **`notification_test.dart`** — background the app, peer sends, notification
-appears in the shade, tap it, correct *merged* conversation opens. Then
-direct-reply and mark-as-read from the shade. All three Android actions bring
-Weft to the foreground by design (`README.md`) — the test asserts that, it does
-not work around it.
+appears in the shade, tap it, the right conversation opens. Then direct-reply
+and mark-as-read from the shade. All three Android actions bring Weft to the
+foreground by design (`README.md`) — the test asserts that, it does not work
+around it. The *merged* half of "the correct merged conversation" belongs to
+`merge_test`; what this asserts is that the tap follows the link rather than the
+inbox's top row.
 
 **`notification_mute_test.dart`** — a muted chat produces nothing; an explicit
 mention in a mentions-only chat produces one. Asserting an *absence* needs a
 bounded wait and a positive control in the same test, or it passes when
 notifications are broken entirely.
 
-**`deeplink_test.dart`** — `weft://chat/<id>`, `weft://user/<id>`,
-`weft://search?q=`, cold and warm, fired from outside. Reuses the shapes from
-`intents_test.dart` and verifies delivery, not parsing. See the callout above
-about `user/` and `sms:`.
+**`deeplink_test.dart`** — `weft://chat/<id>`, `weft://user/<id>` and
+`weft://search?q=` fired from outside as real `ACTION_VIEW`s. Reuses the shapes
+from `intents_test.dart` and verifies delivery, not parsing. See the callout
+above about `user/` and `sms:`. **Warm start only, on every row** — not just on
+macOS: a Patrol test runs inside the app under test, so killing Weft to make a
+cold start kills the test. Recorded as not-executed rather than approximated.
 
 ### Merge, search, bridges, MCP
 
@@ -713,6 +724,142 @@ Two constraints the scenarios are shaped around:
 
 ---
 
+## The notification and deep-link scenarios
+
+Eight scenarios across `notification_test.dart`, `notification_mute_test.dart`
+and `deeplink_test.dart`, over the same `support/`, which grew two files:
+`verification.dart` — how this device becomes trusted, which turns out to be the
+precondition for posting anything at all — and `shade.dart`, the notification
+shade itself. Nothing here was executed.
+
+### The finding that reshaped the whole task
+
+Task 3 recorded that "an unverified session never starts notifications" and
+that `notification_test` "must verify the device first". The first half is
+right and the second half does not work.
+
+`main.dart:299-315` starts the notification service on `WeftSessionState.ready`
+and on no other state, and `WeftMatrixSession.needsVerification`
+(`session.dart:226-235`) asks whether **our own** device key reads as
+`verified`. `DeviceKeys.verified` is `directVerified || crossVerified`
+(`device_keys_list.dart:173`). An interactive verification sets neither of them
+for the local device: `_verifyKeys` marks the keys the **other** end sent
+(`key_verification.dart:786`) — its device key, and its master key when it has
+one — and never one's own. On an account with no cross-signing identity, which
+is every account `tooling/docker/seed.sh` registers, there is therefore *no
+route at all* from `unverified` to `ready`, and a scenario that verified against
+a plain second session would have waited out its deadline on an empty shade.
+
+What does work is the route a user takes, in three steps:
+
+1. **The control session mints a cross-signing identity**
+   (`TestAccount.enableCrossSigning`, which is `MatrixKeyBackup.createRecovery`
+   — the same call the Encryption screen's *Set up a recovery key* makes). It
+   now holds the private halves.
+2. **The app drives an emoji comparison against it** through its own devices
+   screen. Two things follow from one exchange: the app verifies the account's
+   *master* key, and the control — whose cross-signing keys are cached, so
+   `crossSigning.sign` runs rather than `askSSSS`
+   (`key_verification.dart:805-810`) — signs the app's device with the
+   self-signing key. That is a valid chain, so `crossVerified` becomes true.
+3. **Weft is restarted.** Nothing re-derives the session state in place:
+   `_emit(_deriveState())` is called from `initialize()` and from the login-state
+   stream and nowhere else (`session.dart:114,186,202`), so a device that becomes
+   verified while the app is running stays `unverified` to every listener.
+
+`makeSessionReady` does all three, reads the devices list first so an already
+verified device skips them, and asserts the verification gate is gone after the
+restart — because that assertion is the one that fails loudly if any link in the
+chain above is wrong. `ChatScenario.start(notifying: true)` wraps it and takes
+the OS permission.
+
+### Four more findings
+
+1. **A pump while Weft is backgrounded is a hang, not a failure.**
+   `LiveTestWidgetsFlutterBinding.pump` schedules a frame and awaits a completer
+   that only a *drawn* frame completes
+   (`flutter_test/src/binding.dart:2994-3016`), with no timeout on it. A stopped
+   Android activity draws nothing. Every wait between `backgroundApp` and Weft
+   coming back therefore runs on a `Timer`, and `backgroundApp` registers a
+   teardown that foregrounds the app so the *next* scenario's launch does not
+   hang instead. The same argument applied to `media.dart`'s existing
+   `awaitForeignWindow` / `awaitWeftForeground`, which waited by pumping while
+   another application owned the screen; both now wait on a timer.
+2. **Patrol's `getNotifications()` can legitimately return nothing.** It reads
+   `android:id/title` and `android:id/text` (`Automator.kt:558-570`), the ids of
+   the *classic* notification layout. Weft posts `MessagingStyle` with a
+   `shortcutId`, which from API 30 SystemUI draws with the conversation layout
+   and ids of its own. `shade.dart` reads `getNativeViews` instead and matches
+   against every string on screen; `getNotifications()` survives only as the
+   contents of a failure message.
+3. **There is no per-chat mentions-only control.**
+   `ChatNotificationOverride.mentionsOnly` exists, `evaluateNotification` reads
+   it, and `notifications_screen.dart` promises that "a single chat can disagree
+   with this from its own screen" — but nothing in `lib/` ever writes one. The
+   scenario drives the global switch, which reaches the same rule
+   (`rules.dart:734`). Recorded rather than implemented: adding the control is a
+   product decision, not a test fix.
+4. **Cold start is unreachable from a Patrol test, on every row.**
+   `PatrolJUnitRunner.setUp` launches the app once, in `@Parameters`, and every
+   Dart test runs in that process; killing Weft to make the next link a cold
+   start kills the isolate the test is running on. So `deeplink_test` fires real
+   `ACTION_VIEW`s at a running Weft — `Automator.kt:139-146` starts a genuine
+   `Intent.ACTION_VIEW` with `CATEGORY_BROWSABLE` from the instrumentation's
+   context, resolved by the system against the manifest's `weft` scheme filter —
+   and the cold-start half is recorded as not-executed rather than approximated.
+   What is uncovered by it is one join: `MainActivity` stashing the launching
+   intent (`MainActivity.kt:41-44`) and `WeftIntents.deliverInitialIntent`
+   replaying it.
+
+### What each scenario does
+
+| File | Scenarios |
+|---|---|
+| `notification_test.dart` | a backgrounded Weft posts a message to the shade under the conversation's title, and tapping it opens *that* conversation rather than the newer one beside it; a reply typed into the shade's own field arrives on the peer and marks the chat read; *Mark read* posts an `m.read` the peer receives and takes the notification down |
+| `notification_mute_test.dart` | a muted conversation stays out of the shade while an unmuted one in the same window does not; mentions-only silences ordinary chatter and lets a message naming `@alice:localhost` through |
+| `deeplink_test.dart` | `weft://chat/<id>` opens that conversation; `weft://search?q=` opens search on that query; `weft://user/<id>` is delivered and pushes nothing, which is what the app does today; a chat link this account cannot resolve reports itself rather than crashing the router |
+
+Three constraints the scenarios are shaped around:
+
+- **Every absence is asserted beside a presence.** Suppression leaves no trace,
+  so "no notification appeared" is equally true of a working mute and of a
+  notification path that never ran. `expectShadeSilent` sends the control first,
+  waits for *it* to reach the shade, and only then believes the silence.
+- **The muted message must not be a mention.** `mentionsBypassMute` defaults to
+  true and its switch says why — "mute a busy group and still get paged in it" —
+  so asserting silence on a mention would be asserting a bug.
+- **No conversation is opened before the app goes away.**
+  `evaluateNotification`'s `alreadyRead` rule suppresses anything not newer than
+  the read marker, and Weft posts a receipt from the inbox row's tap handler.
+
+### What is not asserted, and why
+
+- **The killed-process path.** Weft notifies from sync while it is running;
+  being notified while *closed* needs sygnal and a Firebase project, neither of
+  which exists here. These scenarios background the app rather than killing it.
+  The gateway leg is not-executed on every row.
+- **That the conversation a tap opens is a *merged* one.** The link is
+  `weft://chat/<Chat.id>` and for a merged contact that id is
+  `merged:<contactId>`; building the merge is `merge_test`'s subject. What is
+  asserted here is the property the merged case rests on — the tap lands in the
+  conversation the message arrived in, and a second conversation is in the inbox
+  so a router that ignored the link has somewhere wrong to go.
+- **Notification actions on iOS.** Weft registers
+  `UNTextInputNotificationAction` and it is a real feature there, but reaching it
+  means long-pressing a banner and Patrol exposes no such gesture. The iOS rows
+  run the tap scenario and skip the two action scenarios, which is skip reason ⑤.
+
+### What was verified for these scenarios
+
+| Checked | How |
+|---|---|
+| The suite analyses and is formatted | `dart analyze integration_test/patrol` clean, `dart format --set-exit-if-changed` clean |
+| Nothing existing regressed | `flutter test` in `apps/weft`, **915 pass**, unchanged |
+| `login_test` still owns its verification scenario | the emoji drive moved to `support/verification.dart` and `login_test` calls it; every assertion it made is still made, in the same order |
+| **Not** checked: anything the eight scenarios assert | no row was executed — `patrol_cli` is not on this host and no matrix row is runnable |
+
+---
+
 ## Environment reality on this host
 
 Recorded 2026-08-19, so a later reader knows what "not executed" meant at the
@@ -772,18 +919,27 @@ API 36 and writing it into an API 35 cell.
    neither of which exists here. `notification_test` backgrounds the app rather
    than killing it, and the killed-process path stays not-executed.
 
+   > **And a cross-signed device**, which this list did not know when it was
+   > written. `ready` — the state the service starts on — needs the device's
+   > *own* key to read as verified, and an emoji comparison does not do that on
+   > an account with no cross-signing identity. See
+   > [the finding that reshaped the whole task](#the-finding-that-reshaped-the-whole-task).
+   > A notification row that fails on an empty shade should be checked there
+   > first: it is far more likely than a broken pipeline.
+
 ---
 
 ## Results
 
 Filled in by the last task of Phase 09. Every cell is **not executed**. For the
-first six scenarios the reason is no longer *not written* — they are written, and
-what that means is recorded above for the
-[core three](#what-was-verified-and-what-was-not) and for the
-[media three](#what-was-verified-for-these-scenarios) — it is that no row on this
-host can run them: `patrol_cli` is absent, the Android system images are API 36
-only, and there is no iOS runtime. For the other seven the reason is still that
-the scenario does not exist yet.
+first nine scenarios the reason is no longer *not written* — they are written,
+and what that means is recorded above for the
+[core three](#what-was-verified-and-what-was-not), the
+[media three](#what-was-verified-for-these-scenarios) and the
+[notification and deep-link three](#what-was-verified-for-these-scenarios-1) —
+it is that no row on this host can run them: `patrol_cli` is absent, the Android
+system images are API 36 only, and there is no iOS runtime. For the remaining
+four the reason is still that the scenario does not exist yet.
 
 | Scenario | A28-P | A28-T | A33-P | A33-T | A35-P | A35-T | I16-P | I16-T | I17-P | I17-T | MAC |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|

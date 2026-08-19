@@ -322,6 +322,51 @@ class TestAccount {
         event,
   ];
 
+  /// Whether this account has a cross-signing identity at all.
+  ///
+  /// The question [enableCrossSigning] is asked before doing anything, and the
+  /// reason the notification scenarios can reach `ready` at all — see that
+  /// method.
+  bool get crossSigningEnabled => session.crossSigningExists;
+
+  /// Mints a cross-signing identity for the account, from *this* session.
+  ///
+  /// The same call the Encryption screen's "Set up a recovery key" makes
+  /// (`MatrixKeyBackup.createRecovery`), run headlessly because the account
+  /// needs the identity before the app can be signed into it and the app has
+  /// no screen that does this to *another* device.
+  ///
+  /// It exists because of a gap task 3 recorded only half of. An unverified
+  /// session never starts notifications — `main.dart:299-315` starts the
+  /// service on `ready` only — and an interactive verification against a second
+  /// session **does not on its own make this device `ready`**:
+  /// `WeftMatrixSession.needsVerification` asks whether *our own* device key is
+  /// `verified`, and SAS marks the keys the *other* end sent
+  /// (`key_verification.dart:786`), never one's own. `DeviceKeys.verified` is
+  /// `directVerified || crossVerified`, so on an account with no cross-signing
+  /// identity there is no route to either: the device stays `unverified`
+  /// forever and no notification is ever posted.
+  ///
+  /// With an identity minted here, the SAS the app drives does reach it. This
+  /// session holds the private halves it has just created, so when the
+  /// verification completes it signs the app's device with the self-signing key
+  /// (`key_verification.dart:805-810`); the app meanwhile has verified this
+  /// account's *master* key over the same exchange, which is what turns that
+  /// signature into a valid chain. `needsVerification` is then false — on the
+  /// next `initialize()`, because nothing re-derives the session state in
+  /// place.
+  ///
+  /// The recovery key is discarded. It is the one thing this returns that a
+  /// user would keep, and a test has nothing to restore.
+  Future<void> enableCrossSigning() async {
+    // `replaceExisting` because a kept container (`e2e.sh --keep`) leaves an
+    // account whose identity was minted by a session that is long gone, and a
+    // private half nobody holds cannot sign anything. Re-minting is the only
+    // way back to a signable account, and it is what `runBootstrap` does for
+    // the user in the same situation.
+    await MatrixKeyBackup(client).createRecovery(replaceExisting: true);
+  }
+
   /// Every device id the homeserver currently lists for this account.
   Future<Set<String>> deviceIds() async {
     final devices = await client.getDevices();

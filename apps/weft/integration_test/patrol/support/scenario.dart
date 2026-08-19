@@ -13,6 +13,8 @@ import 'package:patrol/patrol.dart';
 import 'accounts.dart';
 import 'app.dart';
 import 'environment.dart';
+import 'shade.dart';
+import 'verification.dart';
 
 /// The app, a peer, and an encrypted conversation between them.
 ///
@@ -31,14 +33,31 @@ class ChatScenario {
   /// run by [createJoinedRoom], because the homeserver is shared across a whole
   /// matrix and a test that opened "Attachments" could otherwise open one an
   /// hour old from a different device.
+  ///
+  /// [notifying] additionally gets the session as far as `ready` and takes the
+  /// OS notification permission — everything `makeSessionReady` documents, which
+  /// is the only state in which Weft posts anything at all. It is off by default
+  /// because it costs a cross-signing bootstrap, an emoji comparison and an app
+  /// restart, and only the two notification files need any of it.
   static Future<ChatScenario> start(
     PatrolIntegrationTester $, {
     required String title,
+    bool notifying = false,
   }) async {
-    await ensureSignedIn($);
-
+    // The control session comes first when notifying, because it is what mints
+    // the cross-signing identity this device is then verified into. It is made
+    // first either way so the two orders do not diverge; nothing about it
+    // depends on the app being signed in.
     final control = await TestAccount.control();
     addTearDown(control.dispose);
+
+    if (notifying) {
+      await makeSessionReady($, helper: control);
+      await grantNotificationPermission($);
+    } else {
+      await ensureSignedIn($);
+    }
+
     final bob = await TestAccount.peer();
     addTearDown(bob.dispose);
 

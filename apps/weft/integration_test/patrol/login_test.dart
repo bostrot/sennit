@@ -1,8 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
-import 'package:weft/features/auth/verification_screen.dart';
-import 'package:weft_matrix/weft_matrix.dart' show KeyVerificationState;
 
 import 'support/support.dart';
 
@@ -67,67 +64,12 @@ void main() {
       final control = await TestAccount.control();
       addTearDown(control.dispose);
 
-      // The other device has to be visible to this one before it can be verified:
-      // its keys arrive over sync like everything else.
-      await openInboxMenu($, 'Devices');
-      await pumpUntil(
-        $,
-        () => showing(find.text(kControlDeviceName)),
-        within: kSyncDeadline,
-        reason: 'the helper session to appear in the devices list',
-      );
-
-      // Subscribed before the app is told to start, and deliberately not awaited
-      // yet: the request is sent by the tap below, and a listener attached
-      // afterwards would miss it.
-      final pendingResponder = SasResponder.awaitRequest(control);
-
-      final tile = find.ancestor(
-        of: find.text(kControlDeviceName),
-        matching: find.byType(ListTile),
-      );
-      await $.tap(
-        find.descendant(
-          of: tile,
-          matching: find.byType(PopupMenuButton<String>),
-        ),
-      );
-      await $.tap(find.text('Verify'));
-      await $.tap(find.text('Start verification'));
-
-      final responder = await pendingResponder;
-      final shownEmoji = await _compareEmojiOnScreen($);
-
-      expect(
-        await responder.finished,
-        KeyVerificationState.done,
-        reason: 'the other device has to reach done, not error',
-      );
-      expect(
-        shownEmoji,
-        isNotEmpty,
-        reason:
-            'the emoji comparison is the whole of what the user is asked to do; a '
-            'flow that reached done without showing any is a flow that verified '
-            'without asking',
-      );
-      expect(
-        shownEmoji,
-        responder.emojiNames,
-        reason:
-            'both ends must have derived the same short authentication string, in '
-            'the same order — that is what the comparison proves',
-      );
-
-      // Back to the list, which is where a user would go to check.
-      await $.tap(find.text('Continue'));
-      await pumpUntil(
-        $,
-        () =>
-            showing(find.descendant(of: tile, matching: find.text('Verified'))),
-        within: kSyncDeadline,
-        reason: 'the devices list to show the helper session as verified',
-      );
+      // The whole scenario, and it lives in `support/verification.dart` because
+      // the notification tests need the same drive for a different reason —
+      // they cannot post anything until this device is trusted. Every assertion
+      // it makes is this test's: the two ends reach `done`, emoji were shown,
+      // and both derived the same ones in the same order.
+      await verifyThisDeviceAgainst($, control);
     },
     config: kWeftPatrolConfig,
     timeout: kScenarioTimeout,
@@ -166,64 +108,3 @@ void main() {
     timeout: kScenarioTimeout,
   );
 }
-
-/// Drives the app's half of an interactive verification, returning the emoji
-/// names it was shown.
-///
-/// A loop over what is on screen rather than a fixed sequence of taps, because
-/// the two ends advance each other: which step the app is on depends on what the
-/// other device has just done, and the SDK deliberately skips the choice step
-/// when only one method is possible. Each action is taken at most once — a
-/// second `acceptSas` is a cancelled verification, not a no-op.
-Future<List<String>> _compareEmojiOnScreen(
-  PatrolIntegrationTester $, {
-  Duration? within,
-}) async {
-  const success = 'This device is verified. Your history is unlocking now.';
-  const failure = 'Verification failed or was cancelled.';
-
-  final limit = within ?? kSyncDeadline;
-  final deadline = DateTime.now().add(limit);
-  var names = const <String>[];
-  var chose = false;
-  var accepted = false;
-
-  while (DateTime.now().isBefore(deadline)) {
-    if (showing(find.text(success))) return names;
-    if (showing(find.text(failure))) fail('The app reported: $failure');
-
-    if (!accepted && showing(find.text('They match'))) {
-      // Read before tapping: the cells are gone the moment the state moves on,
-      // and the names are what the two ends are being compared on.
-      names = _sasEmojiNames($);
-      await $.tap(find.text('They match'));
-      accepted = true;
-      continue;
-    }
-    if (!chose && showing(find.text('Compare emoji instead'))) {
-      await $.tap(find.text('Compare emoji instead'));
-      chose = true;
-      continue;
-    }
-    if (!chose && showing(find.text('Compare emoji'))) {
-      await $.tap(find.text('Compare emoji'));
-      chose = true;
-      continue;
-    }
-    await $.pump(const Duration(milliseconds: 200));
-  }
-  fail(
-    'The verification never completed within ${limit.inSeconds}s '
-    '(chose a method: $chose, confirmed the emoji: $accepted)',
-  );
-}
-
-/// The names under the emoji currently on screen, in order.
-///
-/// `SasEmojiCell` is public for exactly this kind of reach: a `KeyVerification`
-/// cannot be built without a live client, so the screen around it cannot be
-/// pumped in a widget test at all.
-List<String> _sasEmojiNames(PatrolIntegrationTester $) => [
-  for (final element in find.byType(SasEmojiCell).evaluate())
-    (element.widget as SasEmojiCell).name,
-];

@@ -139,10 +139,17 @@ Future<void> launchWeft(PatrolIntegrationTester $) async {
 /// assume either state. This is what makes each file independently runnable:
 /// run `messaging_test.dart` alone and it signs in; run it after `login_test`
 /// and it finds a session already there.
+///
+/// [wantsNotifications] is the answer given to the rationale sheet if it turns
+/// up. False — *Not now* — for every scenario that is not about notifications,
+/// because the sheet is modal and the OS prompt behind it is spent exactly once
+/// per install; the notification scenarios pass true, which is the only way this
+/// suite ever gets the permission. See [answerNotificationRationale].
 Future<void> ensureSignedIn(
   PatrolIntegrationTester $, {
   String username = kAppUser,
   String password = kTestPassword,
+  bool wantsNotifications = false,
 }) async {
   await launchWeft($);
   await pumpUntil(
@@ -153,11 +160,16 @@ Future<void> ensureSignedIn(
   );
 
   if (showing(loginScreen)) {
-    await signIn($, username: username, password: password);
+    await signIn(
+      $,
+      username: username,
+      password: password,
+      wantsNotifications: wantsNotifications,
+    );
     return;
   }
   await passVerificationGate($);
-  await dismissNotificationRationale($);
+  await answerNotificationRationale($, wanted: wantsNotifications);
 }
 
 /// Launches Weft and leaves it on the login screen, signing out if it has to.
@@ -186,6 +198,7 @@ Future<void> signIn(
   String username = kAppUser,
   String password = kTestPassword,
   String homeserver = kHomeserver,
+  bool wantsNotifications = false,
 }) async {
   await _resolveHomeserver($, homeserver);
   await _submitCredentials($, username, password);
@@ -199,7 +212,7 @@ Future<void> signIn(
   _failOnSignInError($, 'signing $username in');
 
   await passVerificationGate($);
-  await dismissNotificationRationale($);
+  await answerNotificationRationale($, wanted: wantsNotifications);
 }
 
 /// Resolves [homeserver] on the login screen, unless it already is.
@@ -317,16 +330,107 @@ Future<void> passVerificationGate(PatrolIntegrationTester $) async {
 Future<void> dismissNotificationRationale(
   PatrolIntegrationTester $, {
   Duration within = const Duration(seconds: 5),
+}) => answerNotificationRationale($, wanted: false, within: within);
+
+/// The rationale sheet's headline, which is the only text on it that is
+/// unambiguously its own.
+final Finder notificationRationale = find.text('Get told when someone writes');
+
+/// Answers the rationale sheet if it appears, and says whether it did.
+///
+/// [wanted] true taps *Turn on notifications*, which is what spends the OS
+/// prompt — `main.dart:229-243` shows the system dialog only on that answer, and
+/// only once ever, because `WeftSettings.notifyPermissionAsked` records that the
+/// one prompt an app gets has been used. False taps *Not now*, which costs
+/// nothing and leaves the prompt unspent.
+///
+/// Bounded and optional because the sheet genuinely may not appear: it is gated
+/// on the platform needing a runtime permission, on the prompt never having been
+/// spent, *and* on the session reaching `ready`. Returning false is therefore
+/// information rather than a failure — the caller decides whether a device that
+/// was never asked is a device that already holds the permission or one that
+/// never got as far as asking.
+Future<bool> answerNotificationRationale(
+  PatrolIntegrationTester $, {
+  required bool wanted,
+  Duration within = const Duration(seconds: 5),
 }) async {
-  final headline = find.text('Get told when someone writes');
   final deadline = DateTime.now().add(within);
   while (DateTime.now().isBefore(deadline)) {
-    if (showing(headline)) {
-      await $.tap(find.text('Not now'));
-      return;
+    if (showing(notificationRationale)) {
+      await $.tap(find.text(wanted ? 'Turn on notifications' : 'Not now'));
+      return true;
     }
     await $.pump(const Duration(milliseconds: 100));
   }
+  return false;
+}
+
+// ---------------------------------------------------------- the devices list
+
+/// Opens the devices screen and waits for the list to arrive.
+///
+/// *This device* is always in it, so it is what the wait is for: an empty
+/// `ListView` and a list still being fetched look identical.
+Future<void> openDevicesList(PatrolIntegrationTester $) async {
+  await openInboxMenu($, 'Devices');
+  await pumpUntil(
+    $,
+    () => showing(find.text('This device')),
+    within: kSyncDeadline,
+    reason: 'the devices list to load',
+  );
+}
+
+/// The row for the session this app is signed in on.
+///
+/// Found by the *This device* chip rather than by a device id or a name: the id
+/// is not known to a test that did not watch the login, and an account this
+/// suite has run against a few times holds several sessions all called "Weft".
+Finder get thisDeviceTile => find
+    .ancestor(of: find.text('This device'), matching: find.byType(ListTile))
+    .first;
+
+/// The row for another session, by the name it gave itself.
+Finder deviceTile(String deviceName) =>
+    find.ancestor(of: find.text(deviceName), matching: find.byType(ListTile));
+
+/// Whether the devices list is currently calling [tile] verified.
+///
+/// The word rather than the icon: `trustLabel` in `devices.dart` is the single
+/// source of *Verified* / *Not verified*, and the icon beside it differs only in
+/// colour. For [thisDeviceTile] this is exactly the gate
+/// `WeftMatrixSession.needsVerification` opens — `DeviceTrust` is computed from
+/// the same `DeviceKeys.verified` — which makes it the one place in the UI where
+/// a test can read whether the session will ever reach `ready`.
+bool deviceIsVerified(Finder tile) =>
+    showing(find.descendant(of: tile, matching: find.text('Verified')));
+
+/// Opens the actions menu of a device row and chooses [entry].
+Future<void> chooseDeviceAction(
+  PatrolIntegrationTester $,
+  Finder tile,
+  String entry,
+) async {
+  await $.tap(
+    find.descendant(of: tile, matching: find.byType(PopupMenuButton<String>)),
+  );
+  await $.tap(find.text(entry));
+}
+
+/// Leaves the screen the inbox menu pushed, back to the inbox.
+///
+/// The `AppBar`'s own back button, by the tooltip `MaterialLocalizations` gives
+/// it — not the platform's Back, which on Android would also be the way out of
+/// the app itself if the route stack were shorter than expected.
+Future<void> leaveSettingsScreen(PatrolIntegrationTester $) async {
+  await $.tap(find.byTooltip('Back'));
+  await pumpUntil(
+    $,
+    () => showing(inbox),
+    within: kUiDeadline,
+    reason: 'the inbox after leaving a settings screen',
+  );
 }
 
 /// Signs the current device out through the devices screen.
@@ -340,21 +444,9 @@ Future<void> signOutThisDevice(
   PatrolIntegrationTester $, {
   String password = kTestPassword,
 }) async {
-  await openInboxMenu($, 'Devices');
-  await pumpUntil(
-    $,
-    () => showing(find.text('This device')),
-    within: kSyncDeadline,
-    reason: 'the devices list to load',
-  );
+  await openDevicesList($);
 
-  final tile = find
-      .ancestor(of: find.text('This device'), matching: find.byType(ListTile))
-      .first;
-  await $.tap(
-    find.descendant(of: tile, matching: find.byType(PopupMenuButton<String>)),
-  );
-  await $.tap(find.text('Sign out'));
+  await chooseDeviceAction($, thisDeviceTile, 'Sign out');
   await $.tap(find.widgetWithText(FilledButton, 'Sign out'));
 
   // Synapse puts device deletion behind user-interactive auth, so the password
@@ -412,6 +504,82 @@ Future<void> openChat(PatrolIntegrationTester $, String title) async {
     within: kUiDeadline,
     reason: 'the conversation "$title" to open',
   );
+}
+
+/// Mutes the conversation titled [title] the way the inbox offers it.
+///
+/// Long-press to enter selection, then the *Mute* button in the selection bar.
+/// That is `ChatRepository.setMuted`, which writes a `dont_notify` push rule on
+/// every source room of the chat — so what is exercised is the whole loop the
+/// mute rides on: the rule reaches the homeserver, comes back through sync,
+/// `MatrixChatRepository._chatFromRoom` reads it off `room.pushRuleState` into
+/// `Chat.muted`, and `evaluateNotification` suppresses on that. Setting a flag
+/// would test none of it.
+///
+/// The wait at the end is for the selection to clear, which `_SelectionBar._apply`
+/// does once every selected chat has been through the action — so it is also the
+/// wait for the homeserver having answered.
+Future<void> muteChatFromInbox(PatrolIntegrationTester $, String title) async {
+  await pumpUntil(
+    $,
+    () => showing(find.text(title)),
+    within: kSyncDeadline,
+    reason: 'the conversation "$title" to appear in the inbox',
+  );
+  await $.longPress(find.text(title).first);
+  await pumpUntil(
+    $,
+    () => showing(find.byTooltip('Mute')),
+    within: kUiDeadline,
+    reason: 'the inbox selection bar',
+  );
+  await $.tap(find.byTooltip('Mute'));
+  await pumpUntil(
+    $,
+    () => !showing(find.byTooltip('Mute')),
+    within: kSyncDeadline,
+    reason: 'the mute to be applied and the selection to clear',
+  );
+}
+
+// -------------------------------------------------------- notification policy
+
+/// Puts the global *Only notify for mentions* switch into [on], and leaves the
+/// notifications screen.
+///
+/// The global one because it is the only one the app has. `NotificationPolicy`
+/// carries a per-chat `mentionsOnly` override and the screen's own subtitle
+/// promises that "a single chat can disagree with this from its own screen" —
+/// but nothing in `lib/` ever writes one, so there is no screen to drive. The
+/// rule reached is the same either way (`rules.dart:734`).
+///
+/// Reads the switch before touching it: the policy is one blob in the settings
+/// database and it outlives a test, so a scenario cannot assume which way it was
+/// left.
+Future<void> setMentionsOnly(
+  PatrolIntegrationTester $, {
+  required bool on,
+}) async {
+  await openInboxMenu($, 'Notifications');
+  final row = find.widgetWithText(SwitchListTile, 'Only notify for mentions');
+  await pumpUntil(
+    $,
+    () => showing(row),
+    within: kUiDeadline,
+    reason: 'the notifications screen',
+  );
+
+  final current = (row.evaluate().first.widget as SwitchListTile).value;
+  if (current != on) {
+    await $.tap(find.text('Only notify for mentions'));
+    await pumpUntil(
+      $,
+      () => (row.evaluate().first.widget as SwitchListTile).value == on,
+      within: kUiDeadline,
+      reason: 'the mentions-only switch to read $on',
+    );
+  }
+  await leaveSettingsScreen($);
 }
 
 /// Where the chat's ranked position in the inbox can be read.

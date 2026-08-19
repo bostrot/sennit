@@ -61,14 +61,18 @@ dart pub global activate patrol_cli
 | `attachment_test.dart` | A photo picked from the device's own gallery, its upload bubble, the settled bubble, the full-screen viewer, and the hand-off back to the platform. |
 | `share_in_test.dart` | `ACTION_SEND` and `ACTION_SEND_MULTIPLE` routed by the OS into Weft's share-target sheet. Android rows only. |
 | `permissions_test.dart` | The camera dialog granted and denied natively, and the *absence* of a storage dialog the pickers do not need. |
-| `support/` | Shared account provisioning, login, teardown, the app driver and the media helpers. Setup is not repeated per file. |
+| `notification_test.dart` | A backgrounded Weft posting to the shade, the tap landing in the right conversation, and reply and mark-as-read pressed from the shade itself. |
+| `notification_mute_test.dart` | A muted conversation staying quiet, and mentions-only letting a mention through — each asserted beside a control that had to be noisy. |
+| `deeplink_test.dart` | `weft://chat/<id>`, `weft://search?q=` and `weft://user/<id>` fired by the OS as real `ACTION_VIEW`s. Warm start; see below. |
+| `support/` | Shared account provisioning, login, teardown, the app driver, the media helpers, device verification and the shade. Setup is not repeated per file. |
 | `test_bundle.dart` | **Generated** by `patrol_cli` on every run, and gitignored. Never edit it. |
 
-`support/` is five files because it answers five questions — what the world is
+`support/` is seven files because it answers seven questions — what the world is
 (`environment.dart`), who else is in it (`accounts.dart`), how the app is worked
-(`app.dart`), what the platform does with a file (`media.dart`), and what a
-scenario starts from (`scenario.dart`) — and `support.dart` re-exports all of
-them, which is what a scenario imports.
+(`app.dart`), what the platform does with a file (`media.dart`), what a scenario
+starts from (`scenario.dart`), how this device becomes trusted
+(`verification.dart`), and what is in the notification shade (`shade.dart`) — and
+`support.dart` re-exports all of them, which is what a scenario imports.
 
 Each scenario file must be independently runnable and must clean up the rooms it
 made. The homeserver is shared across a run, so a test that leaves a room behind
@@ -92,6 +96,43 @@ by Android's photo picker. Two consequences:
   storage dialog Phase 09 asks about does not exist; `permissions_test` asserts
   its absence and exercises grant and deny on the camera, which Weft does ask
   for because the manifest declares `CAMERA` for calls.
+
+## Nothing posts a notification until this device is trusted
+
+`main.dart` starts the notification service on `WeftSessionState.ready` and on
+no other state, so a device that took the *Continue without verifying* door
+never posts anything. Verifying against a second session is **not** enough on
+its own: `needsVerification` asks whether *our own* device key reads as
+verified, while SAS marks the keys the other end sent — so on an account with no
+cross-signing identity neither `directVerified` nor `crossVerified` can ever
+become true.
+
+`ChatScenario.start(notifying: true)` is the way through, and it is three steps
+because the app needs all three: the control session mints a cross-signing
+identity, the app drives an emoji comparison against it through its own devices
+screen (which is what signs this device into that identity), and Weft is
+restarted — because nothing re-derives the session state in place. It then
+answers the rationale sheet with *Turn on notifications* and grants the OS
+dialog. `support/verification.dart` has the citations.
+
+Two consequences for anyone adding a scenario. First, this costs a bootstrap, a
+verification and an app restart, so only ask for it when the scenario is about
+notifications. Second, **never pump a frame while Weft is backgrounded**:
+`LiveTestWidgetsFlutterBinding.pump` awaits a completer only a drawn frame
+completes, a stopped activity draws none, and there is no timeout on the wait —
+it is a hang, not a failure. `support/shade.dart` waits on timers throughout for
+that reason, and `backgroundApp` registers a teardown that brings Weft back so
+the *next* scenario's launch does not hang instead.
+
+## Deep links are warm start only
+
+A Patrol test runs inside the app under test: `PatrolJUnitRunner.setUp` launches
+the activity once and every Dart test runs in that process. Killing Weft to make
+the next link a cold start would kill the isolate the test is running on. So the
+cold-start path is unreachable from this suite on every row, and it is recorded
+as not-executed rather than approximated. `deeplink_test.dart` fires real
+`ACTION_VIEW` intents at a running Weft, which is the other half and is genuinely
+routed by the OS.
 
 ## Two things a scenario cannot do through the UI
 

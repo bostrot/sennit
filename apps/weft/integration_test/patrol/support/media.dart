@@ -319,6 +319,16 @@ Future<void> openFullScreenViewer(PatrolIntegrationTester $) async {
 /// it, and something else again on iOS — three strings for one fact. What every
 /// hand-off has in common is that Weft stopped being the thing on screen, which
 /// is checkable on both platforms and on every API level.
+///
+/// Waits on a `Timer` rather than by pumping, and that is load-bearing rather
+/// than stylistic. Both waiters in this section are used at exactly the moments
+/// when another application owns the screen and Weft's activity is stopped —
+/// which is when `LiveTestWidgetsFlutterBinding.pump` is at its most dangerous:
+/// it schedules a frame and awaits a completer that only a *drawn* frame
+/// completes (`flutter_test/src/binding.dart:2994-3016`), with no timeout on it.
+/// A frame that never comes is a hang rather than a failure, and there is
+/// nothing a frame would bring closer here anyway: the condition is a window
+/// belonging to another process.
 Future<Set<String>> awaitForeignWindow(
   PatrolIntegrationTester $, {
   required String reason,
@@ -331,7 +341,7 @@ Future<Set<String>> awaitForeignWindow(
     seen = await _visiblePackages($);
     final foreign = seen.where((package) => package != kAppId).toSet();
     if (foreign.isNotEmpty) return foreign;
-    await $.pump(const Duration(milliseconds: 250));
+    await Future<void>.delayed(const Duration(milliseconds: 250));
   }
   fail(
     'Weft still owned the screen after ${limit.inSeconds}s, waiting for '
@@ -349,7 +359,7 @@ Future<void> awaitWeftForeground(
   while (DateTime.now().isBefore(deadline)) {
     final packages = await _visiblePackages($);
     if (packages.contains(kAppId)) return;
-    await $.pump(const Duration(milliseconds: 250));
+    await Future<void>.delayed(const Duration(milliseconds: 250));
   }
   fail('Weft never came back to the foreground within ${limit.inSeconds}s');
 }
