@@ -138,15 +138,17 @@ class MatrixChatRepository implements ChatRepository {
     }
     _profilesInFlight.add(userId);
 
-    Future<sdk.Profile> lookup() async {
+    Future<(sdk.Profile, bool failed)> lookup() async {
+      var failed = false;
       sdk.Profile? profile;
       try {
         profile = await _client.getProfileFromUserId(userId);
       } on Exception catch (error) {
+        failed = true;
         debugPrint('weft: profile fetch failed for $userId: $error');
       }
       if (profile?.avatarUrl != null || room == null) {
-        return profile ?? sdk.Profile(userId: userId);
+        return (profile ?? sdk.Profile(userId: userId), failed);
       }
       try {
         final member = await _client.getRoomStateWithKey(
@@ -155,21 +157,32 @@ class MatrixChatRepository implements ChatRepository {
           userId,
         );
         final avatar = member['avatar_url'];
-        return sdk.Profile(
-          userId: userId,
-          displayName:
-              (member['displayname'] as String?) ?? profile?.displayName,
-          avatarUrl: avatar is String ? Uri.tryParse(avatar) : null,
+        return (
+          sdk.Profile(
+            userId: userId,
+            displayName:
+                (member['displayname'] as String?) ?? profile?.displayName,
+            avatarUrl: avatar is String ? Uri.tryParse(avatar) : null,
+          ),
+          false,
         );
       } on Exception catch (error) {
         debugPrint('weft: member state fetch failed for $userId: $error');
-        return profile ?? sdk.Profile(userId: userId);
+        return (profile ?? sdk.Profile(userId: userId), true);
       }
     }
 
-    lookup().then((profile) {
+    lookup().then((result) {
+      final (profile, failed) = result;
       _profiles[userId] = profile;
       _profilesInFlight.remove(userId);
+      // An answer that came out of a *network failure* is not an answer: a
+      // DNS blip during first sync used to cache "no name, no picture" for
+      // the rest of the session. The empty result still serves for now, but
+      // it expires, so a later rebuild asks again on a healthier connection.
+      if (failed && profile.avatarUrl == null && profile.displayName == null) {
+        Timer(const Duration(seconds: 45), () => _profiles.remove(userId));
+      }
       // A name is as much a reason to redraw as a picture: chats waiting on a
       // lazy-loaded member are titled by their raw identifier until this lands.
       if (profile.avatarUrl != null || profile.displayName != null) _rebuild();
