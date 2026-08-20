@@ -1,18 +1,12 @@
-import 'dart:io';
-
-import 'package:add_2_calendar/add_2_calendar.dart' as cal;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
 import '../../services/agenda/agenda_service.dart';
+import '../../services/agenda/device_calendar.dart';
 import '../../services/agenda/event_detector.dart';
 
 /// The "add to calendar" offer under a message that names a date.
@@ -58,45 +52,10 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
 
   Future<void> _add() async {
     final candidate = _candidate!;
-    final isMobile =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS);
-
-    if (isMobile) {
-      await cal.Add2Calendar.addEvent2Cal(
-        cal.Event(
-          title: candidate.title,
-          startDate: candidate.start,
-          endDate: candidate.start.add(const Duration(hours: 1)),
-          allDay: !candidate.hasTime,
-        ),
-      );
-      return;
-    }
-
-    // Desktop: a minimal VEVENT, shared. Every calendar app opens these.
-    String stamp(DateTime t) =>
-        '${t.year.toString().padLeft(4, '0')}'
-        '${t.month.toString().padLeft(2, '0')}'
-        '${t.day.toString().padLeft(2, '0')}T'
-        '${t.hour.toString().padLeft(2, '0')}'
-        '${t.minute.toString().padLeft(2, '0')}00';
-    final ics =
-        'BEGIN:VCALENDAR\r\n'
-        'VERSION:2.0\r\n'
-        'PRODID:-//Weft//EN\r\n'
-        'BEGIN:VEVENT\r\n'
-        'DTSTART:${stamp(candidate.start)}\r\n'
-        'DTEND:${stamp(candidate.start.add(const Duration(hours: 1)))}\r\n'
-        'SUMMARY:${candidate.title.replaceAll(RegExp(r'[\r\n]'), ' ')}\r\n'
-        'END:VEVENT\r\n'
-        'END:VCALENDAR\r\n';
-    final dir = await getTemporaryDirectory();
-    final file = File(p.join(dir.path, 'weft-event.ics'));
-    await file.writeAsString(ics);
-    await SharePlus.instance.share(
-      ShareParams(files: [XFile(file.path, mimeType: 'text/calendar')]),
+    await addToDeviceCalendar(
+      title: candidate.title,
+      start: candidate.start,
+      allDay: !candidate.hasTime,
     );
   }
 

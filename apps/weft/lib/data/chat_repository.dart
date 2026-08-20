@@ -70,6 +70,26 @@ abstract class ChatRepository {
 
   Future<void> send(String chatId, String body, {ChatNetwork? via});
 
+  /// Proposes a calendar entry to the conversation.
+  ///
+  /// Weft peers get the negotiation UI; everyone else sees the readable text
+  /// and, in unencrypted rooms, the `.ics` file the entry rides in on.
+  Future<void> sendCalendarInvite(
+    String chatId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+    ChatNetwork? via,
+  });
+
+  /// Answers [inviteEventId]'s calendar invitation.
+  Future<void> respondCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required CalendarReply reply,
+    DateTime? proposedStart,
+  });
+
   /// Starts an MSC3381 poll in the conversation.
   Future<void> createPoll(
     String chatId, {

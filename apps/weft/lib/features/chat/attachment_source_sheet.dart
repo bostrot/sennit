@@ -42,6 +42,11 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
       icon: Icons.poll_outlined,
       label: 'Poll',
     ),
+    (
+      source: AttachmentPickSource.calendar,
+      icon: Icons.event_outlined,
+      label: 'Calendar entry',
+    ),
     if (paperless)
       (
         source: AttachmentPickSource.paperless,

@@ -13,6 +13,7 @@ import '../data/sms_chat_repository.dart';
 import '../services/sms/sms_platform.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../services/status/status_feed.dart';
 import 'labels.dart';
 import 'session_providers.dart';
 import 'stores.dart';
@@ -278,12 +279,18 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   final label = ref.watch(labelFilterProvider);
   final labels = ref.watch(chatLabelsProvider.notifier);
   ref.watch(chatLabelsProvider);
+  // With rings on, the status broadcast group leaves the list — its content
+  // lives in the story row instead of between real conversations.
+  final statusChatId = ref.watch(statusRingsEnabledProvider)
+      ? ref.watch(statusChatProvider)?.id
+      : null;
   final filtered = filterChats(
     chats
         .where(
           (c) =>
               c.archived == showArchived &&
               !service.contains(c.id) &&
+              c.id != statusChatId &&
               (label == null || labels.ofChat(c.id).contains(label)),
         )
         .toList(),

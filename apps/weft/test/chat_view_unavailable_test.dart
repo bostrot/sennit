@@ -16,6 +16,23 @@ import 'package:weft_merge/weft_merge.dart';
 /// rooms, standing in for a room the account has since left.
 class _NoRoomsRepository implements ChatRepository {
   @override
+  Future<void> sendCalendarInvite(
+    String chatId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+    ChatNetwork? via,
+  }) async {}
+
+  @override
+  Future<void> respondCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required CalendarReply reply,
+    DateTime? proposedStart,
+  }) async {}
+
+  @override
   Future<void> createPoll(
     String chatId, {
     required String question,

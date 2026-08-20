@@ -106,6 +106,8 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => push(const SmsScreen()),
             ),
 
+          const _StatusRingsToggle(),
+
           header('Look & feel'),
           tile(
             icon: Icons.palette_outlined,
@@ -254,6 +256,36 @@ class _AgendaToggle extends ConsumerWidget {
       value: stores.settings.getBool(WeftSettings.agendaDetect, fallback: true),
       onChanged: (value) {
         stores.settings.setBool(WeftSettings.agendaDetect, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
+    );
+  }
+}
+
+/// The status-rings switch: WhatsApp statuses as stories, not as a group.
+class _StatusRingsToggle extends ConsumerWidget {
+  const _StatusRingsToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      return const SizedBox.shrink();
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.donut_large_rounded),
+      title: const Text('Statuses as rings'),
+      subtitle: const Text(
+        'Show contacts\' WhatsApp statuses as story rings above the inbox '
+        'instead of a "Status Broadcast" group.',
+      ),
+      value: stores.settings.getBool(WeftSettings.statusRings, fallback: true),
+      onChanged: (value) {
+        stores.settings.setBool(WeftSettings.statusRings, value: value);
         ref.read(settingsRevisionProvider.notifier).bump();
       },
     );

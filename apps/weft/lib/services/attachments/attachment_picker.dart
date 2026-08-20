@@ -40,6 +40,9 @@ enum AttachmentPickSource {
   /// only offered when the integration is configured.
   paperless,
 
+  /// A proposed calendar entry the other side can accept, decline or move.
+  calendar,
+
   /// A photo taken now. Mobile only — [AttachmentPicker.supports] says so.
   camera,
 }
@@ -130,7 +133,8 @@ class PlatformAttachmentPicker implements AttachmentPicker {
       // Not files: the chat view intercepts these before ever calling pick.
       AttachmentPickSource.location ||
       AttachmentPickSource.poll ||
-      AttachmentPickSource.paperless => throw UnsupportedError(
+      AttachmentPickSource.paperless ||
+      AttachmentPickSource.calendar => throw UnsupportedError(
         'Sent as an event, not picked as a file',
       ),
     };

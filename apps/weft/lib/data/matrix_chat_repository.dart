@@ -327,6 +327,99 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> sendCalendarInvite(
+    String chatId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+    ChatNetwork? via,
+  }) async {
+    final target = _sendSource(chatId, via: via);
+    if (target.network == ChatNetwork.sms) {
+      throw StateError('SMS cannot carry a calendar invitation');
+    }
+    final room = _roomFor(target);
+    final uid =
+        'weft-${DateTime.now().millisecondsSinceEpoch}@weft.bostrot.com';
+    final when = start.toUtc();
+    final until = (end ?? start.add(const Duration(hours: 1))).toUtc();
+
+    String stamp(DateTime t) =>
+        '${t.year.toString().padLeft(4, '0')}'
+        '${t.month.toString().padLeft(2, '0')}'
+        '${t.day.toString().padLeft(2, '0')}T'
+        '${t.hour.toString().padLeft(2, '0')}'
+        '${t.minute.toString().padLeft(2, '0')}00Z';
+    final ics =
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Weft//EN\r\n'
+        'METHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:$uid\r\n'
+        'DTSTART:${stamp(when)}\r\nDTEND:${stamp(until)}\r\n'
+        'SUMMARY:${title.replaceAll(RegExp(r'[\r\n]'), ' ')}\r\n'
+        'END:VEVENT\r\nEND:VCALENDAR\r\n';
+
+    final calendarBlock = {
+      'uid': uid,
+      'title': title,
+      'start': when.toIso8601String(),
+      'end': until.toIso8601String(),
+    };
+    final readable =
+        '📅 $title — '
+        '${start.day}.${start.month}.${start.year}, '
+        '${start.hour.toString().padLeft(2, '0')}:'
+        '${start.minute.toString().padLeft(2, '0')}';
+
+    if (room.encrypted) {
+      // No plain-media upload in an encrypted room; the custom key carries
+      // everything a Weft peer needs and the body carries it for humans.
+      await room.sendEvent({
+        'msgtype': sdk.MessageTypes.Text,
+        'body': readable,
+        kCalendarInviteKey: calendarBlock,
+      });
+      return;
+    }
+
+    final mxc = await _client.uploadContent(
+      Uint8List.fromList(ics.codeUnits),
+      filename: '$title.ics',
+      contentType: 'text/calendar',
+    );
+    await room.sendEvent({
+      'msgtype': sdk.MessageTypes.File,
+      'body': readable,
+      'filename': '$title.ics',
+      'url': mxc.toString(),
+      'info': {'mimetype': 'text/calendar', 'size': ics.length},
+      kCalendarInviteKey: calendarBlock,
+    });
+  }
+
+  @override
+  Future<void> respondCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required CalendarReply reply,
+    DateTime? proposedStart,
+  }) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) throw StateError('That conversation is gone');
+    await room.sendEvent({
+      'm.relates_to': {
+        'rel_type': sdk.RelationshipTypes.reference,
+        'event_id': inviteEventId,
+      },
+      'response': switch (reply) {
+        CalendarReply.accepted => 'accept',
+        CalendarReply.declined => 'decline',
+        CalendarReply.reschedule => 'reschedule',
+      },
+      if (proposedStart != null)
+        'proposed_start': proposedStart.toUtc().toIso8601String(),
+    }, type: kCalendarResponseType);
+  }
+
+  @override
   Future<void> createPoll(
     String chatId, {
     required String question,

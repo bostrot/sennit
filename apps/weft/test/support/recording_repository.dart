@@ -32,6 +32,23 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  Future<void> sendCalendarInvite(
+    String chatId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+    ChatNetwork? via,
+  }) async {}
+
+  @override
+  Future<void> respondCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required CalendarReply reply,
+    DateTime? proposedStart,
+  }) async {}
+
+  @override
   Future<void> createPoll(
     String chatId, {
     required String question,

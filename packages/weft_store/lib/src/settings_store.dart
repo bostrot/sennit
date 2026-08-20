@@ -147,6 +147,10 @@ abstract final class WeftSettings {
   /// embedding model — which is why it may default on.
   static const String agendaDetect = 'agenda.detect';
 
+  /// Whether bridge status broadcasts (WhatsApp statuses) show as story
+  /// rings above the inbox instead of as the broadcast group chat.
+  static const String statusRings = 'status.rings';
+
   /// The user's Home Assistant base URL, e.g. `http://homeassistant.local:8123`.
   static const String homeAssistantUrl = 'integrations.ha_url';
 

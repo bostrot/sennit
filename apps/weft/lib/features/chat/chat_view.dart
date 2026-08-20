@@ -34,6 +34,7 @@ import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
+import '../../services/agenda/device_calendar.dart';
 import 'agenda_chip.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
@@ -909,6 +910,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                   ),
                               onTapLink: _openLink,
                               onTapMention: _openMention,
+                              onRespondInvite: message.calendarInvite == null
+                                  ? null
+                                  : (reply, proposedStart) => _respondInvite(
+                                      message,
+                                      reply,
+                                      proposedStart,
+                                    ),
                               onVote: message.kind == MessageKind.poll
                                   ? (optionId) => _run(
                                       () => ref
@@ -1334,6 +1342,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
       await _createPoll(chat);
       return;
     }
+    if (source == AttachmentPickSource.calendar) {
+      await _createCalendarInvite(chat);
+      return;
+    }
     if (source == AttachmentPickSource.paperless) {
       final staged = await showPaperlessPickerSheet(context, ref);
       if (staged == null || !mounted) return;
@@ -1408,6 +1420,102 @@ class _ChatViewState extends ConsumerState<ChatView> {
       debugPrint('weft: share location failed: $error');
       if (mounted) _showMessage('Could not get a position.');
     }
+  }
+
+  Future<void> _respondInvite(
+    WeftMessage message,
+    CalendarReply reply,
+    DateTime? proposedStart,
+  ) async {
+    // The sender adopting a proposed time is not an *answer* — it is the next
+    // version of the invitation, sent at that time.
+    if (message.isOwn && proposedStart != null) {
+      final invite = message.calendarInvite!;
+      final chat = ref
+          .read(chatsProvider)
+          .value
+          ?.where((c) => c.id == _chatId)
+          .firstOrNull;
+      await _run(
+        () => ref
+            .read(chatRepositoryProvider)
+            .sendCalendarInvite(
+              _chatId,
+              title: invite.title,
+              start: proposedStart,
+              via: chat?.sendNetwork,
+            ),
+      );
+      return;
+    }
+    await _run(
+      () => ref
+          .read(chatRepositoryProvider)
+          .respondCalendarInvite(
+            message.roomId,
+            message.eventId,
+            reply: reply,
+            proposedStart: proposedStart,
+          ),
+    );
+    if (reply == CalendarReply.accepted && message.calendarInvite != null) {
+      // Accepting means it goes in the calendar — that is what accept *is*.
+      final invite = message.calendarInvite!;
+      try {
+        await addToDeviceCalendar(
+          title: invite.title,
+          start: invite.start,
+          end: invite.end,
+        );
+      } on Object catch (error) {
+        debugPrint('weft: calendar add failed: $error');
+      }
+    }
+  }
+
+  Future<void> _createCalendarInvite(Chat chat) async {
+    final title = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Propose a calendar entry'),
+        content: TextField(
+          controller: title,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'What is it?',
+            hintText: 'Dinner at ours',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Pick a time'),
+          ),
+        ],
+      ),
+    );
+    Future<void>.delayed(const Duration(seconds: 1), title.dispose);
+    if (confirmed != true || title.text.trim().isEmpty || !mounted) return;
+
+    final when = await _pickDateTime(context, from: DateTime.now());
+    if (when == null || !mounted) return;
+
+    await _run(
+      () => ref
+          .read(chatRepositoryProvider)
+          .sendCalendarInvite(
+            _chatId,
+            title: title.text.trim(),
+            start: when,
+            via: chat.sendNetwork,
+          ),
+    );
   }
 
   Future<void> _createPoll(Chat chat) async {
@@ -1661,6 +1769,7 @@ class _MessageBubble extends StatelessWidget {
     required this.groupedWithPrevious,
     this.replyPreview,
     this.onVote,
+    this.onRespondInvite,
     this.content,
     this.highlighted = false,
     this.transcribing = false,
@@ -1681,6 +1790,10 @@ class _MessageBubble extends StatelessWidget {
 
   /// Casts a vote on this message's poll. Null for everything else.
   final ValueChanged<String>? onVote;
+
+  /// Answers this message's calendar invitation.
+  final void Function(CalendarReply reply, DateTime? proposedStart)?
+  onRespondInvite;
 
   /// What this message is answering, already resolved across every leg of a
   /// merged chat. Null when it is not a reply.
@@ -1907,6 +2020,12 @@ class _MessageBubble extends StatelessWidget {
                           )
                         else if (message.kind == MessageKind.location)
                           _LocationContent(message: message, own: own)
+                        else if (message.calendarInvite != null)
+                          _CalendarInviteContent(
+                            message: message,
+                            own: own,
+                            onRespond: onRespondInvite,
+                          )
                         else if (message.kind == MessageKind.poll &&
                             message.poll != null)
                           _PollContent(
@@ -2986,6 +3105,130 @@ class _PollComposerDialogState extends State<_PollComposerDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _submit, child: const Text('Create poll')),
+      ],
+    );
+  }
+}
+
+/// A proposed calendar entry, with the negotiation the sender asked for.
+///
+/// The receiving side can accept — which also opens their device calendar,
+/// because that is what accepting *means* — decline, or propose another time.
+/// The sender watches the answers arrive, and a proposed new time comes with
+/// a one-tap "invite again at that time".
+class _CalendarInviteContent extends StatelessWidget {
+  const _CalendarInviteContent({
+    required this.message,
+    required this.own,
+    this.onRespond,
+  });
+
+  final WeftMessage message;
+  final bool own;
+  final void Function(CalendarReply reply, DateTime? proposedStart)? onRespond;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final invite = message.calendarInvite!;
+    final when = DateFormat.yMMMEd().add_Hm().format(invite.start);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          container: true,
+          excludeSemantics: true,
+          label: semanticsSentence(['Calendar invitation', invite.title, when]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_rounded, size: 26, color: onBubble),
+              const SizedBox(width: WeftSpace.sm),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      invite.title,
+                      style: context.text.bodyMedium?.copyWith(
+                        color: onBubble,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      when,
+                      style: context.text.labelSmall?.copyWith(
+                        color: palette.mutedOnBubble(own),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // The answers, one line each — who, what, and any new time proposed.
+        for (final response in invite.responses)
+          Padding(
+            padding: const EdgeInsets.only(top: WeftSpace.xs),
+            child: Text(switch (response.reply) {
+              CalendarReply.accepted => '✓ ${response.senderName} accepted',
+              CalendarReply.declined => '✕ ${response.senderName} declined',
+              CalendarReply.reschedule =>
+                '↻ ${response.senderName} suggests '
+                    '${response.proposedStart == null ? 'another time' : DateFormat.MMMEd().add_Hm().format(response.proposedStart!)}',
+            }, style: context.text.labelSmall?.copyWith(color: onBubble)),
+          ),
+        if (onRespond != null && !own) ...[
+          const SizedBox(height: WeftSpace.sm),
+          Wrap(
+            spacing: WeftSpace.sm,
+            children: [
+              FilledButton.tonal(
+                onPressed: () => onRespond!(CalendarReply.accepted, null),
+                child: const Text('Accept'),
+              ),
+              OutlinedButton(
+                onPressed: () => onRespond!(CalendarReply.declined, null),
+                child: const Text('Decline'),
+              ),
+              OutlinedButton(
+                onPressed: () async {
+                  final when = await _ChatViewState._pickDateTime(
+                    context,
+                    from: DateTime.now(),
+                  );
+                  if (when != null) {
+                    onRespond!(CalendarReply.reschedule, when);
+                  }
+                },
+                child: const Text('New time'),
+              ),
+            ],
+          ),
+        ],
+        // The sender's shortcut: someone proposed a time, make it the plan.
+        if (onRespond != null && own)
+          for (final response in invite.responses)
+            if (response.reply == CalendarReply.reschedule &&
+                response.proposedStart != null)
+              Padding(
+                padding: const EdgeInsets.only(top: WeftSpace.sm),
+                child: OutlinedButton.icon(
+                  onPressed: () => onRespond!(
+                    CalendarReply.accepted,
+                    response.proposedStart,
+                  ),
+                  icon: const Icon(Icons.update_rounded, size: 16),
+                  label: Text(
+                    'Use ${DateFormat.MMMEd().add_Hm().format(response.proposedStart!)}',
+                  ),
+                ),
+              ),
       ],
     );
   }

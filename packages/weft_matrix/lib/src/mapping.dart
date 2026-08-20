@@ -162,6 +162,30 @@ WeftMessage? mapEvent(
     );
   }
 
+  // A Weft calendar invitation rides an ordinary message under a custom key,
+  // so every other client still shows the text (and the .ics, where one was
+  // attached). Weft peers additionally get the negotiation: answers arrive as
+  // reference relations and fold onto the invite here.
+  if (event.content[kCalendarInviteKey] is Map) {
+    final invite = _calendarInviteFrom(event, timeline: timeline);
+    if (invite != null) {
+      return WeftMessage(
+        eventId: event.eventId,
+        roomId: event.roomId ?? '',
+        network: network,
+        senderId: event.senderId,
+        senderName: event.senderFromMemoryOrFallback.calcDisplayname(),
+        timestamp: event.originServerTs,
+        kind: MessageKind.event,
+        isOwn: event.senderId == ownUserId,
+        body: event.text,
+        redacted: event.redacted,
+        deliveryState: _deliveryFor(event),
+        calendarInvite: invite,
+      );
+    }
+  }
+
   // A call leaves marks in the room, and a conversation that hides them reads
   // as if nothing happened — "someone called" is exactly the kind of event a
   // person scrolls back to find. Invite, hangup and reject are the three that
@@ -596,5 +620,62 @@ PollData? _pollFrom(
     ownVotes: ownVotes,
     ended: ended,
     maxSelections: maxSelections,
+  );
+}
+
+/// The content key a Weft calendar invitation rides under.
+const String kCalendarInviteKey = 'com.bostrot.weft.calendar';
+
+/// The relation type its answers use.
+const String kCalendarResponseType = 'com.bostrot.weft.calendar.response';
+
+CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
+  final block = event.content[kCalendarInviteKey];
+  if (block is! Map) return null;
+  final uid = block['uid'];
+  final title = block['title'];
+  final start = DateTime.tryParse(block['start'] as String? ?? '');
+  if (uid is! String || title is! String || start == null) return null;
+
+  final responses = <String, CalendarResponse>{};
+  if (timeline != null) {
+    // Latest answer per person wins, same rule as polls.
+    final latest = <String, sdk.Event>{};
+    for (final related in event.aggregatedEvents(
+      timeline,
+      sdk.RelationshipTypes.reference,
+    )) {
+      if (related.type != kCalendarResponseType) continue;
+      final previous = latest[related.senderId];
+      if (previous == null ||
+          related.originServerTs.isAfter(previous.originServerTs)) {
+        latest[related.senderId] = related;
+      }
+    }
+    for (final entry in latest.entries) {
+      final reply = switch (entry.value.content['response']) {
+        'accept' => CalendarReply.accepted,
+        'decline' => CalendarReply.declined,
+        'reschedule' => CalendarReply.reschedule,
+        _ => null,
+      };
+      if (reply == null) continue;
+      responses[entry.key] = CalendarResponse(
+        senderId: entry.key,
+        senderName: entry.value.senderFromMemoryOrFallback.calcDisplayname(),
+        reply: reply,
+        proposedStart: DateTime.tryParse(
+          entry.value.content['proposed_start'] as String? ?? '',
+        ),
+      );
+    }
+  }
+
+  return CalendarInvite(
+    uid: uid,
+    title: title,
+    start: start.toLocal(),
+    end: DateTime.tryParse(block['end'] as String? ?? '')?.toLocal(),
+    responses: responses.values.toList(growable: false),
   );
 }

@@ -161,6 +161,23 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> sendCalendarInvite(
+    String chatId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+    ChatNetwork? via,
+  }) => send(chatId, '📅 $title', via: via);
+
+  @override
+  Future<void> respondCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required CalendarReply reply,
+    DateTime? proposedStart,
+  }) async {}
+
+  @override
   Future<void> createPoll(
     String chatId, {
     required String question,
