@@ -874,15 +874,39 @@ class MatrixChatRepository implements ChatRepository {
     if (!_chatsController.isClosed) _chatsController.add(_chats);
   }
 
+  /// The peer's human name, resolved the same way for titles and handles.
+  ///
+  /// Member event first, fetched profile second, and always with the bridge's
+  /// " (WA)"-style suffix stripped — the merge scorer compares names *exactly*,
+  /// and "Joanne (WA)" versus "Joanne" is how two chats with the same person's
+  /// name on them never became a suggestion.
+  String? _peerDisplayName(sdk.Room room, String peerId) {
+    final fromMember = room
+        .unsafeGetUserFromMemoryOrFallback(peerId)
+        .displayName
+        ?.trim();
+    if (fromMember != null && fromMember.isNotEmpty) {
+      return _stripNetworkTag(fromMember);
+    }
+    final fetched = _profiles[peerId]?.displayName?.trim();
+    if (fetched != null && fetched.isNotEmpty) {
+      return _stripNetworkTag(fetched);
+    }
+    return null;
+  }
+
   /// Rebuilds handles from direct chats so the scorer can suggest merges.
   ///
   /// Only DMs participate: merging two group rooms is not a "same person"
-  /// question, so groups are always left alone.
+  /// question, so groups are always left alone. A DM is what [_peerOf] says it
+  /// is — bridge portals usually never enter `m.direct`, and skipping them
+  /// here is why a WhatsApp chat and an SMS thread with the same person on
+  /// them could not be offered as a merge at all.
   void _refreshIdentityGraph() {
     for (final room in _client.rooms) {
-      if (!room.isDirectChat || room.isSpace) continue;
+      if (room.isSpace) continue;
 
-      final peerId = room.directChatMatrixID;
+      final peerId = _peerOf(room);
       if (peerId == null) continue;
 
       final network = networkForRoom(room);
@@ -894,7 +918,7 @@ class MatrixChatRepository implements ChatRepository {
         remoteId: _remoteIdFor(peerId, network),
         matrixUserId: peerId,
         roomId: room.id,
-        displayName: peer.calcDisplayname(),
+        displayName: _peerDisplayName(room, peerId) ?? peer.calcDisplayname(),
         avatarUrl: _thumbnail(peer.avatarUrl?.toString()),
         // The localpart of a bridged ghost is often the phone number. Storing
         // the normalised form means the strongest merge signal is actually
@@ -1019,15 +1043,8 @@ class MatrixChatRepository implements ChatRepository {
       return _stripNetworkTag(explicit);
     }
 
-    final member = room.unsafeGetUserFromMemoryOrFallback(peerId);
-    final fromMember = member.displayName?.trim();
-    if (fromMember != null && fromMember.isNotEmpty) {
-      return _stripNetworkTag(fromMember);
-    }
-    final fetched = _profiles[peerId]?.displayName?.trim();
-    if (fetched != null && fetched.isNotEmpty) {
-      return _stripNetworkTag(fetched);
-    }
+    final resolved = _peerDisplayName(room, peerId);
+    if (resolved != null) return resolved;
     // The member event is lazy-loaded and no profile is cached yet; ask once
     // and name the chat after the peer's own identifier meanwhile — a phone
     // number is a worse name than "Anna" but a far better one than
@@ -1068,9 +1085,10 @@ class MatrixChatRepository implements ChatRepository {
     return Chat(
       id: room.id,
       title: _titleFor(room),
-      contactId: room.directChatMatrixID == null
-          ? null
-          : _graph.contactIdOf(room.directChatMatrixID!),
+      contactId: switch (_peerOf(room)) {
+        null => null,
+        final peer => _graph.contactIdOf(peer),
+      },
       sources: [
         ChatSource(
           roomId: room.id,

@@ -135,6 +135,11 @@ abstract final class WeftSettings {
   /// Networks excluded from any remote endpoint, as a JSON list of network ids.
   static const String remoteExcludedNetworks = 'privacy.remote_excluded';
 
+  /// Whether messages are scanned for appointments to offer "add to
+  /// calendar". Fully on-device — rules plus, when installed, the local
+  /// embedding model — which is why it may default on.
+  static const String agendaDetect = 'agenda.detect';
+
   /// Whether a link in a message may be previewed.
   ///
   /// Off unless set, like every other gate that sends something off the device.

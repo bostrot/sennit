@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_store/weft_store.dart';
+
 import '../../app/session_providers.dart';
+import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
@@ -136,6 +139,7 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Run search and transcription on this device',
             onTap: () => push(const ModelsScreen()),
           ),
+          const _AgendaToggle(),
 
           header('Privacy & security'),
           tile(
@@ -172,6 +176,41 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The appointment-detection switch.
+///
+/// Its own widget because it is the one row on this screen with state. Fully
+/// on-device — rules plus, when installed, the local embedding model — which
+/// is why it defaults on where the remote-endpoint gates default off.
+class _AgendaToggle extends ConsumerWidget {
+  const _AgendaToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      // Settings opened before bootstrap finished; the row simply waits.
+      return const SizedBox.shrink();
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.event_available_rounded),
+      title: const Text('Detect appointments'),
+      subtitle: const Text(
+        'Offer "add to calendar" under messages that name a date. '
+        'Runs entirely on this device.',
+      ),
+      value: stores.settings.getBool(WeftSettings.agendaDetect, fallback: true),
+      onChanged: (value) {
+        stores.settings.setBool(WeftSettings.agendaDetect, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
     );
   }
 }

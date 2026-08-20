@@ -30,6 +30,7 @@ import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
+import 'agenda_chip.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
 import 'attachment_source_sheet.dart';
@@ -1747,6 +1748,11 @@ class _MessageBubble extends StatelessWidget {
           // [LinkPreviewCard].
           if (content == null)
             LinkPreviewCard(message: message, own: own, onTapUrl: onTapLink),
+          // Same reasoning, same place: the chip is an action *about* the
+          // message. It renders nothing unless the detector found a date
+          // worth offering — see [AgendaChip].
+          if (content == null && !message.redacted)
+            AgendaChip(message: message),
           // Outside the bubble's decoration, deliberately. A chip on the own
           // bubble's primary fill would have to fight it for contrast, and the
           // bar belongs to the message rather than being part of what it says.
@@ -1875,7 +1881,10 @@ class _VoiceContent extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
+          // Max, not min: a voice note is drawn as a full-width instrument the
+          // way every messenger draws one, and the waveform below expands to
+          // whatever the bubble has — bars that stopped mid-bubble read as a
+          // rendering bug, and were reported as one.
           children: [
             // A real control, not an icon-shaped decoration: this is the
             // play/pause button the whole bubble is drawn around. Its own
@@ -1922,7 +1931,7 @@ class _VoiceContent extends ConsumerWidget {
             // Whether there is a transcript belongs here too — it is the
             // difference between a message this reader can read and one they
             // cannot.
-            Flexible(
+            Expanded(
               child: Semantics(
                 container: true,
                 excludeSemantics: true,
@@ -1938,20 +1947,19 @@ class _VoiceContent extends ConsumerWidget {
                     'no transcript yet',
                 ]),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Waveform takes the space the bubble actually has rather than a
                     // fixed 22 bars: previously the bubble stretched to full width
                     // while the bars and timestamp stopped around the middle.
-                    Flexible(
+                    Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final barCount = ((constraints.maxWidth - 60) / 5.5)
+                          final barCount = (constraints.maxWidth / 5.5)
                               .floor()
-                              .clamp(8, 48);
+                              .clamp(8, 160);
                           final playedBars = (progress * barCount).round();
                           return Row(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               // Deterministic pseudo-waveform: real amplitude data arrives with
                               // the recorder in M9. During playback the bars fill left

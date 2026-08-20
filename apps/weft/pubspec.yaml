@@ -60,6 +60,9 @@ dependencies:
   # Matrix client expects a voice note in — and AAC on Apple platforms, where
   # no opus encoder is available.
   record: ^7.1.1
+  # "Add to calendar" on the platforms with a system calendar editor to open.
+  # Desktop shares an .ics instead — see agenda_chip.dart.
+  add_2_calendar: ^3.1.1
   intl: any
   matrix: ^10.1.0
   path: ^1.9.1

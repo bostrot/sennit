@@ -32,7 +32,14 @@ class DetectedBridge {
 List<DetectedBridge> detectBridges(sdk.Client client) {
   final byNetwork = <ChatNetwork, ({Set<String> rooms, String? bot})>{};
 
+  void record(ChatNetwork network, String roomId, String? bot) {
+    final existing = byNetwork[network] ?? (rooms: <String>{}, bot: null);
+    existing.rooms.add(roomId);
+    byNetwork[network] = (rooms: existing.rooms, bot: existing.bot ?? bot);
+  }
+
   for (final room in client.rooms) {
+    var stamped = false;
     for (final type in bridgeStateEventTypes) {
       final states = room.states[type];
       if (states == null) continue;
@@ -41,15 +48,35 @@ List<DetectedBridge> detectBridges(sdk.Client client) {
         final network = networkFromBridgeStateContent(event.content);
         if (network == ChatNetwork.unknown) continue;
 
-        final existing = byNetwork[network] ?? (rooms: <String>{}, bot: null);
-        existing.rooms.add(room.id);
+        stamped = true;
         final bot = event.content['bridgebot'];
-        byNetwork[network] = (
-          rooms: existing.rooms,
-          bot: existing.bot ?? (bot is String ? bot : null),
-        );
+        record(network, room.id, bot is String ? bot : null);
       }
     }
+
+    if (stamped) continue;
+
+    // No `m.bridge` state — not every bridge writes it (mautrix-gmessages
+    // among them), and a bridge whose rooms are all unmistakably its own
+    // ghosts must not be invisible in the bridges screen for the missing
+    // stamp. The ghost-localpart heuristic that already classifies these
+    // rooms for the inbox classifies them here too, and the bot — whose
+    // localpart names the network with a `bot` suffix — is picked out of the
+    // membership when it is present.
+    final network = networkForRoom(room);
+    if (network == ChatNetwork.matrix || network == ChatNetwork.unknown) {
+      continue;
+    }
+    String? bot;
+    for (final participant in room.getParticipants()) {
+      final localpart = participant.id.split(':').first;
+      if (localpart.endsWith('bot') &&
+          networkFromBridgeBotId(participant.id) == network) {
+        bot = participant.id;
+        break;
+      }
+    }
+    record(network, room.id, bot);
   }
 
   final detected = byNetwork.entries
