@@ -75,12 +75,42 @@ String? _defaultCountryCode(Ref ref) {
   return stored == null || stored.trim().isEmpty ? null : stored.trim();
 }
 
-/// Auth headers for avatar/media fetches, or null in demo mode.
+/// Auth headers for avatar/media fetches, or null in demo mode or before the
+/// client actually has a token.
+///
+/// Deliberately watches [sessionStateProvider] rather than reading
+/// `session.isInitialized` directly. `matrixSessionProvider` returns the same
+/// [WeftMatrixSession] instance for the app's whole lifetime, and Riverpod
+/// only recomputes a `Provider` when a *watched provider's value* changes —
+/// not when a mutable field on an already-returned object changes underneath
+/// it. `isInitialized` flips from a private field the moment the SDK's
+/// `Client` is constructed, which is *before* `client.init()` has restored
+/// any stored access token — so the old code could (and reproducibly did)
+/// compute once during that window, cache `null` headers forever, and send
+/// every avatar and media request unauthenticated for the rest of the
+/// session: a 401 on every single fetch, not a `null` mxc URL, which is
+/// exactly the failure mode this was silently causing. `sessionStateProvider`
+/// is a real stream that re-emits on every login-state transition, including
+/// after `onSoftLogout`'s token refresh, so watching it recomputes the
+/// headers exactly when the token is actually usable — and again if it
+/// changes later.
 final mediaHeadersProvider = Provider<Map<String, String>?>((ref) {
   if (kDemoMode) return null;
-  final session = ref.watch(matrixSessionProvider);
-  if (!session.isInitialized) return null;
-  return mediaAuthHeaders(session.client);
+  final state = ref.watch(sessionStateProvider).value;
+  switch (state) {
+    case null:
+    case WeftSessionState.loggedOut:
+    case WeftSessionState.connecting:
+    // The SDK is mid-refresh; the old token is already known bad, so there is
+    // no point sending it. `_onLoginStateChanged` re-emits once the refresh
+    // lands, which recomputes this with the new one.
+    case WeftSessionState.softLoggedOut:
+      return null;
+    case WeftSessionState.unverified:
+    case WeftSessionState.ready:
+      break;
+  }
+  return mediaAuthHeaders(ref.watch(matrixSessionProvider).client);
 });
 
 final chatsProvider = StreamProvider<List<Chat>>((ref) {
