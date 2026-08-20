@@ -20,17 +20,25 @@ class MergeScreen extends ConsumerStatefulWidget {
 }
 
 class _MergeScreenState extends ConsumerState<MergeScreen> {
-  /// Applies [action] and then says what it did.
+  /// Applies [action] and then says what it did — out loud *and* on screen.
   ///
-  /// Every decision on this screen reports itself the same way: the card the
-  /// user acted on disappears. That is a complete report for someone watching
-  /// the list and no report at all for someone listening to it — the reader is
-  /// simply left on whatever moved up into the gap.
+  /// The card disappearing used to be the whole visible report, which is no
+  /// report at all when the action throws (nothing announced, nothing moved,
+  /// nothing explained) and a thin one even when it works. Now every decision
+  /// ends in a sentence: the outcome as a snack bar, or the failure as one.
   Future<void> _decide(Future<void> Function() action, String outcome) async {
-    await action();
+    try {
+      await action();
+    } on Object catch (error) {
+      debugPrint('weft: merge decision failed: $error');
+      if (mounted) {
+        showWeftMessage(context, 'That did not go through. $error');
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {});
-    announce(context, outcome);
+    showWeftMessage(context, outcome);
   }
 
   @override

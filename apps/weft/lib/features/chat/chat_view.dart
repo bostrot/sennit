@@ -118,6 +118,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// progressively jankier the further back you went.
   final Set<String> _indexed = {};
 
+  /// The conversation's *current* id, which is not always the one this view
+  /// was opened with: merging the person folds their rooms into a
+  /// `merged:<contact>` chat, and the room id this route carries stops naming
+  /// anything in the inbox. Every action and lookup below goes through this,
+  /// so a merge underneath an open chat re-points the view instead of
+  /// stranding it on a spinner that never ends.
+  String get _chatId {
+    final direct = ref
+        .read(chatsProvider)
+        .value
+        ?.where((c) => c.id == widget.chatId)
+        .firstOrNull;
+    if (direct != null) return widget.chatId;
+    return ref.read(chatRepositoryProvider).chatForRoom(widget.chatId)?.id ??
+        widget.chatId;
+  }
+
+  /// What the open timeline was built for, to notice when [_chatId] moves.
+  String? _timelineChatId;
+
   /// Held rather than read back in [dispose], where `ref` is already unsafe:
   /// a `ConsumerState` is unmounted before its `dispose` runs, and reading a
   /// provider through a dead `BuildContext` throws.
@@ -162,8 +182,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   void _syncRefresh() {
+    if (!mounted) return;
+    // The conversation was merged (or unmerged) underneath this view: its id
+    // moved, and the open timeline covers the wrong set of rooms. Reopen on
+    // the new id — this is what turned the back-from-merge spinner into a
+    // conversation again.
+    if (_timelineChatId != null && _timelineChatId != _chatId) {
+      _open();
+      return;
+    }
     final timeline = _timeline;
-    if (timeline == null || !mounted) return;
+    if (timeline == null) return;
     final next = timeline.view();
     if (_viewFingerprint(next) == _viewFingerprint(_view)) return;
     setState(() => _view = next);
@@ -200,9 +229,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // that had arrived.
     _announcedEventId = null;
     try {
+      final chatId = _chatId;
+      _timelineChatId = chatId;
       final timeline = await ref
           .read(chatRepositoryProvider)
-          .timelineFor(widget.chatId);
+          .timelineFor(chatId);
       if (!mounted) return;
       setState(() {
         _timeline = timeline;
@@ -332,12 +363,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
       final title = ref
           .read(chatsProvider)
           .value
-          ?.where((c) => c.id == widget.chatId)
+          ?.where((c) => c.id == _chatId)
           .firstOrNull
           ?.title;
       ref
           .read(chatRepositoryProvider)
-          .indexMessages(widget.chatId, fresh, chatTitle: title ?? '');
+          .indexMessages(_chatId, fresh, chatTitle: title ?? '');
     });
   }
 
@@ -486,9 +517,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (!await confirmRedaction(context)) return;
     if (!mounted) return;
     await _run(
-      () => ref
-          .read(chatRepositoryProvider)
-          .redact(widget.chatId, message.eventId),
+      () => ref.read(chatRepositoryProvider).redact(_chatId, message.eventId),
     );
   }
 
@@ -516,7 +545,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     final repository = ref.read(chatRepositoryProvider);
     ref.read(reactionRecentsProvider.notifier).note(key);
-    await _run(() => repository.react(widget.chatId, message.eventId, key));
+    await _run(() => repository.react(_chatId, message.eventId, key));
   }
 
   Future<void> _toggleReaction(WeftMessage message, ReactionTally tally) async {
@@ -524,13 +553,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final localEventId = tally.localEventId;
 
     if (tally.byLocalUser && localEventId != null) {
-      await _run(() => repository.unreact(widget.chatId, localEventId));
+      await _run(() => repository.unreact(_chatId, localEventId));
       return;
     }
     ref.read(reactionRecentsProvider.notifier).note(tally.key);
-    await _run(
-      () => repository.react(widget.chatId, message.eventId, tally.key),
-    );
+    await _run(() => repository.react(_chatId, message.eventId, tally.key));
   }
 
   /// Opens a link a message carried.
@@ -630,7 +657,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
             VerificationScreen(onContinue: () => Navigator.of(context).pop()),
       ),
     );
-    if (mounted) ref.invalidate(chatTrustProvider(widget.chatId));
+    if (mounted) ref.invalidate(chatTrustProvider(_chatId));
   }
 
   @override
@@ -639,13 +666,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (unavailable != null) return _unavailableScaffold(context, unavailable);
 
     final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
-    final chat = chats.where((c) => c.id == widget.chatId).firstOrNull;
+    final chat = chats.where((c) => c.id == _chatId).firstOrNull;
     // Uploads sit *below* the settled messages in a reversed list, which is the
     // bottom of the thread: a photo the user just picked belongs where the next
     // message would go, not above the history they were reading.
     final uploads =
-        ref.watch(chatUploadsProvider(widget.chatId)).value ??
-        const <UploadTask>[];
+        ref.watch(chatUploadsProvider(_chatId)).value ?? const <UploadTask>[];
     if (chat == null) {
       // Still syncing, or genuinely gone; either way there is nothing to draw
       // yet and the timeline load will settle it.
@@ -675,7 +701,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 // default: a warning that flashes in and out on every open would
                 // be trained away within a day.
                 trust:
-                    ref.watch(chatTrustProvider(widget.chatId)).value ??
+                    ref.watch(chatTrustProvider(_chatId)).value ??
                     RoomTrust.none,
                 onVerify: _verifyOwnDevice,
               ),
@@ -1041,7 +1067,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     setState(() => _recording = false);
     final problems = await sendAttachments(
       ref.read(chatRepositoryProvider),
-      widget.chatId,
+      _chatId,
       [recording.source],
       via: chat.sendNetwork,
       isVoiceNote: true,
@@ -1061,11 +1087,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     switch (composing?.mode) {
       case ComposerMode.edit:
         await _run(
-          () => repository.editMessage(
-            widget.chatId,
-            composing!.message.eventId,
-            text,
-          ),
+          () =>
+              repository.editMessage(_chatId, composing!.message.eventId, text),
         );
         // Deliberately no `_noteSend`: an edit is not a message sent to this
         // conversation, and counting it would push a chat up the share ranker
@@ -1074,13 +1097,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
       case ComposerMode.reply:
         await _run(
           () => repository.sendReply(
-            widget.chatId,
+            _chatId,
             text,
             replyToEventId: composing!.message.eventId,
           ),
         );
       case null:
-        await _run(() => repository.send(widget.chatId, text));
+        await _run(() => repository.send(_chatId, text));
     }
     _noteSend();
   }
@@ -1102,7 +1125,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// difference between the conversations that made a noise and the ones they
   /// talk in. Not awaited: nothing on screen waits for a launcher.
   void _noteSend() =>
-      unawaited(ref.read(shareShortcutServiceProvider).noteSend(widget.chatId));
+      unawaited(ref.read(shareShortcutServiceProvider).noteSend(_chatId));
 
   /// Opens [message] full screen, in the company of the rest of the
   /// conversation's media.
@@ -1128,7 +1151,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   void _pickNetwork(ChatNetwork network) {
     unawaited(
-      ref.read(chatRepositoryProvider).setSendNetwork(widget.chatId, network),
+      ref.read(chatRepositoryProvider).setSendNetwork(_chatId, network),
     );
   }
 
@@ -1173,7 +1196,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   Future<void> _sendAttachments(List<AttachmentSource> sources) async {
     final problems = await sendAttachments(
       ref.read(chatRepositoryProvider),
-      widget.chatId,
+      _chatId,
       sources,
     );
     if (problems.length < sources.length) _noteSend();
