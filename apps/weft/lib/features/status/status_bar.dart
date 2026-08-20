@@ -35,6 +35,27 @@ class StatusBar extends ConsumerWidget {
                 builder: (_) => StatusViewer(entry: entry),
               ),
             ),
+            onLongPress: () async {
+              final hide = await showModalBottomSheet<bool>(
+                context: context,
+                showDragHandle: true,
+                builder: (context) => SafeArea(
+                  child: ListTile(
+                    leading: const Icon(Icons.visibility_off_outlined),
+                    title: Text('Hide ${entry.senderName}\'s statuses'),
+                    subtitle: const Text(
+                      'Bring everyone back under Settings → Statuses.',
+                    ),
+                    onTap: () => Navigator.of(context).pop(true),
+                  ),
+                ),
+              );
+              if (hide == true) {
+                ref
+                    .read(hiddenStatusSendersProvider.notifier)
+                    .hide(entry.senderId);
+              }
+            },
           );
         },
       ),
@@ -43,11 +64,17 @@ class StatusBar extends ConsumerWidget {
 }
 
 class _StatusRing extends StatelessWidget {
-  const _StatusRing({required this.entry, required this.onTap, this.headers});
+  const _StatusRing({
+    required this.entry,
+    required this.onTap,
+    this.onLongPress,
+    this.headers,
+  });
 
   final StatusEntry entry;
   final Map<String, String>? headers;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +83,8 @@ class _StatusRing extends StatelessWidget {
     return WeftFocusable(
       button: true,
       onTap: onTap,
+      onLongPress: onLongPress,
+      onLongPressHint: 'hide this person\'s statuses',
       label: semanticsSentence([
         'Status from ${entry.senderName}',
         '${entry.messages.length} update'

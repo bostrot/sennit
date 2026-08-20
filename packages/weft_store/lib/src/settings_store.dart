@@ -151,6 +151,14 @@ abstract final class WeftSettings {
   /// rings above the inbox instead of as the broadcast group chat.
   static const String statusRings = 'status.rings';
 
+  /// How statuses appear at all: `rings` (default), `group`, or `off` —
+  /// off hides both the ring row and the broadcast conversation.
+  static const String statusMode = 'status.mode';
+
+  /// Sender ids whose statuses are never shown, as a JSON list under
+  /// `senders`. Long-press a ring to add someone.
+  static const String statusHiddenSenders = 'status.hidden_senders';
+
   /// The user's Home Assistant base URL, e.g. `http://homeassistant.local:8123`.
   static const String homeAssistantUrl = 'integrations.ha_url';
 

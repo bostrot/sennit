@@ -8,6 +8,7 @@ import 'package:weft_store/weft_store.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
+import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
 import 'integrations_screen.dart';
@@ -262,7 +263,8 @@ class _AgendaToggle extends ConsumerWidget {
   }
 }
 
-/// The status-rings switch: WhatsApp statuses as stories, not as a group.
+/// How statuses appear: rings, the plain group, or nowhere at all — plus
+/// the way back for people hidden with a long-press on their ring.
 class _StatusRingsToggle extends ConsumerWidget {
   const _StatusRingsToggle();
 
@@ -275,19 +277,63 @@ class _StatusRingsToggle extends ConsumerWidget {
     } on Object {
       return const SizedBox.shrink();
     }
+    final mode = ref.watch(statusModeProvider);
+    final hidden = ref.watch(hiddenStatusSendersProvider);
 
-    return SwitchListTile(
-      secondary: const Icon(Icons.donut_large_rounded),
-      title: const Text('Statuses as rings'),
-      subtitle: const Text(
-        'Show contacts\' WhatsApp statuses as story rings above the inbox '
-        'instead of a "Status Broadcast" group.',
-      ),
-      value: stores.settings.getBool(WeftSettings.statusRings, fallback: true),
-      onChanged: (value) {
-        stores.settings.setBool(WeftSettings.statusRings, value: value);
-        ref.read(settingsRevisionProvider.notifier).bump();
-      },
+    void setMode(StatusMode next) {
+      stores.settings.setString(WeftSettings.statusMode, switch (next) {
+        StatusMode.rings => 'rings',
+        StatusMode.group => 'group',
+        StatusMode.off => 'off',
+      });
+      ref.read(settingsRevisionProvider.notifier).bump();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.donut_large_rounded),
+          title: const Text('Statuses'),
+          subtitle: Text(switch (mode) {
+            StatusMode.rings =>
+              'Shown as story rings above the inbox. The broadcast group '
+                  'stays hidden.',
+            StatusMode.group =>
+              'Shown as the "Status Broadcast" group chat, like any other.',
+            StatusMode.off => 'Not shown anywhere.',
+          }),
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(
+            start: WeftSpace.xl + WeftSpace.xl,
+            end: WeftSpace.lg,
+            bottom: WeftSpace.sm,
+          ),
+          child: Wrap(
+            spacing: WeftSpace.sm,
+            children: [
+              for (final (value, label) in [
+                (StatusMode.rings, 'Rings'),
+                (StatusMode.group, 'Group chat'),
+                (StatusMode.off, 'Off'),
+              ])
+                ChoiceChip(
+                  label: Text(label),
+                  selected: mode == value,
+                  onSelected: (_) => setMode(value),
+                ),
+              if (hidden.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.visibility_rounded, size: 16),
+                  label: Text('Unhide ${hidden.length}'),
+                  onPressed: () =>
+                      ref.read(hiddenStatusSendersProvider.notifier).reset(),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

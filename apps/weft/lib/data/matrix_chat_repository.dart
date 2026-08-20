@@ -1049,15 +1049,33 @@ class MatrixChatRepository implements ChatRepository {
   Set<String> get serviceChatIds => _serviceChatIds;
   Set<String> _serviceChatIds = const {};
 
-  /// A DM whose peer *is* a bridge's service bot. The bot suffix alone is not
-  /// enough — a person may be called `@robot:...` — so the localpart must also
-  /// resolve to a known network the way mautrix bots name themselves.
+  /// A room that exists to *operate* a bridge: the user plus its service bot.
+  ///
+  /// Scanned over participants rather than resolved through [_peerOf], and
+  /// that is the fix for the one that kept showing: mautrix *names* its
+  /// management rooms ("Google Messages bridge bot"), and a named room gets
+  /// no summary heroes — so a hero-based peer lookup came back empty and the
+  /// room passed as a normal chat. The bot suffix alone is not enough — a
+  /// person may be called `@robot:...` — so the localpart must also resolve
+  /// to a known network the way mautrix bots name themselves.
   bool _isServiceChat(sdk.Room room) {
-    final peer = _peerOf(room);
-    if (peer == null) return false;
-    final localpart = peer.split(':').first;
-    return localpart.endsWith('bot') &&
-        networkFromBridgeBotId(peer) != ChatNetwork.unknown;
+    final participants = room.getParticipants();
+    if (participants.length > 3) return false;
+
+    var foundBot = false;
+    for (final participant in participants) {
+      if (participant.id == _client.userID) continue;
+      final localpart = participant.id.split(':').first;
+      if (localpart.endsWith('bot') &&
+          networkFromBridgeBotId(participant.id) != ChatNetwork.unknown) {
+        foundBot = true;
+      } else {
+        // Someone who is neither the user nor a bridge bot: a real
+        // conversation the bot happens to sit in must not vanish.
+        return false;
+      }
+    }
+    return foundBot;
   }
 
   void _rebuild() {

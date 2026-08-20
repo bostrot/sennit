@@ -279,11 +279,12 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   final label = ref.watch(labelFilterProvider);
   final labels = ref.watch(chatLabelsProvider.notifier);
   ref.watch(chatLabelsProvider);
-  // With rings on, the status broadcast group leaves the list — its content
-  // lives in the story row instead of between real conversations.
-  final statusChatId = ref.watch(statusRingsEnabledProvider)
-      ? ref.watch(statusChatProvider)?.id
-      : null;
+  // The broadcast group leaves the list in `rings` mode (its content lives
+  // in the story row) and in `off` mode (the user asked for none of it);
+  // only `group` mode shows it as an ordinary conversation.
+  final statusChatId = ref.watch(statusModeProvider) == StatusMode.group
+      ? null
+      : ref.watch(statusChatProvider)?.id;
   final filtered = filterChats(
     chats
         .where(
