@@ -1,7 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
+import 'calendar_invite.dart';
 import 'network.dart';
+import 'poll.dart';
 import 'relations.dart';
 
 /// What kind of content a message carries. Drives rendering and, for
@@ -49,6 +51,8 @@ class WeftMessage {
     this.deliveryState,
     this.attachmentUrl,
     this.geoUri,
+    this.poll,
+    this.calendarInvite,
     this.durationMs,
     this.mediaWidth,
     this.mediaHeight,
@@ -126,6 +130,12 @@ class WeftMessage {
 
   /// `geo:` URI of an [MessageKind.location] message, verbatim from the event.
   final String? geoUri;
+
+  /// The aggregated poll, for [MessageKind.poll] messages.
+  final PollData? poll;
+
+  /// A calendar entry proposed by this message, answers folded in.
+  final CalendarInvite? calendarInvite;
   final int? durationMs;
 
   /// Pixel size of the attached image or video, when the sender announced it.
@@ -184,6 +194,8 @@ class WeftMessage {
   /// the bubble renders the previous message's markup around the new words.
   WeftMessage copyWith({
     String? geoUri,
+    PollData? poll,
+    CalendarInvite? calendarInvite,
     String? body,
     Object? formattedBody = _unchanged,
     String? transcript,
@@ -219,6 +231,8 @@ class WeftMessage {
       deliveryState: deliveryState ?? this.deliveryState,
       attachmentUrl: attachmentUrl,
       geoUri: geoUri ?? this.geoUri,
+      poll: poll ?? this.poll,
+      calendarInvite: calendarInvite ?? this.calendarInvite,
       durationMs: durationMs,
       mediaWidth: mediaWidth,
       mediaHeight: mediaHeight,

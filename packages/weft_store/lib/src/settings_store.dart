@@ -81,6 +81,8 @@ class SecretStore {
   static const String transcriptionApiKey = 'transcription_api_key';
   static const String embeddingApiKey = 'embedding_api_key';
   static const String mcpTunnelToken = 'mcp_tunnel_token';
+  static const String homeAssistantToken = 'home_assistant_token';
+  static const String paperlessToken = 'paperless_token';
 
   Future<String?> read(String key) => _storage.read(key: key);
 
@@ -144,6 +146,12 @@ abstract final class WeftSettings {
   /// calendar". Fully on-device — rules plus, when installed, the local
   /// embedding model — which is why it may default on.
   static const String agendaDetect = 'agenda.detect';
+
+  /// The user's Home Assistant base URL, e.g. `http://homeassistant.local:8123`.
+  static const String homeAssistantUrl = 'integrations.ha_url';
+
+  /// The user's paperless-ngx base URL.
+  static const String paperlessUrl = 'integrations.paperless_url';
 
   /// Whether a link in a message may be previewed.
   ///

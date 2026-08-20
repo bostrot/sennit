@@ -36,6 +36,8 @@
 	     opens a capture device — not refused, not prompted: killed — so its
 	     absence is a crash on the first call rather than a call with no sound.
 	     The camera description above already covers a video call. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Weft shares your position only when you tap "share location" in a chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Weft needs the microphone so you can talk in a voice or video call.</string>
 	<key>CFBundleName</key>

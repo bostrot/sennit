@@ -32,7 +32,30 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  Future<void> createPoll(
+    String chatId, {
+    required String question,
+    required List<String> options,
+    ChatNetwork? via,
+  }) async {}
+
+  @override
+  Future<void> votePoll(
+    String roomId,
+    String startEventId,
+    Set<String> answerIds,
+  ) async {}
+
+  @override
   Set<String> get serviceChatIds => const {};
+
+  @override
+  Future<void> sendLocation(
+    String chatId, {
+    required double latitude,
+    required double longitude,
+    ChatNetwork? via,
+  }) async {}
 
   RecordingChatRepository(this.inner);
 

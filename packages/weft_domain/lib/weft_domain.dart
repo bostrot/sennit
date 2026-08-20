@@ -4,10 +4,12 @@
 /// be constructed in a unit test without a device or a homeserver.
 library;
 
+export 'src/calendar_invite.dart';
 export 'src/chat.dart';
 export 'src/contact.dart';
 export 'src/handle.dart';
 export 'src/link.dart';
 export 'src/message.dart';
 export 'src/network.dart';
+export 'src/poll.dart';
 export 'src/relations.dart';

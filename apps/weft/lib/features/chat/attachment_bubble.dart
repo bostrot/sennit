@@ -125,8 +125,86 @@ class AttachmentBubble extends StatelessWidget {
         onTranscribe: onTranscribe,
         onRetranscribe: onRetranscribe,
       ),
+      _ when _isContactCard(message) => _ContactAttachment(
+        message: message,
+        own: own,
+        onOpen: onOpen,
+      ),
       _ => _FileAttachment(message: message, own: own, onOpen: onOpen),
     };
+  }
+
+  /// A vCard riding as a file — how every bridge relays "shared a contact".
+  static bool _isContactCard(WeftMessage message) {
+    final name = message.body.toLowerCase();
+    return name.endsWith('.vcf') || name.endsWith('.vcard');
+  }
+}
+
+/// A shared contact: WhatsApp and friends send these as .vcf files, and a
+/// bubble reading "IMG_0001.vcf · 1.2 KB" buried what it was. Opening hands
+/// the card to the OS, whose contacts app owns the import.
+class _ContactAttachment extends StatelessWidget {
+  const _ContactAttachment({
+    required this.message,
+    required this.own,
+    this.onOpen,
+  });
+
+  final WeftMessage message;
+  final bool own;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    // "Anna Maven.vcf" → "Anna Maven".
+    final name = message.body.replaceFirst(
+      RegExp(r'\.(vcf|vcard)$', caseSensitive: false),
+      '',
+    );
+
+    return WeftFocusable(
+      button: onOpen != null,
+      onTap: onOpen,
+      label: semanticsSentence([
+        'Contact card',
+        name,
+        if (onOpen != null) 'opens to save the contact',
+      ]),
+      borderRadius: WeftRadius.allSm,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: onBubble.withValues(alpha: 0.15),
+            child: Icon(Icons.person_rounded, color: onBubble),
+          ),
+          const SizedBox(width: WeftSpace.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name.isEmpty ? 'Contact' : name,
+                style: context.text.bodyMedium?.copyWith(
+                  color: onBubble,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'Contact card · tap to save',
+                style: context.text.labelSmall?.copyWith(
+                  color: palette.mutedOnBubble(own),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

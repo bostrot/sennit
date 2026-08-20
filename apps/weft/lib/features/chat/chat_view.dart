@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_attachments/weft_attachments.dart';
@@ -26,6 +27,8 @@ import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
 import '../../services/schedule/scheduled_actions.dart';
+import '../settings/integrations_screen.dart';
+import 'paperless_picker_sheet.dart';
 import '../auth/verification_screen.dart';
 import '../call/external_call.dart';
 import '../call/start_call.dart';
@@ -446,6 +449,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       message: message,
       canTranscribe: message.canTranscribe,
       hasTranscript: message.transcript != null,
+      homeAssistant: ref.read(homeAssistantProvider) != null,
     );
     if (choice == null || !mounted) return;
 
@@ -479,6 +483,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
         if (mounted) await showEditHistorySheet(context, message: message);
       case MessageAction.remind:
         await _remindLater(message);
+      case MessageAction.sendToHomeAssistant:
+        await _sendToHomeAssistant(message);
+    }
+  }
+
+  Future<void> _sendToHomeAssistant(WeftMessage message) async {
+    final client = ref.read(homeAssistantProvider);
+    if (client == null) return;
+    try {
+      await client.fireMessageEvent({
+        'sender': message.senderName,
+        'sender_id': message.senderId,
+        'network': message.network.id,
+        'chat_id': _chatId,
+        'body': messageDocument(message).plainText,
+        'timestamp': message.timestamp.toIso8601String(),
+      });
+      _showMessage('Sent to Home Assistant as a weft_message event.');
+    } on Object catch (error) {
+      _showMessage('Home Assistant refused it: $error');
     }
   }
 
@@ -885,6 +909,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                   ),
                               onTapLink: _openLink,
                               onTapMention: _openMention,
+                              onVote: message.kind == MessageKind.poll
+                                  ? (optionId) => _run(
+                                      () => ref
+                                          .read(chatRepositoryProvider)
+                                          .votePoll(
+                                            message.roomId,
+                                            message.eventId,
+                                            {optionId},
+                                          ),
+                                    )
+                                  : null,
                               showNetwork: chat.isMerged,
                               groupedWithPrevious:
                                   older != null &&
@@ -1284,8 +1319,34 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// same as cancelling it.
   Future<void> _attach(Chat chat) async {
     final picker = ref.read(attachmentPickerProvider);
-    final source = await showAttachmentSourceSheet(context, picker);
+    final source = await showAttachmentSourceSheet(
+      context,
+      picker,
+      paperless: ref.read(paperlessProvider) != null,
+    );
     if (source == null || !mounted) return;
+
+    if (source == AttachmentPickSource.location) {
+      await _shareLocation(chat);
+      return;
+    }
+    if (source == AttachmentPickSource.poll) {
+      await _createPoll(chat);
+      return;
+    }
+    if (source == AttachmentPickSource.paperless) {
+      final staged = await showPaperlessPickerSheet(context, ref);
+      if (staged == null || !mounted) return;
+      final confirmed = await showAttachmentPreviewSheet(
+        context,
+        chat: chat,
+        sources: [staged],
+        onPickNetwork: _pickNetwork,
+      );
+      if (confirmed == null || confirmed.isEmpty || !mounted) return;
+      await _sendAttachments(confirmed);
+      return;
+    }
 
     final List<AttachmentSource> picked;
     try {
@@ -1314,6 +1375,60 @@ class _ChatViewState extends ConsumerState<ChatView> {
   ///
   /// The loop itself is [sendAttachments], shared with the share sheet — the
   /// two paths differ only in where the files came from.
+  /// One-shot position → `m.location`. The permission dialog is the OS's,
+  /// shown at the moment of sharing.
+  Future<void> _shareLocation(Chat chat) async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage('Weft has no location permission.');
+        return;
+      }
+      _showMessage('Getting your position…');
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+      if (!mounted) return;
+      await ref
+          .read(chatRepositoryProvider)
+          .sendLocation(
+            _chatId,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            via: chat.sendNetwork,
+          );
+    } on Object catch (error) {
+      debugPrint('weft: share location failed: $error');
+      if (mounted) _showMessage('Could not get a position.');
+    }
+  }
+
+  Future<void> _createPoll(Chat chat) async {
+    final result = await showDialog<(String, List<String>)>(
+      context: context,
+      builder: (context) => const _PollComposerDialog(),
+    );
+    if (result == null || !mounted) return;
+    final (question, options) = result;
+    await _run(
+      () => ref
+          .read(chatRepositoryProvider)
+          .createPoll(
+            _chatId,
+            question: question,
+            options: options,
+            via: chat.sendNetwork,
+          ),
+    );
+  }
+
   Future<void> _sendAttachments(List<AttachmentSource> sources) async {
     final problems = await sendAttachments(
       ref.read(chatRepositoryProvider),
@@ -1545,6 +1660,7 @@ class _MessageBubble extends StatelessWidget {
     required this.showNetwork,
     required this.groupedWithPrevious,
     this.replyPreview,
+    this.onVote,
     this.content,
     this.highlighted = false,
     this.transcribing = false,
@@ -1562,6 +1678,9 @@ class _MessageBubble extends StatelessWidget {
 
   /// Opens the attachment full screen. Null for a message that has none.
   final VoidCallback? onOpen;
+
+  /// Casts a vote on this message's poll. Null for everything else.
+  final ValueChanged<String>? onVote;
 
   /// What this message is answering, already resolved across every leg of a
   /// merged chat. Null when it is not a reply.
@@ -1785,6 +1904,15 @@ class _MessageBubble extends StatelessWidget {
                             transcribing: transcribing,
                             onTranscribe: onTranscribe,
                             onRetranscribe: onRetranscribe,
+                          )
+                        else if (message.kind == MessageKind.location)
+                          _LocationContent(message: message, own: own)
+                        else if (message.kind == MessageKind.poll &&
+                            message.poll != null)
+                          _PollContent(
+                            message: message,
+                            own: own,
+                            onVote: onVote ?? (_) {},
                           )
                         else if (message.kind == MessageKind.voice)
                           _VoiceContent(
@@ -2537,6 +2665,328 @@ class _ScheduledSendsBar extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// A shared position: a pin, the coordinates, and a tap into the maps app.
+///
+/// No embedded map tile on purpose — fetching one would send the sender's
+/// position to a tile server the user never chose. The maps app the tap opens
+/// is the user's own.
+class _LocationContent extends StatelessWidget {
+  const _LocationContent({required this.message, required this.own});
+
+  final WeftMessage message;
+  final bool own;
+
+  /// `geo:52.5,13.4;u=10` → (52.5, 13.4), or null when unparseable.
+  (double, double)? get _coordinates {
+    final raw = message.geoUri;
+    if (raw == null) return null;
+    final match = RegExp(
+      r'^geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)',
+    ).firstMatch(raw.trim());
+    if (match == null) return null;
+    return (double.parse(match.group(1)!), double.parse(match.group(2)!));
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final coordinates = _coordinates;
+    if (coordinates == null) return;
+    final (lat, lng) = coordinates;
+    // The geo: scheme reaches whatever maps app the platform has; the https
+    // fallback covers a desktop with none registered.
+    final geo = Uri.parse('geo:$lat,$lng?q=$lat,$lng');
+    final web = Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng');
+    final opened = await launchUrl(
+      geo,
+      mode: LaunchMode.externalApplication,
+    ).onError((_, _) => false);
+    if (!opened) {
+      await launchUrl(web, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final coordinates = _coordinates;
+    final label = coordinates == null
+        ? 'Location'
+        : '${coordinates.$1.toStringAsFixed(5)}, '
+              '${coordinates.$2.toStringAsFixed(5)}';
+
+    return WeftFocusable(
+      button: coordinates != null,
+      onTap: coordinates == null ? null : () => _open(context),
+      label: semanticsSentence(['Shared location', label, 'opens in maps']),
+      borderRadius: WeftRadius.allSm,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.location_on_rounded, size: 28, color: onBubble),
+          const SizedBox(width: WeftSpace.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Location',
+                style: context.text.bodyMedium?.copyWith(
+                  color: onBubble,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                coordinates == null ? message.body : '$label · open in maps',
+                style: context.text.labelSmall?.copyWith(
+                  color: palette.mutedOnBubble(own),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A poll: the question, one tappable row per option, and the running tally.
+///
+/// Disclosed results, which is what bridges send: every row shows its count
+/// and the bar behind it is the share of votes. Tapping votes (or re-votes —
+/// MSC3381 counts each voter's latest response); a closed poll ignores taps.
+class _PollContent extends StatelessWidget {
+  const _PollContent({
+    required this.message,
+    required this.own,
+    required this.onVote,
+  });
+
+  final WeftMessage message;
+  final bool own;
+  final ValueChanged<String> onVote;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final poll = message.poll!;
+    final total = poll.totalVotes;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.poll_rounded, size: 18, color: onBubble),
+            const SizedBox(width: WeftSpace.sm),
+            Flexible(
+              child: Text(
+                poll.question,
+                style: context.text.bodyMedium?.copyWith(
+                  color: onBubble,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: WeftSpace.sm),
+        for (final option in poll.options) ...[
+          _PollOptionRow(
+            option: option,
+            votes: poll.votes[option.id] ?? 0,
+            total: total,
+            chosen: poll.ownVotes.contains(option.id),
+            ended: poll.ended,
+            own: own,
+            onTap: poll.ended ? null : () => onVote(option.id),
+          ),
+          const SizedBox(height: WeftSpace.xs),
+        ],
+        Text(
+          poll.ended
+              ? 'Final result · $total vote${total == 1 ? '' : 's'}'
+              : '$total vote${total == 1 ? '' : 's'}',
+          style: context.text.labelSmall?.copyWith(
+            color: palette.mutedOnBubble(own),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PollOptionRow extends StatelessWidget {
+  const _PollOptionRow({
+    required this.option,
+    required this.votes,
+    required this.total,
+    required this.chosen,
+    required this.ended,
+    required this.own,
+    this.onTap,
+  });
+
+  final PollOption option;
+  final int votes;
+  final int total;
+  final bool chosen;
+  final bool ended;
+  final bool own;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+    final share = total == 0 ? 0.0 : votes / total;
+
+    return WeftFocusable(
+      button: onTap != null,
+      onTap: onTap,
+      label: semanticsSentence([
+        option.text,
+        '$votes vote${votes == 1 ? '' : 's'}',
+        if (chosen) 'your vote',
+        if (ended) 'poll closed' else if (onTap != null) 'tap to vote',
+      ]),
+      borderRadius: WeftRadius.allSm,
+      child: Stack(
+        children: [
+          // The share bar, behind the words.
+          Positioned.fill(
+            child: FractionallySizedBox(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: share.clamp(0.0, 1.0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: onBubble.withValues(alpha: 0.15),
+                  borderRadius: WeftRadius.allSm,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: WeftSpace.sm,
+              vertical: WeftSpace.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  chosen ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  size: 16,
+                  color: onBubble,
+                ),
+                const SizedBox(width: WeftSpace.sm),
+                Expanded(
+                  child: Text(
+                    option.text,
+                    style: context.text.bodySmall?.copyWith(color: onBubble),
+                  ),
+                ),
+                Text(
+                  '$votes',
+                  style: context.text.labelSmall?.copyWith(
+                    color: palette.mutedOnBubble(own),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Question plus two-to-eight options; pops `(question, options)` or null.
+class _PollComposerDialog extends StatefulWidget {
+  const _PollComposerDialog();
+
+  @override
+  State<_PollComposerDialog> createState() => _PollComposerDialogState();
+}
+
+class _PollComposerDialogState extends State<_PollComposerDialog> {
+  final _question = TextEditingController();
+  final List<TextEditingController> _options = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
+
+  @override
+  void dispose() {
+    _question.dispose();
+    for (final option in _options) {
+      option.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit() {
+    final question = _question.text.trim();
+    final options = [
+      for (final option in _options)
+        if (option.text.trim().isNotEmpty) option.text.trim(),
+    ];
+    if (question.isEmpty || options.length < 2) return;
+    Navigator.of(context).pop((question, options));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New poll'),
+      content: SizedBox(
+        width: 360,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _question,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Question'),
+              ),
+              const SizedBox(height: WeftSpace.sm),
+              for (var i = 0; i < _options.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: WeftSpace.sm),
+                  child: TextField(
+                    controller: _options[i],
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(labelText: 'Option ${i + 1}'),
+                  ),
+                ),
+              if (_options.length < 8)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        setState(() => _options.add(TextEditingController())),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add option'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Create poll')),
+      ],
     );
   }
 }

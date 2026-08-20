@@ -161,6 +161,29 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> createPoll(
+    String chatId, {
+    required String question,
+    required List<String> options,
+    ChatNetwork? via,
+  }) => send(chatId, 'Poll: $question', via: via);
+
+  @override
+  Future<void> votePoll(
+    String roomId,
+    String startEventId,
+    Set<String> answerIds,
+  ) async {}
+
+  @override
+  Future<void> sendLocation(
+    String chatId, {
+    required double latitude,
+    required double longitude,
+    ChatNetwork? via,
+  }) => send(chatId, 'Location: geo:$latitude,$longitude', via: via);
+
+  @override
   Future<void> sendReply(
     String chatId,
     String body, {

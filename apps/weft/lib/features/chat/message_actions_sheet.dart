@@ -25,6 +25,9 @@ enum MessageAction {
   /// Schedule a local notification pointing back at this message.
   remind,
 
+  /// Fire the message at the user's Home Assistant as a `weft_message` event.
+  sendToHomeAssistant,
+
   /// The versions of a message that has been edited.
   ///
   /// Here rather than only on the "edited" marker under the bubble. That marker
@@ -68,6 +71,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   required WeftMessage message,
   bool canTranscribe = false,
   bool hasTranscript = false,
+  bool homeAssistant = false,
 }) {
   return showModalBottomSheet<MessageActionChoice>(
     context: context,
@@ -82,6 +86,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
       message: message,
       canTranscribe: canTranscribe,
       hasTranscript: hasTranscript,
+      homeAssistant: homeAssistant,
     ),
   );
 }
@@ -91,11 +96,13 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.message,
     required this.canTranscribe,
     required this.hasTranscript,
+    required this.homeAssistant,
   });
 
   final WeftMessage message;
   final bool canTranscribe;
   final bool hasTranscript;
+  final bool homeAssistant;
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +205,12 @@ class _MessageActionsSheet extends StatelessWidget {
                   title: const Text('Remind me'),
                   onTap: () => choose(MessageAction.remind),
                 ),
+                if (homeAssistant)
+                  ListTile(
+                    leading: const Icon(Icons.home_outlined),
+                    title: const Text('Send to Home Assistant'),
+                    onTap: () => choose(MessageAction.sendToHomeAssistant),
+                  ),
                 if (message.editHistory.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.history_rounded),

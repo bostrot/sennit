@@ -18,6 +18,8 @@
 	     what TCC shows the user when it asks. Both are needed on macOS: an
 	     entitlement with no usage description is a prompt that never appears and
 	     a capture that never starts. -->
+	<key>NSLocationUsageDescription</key>
+	<string>Weft shares your position only when you tap "share location" in a chat.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Weft needs the microphone so you can talk in a voice or video call.</string>
 	<key>NSCameraUsageDescription</key>

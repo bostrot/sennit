@@ -29,6 +29,17 @@ enum AttachmentPickSource {
   /// Any file at all, from the platform's document browser.
   files,
 
+  /// The device's current position, sent as an `m.location` event rather
+  /// than as a file. Handled by the chat view, not by [AttachmentPicker.pick].
+  location,
+
+  /// An MSC3381 poll. Also handled by the chat view.
+  poll,
+
+  /// A document fetched from the user's paperless-ngx. Chat-view handled;
+  /// only offered when the integration is configured.
+  paperless,
+
   /// A photo taken now. Mobile only — [AttachmentPicker.supports] says so.
   camera,
 }
@@ -94,8 +105,13 @@ class PlatformAttachmentPicker implements AttachmentPicker {
           defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
-  bool supports(AttachmentPickSource source) =>
-      source == AttachmentPickSource.camera ? _isMobile : true;
+  bool supports(AttachmentPickSource source) => switch (source) {
+    AttachmentPickSource.camera => _isMobile,
+    // geolocator has no usable Linux/Windows backend.
+    AttachmentPickSource.location =>
+      _isMobile || defaultTargetPlatform == TargetPlatform.macOS,
+    _ => true,
+  };
 
   @override
   Future<List<AttachmentSource>> pick(AttachmentPickSource source) async {
@@ -111,6 +127,12 @@ class PlatformAttachmentPicker implements AttachmentPicker {
           source: picker.ImageSource.camera,
         ),
       ],
+      // Not files: the chat view intercepts these before ever calling pick.
+      AttachmentPickSource.location ||
+      AttachmentPickSource.poll ||
+      AttachmentPickSource.paperless => throw UnsupportedError(
+        'Sent as an event, not picked as a file',
+      ),
     };
 
     return [for (final file in files) await attachmentSourceForFile(file)];

@@ -10,6 +10,7 @@ import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
+import 'integrations_screen.dart';
 import 'devices_screen.dart';
 import 'endpoints_screen.dart';
 import 'link_previews_screen.dart';
@@ -168,6 +169,12 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Widgets & watch',
             subtitle: 'Home screen widgets and the watch companion',
             onTap: () => push(const SurfacesScreen()),
+          ),
+          tile(
+            icon: Icons.home_outlined,
+            title: 'Integrations',
+            subtitle: 'Home Assistant and paperless-ngx, your own instances',
+            onTap: () => push(const IntegrationsScreen()),
           ),
           tile(
             icon: Icons.terminal_rounded,

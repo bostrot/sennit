@@ -66,6 +66,9 @@ dependencies:
   # "Add to calendar" on the platforms with a system calendar editor to open.
   # Desktop shares an .ics instead — see agenda_chip.dart.
   add_2_calendar: ^3.1.1
+  # One-shot position for "share my location". The permission prompt is the
+  # OS's own, asked at the moment of sharing and never before.
+  geolocator: ^14.0.2
   intl: any
   matrix: ^10.1.0
   path: ^1.9.1

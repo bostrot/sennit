@@ -70,6 +70,35 @@ abstract class ChatRepository {
 
   Future<void> send(String chatId, String body, {ChatNetwork? via});
 
+  /// Starts an MSC3381 poll in the conversation.
+  Future<void> createPoll(
+    String chatId, {
+    required String question,
+    required List<String> options,
+    ChatNetwork? via,
+  });
+
+  /// Casts (or changes) the local user's vote on [startEventId]'s poll.
+  ///
+  /// [roomId] names the leg the poll lives on — a response referencing an
+  /// event the target room never saw is a vote nobody counts.
+  Future<void> votePoll(
+    String roomId,
+    String startEventId,
+    Set<String> answerIds,
+  );
+
+  /// Sends the user's position as an `m.location` event.
+  ///
+  /// Bridges translate it into the network's own location message, which is
+  /// why it is an event of its own rather than a text with a maps link.
+  Future<void> sendLocation(
+    String chatId, {
+    required double latitude,
+    required double longitude,
+    ChatNetwork? via,
+  });
+
   /// Sends [body] as a rich reply to [replyToEventId].
   ///
   /// The reply rides the leg its *target* lives on, not the chat's send

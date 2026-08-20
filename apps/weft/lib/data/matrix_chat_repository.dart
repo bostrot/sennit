@@ -327,6 +327,71 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> createPoll(
+    String chatId, {
+    required String question,
+    required List<String> options,
+    ChatNetwork? via,
+  }) async {
+    final target = _sendSource(chatId, via: via);
+    if (target.network == ChatNetwork.sms) {
+      throw StateError('SMS cannot carry a poll');
+    }
+    await _roomFor(target).sendEvent({
+      'org.matrix.msc3381.poll.start': {
+        'question': {'org.matrix.msc1767.text': question},
+        'kind': 'org.matrix.msc3381.poll.disclosed',
+        'max_selections': 1,
+        'answers': [
+          for (var i = 0; i < options.length; i++)
+            {'id': 'option_$i', 'org.matrix.msc1767.text': options[i]},
+        ],
+      },
+      // The text fallback older clients render instead of the poll.
+      'org.matrix.msc1767.text': [
+        question,
+        for (var i = 0; i < options.length; i++) '${i + 1}. ${options[i]}',
+      ].join('\n'),
+    }, type: 'org.matrix.msc3381.poll.start');
+  }
+
+  @override
+  Future<void> votePoll(
+    String roomId,
+    String startEventId,
+    Set<String> answerIds,
+  ) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) throw StateError('That poll\'s room is gone');
+    await room.sendEvent({
+      'm.relates_to': {
+        'rel_type': sdk.RelationshipTypes.reference,
+        'event_id': startEventId,
+      },
+      'org.matrix.msc3381.poll.response': {'answers': answerIds.toList()},
+    }, type: 'org.matrix.msc3381.poll.response');
+  }
+
+  @override
+  Future<void> sendLocation(
+    String chatId, {
+    required double latitude,
+    required double longitude,
+    ChatNetwork? via,
+  }) async {
+    final target = _sendSource(chatId, via: via);
+    if (target.network == ChatNetwork.sms) {
+      throw StateError('SMS cannot carry a location message');
+    }
+    final geoUri = 'geo:$latitude,$longitude';
+    await _roomFor(target).sendEvent({
+      'msgtype': sdk.MessageTypes.Location,
+      'body': 'Location: $geoUri',
+      'geo_uri': geoUri,
+    });
+  }
+
+  @override
   Future<void> sendReply(
     String chatId,
     String body, {

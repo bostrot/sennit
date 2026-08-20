@@ -139,6 +139,50 @@ WeftMessage? mapEvent(
   sdk.Timeline? timeline,
   MergedIdentityResolver resolveSender = senderIsIdentity,
 }) {
+  // MSC3381 polls, both the unstable prefix every bridge sends today and the
+  // stable one they will. The start event is the bubble; responses and the
+  // end event are folded in from its reference relations, so the tally is
+  // wherever the timeline has aggregated it to.
+  if (event.type == _pollStartUnstable || event.type == _pollStartStable) {
+    final poll = _pollFrom(event, timeline: timeline, ownUserId: ownUserId);
+    if (poll == null) return null;
+    return WeftMessage(
+      eventId: event.eventId,
+      roomId: event.roomId ?? '',
+      network: network,
+      senderId: event.senderId,
+      senderName: event.senderFromMemoryOrFallback.calcDisplayname(),
+      timestamp: event.originServerTs,
+      kind: MessageKind.poll,
+      isOwn: event.senderId == ownUserId,
+      body: poll.question,
+      redacted: event.redacted,
+      deliveryState: _deliveryFor(event),
+      poll: poll,
+    );
+  }
+
+  // A call leaves marks in the room, and a conversation that hides them reads
+  // as if nothing happened — "someone called" is exactly the kind of event a
+  // person scrolls back to find. Invite, hangup and reject are the three that
+  // mean something to a reader; answer, candidates and renegotiation are
+  // plumbing.
+  if (_callEventBodies.containsKey(event.type)) {
+    return WeftMessage(
+      eventId: event.eventId,
+      roomId: event.roomId ?? '',
+      network: network,
+      senderId: event.senderId,
+      senderName: event.senderFromMemoryOrFallback.calcDisplayname(),
+      timestamp: event.originServerTs,
+      kind: MessageKind.event,
+      isOwn: event.senderId == ownUserId,
+      body: _callEventBodies[event.type]!,
+      redacted: event.redacted,
+      deliveryState: _deliveryFor(event),
+    );
+  }
+
   if (event.type != sdk.EventTypes.Message &&
       event.type != sdk.EventTypes.Sticker &&
       event.type != sdk.EventTypes.Encrypted) {
@@ -438,4 +482,119 @@ int? _durationMs(Map<String, Object?> content) {
     return (audio['duration'] as num).round();
   }
   return null;
+}
+
+/// The call events worth a bubble, and what that bubble says.
+const Map<String, String> _callEventBodies = {
+  sdk.EventTypes.CallInvite: '📞 Call started',
+  sdk.EventTypes.CallHangup: '📞 Call ended',
+  sdk.EventTypes.CallReject: '📞 Call declined',
+};
+
+const String _pollStartUnstable = 'org.matrix.msc3381.poll.start';
+const String _pollStartStable = 'm.poll.start';
+const String _pollResponseUnstable = 'org.matrix.msc3381.poll.response';
+const String _pollResponseStable = 'm.poll.response';
+const String _pollEndUnstable = 'org.matrix.msc3381.poll.end';
+const String _pollEndStable = 'm.poll.end';
+
+/// MSC1767 text: `{'org.matrix.msc1767.text': '…'}` or `{'m.text': …}`.
+String? _extensibleText(Object? block) {
+  if (block is! Map) return null;
+  final unstable = block['org.matrix.msc1767.text'];
+  if (unstable is String) return unstable;
+  final stable = block['m.text'];
+  if (stable is String) return stable;
+  // m.text may itself be a list of representations.
+  if (stable is List) {
+    for (final rep in stable) {
+      if (rep is Map && rep['body'] is String) return rep['body'] as String;
+    }
+  }
+  return null;
+}
+
+/// Parses the start event and folds in whatever responses the timeline holds.
+PollData? _pollFrom(
+  sdk.Event event, {
+  sdk.Timeline? timeline,
+  String? ownUserId,
+}) {
+  final start =
+      event.content[_pollStartUnstable] ?? event.content[_pollStartStable];
+  if (start is! Map) return null;
+
+  final question = _extensibleText(start['question']) ?? '';
+  final rawAnswers = start['answers'];
+  if (question.isEmpty || rawAnswers is! List) return null;
+
+  final options = <PollOption>[
+    for (final answer in rawAnswers)
+      if (answer is Map && answer['id'] is String)
+        PollOption(
+          id: answer['id'] as String,
+          text: _extensibleText(answer) ?? '',
+        ),
+  ];
+  if (options.isEmpty) return null;
+
+  final maxSelections = switch (start['max_selections']) {
+    final int n when n > 0 => n,
+    _ => 1,
+  };
+
+  var ended = false;
+  // Latest response per voter wins — MSC3381's rule.
+  final latest = <String, sdk.Event>{};
+  if (timeline != null) {
+    for (final related in event.aggregatedEvents(
+      timeline,
+      sdk.RelationshipTypes.reference,
+    )) {
+      if (related.type == _pollEndUnstable || related.type == _pollEndStable) {
+        ended = true;
+        continue;
+      }
+      if (related.type != _pollResponseUnstable &&
+          related.type != _pollResponseStable) {
+        continue;
+      }
+      final previous = latest[related.senderId];
+      if (previous == null ||
+          related.originServerTs.isAfter(previous.originServerTs)) {
+        latest[related.senderId] = related;
+      }
+    }
+  }
+
+  final validIds = {for (final option in options) option.id};
+  final votes = <String, int>{};
+  final ownVotes = <String>{};
+  for (final entry in latest.entries) {
+    final block =
+        entry.value.content[_pollResponseUnstable] ??
+        entry.value.content[_pollResponseStable];
+    if (block is! Map) continue;
+    final answers = block['answers'];
+    if (answers is! List) continue;
+    // Spec: more selections than allowed invalidates the whole response.
+    final chosen = answers
+        .whereType<String>()
+        .where(validIds.contains)
+        .take(maxSelections)
+        .toList();
+    for (final id in chosen) {
+      votes[id] = (votes[id] ?? 0) + 1;
+      if (entry.key == ownUserId) ownVotes.add(id);
+    }
+  }
+
+  return PollData(
+    question: question,
+    options: options,
+    votes: votes,
+    ownVotes: ownVotes,
+    ended: ended,
+    maxSelections: maxSelections,
+  );
 }
