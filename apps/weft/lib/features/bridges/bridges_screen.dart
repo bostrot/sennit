@@ -10,8 +10,10 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
+import '../chat/chat_view.dart';
 import '../components/qr_card.dart';
 
 /// One configured bridge, as stored in settings.
@@ -130,8 +132,12 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'The provisioning URL of a mautrix bridge you run, e.g. '
-              'https://bridge.example.org/_matrix/provision',
+              'The provisioning URL of a mautrix bridge you run — where the '
+              'bridge\'s own web API is reachable, e.g. '
+              'https://bridge.example.org/_matrix/provision. It enables the '
+              'guided sign-in flow here.\n\n'
+              'No URL handy? Opening the bridge\'s chat from the list works '
+              'without one: send "login" to the bot there.',
             ),
             const SizedBox(height: WeftSpace.md),
             WeftLabelledField(
@@ -203,6 +209,40 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
       _health.remove(bridge.id);
     });
     _saveBridges(ref.read(storesProvider).settings, _bridges);
+  }
+
+  /// Opens (creating if needed) the DM with the bridge's bot.
+  ///
+  /// This is the path that needs no provisioning URL at all: every mautrix
+  /// bridge accepts `login`, `help` and friends as chat commands in its
+  /// management room, so the bot chat is a complete fallback for anyone whose
+  /// bridge does not expose the provisioning API to the network Weft is on.
+  Future<void> _openBotChat(String botUserId) async {
+    final client = ref.read(matrixSessionProvider).client;
+    final repository = ref.read(chatRepositoryProvider);
+
+    final String roomId;
+    try {
+      roomId = await client.startDirectChat(botUserId);
+    } on Exception catch (e) {
+      if (mounted) showWeftMessage(context, 'Could not open the chat: $e');
+      return;
+    }
+
+    // A just-created room reaches the inbox with the next sync; opening the
+    // view before then would render "unknown chat". Give it a moment, then
+    // open regardless — the view copes.
+    for (var i = 0; i < 20 && repository.chatForRoom(roomId) == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChatView(chatId: repository.chatForRoom(roomId)?.id ?? roomId),
+      ),
+    );
   }
 
   Future<void> _startLogin(_StoredBridge bridge) async {
@@ -303,13 +343,39 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                           semanticsLabel: '',
                         ),
                         title: Text(found.network.label),
-                        subtitle: Text(
-                          '${found.roomCount} bridged chat(s)'
-                          '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
-                        ),
-                        trailing: FilledButton.tonal(
-                          onPressed: _addBridge,
-                          child: const Text('Set up'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${found.roomCount} bridged chat(s)'
+                              '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
+                            ),
+                            const SizedBox(height: WeftSpace.xs),
+                            // Two doors, and the chat is the one that always
+                            // opens: every mautrix bridge takes `login` and
+                            // `help` as messages to its bot, no URL required.
+                            // The provisioning URL stays as the option for
+                            // the richer step-by-step flow.
+                            Wrap(
+                              spacing: WeftSpace.sm,
+                              children: [
+                                if (found.botUserId != null)
+                                  FilledButton.tonalIcon(
+                                    onPressed: () =>
+                                        _openBotChat(found.botUserId!),
+                                    icon: const Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 16,
+                                    ),
+                                    label: const Text('Open bridge chat'),
+                                  ),
+                                OutlinedButton(
+                                  onPressed: _addBridge,
+                                  child: const Text('Add provisioning URL'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                   const Divider(height: WeftSpace.xl),

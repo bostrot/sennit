@@ -51,6 +51,11 @@ dependencies:
   go_router: ^17.5.0
   http: ^1.6.0
   image_picker: ^1.2.3
+  # Voice-note playback. ExoPlayer on Android and AVPlayer on iOS/macOS decode
+  # the ogg/opus that Matrix voice messages actually are on Android; Apple
+  # platforms may refuse the container, which surfaces as a readable error
+  # rather than a dead button.
+  just_audio: ^0.10.6
   intl: any
   matrix: ^10.1.0
   path: ^1.9.1
@@ -66,6 +71,9 @@ dependencies:
   video_player: ^2.11.1
 
   whisper_ggml: ^2.6.0
+  # ONNX Runtime bindings for every platform Weft builds on. Runs the local
+  # embedding model, so semantic search can work with no endpoint at all.
+  flutter_onnxruntime: ^1.8.3
 
   weft_attachments: ^0.1.0
   weft_bridges: ^0.1.0

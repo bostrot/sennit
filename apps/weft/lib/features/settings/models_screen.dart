@@ -53,6 +53,11 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
       .settings
       .getString(WeftSettings.transcriptionLocalModel);
 
+  String? get _selectedSearchModel => ref
+      .read(storesProvider)
+      .settings
+      .getString(WeftSettings.embeddingLocalModel);
+
   /// Selecting a model makes on-device transcription take precedence over any
   /// configured endpoint — the private option wins once it is available.
   void _useForVoice(String? id) {
@@ -60,6 +65,22 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
         .read(storesProvider)
         .settings
         .setString(WeftSettings.transcriptionLocalModel, id ?? '');
+    ref.read(settingsRevisionProvider.notifier).bump();
+    setState(() {});
+  }
+
+  /// Same rule for search, with one extra consequence: vectors from different
+  /// models share no coordinate space, so switching what embeds also wipes the
+  /// stored vectors and re-queues every message for the new model.
+  void _useForSearch(String? id) {
+    final stores = ref.read(storesProvider);
+    final previous = stores.settings.getString(
+      WeftSettings.embeddingLocalModel,
+    );
+    if ((previous ?? '') == (id ?? '')) return;
+
+    stores.settings.setString(WeftSettings.embeddingLocalModel, id ?? '');
+    stores.search.reindexEmbeddings();
     ref.read(settingsRevisionProvider.notifier).bump();
     setState(() {});
   }
@@ -89,15 +110,22 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
               spec: spec,
               state: installer.stateOf(spec),
               selectedForVoice: _selectedVoiceModel == spec.id,
+              selectedForSearch: _selectedSearchModel == spec.id,
               onInstall: () => installer.install(spec),
               onCancel: () => installer.cancel(spec),
               onDelete: () async {
                 if (_selectedVoiceModel == spec.id) _useForVoice(null);
+                if (_selectedSearchModel == spec.id) _useForSearch(null);
                 await installer.delete(spec);
               },
               onUseForVoice: spec.capability == ModelCapability.speechToText
                   ? () => _useForVoice(
                       _selectedVoiceModel == spec.id ? null : spec.id,
+                    )
+                  : null,
+              onUseForSearch: spec.capability == ModelCapability.embedding
+                  ? () => _useForSearch(
+                      _selectedSearchModel == spec.id ? null : spec.id,
                     )
                   : null,
             ),
@@ -112,21 +140,27 @@ class _ModelCard extends StatelessWidget {
     required this.spec,
     required this.state,
     required this.selectedForVoice,
+    required this.selectedForSearch,
     required this.onInstall,
     required this.onCancel,
     required this.onDelete,
     this.onUseForVoice,
+    this.onUseForSearch,
   });
 
   final ModelSpec spec;
   final ModelState state;
   final bool selectedForVoice;
+  final bool selectedForSearch;
   final VoidCallback onInstall;
   final VoidCallback onCancel;
   final VoidCallback onDelete;
 
   /// Null for models that are not speech-to-text.
   final VoidCallback? onUseForVoice;
+
+  /// Null for models that are not embedding models.
+  final VoidCallback? onUseForSearch;
 
   static String _mb(int bytes) => '${(bytes / (1024 * 1024)).round()} MB';
 
@@ -257,6 +291,18 @@ class _ModelCard extends StatelessWidget {
                       ),
                       value: selectedForVoice,
                       onChanged: (_) => onUseForVoice!(),
+                    ),
+                  if (onUseForSearch != null)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('Use for search'),
+                      subtitle: const Text(
+                        'Embeds on this device instead of your endpoint. '
+                        'Switching re-indexes every message for this model.',
+                      ),
+                      value: selectedForSearch,
+                      onChanged: (_) => onUseForSearch!(),
                     ),
                 ],
               ),

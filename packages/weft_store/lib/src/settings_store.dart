@@ -126,6 +126,12 @@ abstract final class WeftSettings {
   static const String embeddingBaseUrl = 'search.embedding_base_url';
   static const String embeddingModel = 'search.embedding_model';
 
+  /// Which downloaded model on-device embeddings should use, by catalog id.
+  /// Empty means "use the configured endpoint instead". The exact counterpart
+  /// of [transcriptionLocalModel], for the same reason: the local model is the
+  /// only option that keeps message text on the device.
+  static const String embeddingLocalModel = 'search.local_model';
+
   /// Networks excluded from any remote endpoint, as a JSON list of network ids.
   static const String remoteExcludedNetworks = 'privacy.remote_excluded';
 

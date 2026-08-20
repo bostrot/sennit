@@ -22,6 +22,7 @@ import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
+import '../../services/audio/voice_player.dart';
 import '../auth/verification_screen.dart';
 import '../call/start_call.dart';
 import '../merge/merge_screen.dart';
@@ -1703,7 +1704,7 @@ class _EditedMarker extends StatelessWidget {
 
 /// Voice message with a waveform placeholder and, when available, the
 /// transcript produced by the user's own STT endpoint.
-class _VoiceContent extends StatelessWidget {
+class _VoiceContent extends ConsumerWidget {
   const _VoiceContent({
     required this.message,
     required this.own,
@@ -1718,88 +1719,163 @@ class _VoiceContent extends StatelessWidget {
   final VoidCallback? onTranscribe;
   final VoidCallback? onRetranscribe;
 
+  Future<void> _toggle(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(voicePlayerProvider.notifier).toggle(message);
+    } on Exception catch (e) {
+      if (context.mounted) {
+        showWeftMessage(context, '$e'.replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
     final bubble = own ? palette.ownBubble : palette.peerBubble;
+
+    final playback = ref.watch(voicePlayerProvider);
+    final isCurrent = playback.eventId == message.eventId;
+    final playing = isCurrent && playback.playing;
+    final loading = isCurrent && playback.loading;
+    final progress = isCurrent ? playback.progress : 0.0;
+
+    // While playing, the clock counts up; at rest it states the length.
+    final shownDuration = isCurrent && playback.position > Duration.zero
+        ? formatMediaDuration(playback.position.inMilliseconds)
+        : formatMediaDuration(message.durationMs);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // One node for the recording itself: a reader was told the duration and
-        // never that this was a voice message at all, because "0:42" beside a
-        // row of coloured bars is the entire visual signal. Whether there is a
-        // transcript belongs here too — it is the difference between a message
-        // this reader can read and one they cannot.
-        Semantics(
-          container: true,
-          excludeSemantics: true,
-          label: semanticsSentence([
-            'Voice message',
-            formatMediaDuration(message.durationMs),
-            if (transcribing)
-              'transcribing'
-            else if (message.transcript != null)
-              'transcript below'
-            else if (onTranscribe != null)
-              'no transcript yet',
-          ]),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.play_arrow_rounded, size: 22, color: onBubble),
-              const SizedBox(width: WeftSpace.sm),
-              // Waveform takes the space the bubble actually has rather than a
-              // fixed 22 bars: previously the bubble stretched to full width
-              // while the bars and timestamp stopped around the middle.
-              Flexible(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final barCount = ((constraints.maxWidth - 60) / 5.5)
-                        .floor()
-                        .clamp(8, 48);
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Deterministic pseudo-waveform: real amplitude data arrives with
-                        // the recorder in M9.
-                        for (var i = 0; i < barCount; i++)
-                          Container(
-                            width: 2.5,
-                            height:
-                                6 +
-                                ((message.eventId.hashCode >> (i % 28)) & 0x0F)
-                                    .toDouble(),
-                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                            decoration: BoxDecoration(
-                              // A waveform bar is a graphic, not text, so 3:1
-                              // rather than 4.5:1 — it can stay fainter than the
-                              // duration beside it and still be seen.
-                              color: WeftContrast.dim(
-                                onBubble,
-                                bubble,
-                                alpha: 0.55,
-                                minRatio: WeftContrast.uiComponent,
-                              ),
-                              borderRadius: WeftRadius.pill,
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // A real control, not an icon-shaped decoration: this is the
+            // play/pause button the whole bubble is drawn around. Its own
+            // semantics node, 48dp — the merged description beside it is a
+            // label, and a label is not a button.
+            Semantics(
+              container: true,
+              button: true,
+              excludeSemantics: true,
+              label: loading
+                  ? 'Loading voice message'
+                  : playing
+                  ? 'Pause voice message'
+                  : 'Play voice message',
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: loading
+                    ? Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: onBubble,
+                        ),
+                      )
+                    : IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: playing ? 'Pause' : 'Play',
+                        icon: Icon(
+                          playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 26,
+                          color: onBubble,
+                        ),
+                        onPressed: () => _toggle(context, ref),
+                      ),
+              ),
+            ),
+            const SizedBox(width: WeftSpace.xs),
+            // One node for the recording itself: a reader was told the duration
+            // and never that this was a voice message at all, because "0:42"
+            // beside a row of coloured bars is the entire visual signal.
+            // Whether there is a transcript belongs here too — it is the
+            // difference between a message this reader can read and one they
+            // cannot.
+            Flexible(
+              child: Semantics(
+                container: true,
+                excludeSemantics: true,
+                label: semanticsSentence([
+                  'Voice message',
+                  formatMediaDuration(message.durationMs),
+                  if (playing) 'playing',
+                  if (transcribing)
+                    'transcribing'
+                  else if (message.transcript != null)
+                    'transcript below'
+                  else if (onTranscribe != null)
+                    'no transcript yet',
+                ]),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Waveform takes the space the bubble actually has rather than a
+                    // fixed 22 bars: previously the bubble stretched to full width
+                    // while the bars and timestamp stopped around the middle.
+                    Flexible(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final barCount = ((constraints.maxWidth - 60) / 5.5)
+                              .floor()
+                              .clamp(8, 48);
+                          final playedBars = (progress * barCount).round();
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Deterministic pseudo-waveform: real amplitude data arrives with
+                              // the recorder in M9. During playback the bars fill left
+                              // to right — the progress indicator and the waveform are
+                              // one drawing.
+                              for (var i = 0; i < barCount; i++)
+                                Container(
+                                  width: 2.5,
+                                  height:
+                                      6 +
+                                      ((message.eventId.hashCode >> (i % 28)) &
+                                              0x0F)
+                                          .toDouble(),
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    // A waveform bar is a graphic, not text, so 3:1
+                                    // rather than 4.5:1 — it can stay fainter than the
+                                    // duration beside it and still be seen.
+                                    color: i < playedBars
+                                        ? onBubble
+                                        : WeftContrast.dim(
+                                            onBubble,
+                                            bubble,
+                                            alpha: 0.55,
+                                            minRatio: WeftContrast.uiComponent,
+                                          ),
+                                    borderRadius: WeftRadius.pill,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: WeftSpace.sm),
+                    Text(
+                      shownDuration ?? '',
+                      style: context.text.labelSmall?.copyWith(
+                        color: palette.muted(onBubble, bubble, alpha: 0.75),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: WeftSpace.sm),
-              Text(
-                formatMediaDuration(message.durationMs) ?? '',
-                style: context.text.labelSmall?.copyWith(
-                  color: palette.muted(onBubble, bubble, alpha: 0.75),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         AttachmentTranscript(
           message: message,

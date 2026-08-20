@@ -55,11 +55,21 @@ class LocalWhisperProvider implements TranscriptionProvider {
     // whisper.cpp reads a file, not a buffer, so the attachment is spilled to
     // a temp file first. ffmpeg inside the package handles the ogg/opus that
     // voice messages actually arrive as.
+    //
+    // Only the *extension* of the original name survives into the temp path.
+    // whisper_ggml hands the path to FFmpegKit as one space-joined command
+    // string, so a filename like "Voice message.ogg" split the -i argument in
+    // two, the conversion failed quietly, and whisper.cpp was then fed raw
+    // opus — which it reported as being unable to open the WAV.
     final tempDir = await getTemporaryDirectory();
+    final extension = p.extension(request.filename).toLowerCase();
+    final safeExtension = RegExp(r'^\.[a-z0-9]{1,5}$').hasMatch(extension)
+        ? extension
+        : '.ogg';
     final audioFile = File(
       p.join(
         tempDir.path,
-        'weft-stt-${DateTime.now().microsecondsSinceEpoch}-${request.filename}',
+        'weft-stt-${DateTime.now().microsecondsSinceEpoch}$safeExtension',
       ),
     );
 
@@ -96,11 +106,15 @@ class LocalWhisperProvider implements TranscriptionProvider {
       throw TranscriptionException('On-device transcription failed: $e');
     } finally {
       // The audio is a copy of a private message; it does not linger in temp.
-      if (audioFile.existsSync()) {
-        try {
-          await audioFile.delete();
-        } on FileSystemException {
-          // Best effort; the OS clears temp anyway.
+      // whisper_ggml writes its converted 16 kHz WAV beside the input, so both
+      // files are swept.
+      for (final file in [audioFile, File('${audioFile.path}.wav')]) {
+        if (file.existsSync()) {
+          try {
+            await file.delete();
+          } on FileSystemException {
+            // Best effort; the OS clears temp anyway.
+          }
         }
       }
     }

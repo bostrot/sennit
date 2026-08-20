@@ -126,22 +126,52 @@ class MatrixChatRepository implements ChatRepository {
   /// The room's member list is lazy-loaded, so a bridged contact's avatar is
   /// usually not in memory at all — which is why avatars stayed as initials
   /// however the URL was built. Ask the server once per peer, then rebuild.
-  void _ensureProfile(String userId) {
+  ///
+  /// Two lookups, in order. The global profile is first because it is one
+  /// request that answers for every room the user shares. But a bridge ghost's
+  /// global profile is frequently empty — many bridges only put the contact's
+  /// picture on the *member event* of the portal room — so an empty answer
+  /// falls back to reading `m.room.member` state from [room] directly.
+  void _ensureProfile(String userId, {sdk.Room? room}) {
     if (_profiles.containsKey(userId) || _profilesInFlight.contains(userId)) {
       return;
     }
     _profilesInFlight.add(userId);
-    _client
-        .getProfileFromUserId(userId)
-        .then((profile) {
-          _profiles[userId] = profile;
-          _profilesInFlight.remove(userId);
-          if (profile.avatarUrl != null) _rebuild();
-        })
-        .catchError((Object error) {
-          _profilesInFlight.remove(userId);
-          debugPrint('weft: profile fetch failed for $userId: $error');
-        });
+
+    Future<sdk.Profile> lookup() async {
+      sdk.Profile? profile;
+      try {
+        profile = await _client.getProfileFromUserId(userId);
+      } on Exception catch (error) {
+        debugPrint('weft: profile fetch failed for $userId: $error');
+      }
+      if (profile?.avatarUrl != null || room == null) {
+        return profile ?? sdk.Profile(userId: userId);
+      }
+      try {
+        final member = await _client.getRoomStateWithKey(
+          room.id,
+          'm.room.member',
+          userId,
+        );
+        final avatar = member['avatar_url'];
+        return sdk.Profile(
+          userId: userId,
+          displayName:
+              (member['displayname'] as String?) ?? profile?.displayName,
+          avatarUrl: avatar is String ? Uri.tryParse(avatar) : null,
+        );
+      } on Exception catch (error) {
+        debugPrint('weft: member state fetch failed for $userId: $error');
+        return profile ?? sdk.Profile(userId: userId);
+      }
+    }
+
+    lookup().then((profile) {
+      _profiles[userId] = profile;
+      _profilesInFlight.remove(userId);
+      if (profile.avatarUrl != null) _rebuild();
+    });
   }
 
   Future<void> _resolveMediaSupport() async {
@@ -906,6 +936,28 @@ class MatrixChatRepository implements ChatRepository {
   String? _thumbnail(String? mxc) =>
       mxcToThumbnailUrl(_client, mxc, authenticatedMedia: _authenticatedMedia);
 
+  /// The person this room is a conversation *with*, when it is one.
+  ///
+  /// `m.direct` first — but bridge portal rooms are only in `m.direct` when
+  /// the bridge bothered to put them there, and several do not. A two-person
+  /// room still names the other side in its summary heroes, so that is the
+  /// fallback; without it every bridged DM outside `m.direct` was treated as
+  /// a group and never looked up its contact's picture at all.
+  String? _peerOf(sdk.Room room) {
+    final direct = room.directChatMatrixID;
+    if (direct != null) return direct;
+
+    final joined = room.summary.mJoinedMemberCount ?? 0;
+    final invited = room.summary.mInvitedMemberCount ?? 0;
+    if (joined + invited > 2) return null;
+
+    final ownId = _client.userID;
+    for (final hero in room.summary.mHeroes ?? const <String>[]) {
+      if (hero != ownId) return hero;
+    }
+    return null;
+  }
+
   /// Room avatar, else the DM partner's member event, else a fetched profile.
   ///
   /// The third step is the one that matters in practice: rooms sync with
@@ -916,7 +968,7 @@ class MatrixChatRepository implements ChatRepository {
     final roomAvatar = _thumbnail(room.avatar?.toString());
     if (roomAvatar != null) return roomAvatar;
 
-    final peerId = room.directChatMatrixID;
+    final peerId = _peerOf(room);
     if (peerId == null) return null;
 
     final fromMember = _thumbnail(
@@ -927,7 +979,7 @@ class MatrixChatRepository implements ChatRepository {
     final cached = _profiles[peerId];
     if (cached != null) return _thumbnail(cached.avatarUrl?.toString());
 
-    _ensureProfile(peerId);
+    _ensureProfile(peerId, room: room);
     return null;
   }
 

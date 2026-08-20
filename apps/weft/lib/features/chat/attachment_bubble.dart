@@ -16,7 +16,9 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/a11y.dart';
 import '../../app/providers.dart';
+import '../../services/audio/voice_player.dart';
 
 /// The hero tag joining a bubble's thumbnail to its full-screen self.
 ///
@@ -299,7 +301,7 @@ class _PlayBadge extends StatelessWidget {
 /// Transcribe action is carried over unchanged, because `canTranscribe` has
 /// always covered [MessageKind.audio] and the only reason an audio attachment
 /// never offered it is that it used to fall through to plain text.
-class _AudioAttachment extends StatelessWidget {
+class _AudioAttachment extends ConsumerWidget {
   const _AudioAttachment({
     required this.message,
     required this.own,
@@ -314,38 +316,83 @@ class _AudioAttachment extends StatelessWidget {
   final VoidCallback? onTranscribe;
   final VoidCallback? onRetranscribe;
 
+  Future<void> _toggle(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(voicePlayerProvider.notifier).toggle(message);
+    } on Exception catch (e) {
+      if (context.mounted) {
+        showWeftMessage(context, '$e'.replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
     final bubble = own ? palette.ownBubble : palette.peerBubble;
     final duration = formatMediaDuration(message.durationMs);
 
+    final playback = ref.watch(voicePlayerProvider);
+    final isCurrent = playback.eventId == message.eventId;
+    final playing = isCurrent && playback.playing;
+    final loading = isCurrent && playback.loading;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // "Audio, Interview take 2, 4:31" as one clause. The name and the
-        // duration were two nodes and neither said what kind of thing this is
-        // — the only signal was a music glyph.
-        Semantics(
-          container: true,
-          excludeSemantics: true,
-          label: semanticsSentence([
-            'Audio',
-            message.body.isEmpty ? null : message.body,
-            duration,
-          ]),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _AttachmentGlyph(
-                icon: Icons.audiotrack_rounded,
-                tint: onBubble,
-                bubble: bubble,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // The button is its own 48dp semantics node; the name and duration
+            // beside it stay a merged label. A label that is also the tap
+            // target reads fine and fails every touch-target audit.
+            Semantics(
+              container: true,
+              button: true,
+              excludeSemantics: true,
+              label: loading
+                  ? 'Loading audio'
+                  : playing
+                  ? 'Pause audio'
+                  : 'Play audio',
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: playing ? 'Pause' : 'Play',
+                        icon: Icon(
+                          playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 26,
+                          color: onBubble,
+                        ),
+                        onPressed: () => _toggle(context, ref),
+                      ),
               ),
-              const SizedBox(width: WeftSpace.sm),
-              Flexible(
+            ),
+            const SizedBox(width: WeftSpace.sm),
+            // "Audio, Interview take 2, 4:31" as one clause. The name and the
+            // duration were two nodes and neither said what kind of thing this
+            // is — the only signal was a music glyph.
+            Flexible(
+              child: Semantics(
+                container: true,
+                excludeSemantics: true,
+                label: semanticsSentence([
+                  'Audio',
+                  message.body.isEmpty ? null : message.body,
+                  duration,
+                  if (playing) 'playing',
+                ]),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -369,8 +416,8 @@ class _AudioAttachment extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         AttachmentTranscript(
           message: message,

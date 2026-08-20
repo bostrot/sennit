@@ -5,6 +5,7 @@ import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../features/settings/models_screen.dart';
 import '../services/models/model_catalog.dart';
+import '../services/search/local_embedding_provider.dart';
 import '../services/transcription/local_whisper_provider.dart';
 import 'stores.dart';
 
@@ -15,6 +16,26 @@ final embeddingProviderProvider = Provider<EmbeddingProvider?>((ref) {
   ref.watch(settingsRevisionProvider);
   final stores = ref.watch(storesProvider);
   final settings = stores.settings;
+
+  // On-device wins when the user switched a downloaded model on: it is both
+  // the private option and the one that needs no endpoint at all. Constructed
+  // synchronously and loaded lazily — whether the files are really on disk is
+  // answered at first use, where the error can actually be shown.
+  final localId = settings.getString(WeftSettings.embeddingLocalModel);
+  if (localId != null && localId.isNotEmpty) {
+    final spec = ModelCatalog.byId(localId);
+    if (spec != null && spec.capability == ModelCapability.embedding) {
+      final installer = ref.watch(modelInstallerProvider);
+      final local = LocalEmbeddingProvider(
+        modelId: spec.id,
+        dimensions: ModelCatalog.miniLmDimensions,
+        modelFile: () => installer.fileFor(spec, spec.files.first.name),
+        vocabFile: () => installer.fileFor(spec, spec.files.last.name),
+      );
+      ref.onDispose(local.dispose);
+      return local;
+    }
+  }
 
   if (!settings.getBool(WeftSettings.embeddingEnabled)) return null;
 

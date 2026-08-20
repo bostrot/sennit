@@ -46,13 +46,15 @@ class ModelSpec {
 abstract final class ModelCatalog {
   /// Embedding model for on-device semantic search.
   ///
-  /// Gecko rather than EmbeddingGemma: the only LiteRT build of EmbeddingGemma
-  /// lives in a gated repository, so unauthenticated downloads 401. Gecko is
-  /// Apache-2.0, ungated, 768 dimensions, and a third smaller. English-first —
-  /// a real trade, and far better than a model that cannot be downloaded.
-  static const ModelSpec gecko = ModelSpec(
-    id: 'gecko-110m-en',
-    displayName: 'Gecko 110M (search)',
+  /// MiniLM as quantised ONNX rather than the earlier Gecko `.tflite`: Weft's
+  /// embedding runtime is ONNX Runtime, which every platform Weft builds on
+  /// can load — the Gecko file needed a LiteRT runtime and a SentencePiece
+  /// tokeniser this app never had, so it downloaded and then did nothing.
+  /// Apache-2.0, ungated, 384 dimensions, WordPiece vocabulary. English-first —
+  /// a real trade, and far better than a model that cannot run.
+  static const ModelSpec miniLm = ModelSpec(
+    id: 'minilm-l6-v2',
+    displayName: 'MiniLM L6 (search)',
     description:
         'Semantic search fully on this device — message text never leaves it. '
         'Tuned for English; other languages work, less precisely.',
@@ -60,21 +62,24 @@ abstract final class ModelCatalog {
     licence: 'Apache-2.0',
     files: [
       ModelFile(
-        name: 'Gecko_512_quant.tflite',
+        name: 'model_quantized.onnx',
         url:
-            'https://huggingface.co/litert-community/Gecko-110m-en/resolve/'
-            'main/Gecko_512_quant.tflite',
-        sizeBytes: 120432640,
+            'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/'
+            'main/onnx/model_quantized.onnx',
+        sizeBytes: 22972370,
       ),
       ModelFile(
-        name: 'sentencepiece.model',
+        name: 'vocab.txt',
         url:
-            'https://huggingface.co/litert-community/Gecko-110m-en/resolve/'
-            'main/sentencepiece.model',
-        sizeBytes: 794346,
+            'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/'
+            'main/vocab.txt',
+        sizeBytes: 231508,
       ),
     ],
   );
+
+  /// Vector length [miniLm] emits, needed wherever its vectors are stored.
+  static const int miniLmDimensions = 384;
 
   /// Whisper for on-device voice transcription, quantised.
   ///
@@ -118,7 +123,7 @@ abstract final class ModelCatalog {
     ],
   );
 
-  static const List<ModelSpec> all = [gecko, whisperBase, whisperSmall];
+  static const List<ModelSpec> all = [miniLm, whisperBase, whisperSmall];
 
   static ModelSpec? byId(String id) {
     for (final spec in all) {

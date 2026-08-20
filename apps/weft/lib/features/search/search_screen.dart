@@ -55,7 +55,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onChanged(String _) {
     _debounce?.cancel();
     // Debounced so every keystroke doesn't hit FTS5 and (worse) the embedding
-    // endpoint, which may be remote and metered.
+    // endpoint, which may be remote and metered. Name matching is an in-memory
+    // scan of the inbox, so it follows every keystroke undebounced.
+    setState(() {});
     _debounce = Timer(const Duration(milliseconds: 250), _run);
   }
 
@@ -79,6 +81,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _searching = false;
       _searchedOnce = true;
     });
+  }
+
+  /// Chats whose *name* matches the query — a person, a group, a merged
+  /// contact. Message search cannot answer this: a chat with no indexed
+  /// history exists only in the inbox, and a name is not a message.
+  List<Chat> _chatMatches() {
+    final query = _controller.text.trim().toLowerCase();
+    if (query.isEmpty) return const [];
+    final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
+    return chats
+        .where((chat) {
+          if (chat.archived) return false;
+          if (_networkFilter.isNotEmpty &&
+              !chat.sources.any((s) => _networkFilter.contains(s.network))) {
+            return false;
+          }
+          return chat.title.toLowerCase().contains(query);
+        })
+        .take(8)
+        .toList(growable: false);
   }
 
   @override
@@ -159,8 +181,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             _Notice(
               icon: Icons.psychology_outlined,
               text:
-                  'Keyword search only. Configure an embedding endpoint in '
-                  'Settings to also search by meaning.',
+                  'Keyword search only. To also search by meaning, download '
+                  'the search model under Settings → Endpoints → Local models '
+                  'and switch it on, or configure an embedding endpoint.',
             )
           else if (backfill != null && backfill.pending > 0)
             _Notice(
@@ -179,7 +202,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: const Text('Backfill now'),
               ),
             ),
-          if (_searchedOnce) _ResultSummary(count: _results.length),
+          if (_searchedOnce)
+            _ResultSummary(count: _results.length + _chatMatches().length),
           Expanded(child: _body()),
         ],
       ),
@@ -187,7 +211,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _body() {
-    if (_results.isEmpty) {
+    final chatMatches = _chatMatches();
+
+    if (_results.isEmpty && chatMatches.isEmpty) {
       // Nothing centred for a search that came back empty: the summary line
       // above already says "Nothing matched", and saying it twice is one
       // sentence for a sighted user and two announcements for a reader.
@@ -203,12 +229,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
 
+    // Chats first: someone typing a name wants the conversation, and making
+    // them scroll past message hits to reach it reads as "search can't find
+    // people".
+    final chatRows = <Widget>[
+      if (chatMatches.isNotEmpty) ...[
+        _SectionLabel(
+          text: 'Chats',
+          semantics:
+              '${chatMatches.length} chat${chatMatches.length == 1 ? '' : 's'} '
+              'matching by name',
+        ),
+        for (final chat in chatMatches) _ChatResultTile(chat: chat),
+        if (_results.isNotEmpty) _SectionLabel(text: 'Messages'),
+      ],
+    ];
+
     return ListView.separated(
-      itemCount: _results.length,
-      separatorBuilder: (_, _) =>
-          Divider(height: 1, color: context.palette.divider),
-      itemBuilder: (context, i) {
-        final result = _results[i];
+      itemCount: chatRows.length + _results.length,
+      separatorBuilder: (_, i) => i < chatRows.length
+          ? const SizedBox.shrink()
+          : Divider(height: 1, color: context.palette.divider),
+      itemBuilder: (context, index) {
+        if (index < chatRows.length) return chatRows[index];
+        final result = _results[index - chatRows.length];
         final when = DateFormat.yMMMd().add_Hm().format(result.timestamp);
         final attribution = result.senderName.trim().isEmpty
             ? when
@@ -281,6 +325,78 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// A small heading between result groups.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text, this.semantics});
+
+  final String text;
+  final String? semantics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      label: semantics ?? text,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          WeftSpace.lg,
+          WeftSpace.md,
+          WeftSpace.lg,
+          WeftSpace.xs,
+        ),
+        child: Text(
+          text,
+          style: context.text.labelMedium?.copyWith(
+            color: context.colors.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A conversation found by its name. Opens the chat, no particular message.
+class _ChatResultTile extends ConsumerWidget {
+  const _ChatResultTile({required this.chat});
+
+  final Chat chat;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final headers = ref.watch(mediaHeadersProvider);
+    void open() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chat.id)),
+      );
+    }
+
+    return Semantics(
+      container: true,
+      button: true,
+      excludeSemantics: true,
+      onTap: open,
+      label: semanticsSentence([
+        chat.title,
+        chat.isGroup ? 'group' : null,
+        chat.networks.map((n) => n.label).join(', '),
+      ]),
+      child: ListTile(
+        leading: WeftAvatar(
+          label: chat.title,
+          imageUrl: chat.avatarUrl,
+          imageHeaders: headers,
+          size: 40,
+          networks: chat.networks,
+        ),
+        title: Text(chat.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        onTap: open,
+      ),
     );
   }
 }

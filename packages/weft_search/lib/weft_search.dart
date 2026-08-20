@@ -7,6 +7,7 @@
 library;
 
 export 'src/embedding/embedding_provider.dart';
+export 'src/embedding/wordpiece_tokenizer.dart';
 export 'src/fusion/reciprocal_rank_fusion.dart';
 export 'src/search_engine.dart';
 export 'src/search_query.dart';
