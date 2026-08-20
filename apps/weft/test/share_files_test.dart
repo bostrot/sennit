@@ -791,6 +791,7 @@ class _RecordingRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) {
     sent.add('file: ${source.basename}');
     return inner.sendAttachment(

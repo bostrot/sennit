@@ -74,6 +74,9 @@ void main() {
     String tooltip = 'Send',
   }) async {
     await tester.enterText(find.byType(TextField), text);
+    // The trailing button is the microphone until the first character lands;
+    // one frame turns it into Send.
+    await tester.pump();
     await tester.tap(find.byTooltip(tooltip));
     await tester.pumpAndSettle();
   }

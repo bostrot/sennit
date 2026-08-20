@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_attachments/weft_attachments.dart';
+import 'package:weft_call/weft_call.dart' show CallBlocked, CallBlocker;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
@@ -23,7 +24,9 @@ import '../../data/chat_repository.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
+import '../../services/audio/voice_recorder.dart';
 import '../auth/verification_screen.dart';
+import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
@@ -39,6 +42,7 @@ import 'reaction_bar.dart';
 import 'reply_chip.dart';
 import 'rich_text_view.dart';
 import 'send_network_chip.dart';
+import 'voice_recording_bar.dart';
 import 'sms_composer_bar.dart';
 import 'unverified_devices_banner.dart';
 
@@ -123,7 +127,46 @@ class _ChatViewState extends ConsumerState<ChatView> {
     super.initState();
     _composerHandle = ref.read(composerHandleProvider)
       ..register(this, _composerFocus);
+    // Every sync re-emits the chat list, which makes it the heartbeat this
+    // view needs: until now nothing refreshed [_view] when the *other side*
+    // did something, so an incoming message — a bridge bot answering a
+    // command, most visibly — appeared only after reopening the chat or
+    // touching it in a way that happened to call [_refresh].
+    ref.listenManual(chatsProvider, (_, _) => _syncRefresh());
     _open();
+  }
+
+  /// What of the loaded view can change underneath us between syncs.
+  ///
+  /// Cheap fingerprint rather than deep equality: recomputing the merged view
+  /// is O(loaded) and fine, but rebuilding the tree on every sync of every
+  /// unrelated room is a scroll hitch the reader can feel. Reactions and edits
+  /// are folded in so a remote edit updates the open bubble too.
+  int _viewFingerprint(MergedTimelineView view) {
+    var reactions = 0;
+    var edited = 0;
+    var redacted = 0;
+    for (final m in view.messages) {
+      reactions += m.reactions.length;
+      if (m.isEdited) edited++;
+      if (m.redacted) redacted++;
+    }
+    return Object.hash(
+      view.messages.length,
+      view.messages.firstOrNull?.eventId,
+      reactions,
+      edited,
+      redacted,
+    );
+  }
+
+  void _syncRefresh() {
+    final timeline = _timeline;
+    if (timeline == null || !mounted) return;
+    final next = timeline.view();
+    if (_viewFingerprint(next) == _viewFingerprint(_view)) return;
+    setState(() => _view = next);
+    _indexNewMessages(next.messages);
   }
 
   @override
@@ -221,9 +264,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
     });
   }
 
+  DateTime _lastLoadOlderAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   Future<void> _loadOlder() async {
     final timeline = _timeline;
     if (timeline == null || _loading || !timeline.hasMoreHistory) return;
+    _lastLoadOlderAt = DateTime.now();
     setState(() => _loading = true);
     // Keeps pulling until the visible list actually grows: one round can lower
     // the watermark without revealing anything, and a "load older" that appears
@@ -637,8 +683,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   order: const NumericFocusOrder(1),
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (n) {
-                      // Reversed list: "extent after" is older history.
-                      if (n.metrics.extentAfter < 600) _loadOlder();
+                      // Reversed list: "extent after" is older history. The
+                      // cooldown matters: scroll notifications arrive per
+                      // frame, and re-triggering a backfill the instant the
+                      // previous one finished kept the list growing — and
+                      // rebuilding — for as long as the reader sat near the
+                      // old end, which read as the chat "lagging up".
+                      if (n.metrics.extentAfter < 600 &&
+                          !_loading &&
+                          DateTime.now().difference(_lastLoadOlderAt) >
+                              const Duration(milliseconds: 300)) {
+                        _loadOlder();
+                      }
                       return false;
                     },
                     child: ListView.builder(
@@ -735,16 +791,22 @@ class _ChatViewState extends ConsumerState<ChatView> {
               ),
               FocusTraversalOrder(
                 order: const NumericFocusOrder(2),
-                child: _Composer(
-                  chat: chat,
-                  controller: _composer,
-                  focusNode: _composerFocus,
-                  composing: _composerContext,
-                  onCancelContext: _cancelComposerContext,
-                  onSend: _send,
-                  onAttach: () => _attach(chat),
-                  onPickNetwork: _pickNetwork,
-                ),
+                child: _recording
+                    ? VoiceRecordingBar(
+                        onCancel: () => setState(() => _recording = false),
+                        onSend: (recording) => _sendVoiceNote(chat, recording),
+                      )
+                    : _Composer(
+                        chat: chat,
+                        controller: _composer,
+                        focusNode: _composerFocus,
+                        composing: _composerContext,
+                        onCancelContext: _cancelComposerContext,
+                        onSend: _send,
+                        onAttach: () => _attach(chat),
+                        onPickNetwork: _pickNetwork,
+                        onRecordVoice: () => setState(() => _recording = true),
+                      ),
               ),
             ],
           ),
@@ -971,6 +1033,22 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// The context is cleared *before* the round trip, not after: the composer
   /// has already been emptied, and a bar still saying "Replying to Anna" over
   /// an empty field is a state the user cannot get out of by typing.
+  /// Whether the composer row is currently the voice recorder.
+  bool _recording = false;
+
+  Future<void> _sendVoiceNote(Chat chat, VoiceRecording recording) async {
+    setState(() => _recording = false);
+    final problems = await sendAttachments(
+      ref.read(chatRepositoryProvider),
+      widget.chatId,
+      [recording.source],
+      via: chat.sendNetwork,
+      isVoiceNote: true,
+      durationMs: recording.durationMs,
+    );
+    if (problems.isNotEmpty && mounted) _showMessage(problems.first);
+  }
+
   Future<void> _send() async {
     final text = _composer.text.trim();
     if (text.isEmpty) return;
@@ -1202,12 +1280,58 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           builder: (context, ref, _) {
             final availability = ref.watch(callAvailabilityProvider(chat.id));
             final target = availability.target;
+            if (target != null) {
+              return IconButton(
+                tooltip: availability.message,
+                icon: const Icon(Icons.call_rounded),
+                onPressed: () => startCall(context, ref, target),
+              );
+            }
+            // No Matrix leg to call over — the call lives in the network's
+            // own app, so the button opens the conversation there (or the
+            // dialler, when all Weft knows is a number) instead of sitting
+            // greyed out under a tooltip explaining itself. Only for the
+            // *bridged* refusal: a group is refused as a group whatever apps
+            // its members are on.
+            if (availability is! CallBlocked ||
+                availability.reason != CallBlocker.bridged) {
+              return IconButton(
+                tooltip: availability.message,
+                icon: const Icon(Icons.call_rounded),
+                onPressed: null,
+              );
+            }
+            final contact = chat.contactId == null
+                ? null
+                : ref
+                      .read(chatRepositoryProvider)
+                      .identityGraph
+                      .contacts()
+                      .where((c) => c.id == chat.contactId)
+                      .firstOrNull;
+            final external = externalCallRouteFor(chat, contact);
+            if (external == null) {
+              return IconButton(
+                tooltip: availability.message,
+                icon: const Icon(Icons.call_rounded),
+                onPressed: null,
+              );
+            }
             return IconButton(
-              tooltip: availability.message,
-              icon: const Icon(Icons.call_rounded),
-              onPressed: target == null
-                  ? null
-                  : () => startCall(context, ref, target),
+              tooltip: external.label,
+              icon: const Icon(Icons.phone_forwarded_rounded),
+              onPressed: () async {
+                final opened = await launchUrl(
+                  external.uri,
+                  mode: LaunchMode.externalApplication,
+                );
+                if (!opened && context.mounted) {
+                  showWeftMessage(
+                    context,
+                    'Nothing on this device could open that call.',
+                  );
+                }
+              },
             );
           },
         ),
@@ -1922,7 +2046,12 @@ class _Composer extends StatelessWidget {
     required this.onPickNetwork,
     this.composing,
     this.onCancelContext,
+    this.onRecordVoice,
   });
+
+  /// Switches the row into voice recording. Null hides the microphone —
+  /// editing a message into a voice note is not a thing.
+  final VoidCallback? onRecordVoice;
 
   final Chat chat;
   final TextEditingController controller;
@@ -2082,13 +2211,33 @@ class _Composer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: WeftSpace.sm),
-                IconButton.filled(
-                  onPressed: onSend,
-                  icon: Icon(
-                    editing ? Icons.check_rounded : Icons.send_rounded,
-                    size: 18,
-                  ),
-                  tooltip: editing ? 'Save edit' : 'Send',
+                // WhatsApp's swap: an empty field sends nothing, so its button
+                // is the microphone; the first typed character turns it into
+                // send. Listening to the controller keeps the swap in step
+                // with typing without rebuilding the whole composer.
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    final showMic =
+                        !editing &&
+                        onRecordVoice != null &&
+                        value.text.trim().isEmpty;
+                    if (showMic) {
+                      return IconButton.filled(
+                        onPressed: onRecordVoice,
+                        icon: const Icon(Icons.mic_rounded, size: 18),
+                        tooltip: 'Record voice message',
+                      );
+                    }
+                    return IconButton.filled(
+                      onPressed: onSend,
+                      icon: Icon(
+                        editing ? Icons.check_rounded : Icons.send_rounded,
+                        size: 18,
+                      ),
+                      tooltip: editing ? 'Save edit' : 'Send',
+                    );
+                  },
                 ),
               ],
             ),

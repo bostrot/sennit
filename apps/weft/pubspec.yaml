@@ -56,6 +56,10 @@ dependencies:
   # platforms may refuse the container, which surfaces as a readable error
   # rather than a dead button.
   just_audio: ^0.10.6
+  # Voice-note recording. Ogg/opus on Android — the container every other
+  # Matrix client expects a voice note in — and AAC on Apple platforms, where
+  # no opus encoder is available.
+  record: ^7.1.1
   intl: any
   matrix: ^10.1.0
   path: ^1.9.1

@@ -170,7 +170,9 @@ class MatrixChatRepository implements ChatRepository {
     lookup().then((profile) {
       _profiles[userId] = profile;
       _profilesInFlight.remove(userId);
-      if (profile.avatarUrl != null) _rebuild();
+      // A name is as much a reason to redraw as a picture: chats waiting on a
+      // lazy-loaded member are titled by their raw identifier until this lands.
+      if (profile.avatarUrl != null || profile.displayName != null) _rebuild();
     });
   }
 
@@ -626,6 +628,7 @@ class MatrixChatRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) async {
     final target = _sendSource(chatId, via: via);
     // Refused rather than silently rerouted to another leg. Sending an MMS
@@ -645,6 +648,7 @@ class MatrixChatRepository implements ChatRepository {
       encrypted: room.encrypted,
       maxUploadBytes: await _transport.maxUploadBytes(),
       isVoiceNote: isVoiceNote,
+      durationMs: durationMs,
     );
     if (decision is UploadRejection) {
       throw AttachmentRejectedException(decision);
@@ -936,6 +940,24 @@ class MatrixChatRepository implements ChatRepository {
   String? _thumbnail(String? mxc) =>
       mxcToThumbnailUrl(_client, mxc, authenticatedMedia: _authenticatedMedia);
 
+  /// The bridge's service bot in [room], from its `m.bridge` state, or null.
+  ///
+  /// The bot is a member of every portal room it manages, and it poisons any
+  /// computation that treats members as people: DM detection, hero-derived
+  /// titles, avatars. Reading it from state rather than pattern-matching on
+  /// localparts means a bridge with an unconventional bot name still works.
+  String? _bridgeBotOf(sdk.Room room) {
+    for (final type in bridgeStateEventTypes) {
+      final states = room.states[type];
+      if (states == null) continue;
+      for (final event in states.values) {
+        final bot = event.content['bridgebot'];
+        if (bot is String && bot.isNotEmpty) return bot;
+      }
+    }
+    return null;
+  }
+
   /// The person this room is a conversation *with*, when it is one.
   ///
   /// `m.direct` first — but bridge portal rooms are only in `m.direct` when
@@ -943,19 +965,75 @@ class MatrixChatRepository implements ChatRepository {
   /// room still names the other side in its summary heroes, so that is the
   /// fallback; without it every bridged DM outside `m.direct` was treated as
   /// a group and never looked up its contact's picture at all.
+  ///
+  /// The bridge bot does not count as a person: a portal DM has *three*
+  /// members — the user, the contact's ghost, and the bot — and counting the
+  /// bot made every such DM look like a group.
   String? _peerOf(sdk.Room room) {
     final direct = room.directChatMatrixID;
     if (direct != null) return direct;
 
+    final bot = _bridgeBotOf(room);
     final joined = room.summary.mJoinedMemberCount ?? 0;
     final invited = room.summary.mInvitedMemberCount ?? 0;
-    if (joined + invited > 2) return null;
+    if (joined + invited > (bot == null ? 2 : 3)) return null;
 
     final ownId = _client.userID;
     for (final hero in room.summary.mHeroes ?? const <String>[]) {
-      if (hero != ownId) return hero;
+      if (hero != ownId && hero != bot) return hero;
     }
     return null;
+  }
+
+  /// A network-decorated ghost name, undecorated.
+  ///
+  /// Bridge display-name templates append the network — "Anna (WA)",
+  /// "Anna (Signal)" — which is redundant in a UI that already labels every
+  /// chat with its network glyph, and noise in a merged conversation.
+  static String _stripNetworkTag(String name) {
+    final stripped = name
+        .replaceFirst(
+          RegExp(
+            r'\s*\((WA|WhatsApp|Signal|Telegram|TG|SMS|FB|'
+            r'Messenger|IG|Instagram|Discord|Slack|GChat|iMessage|LinkedIn|'
+            r'Meta|X|Twitter)\)\s*$',
+          ),
+          '',
+        )
+        .trim();
+    return stripped.isEmpty ? name : stripped;
+  }
+
+  /// What the inbox calls this room.
+  ///
+  /// The SDK's `getLocalizedDisplayname` names an unnamed room after its
+  /// heroes — for a bridged DM that produced "WhatsApp bridge bot, Anna (WA)",
+  /// because the bot is a hero too. An explicitly named room keeps its name;
+  /// an unnamed conversation is named after the person it is with.
+  String _titleFor(sdk.Room room) {
+    final peerId = _peerOf(room);
+    if (peerId == null) return room.getLocalizedDisplayname();
+
+    final explicit = room.getState(sdk.EventTypes.RoomName)?.content['name'];
+    if (explicit is String && explicit.trim().isNotEmpty) {
+      return _stripNetworkTag(explicit);
+    }
+
+    final member = room.unsafeGetUserFromMemoryOrFallback(peerId);
+    final fromMember = member.displayName?.trim();
+    if (fromMember != null && fromMember.isNotEmpty) {
+      return _stripNetworkTag(fromMember);
+    }
+    final fetched = _profiles[peerId]?.displayName?.trim();
+    if (fetched != null && fetched.isNotEmpty) {
+      return _stripNetworkTag(fetched);
+    }
+    // The member event is lazy-loaded and no profile is cached yet; ask once
+    // and name the chat after the peer's own identifier meanwhile — a phone
+    // number is a worse name than "Anna" but a far better one than
+    // "WhatsApp bridge bot, Anna (WA)".
+    _ensureProfile(peerId, room: room);
+    return _stripNetworkTag(_remoteIdFor(peerId, networkForRoom(room)));
   }
 
   /// Room avatar, else the DM partner's member event, else a fetched profile.
@@ -989,7 +1067,7 @@ class MatrixChatRepository implements ChatRepository {
 
     return Chat(
       id: room.id,
-      title: room.getLocalizedDisplayname(),
+      title: _titleFor(room),
       contactId: room.directChatMatrixID == null
           ? null
           : _graph.contactIdOf(room.directChatMatrixID!),
@@ -1010,7 +1088,11 @@ class MatrixChatRepository implements ChatRepository {
           ? null
           : mapEvent(lastEvent, network: network, ownUserId: _client.userID),
       unreadCount: room.notificationCount,
-      isGroup: !room.isDirectChat,
+      // A resolved peer means "conversation with a person", whatever the
+      // member count says: a bridged DM carries the bot as a third member and
+      // is usually missing from m.direct, and calling it a group is what put
+      // group styling on half the inbox.
+      isGroup: _peerOf(room) == null,
       pinned: room.isFavourite,
       archived: room.membership == sdk.Membership.leave,
       muted: room.pushRuleState != sdk.PushRuleState.notify,

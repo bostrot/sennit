@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -6,22 +5,13 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
-import '../../app/session_providers.dart';
 import '../../app/shortcuts.dart';
 import '../bridges/bridges_screen.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
-import '../settings/devices_screen.dart';
-import '../settings/security_screen.dart';
-import '../settings/endpoints_screen.dart';
-import '../settings/link_previews_screen.dart';
-import '../settings/mcp_screen.dart';
-import '../settings/notifications_screen.dart';
-import '../settings/shortcuts_sheet.dart';
-import '../settings/sms_screen.dart';
-import '../settings/surfaces_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// The app's home: network rail, inbox, and — when there's room — the open
 /// conversation beside it.
@@ -329,18 +319,6 @@ class _InboxHeader extends ConsumerWidget {
 
   final Set<ChatNetwork> activeFilter;
 
-  /// The three platforms a physical keyboard is a given on.
-  ///
-  /// The shortcuts still work on a tablet with one attached — they are bound
-  /// app-wide — but an entry advertising them on a phone is a menu row that
-  /// opens a sheet full of keys the device does not have.
-  static bool get _hasKeyboard => switch (defaultTargetPlatform) {
-    TargetPlatform.macOS ||
-    TargetPlatform.windows ||
-    TargetPlatform.linux => true,
-    _ => false,
-  };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
@@ -392,58 +370,19 @@ class _InboxHeader extends ConsumerWidget {
                           builder: (_) => const BridgesScreen(),
                         ),
                       );
-                    case 'notifications':
+                    case 'settings':
                       navigator.push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const NotificationsScreen(),
+                          builder: (_) => const SettingsScreen(),
                         ),
                       );
-                    case 'endpoints':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const EndpointsScreen(),
-                        ),
-                      );
-                    case 'link_previews':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const LinkPreviewsScreen(),
-                        ),
-                      );
-                    case 'surfaces':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SurfacesScreen(),
-                        ),
-                      );
-                    case 'mcp':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const McpScreen(),
-                        ),
-                      );
-                    case 'devices':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DevicesScreen(),
-                        ),
-                      );
-                    case 'security':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SecurityScreen(),
-                        ),
-                      );
-                    case 'sms':
-                      navigator.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SmsScreen(),
-                        ),
-                      );
-                    case 'shortcuts':
-                      showShortcutsSheet(context);
                   }
                 },
+                // Four entries: the three things you do *to the inbox*, and
+                // the door to everything else. Eleven destinations used to
+                // live here, with "Devices" between "Show archived" and
+                // "Keyboard shortcuts" — configuration now has a screen of
+                // its own with room to be grouped and explained.
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'archived',
@@ -467,46 +406,9 @@ class _InboxHeader extends ConsumerWidget {
                   ),
                   const PopupMenuItem(value: 'bridges', child: Text('Bridges')),
                   const PopupMenuItem(
-                    value: 'notifications',
-                    child: Text('Notifications'),
+                    value: 'settings',
+                    child: Text('Settings'),
                   ),
-                  const PopupMenuItem(
-                    value: 'endpoints',
-                    child: Text('Search & transcription'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'link_previews',
-                    child: Text('Link previews'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'surfaces',
-                    child: Text('Widgets & watch'),
-                  ),
-                  const PopupMenuItem(value: 'mcp', child: Text('MCP server')),
-                  // The same condition `smsRepositoryProvider` is built under,
-                  // stated rather than read: an entry that could only ever
-                  // explain its own absence is worse than no entry, and asking
-                  // the provider here would construct a method channel — and
-                  // read the settings store — for a menu that may never open.
-                  if (!kDemoMode &&
-                      defaultTargetPlatform == TargetPlatform.android)
-                    const PopupMenuItem(value: 'sms', child: Text('SMS')),
-                  const PopupMenuItem(value: 'devices', child: Text('Devices')),
-                  const PopupMenuItem(
-                    value: 'security',
-                    child: Text('Encryption'),
-                  ),
-                  // The other way into the shortcuts sheet, and the one that
-                  // matters: Ctrl/Cmd + / only helps someone who already knows
-                  // there is a keyboard model to look for. Stated as a
-                  // platform condition rather than read off a provider, the
-                  // same way the SMS entry above is — a phone with no keyboard
-                  // attached has nothing to show here.
-                  if (_hasKeyboard)
-                    const PopupMenuItem(
-                      value: 'shortcuts',
-                      child: Text('Keyboard shortcuts'),
-                    ),
                 ],
               ),
             ],

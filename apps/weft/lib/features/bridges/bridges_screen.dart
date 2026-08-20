@@ -15,6 +15,7 @@ import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../chat/chat_view.dart';
 import '../components/qr_card.dart';
+import 'bot_login_screen.dart';
 
 /// One configured bridge, as stored in settings.
 typedef _StoredBridge = ({String id, String url, String networkId});
@@ -351,28 +352,45 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                               '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
                             ),
                             const SizedBox(height: WeftSpace.xs),
-                            // Two doors, and the chat is the one that always
-                            // opens: every mautrix bridge takes `login` and
-                            // `help` as messages to its bot, no URL required.
-                            // The provisioning URL stays as the option for
-                            // the richer step-by-step flow.
+                            // Sign-in first: the guided flow talks to the
+                            // bot's management room, which every mautrix
+                            // bridge has, no provisioning URL required. The
+                            // plain chat stays for everything else the bot
+                            // can do, and the URL flow lives behind the
+                            // "Add bridge" button for the richer API.
                             Wrap(
                               spacing: WeftSpace.sm,
                               children: [
-                                if (found.botUserId != null)
+                                if (found.botUserId != null) ...[
                                   FilledButton.tonalIcon(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => BridgeBotLoginScreen(
+                                          botUserId: found.botUserId!,
+                                          network: found.network,
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const WeftMirroredIcon(
+                                      Icons.login_rounded,
+                                      size: 16,
+                                    ),
+                                    label: const Text('Sign in'),
+                                  ),
+                                  OutlinedButton.icon(
                                     onPressed: () =>
                                         _openBotChat(found.botUserId!),
                                     icon: const Icon(
                                       Icons.chat_bubble_outline_rounded,
                                       size: 16,
                                     ),
-                                    label: const Text('Open bridge chat'),
+                                    label: const Text('Open chat'),
                                   ),
-                                OutlinedButton(
-                                  onPressed: _addBridge,
-                                  child: const Text('Add provisioning URL'),
-                                ),
+                                ] else
+                                  OutlinedButton(
+                                    onPressed: _addBridge,
+                                    child: const Text('Add provisioning URL'),
+                                  ),
                               ],
                             ),
                           ],

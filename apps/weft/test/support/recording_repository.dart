@@ -141,6 +141,7 @@ class RecordingChatRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) =>
       inner.sendAttachment(chatId, source, via: via, isVoiceNote: isVoiceNote);
   @override

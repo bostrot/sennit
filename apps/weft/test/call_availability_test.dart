@@ -25,19 +25,24 @@ import 'support/call_fixtures.dart';
 /// is the only place a user learns why.
 void main() {
   group('the button in a conversation', () {
-    testWidgets('is disabled with a reason for a bridged conversation', (
+    testWidgets('routes a bridged conversation to the network\'s own app', (
       tester,
     ) async {
       // Anna is reachable on WhatsApp, Signal and Telegram — three rooms on the
       // user's own homeserver, none of them Matrix-native, and a bridge ghost on
-      // the far end of each that will never answer an `m.call.invite`.
+      // the far end of each that will never answer an `m.call.invite`. The call
+      // still exists — in WhatsApp — so the button now opens it there rather
+      // than sitting greyed out under a tooltip explaining itself.
       await pumpChat(tester);
 
-      final button = callButton(tester);
-      expect(button.onPressed, isNull);
-      expect(button.tooltip, contains("can't carry calls"));
-      expect(button.tooltip, contains('WhatsApp'));
-      expect(button.tooltip, contains('Matrix'));
+      final button = tester.widget<IconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.phone_forwarded_rounded),
+          matching: find.byType(IconButton),
+        ),
+      );
+      expect(button.onPressed, isNotNull);
+      expect(button.tooltip, contains('Call'));
     });
 
     testWidgets('is enabled for a Matrix-native one, and names the peer', (

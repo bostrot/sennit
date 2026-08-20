@@ -1,0 +1,177 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart';
+
+import '../../app/session_providers.dart';
+import '../bridges/bridges_screen.dart';
+import '../merge/merge_screen.dart';
+import 'appearance_sheet.dart';
+import 'devices_screen.dart';
+import 'endpoints_screen.dart';
+import 'link_previews_screen.dart';
+import 'mcp_screen.dart';
+import 'models_screen.dart';
+import 'notifications_screen.dart';
+import 'security_screen.dart';
+import 'shortcuts_sheet.dart';
+import 'sms_screen.dart';
+import 'surfaces_screen.dart';
+
+/// The one place every setting lives.
+///
+/// The inbox's overflow menu used to be this screen: eleven destinations in a
+/// popup, where "Devices" sat between "Show archived" and "Keyboard
+/// shortcuts". A menu is for things you do *to the inbox*; configuration
+/// belongs on a screen with room for grouping and a sentence per entry.
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  static bool get _hasKeyboard => switch (defaultTargetPlatform) {
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux => true,
+    _ => false,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    void push(Widget screen) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => screen));
+    }
+
+    Widget tile({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+    }) {
+      return ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
+      );
+    }
+
+    Widget header(String text) => Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        WeftSpace.lg,
+        WeftSpace.lg,
+        WeftSpace.lg,
+        WeftSpace.xs,
+      ),
+      child: Semantics(
+        header: true,
+        child: Text(
+          text,
+          style: context.text.labelLarge?.copyWith(
+            color: context.colors.primary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: WeftSpace.xxl),
+        children: [
+          header('Chats'),
+          tile(
+            icon: Icons.call_merge_rounded,
+            title: 'Merged chats',
+            subtitle: 'One person across several messengers, as one thread',
+            onTap: () => push(const MergeScreen()),
+          ),
+          tile(
+            icon: Icons.hub_outlined,
+            title: 'Bridges',
+            subtitle: 'The messenger bridges on your Matrix server',
+            onTap: () => push(const BridgesScreen()),
+          ),
+          if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
+            tile(
+              icon: Icons.sms_outlined,
+              title: 'SMS',
+              subtitle: 'Text messages on this phone, in the inbox',
+              onTap: () => push(const SmsScreen()),
+            ),
+
+          header('Look & feel'),
+          tile(
+            icon: Icons.palette_outlined,
+            title: 'Appearance',
+            subtitle: 'Theme, colour and density',
+            onTap: () => showAppearanceSheet(context),
+          ),
+          tile(
+            icon: Icons.notifications_outlined,
+            title: 'Notifications',
+            subtitle: 'What may interrupt you, and how',
+            onTap: () => push(const NotificationsScreen()),
+          ),
+          if (_hasKeyboard)
+            tile(
+              icon: Icons.keyboard_outlined,
+              title: 'Keyboard shortcuts',
+              subtitle: 'Everything the keyboard can do here',
+              onTap: () => showShortcutsSheet(context),
+            ),
+
+          header('Search & intelligence'),
+          tile(
+            icon: Icons.manage_search_rounded,
+            title: 'Search & transcription',
+            subtitle: 'Semantic search and voice transcription endpoints',
+            onTap: () => push(const EndpointsScreen()),
+          ),
+          tile(
+            icon: Icons.download_for_offline_outlined,
+            title: 'Local models',
+            subtitle: 'Run search and transcription on this device',
+            onTap: () => push(const ModelsScreen()),
+          ),
+
+          header('Privacy & security'),
+          tile(
+            icon: Icons.link_rounded,
+            title: 'Link previews',
+            subtitle: 'Whether links in messages may be previewed',
+            onTap: () => push(const LinkPreviewsScreen()),
+          ),
+          tile(
+            icon: Icons.devices_rounded,
+            title: 'Devices',
+            subtitle: 'Your other logins, and signing them out',
+            onTap: () => push(const DevicesScreen()),
+          ),
+          tile(
+            icon: Icons.lock_outline_rounded,
+            title: 'Encryption',
+            subtitle: 'Cross-signing, key backup and recovery',
+            onTap: () => push(const SecurityScreen()),
+          ),
+
+          header('Connections'),
+          tile(
+            icon: Icons.widgets_outlined,
+            title: 'Widgets & watch',
+            subtitle: 'Home screen widgets and the watch companion',
+            onTap: () => push(const SurfacesScreen()),
+          ),
+          tile(
+            icon: Icons.terminal_rounded,
+            title: 'MCP server',
+            subtitle: 'Let your own agents read and send through Weft',
+            onTap: () => push(const McpScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -166,11 +166,14 @@ abstract class ChatRepository {
   ///
   /// [isVoiceNote] is the recorder's assertion and is only meaningful for
   /// audio — it is what separates [MessageKind.voice] from [MessageKind.audio].
+  /// [durationMs] rides along for the same reason: only the recorder knows it
+  /// without decoding the file, and the bubble draws it before download.
   Future<void> sendAttachment(
     String chatId,
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   });
 
   /// Uploads in flight, and recently finished ones, for this chat.

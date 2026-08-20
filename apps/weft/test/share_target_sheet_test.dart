@@ -996,6 +996,7 @@ class _RecordingRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) async {
     if (failing.contains(chatId)) throw StateError('no route to $chatId');
     sent.add('$chatId/${via?.id ?? 'default'}: file ${source.basename}');

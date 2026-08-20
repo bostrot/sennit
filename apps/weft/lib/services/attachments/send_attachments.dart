@@ -25,12 +25,20 @@ Future<List<String>> sendAttachments(
   String chatId,
   List<AttachmentSource> sources, {
   ChatNetwork? via,
+  bool isVoiceNote = false,
+  int? durationMs,
 }) async {
   final problems = <String>[];
 
   for (final source in sources) {
     try {
-      await repository.sendAttachment(chatId, source, via: via);
+      await repository.sendAttachment(
+        chatId,
+        source,
+        via: via,
+        isVoiceNote: isVoiceNote,
+        durationMs: durationMs,
+      );
     } on AttachmentRejectedException catch (e) {
       problems.add('${source.basename}: ${e.message}');
     } on Object catch (error) {

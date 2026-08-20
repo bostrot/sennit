@@ -16,6 +16,7 @@ import flutter_secure_storage_darwin
 import flutter_webrtc
 import just_audio
 import patrol
+import record_macos
 import share_plus
 import url_launcher_macos
 import video_player_avfoundation
@@ -32,6 +33,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterWebRTCPlugin.register(with: registry.registrar(forPlugin: "FlutterWebRTCPlugin"))
   JustAudioPlugin.register(with: registry.registrar(forPlugin: "JustAudioPlugin"))
   PatrolPlugin.register(with: registry.registrar(forPlugin: "PatrolPlugin"))
+  RecordMacOsPlugin.register(with: registry.registrar(forPlugin: "RecordMacOsPlugin"))
   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))
   UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))
   VideoPlayerPlugin.register(with: registry.registrar(forPlugin: "VideoPlayerPlugin"))

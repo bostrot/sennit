@@ -437,6 +437,7 @@ class DemoChatRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) async {
     // An unknown id is an ArgumentError here rather than the silent return the
     // other demo mutators take: losing a file is not the same as failing to
@@ -454,6 +455,7 @@ class DemoChatRepository implements ChatRepository {
       encrypted: false,
       maxUploadBytes: kDemoMaxUploadBytes,
       isVoiceNote: isVoiceNote,
+      durationMs: durationMs,
     );
     if (decision is UploadRejection) {
       throw AttachmentRejectedException(decision);

@@ -18,6 +18,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
 import '../../app/providers.dart';
+import '../../services/attachments/attachment_byte_cache.dart';
 import '../../services/audio/voice_player.dart';
 
 /// The hero tag joining a bubble's thumbnail to its full-screen self.
@@ -149,16 +150,30 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   Uint8List? _bytes;
   bool _failed = false;
 
+  String get _cacheKey =>
+      AttachmentByteCache.keyFor(widget.message.roomId, widget.message.eventId);
+
   @override
   void initState() {
     super.initState();
-    _load();
+    // Synchronous cache hit first: a row scrolling back into view must get its
+    // pixels in the same frame it is built, or the timeline reflows under the
+    // reader's thumb — which is what "scrolling back down keeps jumping" was.
+    final cached = ref.read(attachmentByteCacheProvider).get(_cacheKey);
+    if (cached != null) {
+      _bytes = cached;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
     final bytes = await ref
         .read(chatRepositoryProvider)
         .attachmentBytes(widget.message.roomId, widget.message.eventId);
+    if (bytes != null) {
+      ref.read(attachmentByteCacheProvider).put(_cacheKey, bytes);
+    }
     if (!mounted) return;
     setState(() {
       _bytes = bytes;
@@ -209,11 +224,26 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                   switch ((_bytes, _failed)) {
                     (final Uint8List bytes, _) => Hero(
                       tag: mediaHeroTag(widget.message),
-                      child: Image.memory(
-                        bytes,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _placeholder(context, broken: true),
+                      // Exactly the placeholder's box, so the swap from grey to
+                      // pixels changes *nothing* about layout. Any difference
+                      // here reflows every row below it — in a reversed list,
+                      // that is a shove against the direction the reader is
+                      // scrolling. `cacheWidth` bounds the decode to what the
+                      // box can show; a 12-megapixel original decoded in full
+                      // on the UI thread was most of the remaining jank.
+                      child: SizedBox(
+                        width: _boxWidth,
+                        height: _boxHeight,
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.cover,
+                          cacheWidth:
+                              (_boxWidth *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                          errorBuilder: (_, _, _) =>
+                              _placeholder(context, broken: true),
+                        ),
                       ),
                     ),
                     (_, true) => _placeholder(context, broken: true),
@@ -238,19 +268,25 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     );
   }
 
+  /// One box for both states. The placeholder reserves it and the loaded
+  /// image fills it, so the timeline's geometry is settled the moment the row
+  /// is built and never changes again.
+  static const double _boxWidth = 220;
+
+  double get _boxHeight {
+    final ratio = widget.message.mediaAspectRatio;
+    return ratio == null ? 140.0 : (_boxWidth / ratio).clamp(90.0, 320.0);
+  }
+
   /// Reserves the attachment's own shape while the bytes are still coming.
   ///
   /// [WeftMessage.mediaAspectRatio] is used when the sender announced one, so an
   /// encrypted photo does not lay out as a squat grey box and then reflow the
   /// whole timeline under the reader's thumb when it decodes.
   Widget _placeholder(BuildContext context, {required bool broken}) {
-    final ratio = widget.message.mediaAspectRatio;
-    const width = 220.0;
-    final height = ratio == null ? 140.0 : (width / ratio).clamp(90.0, 320.0);
-
     return Container(
-      width: width,
-      height: height,
+      width: _boxWidth,
+      height: _boxHeight,
       color: context.colors.surfaceContainerHighest,
       alignment: Alignment.center,
       child: broken

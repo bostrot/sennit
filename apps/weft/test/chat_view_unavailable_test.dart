@@ -77,6 +77,7 @@ class _NoRoomsRepository implements ChatRepository {
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
+    int? durationMs,
   }) =>
       _inner.sendAttachment(chatId, source, via: via, isVoiceNote: isVoiceNote);
   @override
