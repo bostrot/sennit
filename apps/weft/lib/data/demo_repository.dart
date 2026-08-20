@@ -32,6 +32,9 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// `--dart-define=WEFT_DEMO=true`; the Matrix-backed repository is the default
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
+  @override
+  Set<String> get serviceChatIds => const {};
+
   DemoChatRepository({Duration uploadTick = kDemoUploadTick})
     : _uploadTick = uploadTick {
     _graph = IdentityGraph(handles: _handles, idFactory: _ids());

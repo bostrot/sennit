@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInput;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
@@ -76,6 +77,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             username: _username.text.trim(),
             password: _password.text,
           );
+      // A successful login is the moment the password manager should offer to
+      // save what was typed; without this commit it never asks.
+      TextInput.finishAutofillContext();
       // The auth gate reacts to the session state change; nothing to do here.
     } on Exception catch (e) {
       if (!mounted) return;
@@ -157,31 +161,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 if (_serverResolved && _supportsPassword) ...[
                   const SizedBox(height: WeftSpace.lg),
-                  WeftLabelledField(
-                    label: 'Username',
-                    child: TextField(
-                      controller: _username,
-                      enabled: !_busy,
-                      autocorrect: false,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline, size: 20),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: WeftSpace.sm),
-                  WeftLabelledField(
-                    label: 'Password',
-                    child: TextField(
-                      controller: _password,
-                      enabled: !_busy,
-                      obscureText: true,
-                      onSubmitted: (_) => _signIn(),
-                      decoration: const InputDecoration(
-                        hintText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline, size: 20),
-                      ),
+                  // One autofill group over both fields, with the standard
+                  // hints: this is the entire contract a password manager
+                  // needs to offer credentials here and to prompt to save
+                  // them. Without it the fields were invisible to autofill
+                  // and every login was typed by hand.
+                  AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        WeftLabelledField(
+                          label: 'Username',
+                          child: TextField(
+                            controller: _username,
+                            enabled: !_busy,
+                            autocorrect: false,
+                            autofocus: true,
+                            autofillHints: const [AutofillHints.username],
+                            keyboardType: TextInputType.name,
+                            decoration: const InputDecoration(
+                              hintText: 'Username',
+                              prefixIcon: Icon(Icons.person_outline, size: 20),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: WeftSpace.sm),
+                        WeftLabelledField(
+                          label: 'Password',
+                          child: TextField(
+                            controller: _password,
+                            enabled: !_busy,
+                            obscureText: true,
+                            autofillHints: const [AutofillHints.password],
+                            onSubmitted: (_) => _signIn(),
+                            decoration: const InputDecoration(
+                              hintText: 'Password',
+                              prefixIcon: Icon(Icons.lock_outline, size: 20),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

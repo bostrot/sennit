@@ -183,6 +183,26 @@ const List<String> weftMigrations = [
   );
   CREATE INDEX idx_link_preview_fetched ON link_preview(fetched_at);
   ''',
+
+  // ---------------------------------------------------------------- v5
+  '''
+  -- Finished voice transcriptions.
+  --
+  -- Transcribing costs seconds of on-device inference or a metered endpoint
+  -- call, and the result used to live in a per-session map — closing the app
+  -- threw the work away and the bubble went back to "Transcribe". A row here
+  -- is the transcript's home; the search index carries a *copy* for FTS and
+  -- embeddings, re-planted on startup for any message the index has not seen.
+  CREATE TABLE transcript (
+    event_id   TEXT NOT NULL,
+    room_id    TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    provider   TEXT NOT NULL DEFAULT '',
+    language   TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (event_id, room_id)
+  );
+  ''',
 ];
 
 /// Applies any migrations the database has not seen yet.

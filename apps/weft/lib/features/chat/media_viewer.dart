@@ -163,10 +163,12 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
       // disk, and neither should take the viewer down with it.
       debugPrint('weft: staging ${message.eventId} failed: $error');
       if (!_disposed) {
+        // The reason rides along. "Could not be downloaded" with nothing after
+        // it turns every distinct failure — an expired link, a 401, a full
+        // disk — into the same unreportable sentence.
         setState(
           () => _failures[message.eventId] =
-              'This attachment could not '
-              'be downloaded.',
+              'This attachment could not be downloaded.\n$error',
         );
       }
       return null;

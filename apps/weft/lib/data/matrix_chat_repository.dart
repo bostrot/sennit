@@ -42,10 +42,12 @@ class MatrixChatRepository implements ChatRepository {
     this._session, {
     IdentityStore? store,
     SearchStore? searchStore,
+    SettingsStore? settings,
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
     SmsChatRepository? sms,
   }) : _store = store,
+       _settings = settings,
        _searchStore = searchStore,
        _transportOverride = transport,
        _readBytes = readBytes,
@@ -98,6 +100,7 @@ class MatrixChatRepository implements ChatRepository {
 
   final WeftMatrixSession _session;
   final IdentityStore? _store;
+  final SettingsStore? _settings;
   final SearchStore? _searchStore;
   final AttachmentBytesLoader _readBytes;
 
@@ -554,9 +557,13 @@ class MatrixChatRepository implements ChatRepository {
         getThumbnail: thumbnail,
       );
       return Uint8List.fromList(file.bytes);
-    } on Exception {
+    } on Object catch (error) {
+      // Object, not Exception: the SDK throws bare *strings* for several of
+      // its refusals ("This event hasn't any attachment or thumbnail."), and
+      // an `on Exception` let those sail through as unhandled async errors.
       // A missing or undecryptable attachment renders as a placeholder rather
-      // than taking the timeline down.
+      // than taking the timeline down — but the reason is worth one log line.
+      debugPrint('weft: attachment $eventId failed: $error');
       return null;
     }
   }
@@ -593,7 +600,9 @@ class MatrixChatRepository implements ChatRepository {
         url: parsed,
         headers: mediaAuthHeaders(_client) ?? const {},
       );
-    } on Exception {
+    } on Object catch (error) {
+      // Same string-throw hazard as [attachmentBytes].
+      debugPrint('weft: attachment location $eventId failed: $error');
       return null;
     }
   }
@@ -847,7 +856,18 @@ class MatrixChatRepository implements ChatRepository {
       final room = _client.getRoomById(source.roomId);
       final lastEvent = room?.lastEvent;
       if (room == null || lastEvent == null) continue;
-      await room.setReadMarker(lastEvent.eventId, mRead: lastEvent.eventId);
+      // `public: false` sends only the private receipt: this account's other
+      // devices still clear the unread badge, but the sender is not told.
+      // Bridges relay the public receipt to the remote network as its native
+      // read marker, so this switch is exactly WhatsApp's blue-ticks toggle.
+      final tellSender =
+          _settings?.getBool(WeftSettings.sendReadReceipts, fallback: true) ??
+          true;
+      await room.setReadMarker(
+        lastEvent.eventId,
+        mRead: lastEvent.eventId,
+        public: tellSender,
+      );
     }
   }
 
@@ -867,14 +887,32 @@ class MatrixChatRepository implements ChatRepository {
 
   // ------------------------------------------------------------------ rebuild
 
+  @override
+  Set<String> get serviceChatIds => _serviceChatIds;
+  Set<String> _serviceChatIds = const {};
+
+  /// A DM whose peer *is* a bridge's service bot. The bot suffix alone is not
+  /// enough — a person may be called `@robot:...` — so the localpart must also
+  /// resolve to a known network the way mautrix bots name themselves.
+  bool _isServiceChat(sdk.Room room) {
+    final peer = _peerOf(room);
+    if (peer == null) return false;
+    final localpart = peer.split(':').first;
+    return localpart.endsWith('bot') &&
+        networkFromBridgeBotId(peer) != ChatNetwork.unknown;
+  }
+
   void _rebuild() {
     _refreshIdentityGraph();
 
+    final service = <String>{};
     final byRoom = <String, Chat>{};
     for (final room in _client.rooms) {
       if (room.isSpace) continue;
       byRoom[room.id] = _chatFromRoom(room);
+      if (_isServiceChat(room)) service.add(room.id);
     }
+    _serviceChatIds = service;
     // Into the *same* map, not appended to the result: this is what makes an
     // SMS thread a candidate for [_applyMerges] rather than a row that is only
     // ever shown on its own. A number the user has merged with their WhatsApp

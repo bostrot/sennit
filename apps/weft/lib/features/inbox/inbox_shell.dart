@@ -4,11 +4,14 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/labels.dart';
+import '../../services/schedule/scheduled_actions.dart';
 import '../../app/providers.dart';
 import '../../app/shortcuts.dart';
 import '../bridges/bridges_screen.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
+import 'label_sheet.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
@@ -21,6 +24,9 @@ class InboxShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repository = ref.watch(chatRepositoryProvider);
+    // Not used here — *held* here: the scheduler's timer only runs while
+    // something watches it, and the shell is alive as long as the app is.
+    ref.watch(messageSchedulerProvider);
     final filter = ref.watch(networkFilterProvider);
     final unread = ref.watch(unreadByNetworkProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
@@ -265,6 +271,17 @@ class _SelectionBar extends ConsumerWidget {
                   _apply(ref, (id) => repository.setMuted(id, muted: true)),
             ),
             IconButton(
+              tooltip: 'Label',
+              icon: const Icon(Icons.label_outline_rounded),
+              onPressed: () async {
+                final label = await showLabelSheet(context, ref, selected);
+                if (label != null) {
+                  ref.read(chatLabelsProvider.notifier).toggle(selected, label);
+                  ref.read(chatSelectionProvider.notifier).clear();
+                }
+              },
+            ),
+            IconButton(
               tooltip: archived ? 'Unarchive' : 'Archive',
               icon: Icon(
                 archived ? Icons.unarchive_outlined : Icons.archive_outlined,
@@ -416,6 +433,7 @@ class _InboxHeader extends ConsumerWidget {
           const SizedBox(height: WeftSpace.md),
           const _SearchField(),
           const SizedBox(height: WeftSpace.md),
+          const _LabelFilterRow(),
           if (activeFilter.isNotEmpty)
             Align(
               alignment: AlignmentDirectional.centerStart,
@@ -615,6 +633,43 @@ class _EmptyDetail extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The label chips under the search field — drawn only once labels exist.
+///
+/// Single-select, like the rail in its default mode: a label answers "which
+/// slice of my life", and slices of a life rarely intersect on purpose.
+class _LabelFilterRow extends ConsumerWidget {
+  const _LabelFilterRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(chatLabelsProvider);
+    final labels = ref.read(chatLabelsProvider.notifier).all;
+    if (labels.isEmpty) return const SizedBox.shrink();
+    final selected = ref.watch(labelFilterProvider);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final label in labels) ...[
+              FilterChip(
+                label: Text(label),
+                selected: selected == label,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) =>
+                    ref.read(labelFilterProvider.notifier).select(label),
+              ),
+              const SizedBox(width: WeftSpace.sm),
+            ],
+          ],
         ),
       ),
     );

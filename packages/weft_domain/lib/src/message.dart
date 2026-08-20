@@ -48,6 +48,7 @@ class WeftMessage {
     this.redacted = false,
     this.deliveryState,
     this.attachmentUrl,
+    this.geoUri,
     this.durationMs,
     this.mediaWidth,
     this.mediaHeight,
@@ -122,6 +123,9 @@ class WeftMessage {
   final bool redacted;
   final DeliveryState? deliveryState;
   final String? attachmentUrl;
+
+  /// `geo:` URI of an [MessageKind.location] message, verbatim from the event.
+  final String? geoUri;
   final int? durationMs;
 
   /// Pixel size of the attached image or video, when the sender announced it.
@@ -179,6 +183,7 @@ class WeftMessage {
   /// genuinely means: an edit that drops formatting must clear the old HTML, or
   /// the bubble renders the previous message's markup around the new words.
   WeftMessage copyWith({
+    String? geoUri,
     String? body,
     Object? formattedBody = _unchanged,
     String? transcript,
@@ -213,6 +218,7 @@ class WeftMessage {
       redacted: redacted ?? this.redacted,
       deliveryState: deliveryState ?? this.deliveryState,
       attachmentUrl: attachmentUrl,
+      geoUri: geoUri ?? this.geoUri,
       durationMs: durationMs,
       mediaWidth: mediaWidth,
       mediaHeight: mediaHeight,

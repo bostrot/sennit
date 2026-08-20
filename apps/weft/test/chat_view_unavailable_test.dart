@@ -15,6 +15,9 @@ import 'package:weft_merge/weft_merge.dart';
 /// Wraps the demo repository but reports every chat as having no reachable
 /// rooms, standing in for a room the account has since left.
 class _NoRoomsRepository implements ChatRepository {
+  @override
+  Set<String> get serviceChatIds => const {};
+
   _NoRoomsRepository(this._inner);
 
   final DemoChatRepository _inner;

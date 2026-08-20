@@ -31,6 +31,9 @@ class RecordedCall {
 /// `react` into a chip. A stub would have to reimplement that to be useful, and
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
+  @override
+  Set<String> get serviceChatIds => const {};
+
   RecordingChatRepository(this.inner);
 
   final ChatRepository inner;

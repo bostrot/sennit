@@ -71,7 +71,7 @@ void main() {
   Future<void> typeAndSend(
     WidgetTester tester,
     String text, {
-    String tooltip = 'Send',
+    String tooltip = 'Send — hold to schedule',
   }) async {
     await tester.enterText(find.byType(TextField), text);
     // The trailing button is the microphone until the first character lands;

@@ -10,4 +10,5 @@ export 'src/link_preview_store.dart';
 export 'src/migrations.dart';
 export 'src/search_store.dart';
 export 'src/settings_store.dart';
+export 'src/transcript_store.dart';
 export 'src/weft_database.dart';

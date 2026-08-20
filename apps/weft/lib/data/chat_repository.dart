@@ -40,6 +40,15 @@ abstract class ChatRepository {
   /// empty for their first few frames.
   Future<MergedTimeline> timelineFor(String chatId);
 
+  /// Chats that exist to *operate* a bridge rather than to talk to a person —
+  /// the management DM with `@whatsappbot` and friends.
+  ///
+  /// Surfaced as ids rather than filtered out of [watchChats]: the bridges
+  /// screen still opens these on request, deep links still resolve them, and
+  /// only the inbox's default view hides them. An empty set is the correct
+  /// answer for every repository without bridges.
+  Set<String> get serviceChatIds => const {};
+
   /// The identity graph backing merge suggestions.
   IdentityGraph get identityGraph;
 

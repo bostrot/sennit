@@ -6,6 +6,7 @@ import 'package:weft_merge/weft_merge.dart';
 
 import '../../app/a11y.dart';
 import '../../app/providers.dart';
+import '../../data/chat_repository.dart';
 
 /// Merge management: what the scorer proposes, and what is already merged.
 ///
@@ -41,6 +42,54 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
     showWeftMessage(context, outcome);
   }
 
+  /// Two pickers and a confirmation: the user names both sides themselves.
+  Future<void> _manualMerge(ChatRepository repository) async {
+    final handles =
+        repository.identityGraph
+            .contacts()
+            .expand((contact) => contact.handles)
+            .toList()
+          ..sort(
+            (a, b) => handleLabel(
+              a,
+            ).toLowerCase().compareTo(handleLabel(b).toLowerCase()),
+          );
+    if (handles.length < 2) {
+      showWeftMessage(context, 'There is nothing to merge yet.');
+      return;
+    }
+
+    final first = await _pickHandle('Merge which conversation?', handles);
+    if (first == null || !mounted) return;
+
+    final firstContact = repository.identityGraph.contactIdOf(first.id);
+    final second = await _pickHandle('Merge ${handleLabel(first)} with…', [
+      // Everything not already the same person.
+      for (final handle in handles)
+        if (repository.identityGraph.contactIdOf(handle.id) != firstContact)
+          handle,
+    ]);
+    if (second == null || !mounted) return;
+
+    await _decide(
+      () => repository.mergeHandles(first.id, second.id),
+      'Merged ${handleLabel(first)} with ${handleLabel(second)}. '
+      'They are now one conversation.',
+    );
+  }
+
+  Future<NetworkHandle?> _pickHandle(
+    String title,
+    List<NetworkHandle> handles,
+  ) {
+    return showModalBottomSheet<NetworkHandle>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _HandlePickerSheet(title: title, handles: handles),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final repository = ref.watch(chatRepositoryProvider);
@@ -55,6 +104,14 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Merged chats')),
+      // Suggestions need a matching signal, and people rename themselves per
+      // app — "Mum" on WhatsApp is "Petra" on Signal, and no scorer bridges
+      // that. Manual merge is the user asserting what only they know.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _manualMerge(repository),
+        icon: const Icon(Icons.call_merge_rounded),
+        label: const Text('Merge two chats'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(WeftSpace.lg),
         children: [
@@ -365,6 +422,101 @@ class _HandleChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Searchable list of every known handle, one tap to choose.
+class _HandlePickerSheet extends StatefulWidget {
+  const _HandlePickerSheet({required this.title, required this.handles});
+
+  final String title;
+  final List<NetworkHandle> handles;
+
+  @override
+  State<_HandlePickerSheet> createState() => _HandlePickerSheetState();
+}
+
+class _HandlePickerSheetState extends State<_HandlePickerSheet> {
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.text.trim().toLowerCase();
+    final visible = query.isEmpty
+        ? widget.handles
+        : [
+            for (final handle in widget.handles)
+              if (handleLabel(handle).toLowerCase().contains(query) ||
+                  handle.remoteId.toLowerCase().contains(query))
+                handle,
+          ];
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      builder: (context, controller) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: WeftSpace.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: context.text.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: WeftSpace.sm),
+                WeftLabelledField(
+                  label: 'Search conversations',
+                  child: TextField(
+                    controller: _query,
+                    autofocus: true,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search by name or number',
+                      prefixIcon: Icon(Icons.search_rounded, size: 20),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: WeftSpace.sm),
+          Expanded(
+            child: ListView.builder(
+              controller: controller,
+              itemCount: visible.length,
+              itemBuilder: (context, index) {
+                final handle = visible[index];
+                return ListTile(
+                  leading: NetworkGlyph(
+                    network: handle.network,
+                    size: 28,
+                    semanticsLabel: '',
+                  ),
+                  title: Text(handleLabel(handle)),
+                  subtitle: Text(
+                    '${handle.network.label} · ${handle.remoteId}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => Navigator.of(context).pop(handle),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

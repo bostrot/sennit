@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_store/weft_store.dart' show StoredTranscript;
 import 'package:weft_transcribe/weft_transcribe.dart';
 
 import 'search_providers.dart';
@@ -30,7 +31,21 @@ class TranscriptionService {
   /// not by every scroll past the bubble.
   final Set<String> _failed = {};
 
-  Transcript? cached(String eventId) => _cache[eventId];
+  /// The session cache, then the database: a transcription done last week is
+  /// work already paid for, and it survives restarts now.
+  Transcript? cached(String eventId, {String? roomId}) {
+    final hot = _cache[eventId];
+    if (hot != null) return hot;
+    if (roomId == null) return null;
+
+    final stored = storesOrNull(_ref)?.transcripts.byEvent(eventId, roomId);
+    if (stored == null) return null;
+    return _cache[eventId] = Transcript(
+      text: stored.text,
+      provider: stored.provider,
+      language: stored.language,
+    );
+  }
 
   /// Whether any provider — on-device or endpoint — is usable right now.
   Future<bool> get isConfigured async =>
@@ -80,16 +95,25 @@ class TranscriptionService {
 
     _cache[message.eventId] = transcript;
 
-    // Re-index with the transcript attached, so search finds the spoken words.
+    // Persisted, then indexed: the row is the transcript's home across
+    // restarts, and the index copy is what makes the spoken words findable —
+    // by keyword through FTS, and by meaning once the embedding queue drains.
     if (!transcript.isEmpty) {
-      _ref
-          .read(storesProvider)
-          .search
-          .indexMessage(
-            message.copyWith(transcript: transcript.text),
-            chatId: message.roomId,
-            chatTitle: message.senderName,
-          );
+      final stores = _ref.read(storesProvider);
+      stores.transcripts.save(
+        StoredTranscript(
+          eventId: message.eventId,
+          roomId: message.roomId,
+          text: transcript.text,
+          provider: transcript.provider,
+          language: transcript.language,
+        ),
+      );
+      stores.search.indexMessage(
+        message.copyWith(transcript: transcript.text),
+        chatId: message.roomId,
+        chatTitle: message.senderName,
+      );
     }
     return transcript;
   }

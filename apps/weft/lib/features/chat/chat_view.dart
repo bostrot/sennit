@@ -25,6 +25,7 @@ import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
+import '../../services/schedule/scheduled_actions.dart';
 import '../auth/verification_screen.dart';
 import '../call/external_call.dart';
 import '../call/start_call.dart';
@@ -476,7 +477,92 @@ class _ChatViewState extends ConsumerState<ChatView> {
         await _retranscribe(message);
       case MessageAction.editHistory:
         if (mounted) await showEditHistorySheet(context, message: message);
+      case MessageAction.remind:
+        await _remindLater(message);
     }
+  }
+
+  /// "Remind me": a handful of natural offsets, then the OS carries it.
+  Future<void> _remindLater(WeftMessage message) async {
+    final now = DateTime.now();
+    final tonight = DateTime(now.year, now.month, now.day, 19);
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 9);
+    final choice = await showModalBottomSheet<DateTime>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.schedule_rounded),
+              title: const Text('In one hour'),
+              onTap: () =>
+                  Navigator.of(context).pop(now.add(const Duration(hours: 1))),
+            ),
+            if (tonight.isAfter(now))
+              ListTile(
+                leading: const Icon(Icons.nights_stay_outlined),
+                title: const Text('This evening (19:00)'),
+                onTap: () => Navigator.of(context).pop(tonight),
+              ),
+            ListTile(
+              leading: const Icon(Icons.wb_sunny_outlined),
+              title: const Text('Tomorrow morning (9:00)'),
+              onTap: () => Navigator.of(context).pop(tomorrow),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_calendar_rounded),
+              title: const Text('Pick a time…'),
+              onTap: () async {
+                final navigator = Navigator.of(context);
+                final when = await _pickDateTime(context, from: now);
+                navigator.pop(when);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    final preview = messageDocument(message).plainText;
+    await ref
+        .read(reminderSchedulerProvider)
+        .remind(
+          chatId: _chatId,
+          title: 'Reminder: ${message.isOwn ? 'you' : message.senderName}',
+          body: preview.length > 120
+              ? '${preview.substring(0, 117)}…'
+              : preview,
+          at: choice,
+        );
+    if (mounted) {
+      _showMessage(
+        'Will remind you at '
+        '${DateFormat.MMMEd().add_Hm().format(choice)}.',
+      );
+    }
+  }
+
+  /// Date then time, composed; null when either step is dismissed.
+  static Future<DateTime?> _pickDateTime(
+    BuildContext context, {
+    required DateTime from,
+  }) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: from,
+      firstDate: from,
+      lastDate: from.add(const Duration(days: 365)),
+    );
+    if (date == null || !context.mounted) return null;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(from.add(const Duration(hours: 1))),
+    );
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
   void _startEdit(WeftMessage message) {
@@ -748,7 +834,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                         // session cache so a finished transcription shows in place.
                         final cachedTranscript = ref
                             .watch(transcriptionServiceProvider)
-                            .cached(message.eventId);
+                            .cached(message.eventId, roomId: message.roomId);
                         if (cachedTranscript != null &&
                             message.transcript == null) {
                           message = message.copyWith(
@@ -816,6 +902,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   ),
                 ),
               ),
+              _ScheduledSendsBar(chatId: _chatId),
               FocusTraversalOrder(
                 order: const NumericFocusOrder(2),
                 child: _recording
@@ -833,6 +920,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                         onAttach: () => _attach(chat),
                         onPickNetwork: _pickNetwork,
                         onRecordVoice: () => setState(() => _recording = true),
+                        onSendLater: () => _sendLater(chat),
                       ),
               ),
             ],
@@ -1074,6 +1162,39 @@ class _ChatViewState extends ConsumerState<ChatView> {
       durationMs: recording.durationMs,
     );
     if (problems.isNotEmpty && mounted) _showMessage(problems.first);
+  }
+
+  /// Long-press on Send: pick a moment, park the text in the outbox.
+  Future<void> _sendLater(Chat chat) async {
+    final text = _composer.text.trim();
+    if (text.isEmpty) {
+      _showMessage('Write the message first, then hold Send to schedule it.');
+      return;
+    }
+    final when = await _pickDateTime(context, from: DateTime.now());
+    if (when == null || !mounted) return;
+    if (!when.isAfter(DateTime.now())) {
+      _showMessage('That time is already past.');
+      return;
+    }
+
+    ref
+        .read(messageSchedulerProvider.notifier)
+        .schedule(
+          ScheduledMessage(
+            id: 'send-${DateTime.now().microsecondsSinceEpoch}',
+            chatId: _chatId,
+            chatTitle: chat.title,
+            body: text,
+            dueAtMs: when.millisecondsSinceEpoch,
+            networkId: chat.sendNetwork?.id,
+          ),
+        );
+    _composer.clear();
+    _showMessage(
+      'Scheduled for ${DateFormat.MMMEd().add_Hm().format(when)}. '
+      'It sends while Weft is running.',
+    );
   }
 
   Future<void> _send() async {
@@ -2078,11 +2199,15 @@ class _Composer extends StatelessWidget {
     this.composing,
     this.onCancelContext,
     this.onRecordVoice,
+    this.onSendLater,
   });
 
   /// Switches the row into voice recording. Null hides the microphone —
   /// editing a message into a voice note is not a thing.
   final VoidCallback? onRecordVoice;
+
+  /// Long-press on Send: schedule this text instead of sending it now.
+  final VoidCallback? onSendLater;
 
   final Chat chat;
   final TextEditingController controller;
@@ -2260,13 +2385,21 @@ class _Composer extends StatelessWidget {
                         tooltip: 'Record voice message',
                       );
                     }
-                    return IconButton.filled(
-                      onPressed: onSend,
-                      icon: Icon(
-                        editing ? Icons.check_rounded : Icons.send_rounded,
-                        size: 18,
+                    return GestureDetector(
+                      // Long-press for "send later" — the same spot WhatsApp
+                      // and Telegram hide it, and harmless to discover: a
+                      // long-press that does nothing was doing nothing anyway.
+                      onLongPress: editing ? null : onSendLater,
+                      child: IconButton.filled(
+                        onPressed: onSend,
+                        icon: Icon(
+                          editing ? Icons.check_rounded : Icons.send_rounded,
+                          size: 18,
+                        ),
+                        tooltip: editing
+                            ? 'Save edit'
+                            : 'Send — hold to schedule',
                       ),
-                      tooltip: editing ? 'Save edit' : 'Send',
                     );
                   },
                 ),
@@ -2338,6 +2471,71 @@ class _ComposerContextBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The thin strip above the composer when this chat has messages waiting to
+/// send. Tapping an entry's cross cancels it; nothing draws when the outbox
+/// has nothing for this conversation.
+class _ScheduledSendsBar extends ConsumerWidget {
+  const _ScheduledSendsBar({required this.chatId});
+
+  final String chatId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = [
+      for (final m in ref.watch(messageSchedulerProvider))
+        if (m.chatId == chatId) m,
+    ];
+    if (pending.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      color: context.colors.surfaceContainerHigh,
+      padding: const EdgeInsets.symmetric(
+        horizontal: WeftSpace.lg,
+        vertical: WeftSpace.xs,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final message in pending)
+            Row(
+              children: [
+                Icon(
+                  Icons.schedule_send_rounded,
+                  size: 16,
+                  color: context.colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: WeftSpace.sm),
+                Expanded(
+                  child: Text(
+                    '${DateFormat.MMMEd().add_Hm().format(message.dueAt)} — '
+                    '${message.body}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.bodySmall,
+                  ),
+                ),
+                NamedButton(
+                  label: 'Cancel the scheduled message',
+                  onPressed: () => ref
+                      .read(messageSchedulerProvider.notifier)
+                      .cancel(message.id),
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    tooltip: 'Cancel',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => ref
+                        .read(messageSchedulerProvider.notifier)
+                        .cancel(message.id),
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }

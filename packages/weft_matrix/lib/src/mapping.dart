@@ -168,9 +168,17 @@ WeftMessage? mapEvent(
         : messageKindFromMsgtype(msgtype, isVoice: voice),
     isOwn: event.senderId == ownUserId,
     // The event as sent. Edits are applied below, from the replacement chain,
-    // rather than trusted from here: `event.body` is the *original* text until
+    // rather than trusted from here: the body is the *original* text until
     // someone asks the timeline for the display event.
-    body: event.redacted ? '' : event.body,
+    //
+    // `event.text`, NOT `event.body`: the SDK's `body` getter substitutes
+    // 'Unknown message format of type "m.room.message"' when the content has
+    // no body key — which perfectly legal bridged media (captionless photos,
+    // albums) sometimes does, and which then rendered as that sentence in the
+    // middle of a conversation.
+    body: event.redacted
+        ? ''
+        : (event.text.isNotEmpty ? event.text : _fallbackBody(content)),
     formattedBody: event.redacted ? null : formattedBodyOf(content),
     replyToEventId: replyTargetEventId(content),
     redacted: event.redacted,
@@ -179,6 +187,7 @@ WeftMessage? mapEvent(
     // for encrypted rooms, so the UI asks the repository for bytes instead —
     // this only records that something is there to load.
     attachmentUrl: _hasAttachment(content) ? event.eventId : null,
+    geoUri: content['geo_uri'] is String ? content['geo_uri'] as String : null,
     durationMs: _durationMs(content),
     mediaWidth: _positiveInfoInt(content, 'w'),
     mediaHeight: _positiveInfoInt(content, 'h'),
@@ -361,6 +370,45 @@ DeliveryState? _deliveryFor(sdk.Event event) {
 /// Whether the event carries a file, plain (`url`) or encrypted (`file`).
 bool _hasAttachment(Map<String, Object?> content) =>
     content['url'] is String || content['file'] is Map;
+
+/// What to say for a message with no text and no top-level file.
+///
+/// A captionless photo says nothing — the bubble draws the picture. Anything
+/// else is a shape this client does not know; it gets a quiet placeholder and
+/// one diagnostic line naming the content *keys* (never the values — this is
+/// message content) so the next report can say what the bridge actually sent.
+String _fallbackBody(Map<String, Object?> content) {
+  if (_hasAttachment(content)) return '';
+
+  // Bridged albums: a list of media objects under a vendor key
+  // (`com.beeper.gallery.images` and friends). Named rather than fetched —
+  // per-part download needs upstream SDK support — but "album of 4 photos"
+  // beats a sentence about message formats.
+  for (final entry in content.entries) {
+    final value = entry.value;
+    if (value is List && value.isNotEmpty) {
+      final first = value.first;
+      if (first is Map && (first['url'] is String || first['file'] is Map)) {
+        return value.length == 1
+            ? 'A photo album'
+            : 'A photo album of ${value.length} images';
+      }
+    }
+  }
+
+  assert(() {
+    // ignore: avoid_print
+    print(
+      'weft: unrenderable m.room.message, '
+      'msgtype=${content['msgtype']}, keys=${content.keys.toList()}',
+    );
+    return true;
+  }());
+  final msgtype = content['msgtype'];
+  return msgtype is String && msgtype.isNotEmpty
+      ? 'Unsupported message ($msgtype)'
+      : 'Unsupported message';
+}
 
 /// Reads a positive integer out of `info` — `w`, `h` or `size`, which is where
 /// a sender announces the shape and the length of an attachment.

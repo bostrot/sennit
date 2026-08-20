@@ -135,6 +135,11 @@ abstract final class WeftSettings {
   /// Networks excluded from any remote endpoint, as a JSON list of network ids.
   static const String remoteExcludedNetworks = 'privacy.remote_excluded';
 
+  /// Whether reading a chat tells the *sender* it was read. Off sends only
+  /// private receipts — unread counts still clear on this account's devices,
+  /// but the other side sees no blue-tick equivalent.
+  static const String sendReadReceipts = 'privacy.read_receipts';
+
   /// Whether messages are scanned for appointments to offer "add to
   /// calendar". Fully on-device — rules plus, when installed, the local
   /// embedding model — which is why it may default on.

@@ -15,6 +15,7 @@ class WeftStores {
     required this.identity,
     required this.settings,
     required this.search,
+    required this.transcripts,
     required this.linkPreviews,
     required this.secrets,
     required this.embeddingApiKey,
@@ -25,6 +26,7 @@ class WeftStores {
   final IdentityStore identity;
   final SettingsStore settings;
   final SearchStore search;
+  final TranscriptStore transcripts;
 
   /// Answers the homeserver has already given about links, so a scroll past
   /// the same bubble does not ask it again. See [LinkPreviewStore].
@@ -48,6 +50,7 @@ class WeftStores {
       identity: IdentityStore(db),
       settings: SettingsStore(db),
       search: SearchStore(db),
+      transcripts: TranscriptStore(db),
       linkPreviews: LinkPreviewStore(db),
       secrets: SecretStore(),
       embeddingApiKey: null,
@@ -74,6 +77,7 @@ class WeftStores {
       identity: IdentityStore(db),
       settings: SettingsStore(db),
       search: SearchStore(db),
+      transcripts: TranscriptStore(db),
       linkPreviews: LinkPreviewStore(db),
       secrets: secrets,
       embeddingApiKey: embeddingKey,

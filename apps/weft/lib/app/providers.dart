@@ -13,6 +13,7 @@ import '../data/sms_chat_repository.dart';
 import '../services/sms/sms_platform.dart';
 import 'package:weft_store/weft_store.dart';
 
+import 'labels.dart';
 import 'session_providers.dart';
 import 'stores.dart';
 
@@ -29,6 +30,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
     ref.watch(matrixSessionProvider),
     store: stores.identity,
     searchStore: stores.search,
+    settings: stores.settings,
     sms: ref.watch(smsRepositoryProvider),
   );
   ref.onDispose(repository.dispose);
@@ -268,8 +270,23 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
   final filter = ref.watch(networkFilterProvider);
   final showArchived = ref.watch(showArchivedProvider);
+  // Bridge management bots are plumbing, not conversations; they open from
+  // the bridges screen instead of sitting between real chats in the inbox.
+  final service = ref.watch(chatRepositoryProvider).serviceChatIds;
+  // Labels compose with the network rail: the rail says which apps, the label
+  // says which *life* — Work on WhatsApp, Family across everything.
+  final label = ref.watch(labelFilterProvider);
+  final labels = ref.watch(chatLabelsProvider.notifier);
+  ref.watch(chatLabelsProvider);
   final filtered = filterChats(
-    chats.where((c) => c.archived == showArchived).toList(),
+    chats
+        .where(
+          (c) =>
+              c.archived == showArchived &&
+              !service.contains(c.id) &&
+              (label == null || labels.ofChat(c.id).contains(label)),
+        )
+        .toList(),
     filter,
   );
 

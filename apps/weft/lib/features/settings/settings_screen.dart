@@ -142,6 +142,7 @@ class SettingsScreen extends ConsumerWidget {
           const _AgendaToggle(),
 
           header('Privacy & security'),
+          const _ReadReceiptsToggle(),
           tile(
             icon: Icons.link_rounded,
             title: 'Link previews',
@@ -176,6 +177,43 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The read-receipts switch.
+///
+/// Off keeps the *private* receipt — this account's own devices still clear
+/// their badges — and withholds the public one, which is what bridges relay
+/// to the remote network as its native read marker.
+class _ReadReceiptsToggle extends ConsumerWidget {
+  const _ReadReceiptsToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      return const SizedBox.shrink();
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.done_all_rounded),
+      title: const Text('Send read receipts'),
+      subtitle: const Text(
+        'Off, senders are not told you read their messages — on WhatsApp and '
+        'friends too, via the bridge. Your own devices still sync.',
+      ),
+      value: stores.settings.getBool(
+        WeftSettings.sendReadReceipts,
+        fallback: true,
+      ),
+      onChanged: (value) {
+        stores.settings.setBool(WeftSettings.sendReadReceipts, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
     );
   }
 }

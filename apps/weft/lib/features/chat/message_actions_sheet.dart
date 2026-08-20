@@ -22,6 +22,9 @@ enum MessageAction {
   transcribe,
   retranscribe,
 
+  /// Schedule a local notification pointing back at this message.
+  remind,
+
   /// The versions of a message that has been edited.
   ///
   /// Here rather than only on the "edited" marker under the bubble. That marker
@@ -189,6 +192,11 @@ class _MessageActionsSheet extends StatelessWidget {
                   leading: const Icon(Icons.forward_rounded),
                   title: const Text('Forward'),
                   onTap: () => choose(MessageAction.forward),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.alarm_add_rounded),
+                  title: const Text('Remind me'),
+                  onTap: () => choose(MessageAction.remind),
                 ),
                 if (message.editHistory.isNotEmpty)
                   ListTile(
