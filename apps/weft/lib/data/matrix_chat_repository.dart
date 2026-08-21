@@ -1239,7 +1239,7 @@ class MatrixChatRepository implements ChatRepository {
   final Map<String, String?> _botCache = {};
 
   ChatNetwork _networkOf(sdk.Room room) =>
-      _networkCache[room.id] ??= _networkOf(room);
+      _networkCache[room.id] ??= networkForRoom(room);
 
   /// The bridge's service bot in [room], from its `m.bridge` state, or null.
   ///
