@@ -177,10 +177,16 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       return const [];
     }
     final settings = stores.settings;
-    if (!settings.getBool(WeftSettings.notifySmartReplies)) return const [];
+    if (!settings.getBool(WeftSettings.notifySmartReplies)) {
+      debugPrint('weft: smart replies: the setting is off');
+      return const [];
+    }
     final baseUrl = settings.getString(WeftSettings.llmBaseUrl) ?? '';
     final model = settings.getString(WeftSettings.llmModel) ?? '';
-    if (baseUrl.trim().isEmpty || model.trim().isEmpty) return const [];
+    if (baseUrl.trim().isEmpty || model.trim().isEmpty) {
+      debugPrint('weft: smart replies: no LLM endpoint is configured');
+      return const [];
+    }
     return suggestSmartReplies(
       baseUrl: baseUrl,
       model: model,

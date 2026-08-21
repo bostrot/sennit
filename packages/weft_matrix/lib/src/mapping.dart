@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
@@ -225,9 +227,20 @@ WeftMessage? mapEvent(
 
   // An invitation whose custom block a bridge stripped down to the readable
   // line. Rebuilt here so the receiving Weft gets the same card the sender
-  // rendered, answers folding in from the local room's relations.
-  if (msgtype == sdk.MessageTypes.Text) {
+  // rendered, answers folding in from the local room's relations. Notice too:
+  // some bridges echo relayed messages as m.notice.
+  if (msgtype == sdk.MessageTypes.Text || msgtype == sdk.MessageTypes.Notice) {
     final bridgedInvite = _bridgedCalendarInviteFrom(event, timeline: timeline);
+    if (bridgedInvite == null && event.text.contains('📅')) {
+      // A calendar-looking body that did not parse. Kept quiet in release
+      // builds by assert semantics being irrelevant here — this is a plain
+      // trace so a device log can show what a bridge actually delivered.
+      // ignore: avoid_print
+      print(
+        'weft: calendar-looking body did not parse as an invite: '
+        '${jsonEncode(event.text)} (msgtype: $msgtype)',
+      );
+    }
     if (bridgedInvite != null) {
       return WeftMessage(
         eventId: event.eventId,

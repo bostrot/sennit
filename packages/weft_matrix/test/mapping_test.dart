@@ -240,6 +240,65 @@ void main() {
       );
     }
 
+    test('a native calendar invitation maps to an interactive card', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': '\u{1F4C5} Dinner \u2014 21.8.2026, 19:30',
+        kCalendarInviteKey: {
+          'uid': 'weft-1@weft.bostrot.com',
+          'title': 'Dinner',
+          'start': '2026-08-21T17:30:00.000Z',
+          'end': '2026-08-21T18:30:00.000Z',
+        },
+      })!;
+
+      expect(message.calendarInvite, isNotNull);
+      expect(message.calendarInvite!.title, 'Dinner');
+      expect(message.kind, MessageKind.event);
+    });
+
+    test('a native invitation riding an .ics file still maps to a card', () {
+      final message = map({
+        'msgtype': 'm.file',
+        'body': '\u{1F4C5} Dinner \u2014 21.8.2026, 19:30',
+        'filename': 'Dinner.ics',
+        'url': 'mxc://example.org/ics',
+        'info': {'mimetype': 'text/calendar', 'size': 120},
+        kCalendarInviteKey: {
+          'uid': 'weft-2@weft.bostrot.com',
+          'title': 'Dinner',
+          'start': '2026-08-21T17:30:00.000Z',
+        },
+      })!;
+
+      expect(message.calendarInvite, isNotNull);
+      expect(message.calendarInvite!.title, 'Dinner');
+    });
+
+    test('an invitation flattened by a bridge is rebuilt from its body', () {
+      // Exactly what sendCalendarInvite writes as the readable line, which is
+      // all that survives the trip through signal or whatsapp.
+      final message = map({
+        'msgtype': 'm.text',
+        'body': '\u{1F4C5} Dinner \u2014 21.8.2026, 19:30',
+      })!;
+
+      expect(message.calendarInvite, isNotNull);
+      expect(message.calendarInvite!.title, 'Dinner');
+      expect(message.calendarInvite!.start, DateTime(2026, 8, 21, 19, 30));
+      expect(message.calendarInvite!.uid, startsWith('bridged-'));
+    });
+
+    test('an ordinary message mentioning a calendar emoji stays text', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': '\u{1F4C5} lets sort the calendar tomorrow',
+      })!;
+
+      expect(message.calendarInvite, isNull);
+      expect(message.kind, MessageKind.text);
+    });
+
     test('an m.video carries its kind, dimensions and duration', () {
       final message = map({
         'msgtype': 'm.video',

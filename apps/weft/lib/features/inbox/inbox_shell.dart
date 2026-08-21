@@ -138,7 +138,12 @@ class _InboxPane extends ConsumerWidget {
                     titleSpacing: WeftSpace.lg,
                     title: const _SearchField(),
                   ),
-                  const SliverToBoxAdapter(child: StatusBar()),
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(top: WeftSpace.md),
+                      child: StatusBar(),
+                    ),
+                  ),
                   SliverToBoxAdapter(child: _FilterRows(activeFilter: filter)),
                 ],
                 if (chats.isEmpty)

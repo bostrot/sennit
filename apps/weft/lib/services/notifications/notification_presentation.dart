@@ -220,7 +220,10 @@ class NotificationPresentation {
           // shows one line and the expanded form shows the same line again.
           styleInformation: MessagingStyleInformation(
             _self,
-            conversationTitle: content.title,
+            // Only a group gets a conversation title. In a DM the title *is*
+            // the sender, and Android then prints the name twice — once as
+            // the header, once on the message line with the network appended.
+            conversationTitle: isGroup ? content.title : null,
             groupConversation: isGroup,
             messages: [
               for (final message in thread)

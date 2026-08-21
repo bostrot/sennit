@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -28,14 +29,42 @@ class StatusViewer extends ConsumerStatefulWidget {
 class _StatusViewerState extends ConsumerState<StatusViewer> {
   late final PageController _pages = PageController();
   int _index = 0;
+  Timer? _advance;
+
+  /// How long an image or text status stays before the pager moves on.
+  static const Duration _dwell = Duration(seconds: 6);
+
+  @override
+  void initState() {
+    super.initState();
+    _armAutoAdvance();
+  }
 
   @override
   void dispose() {
+    _advance?.cancel();
     _pages.dispose();
     super.dispose();
   }
 
+  /// Stories play themselves: an image holds for [_dwell] and moves on, a
+  /// video advances when the clip ends (via [_onVideoFinished]) rather than
+  /// on a clock that would cut it off mid-sentence.
+  void _armAutoAdvance() {
+    _advance?.cancel();
+    final message = widget.entry.messages[_index];
+    if (message.kind == MessageKind.video) return;
+    _advance = Timer(_dwell, () {
+      if (mounted) _step(1);
+    });
+  }
+
+  void _onVideoFinished(int index) {
+    if (mounted && index == _index) _step(1);
+  }
+
   void _step(int direction) {
+    _advance?.cancel();
     final next = _index + direction;
     if (next < 0 || next >= widget.entry.messages.length) {
       Navigator.of(context).pop();
@@ -66,10 +95,15 @@ class _StatusViewerState extends ConsumerState<StatusViewer> {
                 },
                 child: PageView.builder(
                   controller: _pages,
-                  onPageChanged: (index) => setState(() => _index = index),
+                  onPageChanged: (index) {
+                    setState(() => _index = index);
+                    _armAutoAdvance();
+                  },
                   itemCount: messages.length,
-                  itemBuilder: (context, index) =>
-                      _StatusPage(message: messages[index]),
+                  itemBuilder: (context, index) => _StatusPage(
+                    message: messages[index],
+                    onVideoFinished: () => _onVideoFinished(index),
+                  ),
                 ),
               ),
             ),
@@ -132,9 +166,12 @@ class _StatusViewerState extends ConsumerState<StatusViewer> {
 }
 
 class _StatusPage extends ConsumerStatefulWidget {
-  const _StatusPage({required this.message});
+  const _StatusPage({required this.message, required this.onVideoFinished});
 
   final WeftMessage message;
+
+  /// Tells the pager this page's clip has played to the end.
+  final VoidCallback onVideoFinished;
 
   @override
   ConsumerState<_StatusPage> createState() => _StatusPageState();
@@ -225,7 +262,11 @@ class _StatusPageState extends ConsumerState<_StatusPage> {
           child: CircularProgressIndicator(color: Colors.white),
         );
       }
-      return ref.watch(videoSurfaceProvider)(context, video);
+      return ref.watch(storyVideoSurfaceProvider)(
+        context,
+        video,
+        widget.onVideoFinished,
+      );
     }
     final bytes = _bytes;
     if (bytes == null) {

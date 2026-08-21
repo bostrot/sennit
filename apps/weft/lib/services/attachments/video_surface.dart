@@ -25,9 +25,22 @@ typedef VideoSurfaceBuilder = Widget Function(BuildContext context, File file);
 /// playback, Save and Share, so scrubbing a video and then saving it does not
 /// fetch it twice.
 class VideoSurface extends StatefulWidget {
-  const VideoSurface({super.key, required this.file});
+  const VideoSurface({
+    super.key,
+    required this.file,
+    this.autoPlay = false,
+    this.onFinished,
+  });
 
   final File file;
+
+  /// Start playing as soon as the decoder is ready. Off for the media viewer
+  /// — a tapped poster should not start talking — and on for stories, which
+  /// are *opened to be played*.
+  final bool autoPlay;
+
+  /// Called once when playback reaches the end. A story pager advances on it.
+  final VoidCallback? onFinished;
 
   @override
   State<VideoSurface> createState() => _VideoSurfaceState();
@@ -36,6 +49,7 @@ class VideoSurface extends StatefulWidget {
 class _VideoSurfaceState extends State<VideoSurface> {
   VideoPlayerController? _controller;
   Object? _error;
+  bool _finished = false;
 
   @override
   void initState() {
@@ -61,10 +75,11 @@ class _VideoSurfaceState extends State<VideoSurface> {
         await controller.dispose();
         return;
       }
-      // Not autoplaying: the viewer is opened by tapping a poster, and a clip
-      // that starts talking the moment it fills the screen is the behaviour
-      // people mute their phones to avoid.
+      // The media viewer does not autoplay — a tapped poster should not
+      // start talking — but a story does; the caller decides.
       await controller.setLooping(false);
+      if (widget.onFinished != null) controller.addListener(_checkFinished);
+      if (widget.autoPlay) await controller.play();
       setState(() => _controller = controller);
     } on Object catch (error) {
       // Deliberately Object: a platform decoder refusing a codec throws a
@@ -72,6 +87,18 @@ class _VideoSurfaceState extends State<VideoSurface> {
       await controller.dispose();
       if (!mounted) return;
       setState(() => _error = error);
+    }
+  }
+
+  /// Fires [VideoSurface.onFinished] exactly once, at the end of playback.
+  void _checkFinished() {
+    final value = _controller?.value;
+    if (value == null || _finished) return;
+    if (value.duration > Duration.zero &&
+        !value.isPlaying &&
+        value.position >= value.duration) {
+      _finished = true;
+      widget.onFinished?.call();
     }
   }
 
@@ -206,6 +233,18 @@ class _Centred extends StatelessWidget {
 final videoSurfaceProvider = Provider<VideoSurfaceBuilder>(
   (ref) =>
       (context, file) => VideoSurface(file: file),
+);
+
+/// Builds the widget that plays a story: autoplaying, and telling the pager
+/// when the clip is over.
+typedef StoryVideoSurfaceBuilder =
+    Widget Function(BuildContext context, File file, VoidCallback onFinished);
+
+/// The story viewer's video surface. Same test seam as [videoSurfaceProvider].
+final storyVideoSurfaceProvider = Provider<StoryVideoSurfaceBuilder>(
+  (ref) =>
+      (context, file, onFinished) =>
+          VideoSurface(file: file, autoPlay: true, onFinished: onFinished),
 );
 
 /// Where the playhead is, in the words a person would use.

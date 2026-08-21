@@ -172,7 +172,10 @@ void main() {
               ).details.android!.styleInformation!
               as MessagingStyleInformation;
 
-      expect(style.conversationTitle, 'Grace');
+      // No conversation title for a DM: the sender line already names the
+      // person, and Android would otherwise print the name twice — once as
+      // the header and once with the network appended.
+      expect(style.conversationTitle, isNull);
       expect(style.messages!.map((m) => m.text), ['one', 'two']);
       expect(style.messages!.first.person!.name, 'Grace (WhatsApp)');
       expect(style.groupConversation, isFalse);

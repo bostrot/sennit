@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
 /// Asks the configured LLM for one or two short answers to a conversation.
@@ -58,16 +59,29 @@ Future<List<String>> suggestSmartReplies({
           }),
         )
         .timeout(timeout);
-    if (response.statusCode != 200) return const [];
+    if (response.statusCode != 200) {
+      debugPrint('weft: smart replies: $url answered ${response.statusCode}');
+      return const [];
+    }
     final decoded = jsonDecode(utf8.decode(response.bodyBytes));
     final content =
         ((decoded as Map)['choices'] as List?)
                 ?.cast<Map>()
                 .firstOrNull?['message']?['content']
             as String?;
-    if (content == null) return const [];
-    return parseSmartReplies(content);
-  } on Object {
+    if (content == null) {
+      debugPrint('weft: smart replies: no content in the completion');
+      return const [];
+    }
+    final replies = parseSmartReplies(content);
+    if (replies.isEmpty) {
+      debugPrint(
+        'weft: smart replies: nothing usable in ${jsonEncode(content)}',
+      );
+    }
+    return replies;
+  } on Object catch (error) {
+    debugPrint('weft: smart replies against $url failed: $error');
     return const [];
   } finally {
     if (owned) httpClient.close();
