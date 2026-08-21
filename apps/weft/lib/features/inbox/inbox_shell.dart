@@ -246,85 +246,120 @@ class _SelectionBar extends ConsumerWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const Spacer(),
-            IconButton(
-              tooltip: allSelected ? 'Select none' : 'Select all',
-              icon: Icon(
-                allSelected ? Icons.deselect_rounded : Icons.select_all_rounded,
-              ),
-              onPressed: () {
-                final notifier = ref.read(chatSelectionProvider.notifier);
-                if (allSelected) {
-                  notifier.clear();
-                } else {
-                  notifier.selectAll(visible.map((c) => c.id));
-                }
-              },
-            ),
-            IconButton(
-              tooltip: 'Mark read',
-              icon: const Icon(Icons.mark_email_read_outlined),
-              onPressed: () => _apply(ref, repository.markRead),
-            ),
-            IconButton(
-              tooltip: 'Mute',
-              icon: const Icon(Icons.notifications_off_outlined),
-              onPressed: () =>
-                  _apply(ref, (id) => repository.setMuted(id, muted: true)),
-            ),
-            IconButton(
-              tooltip: 'Label',
-              icon: const Icon(Icons.label_outline_rounded),
-              onPressed: () async {
-                final label = await showLabelSheet(context, ref, selected);
-                if (label != null) {
-                  ref.read(chatLabelsProvider.notifier).toggle(selected, label);
-                  ref.read(chatSelectionProvider.notifier).clear();
-                }
-              },
-            ),
-            IconButton(
-              tooltip: archived ? 'Unarchive' : 'Archive',
-              icon: Icon(
-                archived ? Icons.unarchive_outlined : Icons.archive_outlined,
-              ),
-              onPressed: () => _apply(
-                ref,
-                (id) => repository.setArchived(id, archived: !archived),
-              ),
-            ),
-            IconButton(
-              tooltip: 'Leave and delete',
-              icon: Icon(Icons.delete_outline, color: context.colors.error),
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Delete ${selected.length} conversation(s)?'),
-                    content: const Text(
-                      'This leaves and forgets the rooms. The history is gone '
-                      'from this account and cannot be recovered here. '
-                      'Archiving hides a chat without losing anything.',
+            const SizedBox(width: WeftSpace.sm),
+            // Seven actions no longer fit a phone across; the row scrolls
+            // from its end so the count stays put and Delete — the one worth
+            // being careful with — is where the thumb starts.
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: allSelected ? 'Select none' : 'Select all',
+                      icon: Icon(
+                        allSelected
+                            ? Icons.deselect_rounded
+                            : Icons.select_all_rounded,
+                      ),
+                      onPressed: () {
+                        final notifier = ref.read(
+                          chatSelectionProvider.notifier,
+                        );
+                        if (allSelected) {
+                          notifier.clear();
+                        } else {
+                          notifier.selectAll(visible.map((c) => c.id));
+                        }
+                      },
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancel'),
+                    IconButton(
+                      tooltip: 'Mark read',
+                      icon: const Icon(Icons.mark_email_read_outlined),
+                      onPressed: () => _apply(ref, repository.markRead),
+                    ),
+                    IconButton(
+                      tooltip: 'Mute',
+                      icon: const Icon(Icons.notifications_off_outlined),
+                      onPressed: () => _apply(
+                        ref,
+                        (id) => repository.setMuted(id, muted: true),
                       ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: context.colors.error,
-                        ),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('Delete'),
+                    ),
+                    IconButton(
+                      tooltip: 'Label',
+                      icon: const Icon(Icons.label_outline_rounded),
+                      onPressed: () async {
+                        final label = await showLabelSheet(
+                          context,
+                          ref,
+                          selected,
+                        );
+                        if (label != null) {
+                          ref
+                              .read(chatLabelsProvider.notifier)
+                              .toggle(selected, label);
+                          ref.read(chatSelectionProvider.notifier).clear();
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: archived ? 'Unarchive' : 'Archive',
+                      icon: Icon(
+                        archived
+                            ? Icons.unarchive_outlined
+                            : Icons.archive_outlined,
                       ),
-                    ],
-                  ),
-                );
-                if (confirmed ?? false) {
-                  await _apply(ref, repository.deleteChat);
-                }
-              },
+                      onPressed: () => _apply(
+                        ref,
+                        (id) => repository.setArchived(id, archived: !archived),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Leave and delete',
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: context.colors.error,
+                      ),
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(
+                              'Delete ${selected.length} conversation(s)?',
+                            ),
+                            content: const Text(
+                              'This leaves and forgets the rooms. The history is gone '
+                              'from this account and cannot be recovered here. '
+                              'Archiving hides a chat without losing anything.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: context.colors.error,
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(true),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed ?? false) {
+                          await _apply(ref, repository.deleteChat);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
