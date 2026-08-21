@@ -119,7 +119,35 @@ class SearchEngine {
       limit: query.limit,
     );
 
-    return _backend.hydrate(fused, query.text);
+    final hydrated = await _backend.hydrate(fused, query.text);
+    return _tiered(hydrated, query.text);
+  }
+
+  /// Orders results the way a reader expects them, whatever the scores say:
+  /// messages containing the typed words verbatim first, then any keyword
+  /// match, then the purely semantic neighbours. Fusion is kept for ordering
+  /// *within* a tier — its mistake was letting a close embedding outrank the
+  /// message that literally says what was typed.
+  static List<SearchResult> _tiered(
+    List<SearchResult> results,
+    String queryText,
+  ) {
+    final phrase = queryText.trim().toLowerCase().replaceAll('"', '');
+    int tierOf(SearchResult result) {
+      if (phrase.isNotEmpty && result.body.toLowerCase().contains(phrase)) {
+        return 0;
+      }
+      if (result.matchedKeyword) return 1;
+      return 2;
+    }
+
+    final indexed = results.indexed.toList()
+      ..sort((a, b) {
+        final tiers = tierOf(a.$2).compareTo(tierOf(b.$2));
+        // Stable within a tier: fusion's order was position in the list.
+        return tiers != 0 ? tiers : a.$1.compareTo(b.$1);
+      });
+    return [for (final entry in indexed) entry.$2];
   }
 
   Future<List<RankedHit>> _vectorSearch(
@@ -129,22 +157,54 @@ class SearchEngine {
     final provider = _embeddings;
     if (provider == null) return const [];
 
-    final Int8List queryVector;
+    // The whole query is always embedded; a multi-word query additionally
+    // embeds its significant words on their own. "insurance letter deadline"
+    // as one vector lands between three concepts, and the message that nails
+    // one of them can sit closer to a single-word vector than to the blend —
+    // per-word probes are what give multi-word semantic search its recall.
+    final probes = <String>[text.trim()];
+    final words = text
+        .toLowerCase()
+        .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
+        .where((w) => w.length > 3)
+        .toSet()
+        .toList();
+    if (words.length >= 2) probes.addAll(words.take(4));
+
+    final List<Int8List> vectors;
     try {
-      final vectors = await provider.embed([text]);
+      vectors = await provider.embed(probes);
       if (vectors.isEmpty) return const [];
-      queryVector = vectors.first;
     } on EmbeddingException {
       // A dead endpoint degrades search to keyword-only rather than failing
       // the whole query — partial results beat an error dialog.
       return const [];
     }
 
-    return _vectorIndex.search(
-      queryVector,
-      limit: candidateDepth,
-      restrictTo: restrictTo,
-    );
+    // Merge by each row's best similarity across the probes. The full-query
+    // vector is first, so a tie keeps its answer.
+    final best = <int, double>{};
+    for (final vector in vectors) {
+      final hits = await _vectorIndex.search(
+        vector,
+        limit: candidateDepth,
+        restrictTo: restrictTo,
+      );
+      for (final hit in hits) {
+        final existing = best[hit.id];
+        if (existing == null || hit.score > existing) {
+          best[hit.id] = hit.score;
+        }
+      }
+    }
+
+    final merged = [
+      for (final entry in best.entries)
+        RankedHit(id: entry.key, score: entry.value),
+    ]..sort((a, b) => b.score.compareTo(a.score));
+    return merged.length > candidateDepth
+        ? merged.sublist(0, candidateDepth)
+        : merged;
   }
 
   /// Quoted text, or anything with an identifier-ish token, reads as a request
