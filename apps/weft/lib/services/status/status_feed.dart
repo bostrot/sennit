@@ -113,7 +113,14 @@ final statusFeedProvider = FutureProvider<List<StatusEntry>>((ref) async {
       StatusEntry(
         senderId: entry.key,
         senderName: entry.value.first.senderName,
-        avatarUrl: graph.handleFor(entry.key)?.avatarUrl,
+        // Status senders are rarely DM peers with handles of their own, so
+        // fall back to the member state of the broadcast room itself.
+        avatarUrl:
+            graph.handleFor(entry.key)?.avatarUrl ??
+            repository.avatarUrlFor(
+              entry.key,
+              roomId: entry.value.first.roomId,
+            ),
         messages: entry.value
           ..sort((a, b) => b.timestamp.compareTo(a.timestamp)),
       ),

@@ -10,6 +10,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/push_registration.dart';
 import 'providers.dart';
@@ -163,6 +164,35 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     avatarLoader: await ref.watch(avatarFileLoaderProvider.future),
     push: await ref.watch(pushTransportProvider.future),
   );
+
+  // AI answer chips on message notifications. Settings are read per message
+  // rather than captured, so flipping the toggle needs no restart; every
+  // failure path is an empty list, because the notification must never wait
+  // on an error.
+  service.suggestReplies = (content, thread) async {
+    final WeftStores stores;
+    try {
+      stores = ref.read(storesProvider);
+    } on Object {
+      return const [];
+    }
+    final settings = stores.settings;
+    if (!settings.getBool(WeftSettings.notifySmartReplies)) return const [];
+    final baseUrl = settings.getString(WeftSettings.llmBaseUrl) ?? '';
+    final model = settings.getString(WeftSettings.llmModel) ?? '';
+    if (baseUrl.trim().isEmpty || model.trim().isEmpty) return const [];
+    return suggestSmartReplies(
+      baseUrl: baseUrl,
+      model: model,
+      apiKey: stores.llmApiKey,
+      chatTitle: content.title,
+      transcript: [
+        for (final message
+            in thread.length <= 6 ? thread : thread.sublist(thread.length - 6))
+          '${message.senderName}: ${message.body}',
+      ],
+    );
+  };
 
   ref.onDispose(() {
     unawaited(service.dispose());

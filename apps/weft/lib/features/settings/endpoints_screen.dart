@@ -47,6 +47,14 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
   );
   final _sttKey = TextEditingController();
 
+  late final _llmUrl = TextEditingController(
+    text: _settings.getString(WeftSettings.llmBaseUrl) ?? '',
+  );
+  late final _llmModel = TextEditingController(
+    text: _settings.getString(WeftSettings.llmModel) ?? '',
+  );
+  final _llmKey = TextEditingController();
+
   @override
   void dispose() {
     for (final c in [
@@ -57,6 +65,9 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       _sttUrl,
       _sttModel,
       _sttKey,
+      _llmUrl,
+      _llmModel,
+      _llmKey,
     ]) {
       c.dispose();
     }
@@ -90,6 +101,12 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     _settings.setString(WeftSettings.transcriptionModel, _sttModel.text.trim());
     if (_sttKey.text.isNotEmpty) {
       await stores.setTranscriptionApiKey(_sttKey.text);
+    }
+
+    _settings.setString(WeftSettings.llmBaseUrl, _llmUrl.text.trim());
+    _settings.setString(WeftSettings.llmModel, _llmModel.text.trim());
+    if (_llmKey.text.isNotEmpty) {
+      await stores.setLlmApiKey(_llmKey.text);
     }
 
     // A model change invalidates every stored vector: different models share
@@ -209,6 +226,24 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
               contentPadding: EdgeInsets.zero,
             ),
           ],
+          const SizedBox(height: WeftSpace.xl),
+
+          SettingsSectionHeader(
+            title: 'AI assistant (LLM)',
+            subtitle:
+                'An OpenAI-compatible chat endpoint — a local Ollama works. '
+                'Features that use it, like reply suggestions in '
+                'notifications, have their own switches and stay off until '
+                'you turn them on.',
+          ),
+          _field(_llmUrl, 'Base URL', hint: 'http://localhost:11434/v1'),
+          _field(_llmModel, 'Model', hint: 'llama3.2'),
+          _field(
+            _llmKey,
+            'API key (stored in the system keychain)',
+            secret: true,
+            hint: 'leave blank to keep the current key',
+          ),
         ],
       ),
     );

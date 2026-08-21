@@ -433,6 +433,17 @@ class WeftNotificationService {
   /// delivery path.
   void Function(NotificationActivation activation)? onAction;
 
+  /// Asks for AI answer suggestions for a message about to be posted, given
+  /// the whole visible thread (oldest first, the new message last). Unset, or
+  /// returning an empty list, means the notification goes out without them.
+  /// Failures are the callee's to swallow — a notification never waits on an
+  /// error message.
+  Future<List<String>> Function(
+    NotificationContent content,
+    List<NotificationContent> thread,
+  )?
+  suggestReplies;
+
   /// Notifications currently posted for [groupKey], oldest first.
   @visibleForTesting
   List<NotificationContent> postedFor(String groupKey) =>
@@ -631,12 +642,26 @@ class WeftNotificationService {
       iconPath: _avatars[content.eventId],
     );
 
+    var aiReplies = const <String>[];
+    final suggest = suggestReplies;
+    if (suggest != null && !notification.isSilent) {
+      try {
+        aiReplies = await suggest(
+          content,
+          visible,
+        ).timeout(const Duration(seconds: 10));
+      } on Object catch (error) {
+        debugPrint('weft: reply suggestions failed: $error');
+      }
+    }
+
     await _sink.show(
       NotificationPresentation.forMessage(
         content: content,
         silent: notification.isSilent,
         isGroup: _chatForRoom?.call(content.roomId)?.isGroup ?? false,
         conversation: visible,
+        aiReplies: aiReplies,
         avatarPaths: {
           for (final entry in _avatars.entries)
             if (visible.any((c) => c.eventId == entry.key))

@@ -112,6 +112,18 @@ class NotificationActionHandler {
       return NotificationActionResult.ignored;
     }
 
+    final actionId = activation.actionId ?? '';
+    if (actionId.startsWith(WeftNotificationActions.aiReplyPrefix)) {
+      final index = int.tryParse(
+        actionId.substring(WeftNotificationActions.aiReplyPrefix.length),
+      );
+      final suggestions = activation.payload.suggestions;
+      if (index == null || index < 0 || index >= suggestions.length) {
+        return NotificationActionResult.ignored;
+      }
+      return _reply(chatId, suggestions[index]);
+    }
+
     switch (activation.actionId) {
       case WeftNotificationActions.reply:
         return _reply(chatId, activation.input);

@@ -33,6 +33,13 @@ abstract class ChatRepository {
   /// caller's correct response is to stay quiet rather than to invent a key.
   Chat? chatForRoom(String roomId);
 
+  /// Moves whenever a merge or unmerge changes which rooms back which chat.
+  ///
+  /// An open chat view holds a [MergedTimeline] built for one composition;
+  /// when this moves it rebuilds through [timelineFor] instead of showing one
+  /// leg of a conversation that just became three.
+  int get timelineEpoch => 0;
+
   /// A merged (or single-source) timeline for one chat.
   ///
   /// Async because a Matrix timeline has to be opened before it can be read;
@@ -51,6 +58,12 @@ abstract class ChatRepository {
 
   /// The identity graph backing merge suggestions.
   IdentityGraph get identityGraph;
+
+  /// Best-effort avatar for an arbitrary user — status-ring senders, group
+  /// members — who may not be a chat peer with a handle of their own. May
+  /// kick off a profile fetch and return null meanwhile; callers rebuild
+  /// when the repository does.
+  String? avatarUrlFor(String userId, {String? roomId}) => null;
 
   /// Merge / unmerge / dismiss, routed through the repository rather than the
   /// graph directly so the decision is persisted and the inbox rebuilt in one

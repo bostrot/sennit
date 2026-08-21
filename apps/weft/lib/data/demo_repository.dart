@@ -33,6 +33,12 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
   @override
+  String? avatarUrlFor(String userId, {String? roomId}) => null;
+
+  @override
+  int get timelineEpoch => 0;
+
+  @override
   Set<String> get serviceChatIds => const {};
 
   DemoChatRepository({Duration uploadTick = kDemoUploadTick})

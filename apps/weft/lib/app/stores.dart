@@ -22,6 +22,7 @@ class WeftStores {
     required this.transcriptionApiKey,
     this.homeAssistantToken,
     this.paperlessToken,
+    this.llmApiKey,
   });
 
   final WeftDatabase db;
@@ -40,6 +41,7 @@ class WeftStores {
   String? transcriptionApiKey;
   String? homeAssistantToken;
   String? paperlessToken;
+  String? llmApiKey;
 
   /// Test construction: everything in memory, no platform channels.
   ///
@@ -72,12 +74,14 @@ class WeftStores {
     String? transcriptionKey;
     String? haToken;
     String? paperlessKey;
+    String? llmKey;
     if (!kDemoMode) {
       // Secure storage prompts on some platforms; demo mode skips it entirely.
       embeddingKey = await secrets.read(SecretStore.embeddingApiKey);
       transcriptionKey = await secrets.read(SecretStore.transcriptionApiKey);
       haToken = await secrets.read(SecretStore.homeAssistantToken);
       paperlessKey = await secrets.read(SecretStore.paperlessToken);
+      llmKey = await secrets.read(SecretStore.llmApiKey);
     }
 
     return WeftStores._(
@@ -92,6 +96,7 @@ class WeftStores {
       transcriptionApiKey: transcriptionKey,
       homeAssistantToken: haToken,
       paperlessToken: paperlessKey,
+      llmApiKey: llmKey,
     );
   }
 
@@ -113,6 +118,11 @@ class WeftStores {
   Future<void> setPaperlessToken(String? value) async {
     paperlessToken = value;
     await secrets.write(SecretStore.paperlessToken, value);
+  }
+
+  Future<void> setLlmApiKey(String? value) async {
+    llmApiKey = value;
+    await secrets.write(SecretStore.llmApiKey, value);
   }
 
   void dispose() => db.dispose();

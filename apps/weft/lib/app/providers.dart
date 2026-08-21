@@ -266,6 +266,23 @@ final showArchivedProvider = NotifierProvider<ShowArchivedNotifier, bool>(
   ShowArchivedNotifier.new,
 );
 
+/// One-tap slices of the inbox: just what's unread, just the groups, just
+/// the one-on-ones. A second tap on the active chip turns it back off.
+enum InboxQuickFilter { unread, groups, people }
+
+class InboxQuickFilterNotifier extends Notifier<InboxQuickFilter?> {
+  @override
+  InboxQuickFilter? build() => null;
+
+  void toggle(InboxQuickFilter filter) =>
+      state = state == filter ? null : filter;
+}
+
+final inboxQuickFilterProvider =
+    NotifierProvider<InboxQuickFilterNotifier, InboxQuickFilter?>(
+      InboxQuickFilterNotifier.new,
+    );
+
 /// The inbox after the rail filter is applied.
 final visibleChatsProvider = Provider<List<Chat>>((ref) {
   final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
@@ -285,6 +302,7 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   final statusChatId = ref.watch(statusModeProvider) == StatusMode.group
       ? null
       : ref.watch(statusChatProvider)?.id;
+  final quick = ref.watch(inboxQuickFilterProvider);
   final filtered = filterChats(
     chats
         .where(
@@ -292,7 +310,13 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
               c.archived == showArchived &&
               !service.contains(c.id) &&
               c.id != statusChatId &&
-              (label == null || labels.ofChat(c.id).contains(label)),
+              (label == null || labels.ofChat(c.id).contains(label)) &&
+              switch (quick) {
+                null => true,
+                InboxQuickFilter.unread => c.unreadCount > 0,
+                InboxQuickFilter.groups => c.isGroup,
+                InboxQuickFilter.people => !c.isGroup,
+              },
         )
         .toList(),
     filter,

@@ -136,6 +136,10 @@ class MatrixChatRepository implements ChatRepository {
   /// follows so avatars correct themselves rather than staying broken.
   bool _authenticatedMedia = true;
 
+  /// What was last written to the identity store per handle, so an unchanged
+  /// handle is not rewritten on every sync-driven refresh.
+  final Map<String, String> _handleFingerprints = {};
+
   /// The newest event each room was receipted up to, from this session.
   ///
   /// `Room.notificationCount` is the *server's* number and only moves after
@@ -439,6 +443,28 @@ class MatrixChatRepository implements ChatRepository {
       if (proposedStart != null)
         'proposed_start': proposedStart.toUtc().toIso8601String(),
     }, type: kCalendarResponseType);
+
+    // Answering an invite that arrived through a bridge: the custom response
+    // event above never crosses back over, so the other side would see
+    // nothing at all. Say it in words too — that's the only channel the
+    // bridge carries.
+    final inviteEvent = await room.getEventById(inviteEventId);
+    if (inviteEvent != null &&
+        inviteEvent.content[kCalendarInviteKey] is! Map) {
+      final line = switch (reply) {
+        CalendarReply.accepted => '✅ Accepted: ${inviteEvent.text}',
+        CalendarReply.declined => '❌ Declined: ${inviteEvent.text}',
+        CalendarReply.reschedule =>
+          proposedStart == null
+              ? '🔄 Asking for another time: ${inviteEvent.text}'
+              : '🔄 Proposing ${proposedStart.day}.${proposedStart.month}.'
+                    '${proposedStart.year}, '
+                    '${proposedStart.hour.toString().padLeft(2, '0')}:'
+                    '${proposedStart.minute.toString().padLeft(2, '0')} '
+                    'instead: ${inviteEvent.text}',
+      };
+      await room.sendTextEvent(line);
+    }
   }
 
   @override
@@ -651,6 +677,7 @@ class MatrixChatRepository implements ChatRepository {
   @override
   Future<void> mergeHandles(String handleIdA, String handleIdB) async {
     _graph.merge(handleIdA, handleIdB);
+    _invalidateTimelines();
     _persistGraph();
     _rebuild();
   }
@@ -658,9 +685,25 @@ class MatrixChatRepository implements ChatRepository {
   @override
   Future<void> unmergeHandle(String handleId) async {
     _graph.unmerge(handleId);
+    _invalidateTimelines();
     _persistGraph();
     _rebuild();
   }
+
+  /// A merge or unmerge changes which rooms a conversation is *made of*, and
+  /// a cached [MergedTimeline] built before it keeps the old set — which is
+  /// exactly how a freshly widened merge showed only one leg's history until
+  /// the app restarted. Everything cached is dropped and [timelineEpoch]
+  /// moves, so open chat views rebuild their timeline on the next sync tick.
+  void _invalidateTimelines() {
+    _timelines.clear();
+    _sources.clear();
+    _timelineEpoch++;
+  }
+
+  @override
+  int get timelineEpoch => _timelineEpoch;
+  int _timelineEpoch = 0;
 
   @override
   Future<void> rejectSuggestion(String handleIdA, String handleIdB) async {
@@ -1184,7 +1227,9 @@ class MatrixChatRepository implements ChatRepository {
         matrixUserId: peerId,
         roomId: room.id,
         displayName: _peerDisplayName(room, peerId) ?? peer.calcDisplayname(),
-        avatarUrl: _thumbnail(peer.avatarUrl?.toString()),
+        avatarUrl:
+            _thumbnail(peer.avatarUrl?.toString()) ??
+            _thumbnail(_profiles[peerId]?.avatarUrl?.toString()),
         // The localpart of a bridged ghost is often the phone number. Storing
         // the normalised form means the strongest merge signal is actually
         // persisted, rather than left for the scorer to re-derive each pass —
@@ -1193,9 +1238,19 @@ class MatrixChatRepository implements ChatRepository {
         phoneE164: normalizePhone(_remoteIdFor(peerId, network)),
       );
       _graph.upsertHandle(handle);
-      _store?.upsertHandle(
-        handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
-      );
+      // Written to SQLite only when something actually changed: the graph
+      // refresh runs on every (debounced) sync, and re-writing several dozen
+      // identical rows each pass was a solid slice of the first minute's
+      // scroll jank.
+      final fingerprint =
+          '${handle.displayName}|${handle.avatarUrl}|${handle.phoneE164}|'
+          '${_graph.contactIdOf(handle.id)}';
+      if (_handleFingerprints[handle.id] != fingerprint) {
+        _handleFingerprints[handle.id] = fingerprint;
+        _store?.upsertHandle(
+          handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
+        );
+      }
     }
 
     // SMS contributes handles in exactly the same shape, which is the whole
@@ -1341,6 +1396,21 @@ class MatrixChatRepository implements ChatRepository {
   /// lazy-loaded members, so a bridged contact's member event — and with it
   /// their avatar — is usually not in memory at all. No amount of fixing the
   /// URL helps when the source mxc is simply absent.
+  @override
+  String? avatarUrlFor(String userId, {String? roomId}) {
+    final room = roomId == null ? null : _client.getRoomById(roomId);
+    if (room != null) {
+      final fromMember = _thumbnail(
+        room.unsafeGetUserFromMemoryOrFallback(userId).avatarUrl?.toString(),
+      );
+      if (fromMember != null) return fromMember;
+    }
+    final cached = _profiles[userId];
+    if (cached != null) return _thumbnail(cached.avatarUrl?.toString());
+    _ensureProfile(userId, room: room);
+    return null;
+  }
+
   String? _avatarFor(sdk.Room room) {
     final roomAvatar = _thumbnail(room.avatar?.toString());
     if (roomAvatar != null) return roomAvatar;

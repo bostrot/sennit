@@ -32,6 +32,7 @@ import 'paperless_picker_sheet.dart';
 import '../auth/verification_screen.dart';
 import '../call/external_call.dart';
 import '../call/start_call.dart';
+import '../contact/contact_profile.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
 import '../../services/agenda/device_calendar.dart';
@@ -143,6 +144,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// What the open timeline was built for, to notice when [_chatId] moves.
   String? _timelineChatId;
 
+  /// The repository's merge composition when the timeline was opened.
+  int _timelineEpoch = 0;
+
   /// Held rather than read back in [dispose], where `ref` is already unsafe:
   /// a `ConsumerState` is unmounted before its `dispose` runs, and reading a
   /// provider through a dead `BuildContext` throws.
@@ -192,7 +196,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // moved, and the open timeline covers the wrong set of rooms. Reopen on
     // the new id — this is what turned the back-from-merge spinner into a
     // conversation again.
-    if (_timelineChatId != null && _timelineChatId != _chatId) {
+    final repository = ref.read(chatRepositoryProvider);
+    if (_timelineChatId != null &&
+        (_timelineChatId != _chatId ||
+            _timelineEpoch != repository.timelineEpoch)) {
       _open();
       return;
     }
@@ -236,6 +243,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     try {
       final chatId = _chatId;
       _timelineChatId = chatId;
+      _timelineEpoch = ref.read(chatRepositoryProvider).timelineEpoch;
       final timeline = await ref
           .read(chatRepositoryProvider)
           .timelineFor(chatId);
@@ -1584,24 +1592,48 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       // so it is one node, marked as the screen's heading. Three nodes read in
       // isolation ("Anna", "Merged · WhatsApp, Signal", and an avatar reading
       // "AK") is the same failure the inbox row had.
-      title: MergeSemantics(
-        child: Semantics(
-          header: true,
-          child: Row(
-            children: [
-              Consumer(
-                builder: (context, ref, _) => WeftAvatar(
-                  label: chat.title,
-                  imageUrl: chat.avatarUrl,
-                  imageHeaders: ref.watch(mediaHeadersProvider),
-                  networks: chat.networks,
-                  size: 38,
-                  // The lines beside it already say all of this.
-                  semanticsLabel: '',
+      title: Row(
+        children: [
+          // The avatar is a *button* now — it opens the contact profile — so
+          // it stands outside the merged heading with its own 48dp target
+          // and its own name, instead of turning the whole title row into
+          // one enormous 40dp-tall tappable.
+          Semantics(
+            button: true,
+            label: 'Contact details',
+            child: Consumer(
+              builder: (context, ref, _) => InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ContactProfileScreen(chatId: chat.id),
+                  ),
+                ),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: ExcludeSemantics(
+                      child: WeftAvatar(
+                        label: chat.title,
+                        imageUrl: chat.avatarUrl,
+                        imageHeaders: ref.watch(mediaHeadersProvider),
+                        networks: chat.networks,
+                        size: 38,
+                        // The lines beside it already say all of this.
+                        semanticsLabel: '',
+                      ),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: WeftSpace.md),
-              Expanded(
+            ),
+          ),
+          const SizedBox(width: WeftSpace.sm),
+          Expanded(
+            child: MergeSemantics(
+              child: Semantics(
+                header: true,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1635,9 +1667,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
       actions: [
         // Disabled rather than hidden, with the reason in its tooltip: a

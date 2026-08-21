@@ -30,17 +30,21 @@ class NotificationPayload {
     required this.roomId,
     required this.eventId,
     required this.network,
+    this.suggestions = const [],
   });
 
   /// Built from the content the notification was rendered from.
-  factory NotificationPayload.forContent(NotificationContent content) =>
-      NotificationPayload(
-        link: content.deepLink,
-        chatId: content.groupKey,
-        roomId: content.roomId,
-        eventId: content.eventId,
-        network: content.network,
-      );
+  factory NotificationPayload.forContent(
+    NotificationContent content, {
+    List<String> suggestions = const [],
+  }) => NotificationPayload(
+    link: content.deepLink,
+    chatId: content.groupKey,
+    roomId: content.roomId,
+    eventId: content.eventId,
+    network: content.network,
+    suggestions: suggestions,
+  );
 
   /// `weft://chat/<encoded chat id>` — the merged chat's, not the room's.
   final String link;
@@ -56,12 +60,19 @@ class NotificationPayload {
   final String eventId;
   final ChatNetwork network;
 
+  /// AI reply suggestions carried *on* the payload, because that is the only
+  /// channel an Android action activation travels back through: the platform
+  /// returns an action id, and the text that id stands for has to still exist
+  /// in a process that may have been born for this very tap.
+  final List<String> suggestions;
+
   String encode() => jsonEncode({
     'link': link,
     'chatId': chatId,
     'roomId': roomId,
     'eventId': eventId,
     'network': network.id,
+    if (suggestions.isNotEmpty) 'suggestions': suggestions,
   });
 
   /// Reads a payload back, tolerating everything a payload can turn out to be.
@@ -96,12 +107,16 @@ class NotificationPayload {
 
     final link = decoded['link'];
     if (link is! String || link.isEmpty) return null;
+    final rawSuggestions = decoded['suggestions'];
     return NotificationPayload(
       link: link,
       chatId: decoded['chatId'] as String? ?? '',
       roomId: decoded['roomId'] as String? ?? '',
       eventId: decoded['eventId'] as String? ?? '',
       network: ChatNetwork.fromId(decoded['network'] as String? ?? ''),
+      suggestions: rawSuggestions is List
+          ? rawSuggestions.whereType<String>().toList(growable: false)
+          : const [],
     );
   }
 
@@ -112,7 +127,8 @@ class NotificationPayload {
       other.chatId == chatId &&
       other.roomId == roomId &&
       other.eventId == eventId &&
-      other.network == network;
+      other.network == network &&
+      listEquals(other.suggestions, suggestions);
 
   @override
   int get hashCode => Object.hash(link, chatId, roomId, eventId, network);
@@ -182,6 +198,7 @@ class NotificationPresentation {
     bool isGroup = false,
     List<NotificationContent> conversation = const [],
     Map<String, String> avatarPaths = const {},
+    List<String> aiReplies = const [],
   }) {
     final thread = conversation.isEmpty ? [content] : conversation;
     final avatarPath = avatarPaths[content.eventId];
@@ -191,7 +208,7 @@ class NotificationPresentation {
       groupKey: content.groupKey,
       title: content.title,
       body: content.body,
-      payload: NotificationPayload.forContent(content),
+      payload: NotificationPayload.forContent(content, suggestions: aiReplies),
       details: NotificationDetails(
         android: AndroidNotificationDetails(
           messageChannelFor(content.network).id,
@@ -243,7 +260,7 @@ class NotificationPresentation {
           // answerable after this process has died: each one needs a chat to
           // act on, a room to move a read marker in, and an event id the dedupe
           // ledger is keyed on.
-          actions: weftAndroidMessageActions(),
+          actions: weftAndroidMessageActions(aiReplies: aiReplies),
         ),
         iOS: DarwinNotificationDetails(
           // Must equal the Android group key. A merged contact whose iPhone

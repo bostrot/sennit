@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/providers.dart';
+import '../../services/attachments/media_store.dart';
+import '../../services/attachments/video_surface.dart';
 import '../../services/status/status_feed.dart';
 
 /// Full-screen pager through one contact's statuses, newest first.
@@ -139,11 +142,14 @@ class _StatusPage extends ConsumerStatefulWidget {
 
 class _StatusPageState extends ConsumerState<_StatusPage> {
   Uint8List? _bytes;
+  File? _video;
   bool _failed = false;
+
+  bool get _isVideo => widget.message.kind == MessageKind.video;
 
   bool get _isMedia =>
       widget.message.kind == MessageKind.image ||
-      widget.message.kind == MessageKind.video ||
+      _isVideo ||
       widget.message.attachmentUrl != null;
 
   @override
@@ -153,6 +159,26 @@ class _StatusPageState extends ConsumerState<_StatusPage> {
   }
 
   Future<void> _load() async {
+    // A video is a file for the player, not bytes for an image decoder —
+    // feeding it to Image.memory is exactly the "Invalid image data" that
+    // used to sit where the story should play.
+    if (_isVideo) {
+      try {
+        final file = await ref
+            .read(mediaFileStoreProvider)
+            .stage(
+              widget.message,
+              repository: ref.read(chatRepositoryProvider),
+              shouldContinue: () async => mounted,
+            );
+        if (mounted) setState(() => _video = file);
+      } on Object catch (error) {
+        debugPrint('weft: status video failed: $error');
+        if (mounted) setState(() => _failed = true);
+      }
+      return;
+    }
+
     final bytes = await ref
         .read(chatRepositoryProvider)
         .attachmentBytes(widget.message.roomId, widget.message.eventId);
@@ -184,7 +210,6 @@ class _StatusPageState extends ConsumerState<_StatusPage> {
       );
     }
 
-    final bytes = _bytes;
     if (_failed) {
       return const Center(
         child: Text(
@@ -193,6 +218,16 @@ class _StatusPageState extends ConsumerState<_StatusPage> {
         ),
       );
     }
+    if (_isVideo) {
+      final video = _video;
+      if (video == null) {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        );
+      }
+      return ref.watch(videoSurfaceProvider)(context, video);
+    }
+    final bytes = _bytes;
     if (bytes == null) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),

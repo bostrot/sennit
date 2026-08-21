@@ -32,6 +32,12 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  String? avatarUrlFor(String userId, {String? roomId}) => null;
+
+  @override
+  int get timelineEpoch => 0;
+
+  @override
   Future<void> sendCalendarInvite(
     String chatId, {
     required String title,

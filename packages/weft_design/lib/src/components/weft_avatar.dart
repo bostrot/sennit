@@ -116,6 +116,11 @@ class WeftAvatar extends StatelessWidget {
                 width: inner,
                 height: inner,
                 fit: BoxFit.cover,
+                // Bounds the *decode*, not just the layout: a 1024px avatar
+                // decoded at full size for a 48dp circle is wasted work the
+                // scroll thread pays for, once per tile, on every rebuild
+                // after eviction.
+                cacheWidth: (inner * 3).round(),
                 errorBuilder: (context, error, stack) {
                   debugPrint('weft: avatar failed for $imageUrl — $error');
                   return const SizedBox.shrink();

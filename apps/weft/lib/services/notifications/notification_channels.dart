@@ -60,6 +60,10 @@ abstract final class WeftNotificationActions {
 
   /// The input field's id on the platforms that name one.
   static const String replyInput = 'weft.reply.input';
+
+  /// Prefix of the tappable AI answer actions; the index into
+  /// `NotificationPayload.suggestions` follows it.
+  static const String aiReplyPrefix = 'weft.ai_reply.';
 }
 
 /// What the "Mute for 1 hour" action writes.
@@ -99,7 +103,19 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 /// [NotificationActionHandler] dismisses the conversation itself once the work
 /// has actually succeeded. A reply that could not be sent therefore leaves its
 /// notification standing rather than vanishing into a message that never went.
-List<AndroidNotificationAction> weftAndroidMessageActions() => [
+List<AndroidNotificationAction> weftAndroidMessageActions({
+  List<String> aiReplies = const [],
+}) => [
+  // The one-tap AI answers, first so they sit where a thumb lands. Their id
+  // is an index; the text itself rides the payload, which is what makes the
+  // tap answerable in a process that has restarted since posting.
+  for (var i = 0; i < aiReplies.length; i++)
+    AndroidNotificationAction(
+      '${WeftNotificationActions.aiReplyPrefix}$i',
+      aiReplies[i],
+      showsUserInterface: true,
+      cancelNotification: false,
+    ),
   AndroidNotificationAction(
     WeftNotificationActions.reply,
     'Reply',

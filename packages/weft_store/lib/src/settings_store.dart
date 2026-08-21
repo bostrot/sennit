@@ -82,6 +82,7 @@ class SecretStore {
   static const String embeddingApiKey = 'embedding_api_key';
   static const String mcpTunnelToken = 'mcp_tunnel_token';
   static const String homeAssistantToken = 'home_assistant_token';
+  static const String llmApiKey = 'llm_api_key';
   static const String paperlessToken = 'paperless_token';
 
   Future<String?> read(String key) => _storage.read(key: key);
@@ -164,6 +165,18 @@ abstract final class WeftSettings {
 
   /// The user's paperless-ngx base URL.
   static const String paperlessUrl = 'integrations.paperless_url';
+
+  /// An OpenAI-compatible chat-completions endpoint, e.g. a local Ollama.
+  /// Empty means no LLM is configured and every feature that would use one
+  /// stays dormant.
+  static const String llmBaseUrl = 'ai.llm_base_url';
+  static const String llmModel = 'ai.llm_model';
+
+  /// Whether incoming-message notifications carry one or two AI-suggested
+  /// answers. Its own gate on top of the endpoint existing, because
+  /// configuring an LLM for anything sends every notified message's text to
+  /// it — that trade is made here, not implied there.
+  static const String notifySmartReplies = 'notify.smart_replies';
 
   /// Whether a link in a message may be previewed.
   ///

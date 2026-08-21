@@ -281,6 +281,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               onChanged: (v) => _update((p) => p.copyWith(showPreviews: v)),
               contentPadding: EdgeInsets.zero,
             ),
+            const _SmartRepliesTile(),
 
             const Divider(height: WeftSpace.xl),
             const SettingsSectionHeader(
@@ -786,6 +787,52 @@ String _suppressionLabel(NotificationSuppression reason) => switch (reason) {
 /// Background push over UnifiedPush — the self-hosted answer to "messages
 /// while the app is closed". Android only; a build without a distributor
 /// installed gets the sentence saying which app to install.
+/// The gate for AI answer chips on message notifications.
+///
+/// Disabled with the reason spelled out until an LLM endpoint exists —
+/// flipping a switch that silently does nothing is the failure this avoids.
+class _SmartRepliesTile extends ConsumerWidget {
+  const _SmartRepliesTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    SettingsStore? found;
+    try {
+      found = ref.watch(storesProvider).settings;
+    } on Object {
+      found = null;
+    }
+    final settings = found;
+    final configured =
+        (settings?.getString(WeftSettings.llmBaseUrl) ?? '')
+            .trim()
+            .isNotEmpty &&
+        (settings?.getString(WeftSettings.llmModel) ?? '').trim().isNotEmpty;
+    final enabled = settings?.getBool(WeftSettings.notifySmartReplies) ?? false;
+
+    return SwitchListTile(
+      title: const Text('AI reply suggestions'),
+      subtitle: Text(
+        configured
+            ? 'One or two tappable answers on each message notification, '
+                  'written by your configured LLM. The message text is sent '
+                  'to that endpoint.'
+            : 'Needs an LLM endpoint under Settings → Endpoints → '
+                  'AI assistant first.',
+      ),
+      value: enabled && configured,
+      onChanged: !configured || settings == null
+          ? null
+          : (v) {
+              settings.setBool(WeftSettings.notifySmartReplies, value: v);
+              ref.read(settingsRevisionProvider.notifier).bump();
+            },
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+}
+
 class _UnifiedPushSection extends ConsumerStatefulWidget {
   const _UnifiedPushSection();
 

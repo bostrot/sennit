@@ -119,71 +119,97 @@ class _InboxPane extends ConsumerWidget {
         children: [
           // The action bar replaces the header rather than stacking under it,
           // so the row of destructive actions is never off screen.
-          if (selecting)
-            _SelectionBar(selected: selection, visible: chats)
-          else
-            _InboxHeader(activeFilter: filter),
-          if (!selecting) const StatusBar(),
+          if (selecting) _SelectionBar(selected: selection, visible: chats),
           Expanded(
-            child: chats.isEmpty
-                ? const _EmptyInbox()
-                : ListView.builder(
+            // One scroll surface for everything above the chats too: the
+            // title, the stories and the filter rows ride away with the list
+            // (they were a fixed third of a phone's height), while search
+            // floats back in with the first downward gesture.
+            child: CustomScrollView(
+              slivers: [
+                if (!selecting) ...[
+                  SliverToBoxAdapter(child: _InboxHeader(activeFilter: filter)),
+                  SliverAppBar(
+                    floating: true,
+                    snap: true,
+                    automaticallyImplyLeading: false,
+                    backgroundColor: context.colors.surface,
+                    surfaceTintColor: Colors.transparent,
+                    titleSpacing: WeftSpace.lg,
+                    title: const _SearchField(),
+                  ),
+                  const SliverToBoxAdapter(child: StatusBar()),
+                  SliverToBoxAdapter(child: _FilterRows(activeFilter: filter)),
+                ],
+                if (chats.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyInbox(),
+                  )
+                else
+                  SliverPadding(
                     padding: const EdgeInsetsDirectional.only(
                       bottom: WeftSpace.xl,
                     ),
-                    itemCount: chats.length,
-                    itemBuilder: (context, i) {
-                      final chat = chats[i];
-                      final picked = selection.contains(chat.id);
-                      return _StaggeredIn(
-                        index: i,
-                        child: ChatTile(
-                          chat: chat,
-                          avatarHeaders: mediaHeaders,
-                          selected:
-                              picked || (wide && chat.id == selectedChatId),
-                          // The tick's state has to reach the row's merged
-                          // node: the `Checkbox` below is inside it and
-                          // therefore silent, which is an improvement on
-                          // announcing "checkbox" with no conversation name.
-                          checked: selecting ? picked : null,
-                          leading: selecting
-                              ? Checkbox(
-                                  value: picked,
-                                  onChanged: (_) => ref
-                                      .read(chatSelectionProvider.notifier)
-                                      .toggle(chat.id),
-                                )
-                              : null,
-                          onLongPress: () => ref
-                              .read(chatSelectionProvider.notifier)
-                              .toggle(chat.id),
-                          timeLabel: _formatTime(chat.lastMessage?.timestamp),
-                          onTap: () {
-                            // While selecting, a tap toggles rather than opens
-                            // — otherwise the mode is a trap you fall out of.
-                            if (selecting) {
+                    sliver: SliverList.builder(
+                      itemCount: chats.length,
+                      itemBuilder: (context, i) {
+                        final chat = chats[i];
+                        final picked = selection.contains(chat.id);
+                        return _StaggeredIn(
+                          index: i,
+                          child: ChatTile(
+                            chat: chat,
+                            avatarHeaders: mediaHeaders,
+                            selected:
+                                picked || (wide && chat.id == selectedChatId),
+                            // The tick's state has to reach the row's merged
+                            // node: the `Checkbox` below is inside it and
+                            // therefore silent, which is an improvement on
+                            // announcing "checkbox" with no conversation name.
+                            checked: selecting ? picked : null,
+                            leading: selecting
+                                ? Checkbox(
+                                    value: picked,
+                                    onChanged: (_) => ref
+                                        .read(chatSelectionProvider.notifier)
+                                        .toggle(chat.id),
+                                  )
+                                : null,
+                            onLongPress: () => ref
+                                .read(chatSelectionProvider.notifier)
+                                .toggle(chat.id),
+                            timeLabel: _formatTime(chat.lastMessage?.timestamp),
+                            onTap: () {
+                              // While selecting, a tap toggles rather than opens
+                              // — otherwise the mode is a trap you fall out of.
+                              if (selecting) {
+                                ref
+                                    .read(chatSelectionProvider.notifier)
+                                    .toggle(chat.id);
+                                return;
+                              }
                               ref
-                                  .read(chatSelectionProvider.notifier)
-                                  .toggle(chat.id);
-                              return;
-                            }
-                            ref
-                                .read(selectedChatProvider.notifier)
-                                .select(chat.id);
-                            ref.read(chatRepositoryProvider).markRead(chat.id);
-                            if (!wide) {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => ChatView(chatId: chat.id),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                      );
-                    },
+                                  .read(selectedChatProvider.notifier)
+                                  .select(chat.id);
+                              ref
+                                  .read(chatRepositoryProvider)
+                                  .markRead(chat.id);
+                              if (!wide) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ChatView(chatId: chat.id),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -467,20 +493,66 @@ class _InboxHeader extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: WeftSpace.md),
-          const _SearchField(),
-          const SizedBox(height: WeftSpace.md),
-          const _LabelFilterRow(),
-          if (activeFilter.isNotEmpty)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ActionChip(
-                avatar: const Icon(Icons.close_rounded, size: 16),
-                label: const Text('Clear filter'),
-                onPressed: () =>
-                    ref.read(networkFilterProvider.notifier).clear(),
-              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Everything that narrows the list, in one scrolling strip: labels, the
+/// quick filters, and the way out of a network filter. Lives under the search
+/// bar and scrolls away with the list, so on a phone the conversations own
+/// the screen the moment the reader moves.
+class _FilterRows extends ConsumerWidget {
+  const _FilterRows({required this.activeFilter});
+
+  final Set<ChatNetwork> activeFilter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quick = ref.watch(inboxQuickFilterProvider);
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        WeftSpace.lg,
+        0,
+        WeftSpace.md,
+        WeftSpace.xs,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final (value, label) in const [
+                  (InboxQuickFilter.unread, 'Unread'),
+                  (InboxQuickFilter.groups, 'Groups'),
+                  (InboxQuickFilter.people, 'People'),
+                ]) ...[
+                  FilterChip(
+                    label: Text(label),
+                    selected: quick == value,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (_) => ref
+                        .read(inboxQuickFilterProvider.notifier)
+                        .toggle(value),
+                  ),
+                  const SizedBox(width: WeftSpace.sm),
+                ],
+                if (activeFilter.isNotEmpty)
+                  ActionChip(
+                    avatar: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text('Clear network filter'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        ref.read(networkFilterProvider.notifier).clear(),
+                  ),
+              ],
             ),
+          ),
+          const _LabelFilterRow(),
         ],
       ),
     );

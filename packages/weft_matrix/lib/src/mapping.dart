@@ -222,6 +222,30 @@ WeftMessage? mapEvent(
   if (editTargetEventId(content) != null) return null;
 
   final msgtype = content['msgtype'] as String?;
+
+  // An invitation whose custom block a bridge stripped down to the readable
+  // line. Rebuilt here so the receiving Weft gets the same card the sender
+  // rendered, answers folding in from the local room's relations.
+  if (msgtype == sdk.MessageTypes.Text) {
+    final bridgedInvite = _bridgedCalendarInviteFrom(event, timeline: timeline);
+    if (bridgedInvite != null) {
+      return WeftMessage(
+        eventId: event.eventId,
+        roomId: event.roomId ?? '',
+        network: network,
+        senderId: event.senderId,
+        senderName: event.senderFromMemoryOrFallback.calcDisplayname(),
+        timestamp: event.originServerTs,
+        kind: MessageKind.event,
+        isOwn: event.senderId == ownUserId,
+        body: event.text,
+        redacted: event.redacted,
+        deliveryState: _deliveryFor(event),
+        calendarInvite: bridgedInvite,
+      );
+    }
+  }
+
   final voice = isVoiceMessage(content);
 
   final message = WeftMessage(
@@ -629,6 +653,40 @@ const String kCalendarInviteKey = 'com.bostrot.weft.calendar';
 /// The relation type its answers use.
 const String kCalendarResponseType = 'com.bostrot.weft.calendar.response';
 
+/// The human-readable line [sendCalendarInvite] writes into the body — and
+/// the only part of an invitation that survives a trip through a bridge.
+/// Matching it on the way back in is what makes an invite sent over Signal
+/// or WhatsApp interactive for a Weft on the receiving end.
+final RegExp bridgedCalendarInvitePattern = RegExp(
+  r'^📅 (.+) — (\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{1,2}):(\d{2})$',
+);
+
+CalendarInvite? _bridgedCalendarInviteFrom(
+  sdk.Event event, {
+  sdk.Timeline? timeline,
+}) {
+  // An event that still carries the custom key takes the native path.
+  if (event.content[kCalendarInviteKey] is Map) return null;
+  final match = bridgedCalendarInvitePattern.firstMatch(event.text.trim());
+  if (match == null) return null;
+  final start = DateTime(
+    int.parse(match[4]!),
+    int.parse(match[3]!),
+    int.parse(match[2]!),
+    int.parse(match[5]!),
+    int.parse(match[6]!),
+  );
+  return CalendarInvite(
+    // The original uid was stripped with the rest of the block; the event id
+    // is just as unique and stable within this room.
+    uid: 'bridged-${event.eventId}',
+    title: match[1]!,
+    start: start,
+    end: null,
+    responses: _calendarResponsesFor(event, timeline: timeline),
+  );
+}
+
 CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
   final block = event.content[kCalendarInviteKey];
   if (block is! Map) return null;
@@ -637,6 +695,19 @@ CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
   final start = DateTime.tryParse(block['start'] as String? ?? '');
   if (uid is! String || title is! String || start == null) return null;
 
+  return CalendarInvite(
+    uid: uid,
+    title: title,
+    start: start.toLocal(),
+    end: DateTime.tryParse(block['end'] as String? ?? '')?.toLocal(),
+    responses: _calendarResponsesFor(event, timeline: timeline),
+  );
+}
+
+List<CalendarResponse> _calendarResponsesFor(
+  sdk.Event event, {
+  sdk.Timeline? timeline,
+}) {
   final responses = <String, CalendarResponse>{};
   if (timeline != null) {
     // Latest answer per person wins, same rule as polls.
@@ -670,12 +741,5 @@ CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
       );
     }
   }
-
-  return CalendarInvite(
-    uid: uid,
-    title: title,
-    start: start.toLocal(),
-    end: DateTime.tryParse(block['end'] as String? ?? '')?.toLocal(),
-    responses: responses.values.toList(growable: false),
-  );
+  return responses.values.toList(growable: false);
 }
