@@ -3,6 +3,16 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // The UnifiedPush connector pulls plain-JVM Tink while
+    // flutter_secure_storage's androidx security-crypto pulls tink-android —
+    // the same classes in two jars, which D8 rejects as duplicates.
+    // tink-android is the Android build of the same library, so the plain
+    // artifact is excluded everywhere and every consumer resolves to the one
+    // that belongs on this platform.
+    configurations.all {
+        exclude(group = "com.google.crypto.tink", module = "tink")
+    }
 }
 
 val newBuildDir: Directory =
