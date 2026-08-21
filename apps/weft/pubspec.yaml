@@ -25,6 +25,11 @@ dependencies:
   # guard is a platform check and not a compile-time one.
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
+  # Push without Google: a UnifiedPush distributor on the device (ntfy, for
+  # one) delivers pokes from the user's own infrastructure, which is the only
+  # push story that fits an app whose whole point is self-hosting. Android
+  # only; iOS stays on APNs via Firebase.
+  unifiedpush: ^6.2.0
   flutter:
     sdk: flutter
   # Material's own strings, and — the reason it is here — `GlobalWidgetsLocalizations`,

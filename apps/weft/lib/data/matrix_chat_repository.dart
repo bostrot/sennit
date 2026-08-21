@@ -74,7 +74,7 @@ class MatrixChatRepository implements ChatRepository {
     _sendNetworks.addAll(_store?.loadSendNetworks() ?? const {});
     _resolveMediaSupport();
     _rebuild();
-    _syncSub = _session.client.onSync.stream.listen((_) => _rebuild());
+    _syncSub = _session.client.onSync.stream.listen((_) => _scheduleRebuild());
 
     final sms = _sms;
     if (sms != null) {
@@ -115,12 +115,34 @@ class MatrixChatRepository implements ChatRepository {
   final _chatsController = StreamController<List<Chat>>.broadcast();
   List<Chat> _chats = const [];
 
+  /// Coalesces the initial-sync storm: sync can tick many times a second
+  /// while a large account catches up, and every tick used to rebuild every
+  /// chat — three membership scans per room, per tick — which is most of what
+  /// "the app takes long to load" was. One trailing rebuild per 300ms keeps
+  /// the inbox as fresh as an eye can tell and cuts the work by an order of
+  /// magnitude.
+  Timer? _rebuildDebounce;
+  void _scheduleRebuild() {
+    _rebuildDebounce ??= Timer(const Duration(milliseconds: 300), () {
+      _rebuildDebounce = null;
+      _rebuild();
+    });
+  }
+
   final Map<String, ChatNetwork> _sendNetworks = {};
 
   /// Whether the homeserver serves media from the authenticated endpoint.
   /// Assumed true (the modern default) until the probe answers; a rebuild
   /// follows so avatars correct themselves rather than staying broken.
   bool _authenticatedMedia = true;
+
+  /// The newest event each room was receipted up to, from this session.
+  ///
+  /// `Room.notificationCount` is the *server's* number and only moves after
+  /// the receipt lands and a sync returns; until then the badge the user just
+  /// cleared would still glow. A room whose last event is the one we already
+  /// receipted reads as zero, whatever the server still says.
+  final Map<String, String> _readUpTo = {};
 
   /// Profiles fetched for DM partners whose member event was never loaded.
   final Map<String, sdk.Profile> _profiles = {};
@@ -224,7 +246,7 @@ class MatrixChatRepository implements ChatRepository {
     // than one advertising bridges they never set up.
     final seen = <ChatNetwork>{};
     for (final room in _client.rooms) {
-      seen.add(networkForRoom(room));
+      seen.add(_networkOf(room));
     }
     // SMS earns its place in the rail the same way: by there being threads on
     // it. A phone where the role was declined has none and is offered none.
@@ -1014,6 +1036,11 @@ class MatrixChatRepository implements ChatRepository {
       final room = _client.getRoomById(source.roomId);
       final lastEvent = room?.lastEvent;
       if (room == null || lastEvent == null) continue;
+      // Recorded before the request: the badge clears the moment the user
+      // opens the conversation, not a server round trip and a sync later —
+      // and a merged chat summing three legs' stale server counts read as
+      // "7 unread" for one new message until every receipt landed.
+      _readUpTo[room.id] = lastEvent.eventId;
       // `public: false` sends only the private receipt: this account's other
       // devices still clear the unread badge, but the sender is not told.
       // Bridges relay the public receipt to the remote network as its native
@@ -1021,12 +1048,20 @@ class MatrixChatRepository implements ChatRepository {
       final tellSender =
           _settings?.getBool(WeftSettings.sendReadReceipts, fallback: true) ??
           true;
-      await room.setReadMarker(
-        lastEvent.eventId,
-        mRead: lastEvent.eventId,
-        public: tellSender,
-      );
+      try {
+        await room.setReadMarker(
+          lastEvent.eventId,
+          mRead: lastEvent.eventId,
+          public: tellSender,
+        );
+      } on Object catch (error) {
+        // One leg refusing its receipt (a local-echo id, a server hiccup)
+        // must not abandon the other legs — which is exactly how a merged
+        // chat's count got stuck.
+        debugPrint('weft: read receipt for ${room.id} failed: $error');
+      }
     }
+    _scheduleRebuild();
   }
 
   Future<void> dispose() async {
@@ -1058,7 +1093,10 @@ class MatrixChatRepository implements ChatRepository {
   /// room passed as a normal chat. The bot suffix alone is not enough — a
   /// person may be called `@robot:...` — so the localpart must also resolve
   /// to a known network the way mautrix bots name themselves.
-  bool _isServiceChat(sdk.Room room) {
+  bool _isServiceChat(sdk.Room room) =>
+      _serviceCache[room.id] ??= _computeIsServiceChat(room);
+
+  bool _computeIsServiceChat(sdk.Room room) {
     final participants = room.getParticipants();
     if (participants.length > 3) return false;
 
@@ -1136,7 +1174,7 @@ class MatrixChatRepository implements ChatRepository {
       final peerId = _peerOf(room);
       if (peerId == null) continue;
 
-      final network = networkForRoom(room);
+      final network = _networkOf(room);
       final peer = room.unsafeGetUserFromMemoryOrFallback(peerId);
 
       final handle = NetworkHandle(
@@ -1191,6 +1229,18 @@ class MatrixChatRepository implements ChatRepository {
   String? _thumbnail(String? mxc) =>
       mxcToThumbnailUrl(_client, mxc, authenticatedMedia: _authenticatedMedia);
 
+  /// Per-room answers that are expensive to compute and effectively never
+  /// change for a given room: which network it belongs to, whether it is a
+  /// bridge's management room, and which bot serves it. Each involves walking
+  /// the member list, and each used to be recomputed for every room on every
+  /// rebuild.
+  final Map<String, ChatNetwork> _networkCache = {};
+  final Map<String, bool> _serviceCache = {};
+  final Map<String, String?> _botCache = {};
+
+  ChatNetwork _networkOf(sdk.Room room) =>
+      _networkCache[room.id] ??= _networkOf(room);
+
   /// The bridge's service bot in [room], from its `m.bridge` state, or null.
   ///
   /// The bot is a member of every portal room it manages, and it poisons any
@@ -1198,6 +1248,11 @@ class MatrixChatRepository implements ChatRepository {
   /// titles, avatars. Reading it from state rather than pattern-matching on
   /// localparts means a bridge with an unconventional bot name still works.
   String? _bridgeBotOf(sdk.Room room) {
+    if (_botCache.containsKey(room.id)) return _botCache[room.id];
+    return _botCache[room.id] = _computeBridgeBot(room);
+  }
+
+  String? _computeBridgeBot(sdk.Room room) {
     for (final type in bridgeStateEventTypes) {
       final states = room.states[type];
       if (states == null) continue;
@@ -1277,7 +1332,7 @@ class MatrixChatRepository implements ChatRepository {
     // number is a worse name than "Anna" but a far better one than
     // "WhatsApp bridge bot, Anna (WA)".
     _ensureProfile(peerId, room: room);
-    return _stripNetworkTag(_remoteIdFor(peerId, networkForRoom(room)));
+    return _stripNetworkTag(_remoteIdFor(peerId, _networkOf(room)));
   }
 
   /// Room avatar, else the DM partner's member event, else a fetched profile.
@@ -1306,7 +1361,7 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   Chat _chatFromRoom(sdk.Room room) {
-    final network = networkForRoom(room);
+    final network = _networkOf(room);
     final lastEvent = room.lastEvent;
 
     return Chat(
@@ -1332,7 +1387,9 @@ class MatrixChatRepository implements ChatRepository {
       lastMessage: lastEvent == null
           ? null
           : mapEvent(lastEvent, network: network, ownUserId: _client.userID),
-      unreadCount: room.notificationCount,
+      unreadCount: _readUpTo[room.id] == lastEvent?.eventId
+          ? 0
+          : room.notificationCount,
       // A resolved peer means "conversation with a person", whatever the
       // member count says: a bridged DM carries the bot as a third member and
       // is usually missing from m.direct, and calling it a group is what put

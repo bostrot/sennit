@@ -9,11 +9,13 @@ import 'package:weft_matrix/weft_matrix.dart' show PushRuleChange;
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/a11y.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../../services/notifications/push_registration.dart';
+import '../../services/notifications/unified_push.dart';
 import 'settings_section.dart';
 
 /// What the policy says about one network, as a single choice rather than two
@@ -206,6 +208,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(WeftSpace.lg),
         children: [
+          const _UnifiedPushSection(),
           SwitchListTile(
             title: const Text('Notifications'),
             subtitle: const Text(
@@ -779,3 +782,112 @@ String _suppressionLabel(NotificationSuppression reason) => switch (reason) {
     'It was suppressed as ${reason.name}, which should not happen for a '
         'test. Please report it.',
 };
+
+/// Background push over UnifiedPush — the self-hosted answer to "messages
+/// while the app is closed". Android only; a build without a distributor
+/// installed gets the sentence saying which app to install.
+class _UnifiedPushSection extends ConsumerStatefulWidget {
+  const _UnifiedPushSection();
+
+  @override
+  ConsumerState<_UnifiedPushSection> createState() =>
+      _UnifiedPushSectionState();
+}
+
+class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!NotificationPlatform.isAndroid) return const SizedBox.shrink();
+    ref.watch(settingsRevisionProvider);
+    final service = ref.read(unifiedPushServiceProvider);
+    final configured = service.isConfigured;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: WeftSpace.lg),
+      child: Padding(
+        padding: const EdgeInsets.all(WeftSpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  configured
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_paused_outlined,
+                  size: 20,
+                  color: configured
+                      ? context.palette.online
+                      : context.colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: WeftSpace.sm),
+                Expanded(
+                  child: Text(
+                    'Background push',
+                    style: context.text.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: WeftSpace.xs),
+            Text(
+              configured
+                  ? 'Messages reach this phone even with Weft closed, through '
+                        'your UnifiedPush distributor.'
+                  : 'Right now messages only arrive while Weft is running. '
+                        'With a UnifiedPush distributor (the ntfy app works) '
+                        'your own server wakes this phone — no Google in the '
+                        'path.',
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: WeftSpace.md),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : configured
+                  ? OutlinedButton(
+                      onPressed: () async {
+                        setState(() => _busy = true);
+                        await service.unregister();
+                        ref.read(settingsRevisionProvider.notifier).bump();
+                        if (mounted) setState(() => _busy = false);
+                      },
+                      child: const Text('Turn off'),
+                    )
+                  : FilledButton.tonal(
+                      onPressed: () async {
+                        setState(() => _busy = true);
+                        final problem = await service.register();
+                        ref.read(settingsRevisionProvider.notifier).bump();
+                        if (!context.mounted) return;
+                        setState(() => _busy = false);
+                        if (problem != null) {
+                          showWeftMessage(context, problem);
+                        } else {
+                          showWeftMessage(
+                            context,
+                            'Registering… the distributor confirms in a '
+                            'moment.',
+                          );
+                        }
+                      },
+                      child: const Text('Set up'),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

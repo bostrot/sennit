@@ -24,6 +24,7 @@ import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
+import 'services/notifications/unified_push.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,6 +74,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _intents.deliverInitialIntent();
     });
+    // UnifiedPush handlers must exist before its distributor delivers —
+    // including a delivery that cold-started this process. No-op off Android.
+    unawaited(ref.read(unifiedPushServiceProvider).initialize());
   }
 
   @override
