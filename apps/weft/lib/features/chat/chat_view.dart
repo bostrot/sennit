@@ -693,6 +693,21 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
   }
 
+  Future<void> _addInviteToCalendar(WeftMessage message) async {
+    final invite = message.calendarInvite;
+    if (invite == null) return;
+    try {
+      await addToDeviceCalendar(
+        title: invite.title,
+        start: invite.start,
+        end: invite.end,
+      );
+    } on Object catch (error) {
+      debugPrint('weft: add to calendar failed: $error');
+      _showMessage('The calendar could not be opened.');
+    }
+  }
+
   /// Moves a calendar proposal the user already sent. The room sees an edit;
   /// a bridged peer sees their app's own edited-message treatment.
   Future<void> _editInvite(WeftMessage message) async {
@@ -1013,6 +1028,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                         reply,
                                         proposedStart,
                                       ),
+                                onAddInviteToCalendar:
+                                    message.calendarInvite == null
+                                    ? null
+                                    : () => _addInviteToCalendar(message),
+                                onEditInvite: message.calendarInvite == null
+                                    ? null
+                                    : () => _editInvite(message),
                                 onVote: message.kind == MessageKind.poll
                                     ? (optionId) => _run(
                                         () => ref
@@ -1995,6 +2017,8 @@ class _MessageBubble extends StatelessWidget {
     this.replyPreview,
     this.onVote,
     this.onRespondInvite,
+    this.onAddInviteToCalendar,
+    this.onEditInvite,
     this.content,
     this.highlighted = false,
     this.transcribing = false,
@@ -2019,6 +2043,12 @@ class _MessageBubble extends StatelessWidget {
   /// Answers this message's calendar invitation.
   final void Function(CalendarReply reply, DateTime? proposedStart)?
   onRespondInvite;
+
+  /// Puts this message's invitation into the device calendar.
+  final VoidCallback? onAddInviteToCalendar;
+
+  /// Sender only: re-times this message's invitation.
+  final VoidCallback? onEditInvite;
 
   /// What this message is answering, already resolved across every leg of a
   /// merged chat. Null when it is not a reply.
@@ -2250,6 +2280,8 @@ class _MessageBubble extends StatelessWidget {
                             message: message,
                             own: own,
                             onRespond: onRespondInvite,
+                            onAddToCalendar: onAddInviteToCalendar,
+                            onEditTime: own ? onEditInvite : null,
                           )
                         else if (message.kind == MessageKind.poll &&
                             message.poll != null)
@@ -3346,11 +3378,20 @@ class _CalendarInviteContent extends StatelessWidget {
     required this.message,
     required this.own,
     this.onRespond,
+    this.onAddToCalendar,
+    this.onEditTime,
   });
 
   final WeftMessage message;
   final bool own;
   final void Function(CalendarReply reply, DateTime? proposedStart)? onRespond;
+
+  /// Puts the proposal into the device calendar. On every card: the sender
+  /// wants their own proposal in their calendar too.
+  final VoidCallback? onAddToCalendar;
+
+  /// Sender only: moves the proposal, sent as an edit.
+  final VoidCallback? onEditTime;
 
   @override
   Widget build(BuildContext context) {
@@ -3433,6 +3474,28 @@ class _CalendarInviteContent extends StatelessWidget {
                 },
                 child: const Text('New time'),
               ),
+            ],
+          ),
+        ],
+        // The sender's own card used to be inert — nothing happened on tap,
+        // which read as broken. Its verbs: into my calendar, or move it.
+        if (own && (onAddToCalendar != null || onEditTime != null)) ...[
+          const SizedBox(height: WeftSpace.sm),
+          Wrap(
+            spacing: WeftSpace.sm,
+            children: [
+              if (onAddToCalendar != null)
+                FilledButton.tonalIcon(
+                  onPressed: onAddToCalendar,
+                  icon: const Icon(Icons.event_available_rounded, size: 16),
+                  label: const Text('Add to calendar'),
+                ),
+              if (onEditTime != null)
+                OutlinedButton.icon(
+                  onPressed: onEditTime,
+                  icon: const Icon(Icons.edit_calendar_rounded, size: 16),
+                  label: const Text('Change time'),
+                ),
             ],
           ),
         ],

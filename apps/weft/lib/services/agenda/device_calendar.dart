@@ -23,10 +23,13 @@ Future<void> addToDeviceCalendar({
   final until = end ?? start.add(const Duration(hours: 1));
 
   if (isMobile) {
-    await cal.Add2Calendar.addEvent2Cal(
+    final opened = await cal.Add2Calendar.addEvent2Cal(
       cal.Event(title: title, startDate: start, endDate: until, allDay: allDay),
     );
-    return;
+    // False means the editor could not even be resolved — an OEM calendar
+    // the intent query missed, or none installed. Fall through to the .ics
+    // share sheet rather than doing visibly nothing.
+    if (opened) return;
   }
 
   String stamp(DateTime t) =>

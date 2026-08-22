@@ -381,5 +381,13 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- "Add to calendar". add_2_calendar only *starts* the editor if it
+             can resolve it first, and package visibility hides the calendar
+             app unless the intent is declared here — without this the tap
+             silently does nothing, which is exactly how it presented. -->
+        <intent>
+            <action android:name="android.intent.action.INSERT"/>
+            <data android:scheme="content" android:host="com.android.calendar"/>
+        </intent>
     </queries>
 </manifest>
