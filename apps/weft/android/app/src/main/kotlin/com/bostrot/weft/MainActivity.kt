@@ -44,6 +44,7 @@ class MainActivity : FlutterActivity() {
         // opens the same database.
         SyncEngineHolder.onUiVisible()
         SyncControlChannel.register(this, flutterEngine)
+        CalendarChannel.register(this, flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
         channel?.setMethodCallHandler { call, result ->
             when (call.method) {

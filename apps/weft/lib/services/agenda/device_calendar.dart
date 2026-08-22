@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:add_2_calendar/add_2_calendar.dart' as cal;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -22,13 +23,28 @@ Future<void> addToDeviceCalendar({
           defaultTargetPlatform == TargetPlatform.iOS);
   final until = end ?? start.add(const Duration(hours: 1));
 
-  if (isMobile) {
+  // Android goes through Weft's own channel: it *starts* the editor intent
+  // rather than asking whether one is visible first — package visibility
+  // restricts querying, never starting, and the query is exactly what kept
+  // answering "no calendar" on devices that plainly have one.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      final opened = await const MethodChannel('com.bostrot.weft/calendar')
+          .invokeMethod<bool>('insertEvent', {
+            'title': title,
+            'startMs': start.millisecondsSinceEpoch,
+            'endMs': until.millisecondsSinceEpoch,
+            'allDay': allDay,
+          });
+      if (opened == true) return;
+    } on Object catch (error) {
+      debugPrint('weft: calendar editor did not open: $error');
+    }
+    // No calendar app at all: fall through to the .ics share sheet.
+  } else if (isMobile) {
     final opened = await cal.Add2Calendar.addEvent2Cal(
       cal.Event(title: title, startDate: start, endDate: until, allDay: allDay),
     );
-    // False means the editor could not even be resolved — an OEM calendar
-    // the intent query missed, or none installed. Fall through to the .ics
-    // share sheet rather than doing visibly nothing.
     if (opened) return;
   }
 
