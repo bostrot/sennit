@@ -518,6 +518,65 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  List<String> typingIn(String chatId) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return const [];
+    final names = <String>[];
+    for (final source in chat.sources) {
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      for (final user in room.typingUsers) {
+        if (user.id == _client.userID) continue;
+        // The bridge bot "typing" is plumbing, not a person composing.
+        if (networkFromBridgeBotId(user.id) != ChatNetwork.unknown &&
+            _botCache[room.id] == user.id) {
+          continue;
+        }
+        names.add(_stripNetworkTag(user.calcDisplayname()));
+      }
+    }
+    return names;
+  }
+
+  @override
+  Future<void> setTyping(String chatId, {required bool typing}) async {
+    final source = _sendSource(chatId);
+    if (source.network == ChatNetwork.sms) return;
+    final room = _client.getRoomById(source.roomId);
+    // 25s server-side expiry: a lost "stopped" update clears itself.
+    await room?.setTyping(typing, timeout: typing ? 25000 : null);
+  }
+
+  @override
+  ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null || chat.isGroup) return null;
+    bool online = false;
+    DateTime? lastActive;
+    for (final source in chat.sources) {
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      final peerId = _peerOf(room);
+      if (peerId == null) continue;
+      // The sync-fed cache, synchronously: this runs per app-bar build, and
+      // the replacement API is a server round trip per call.
+      // ignore: deprecated_member_use
+      final cached = _client.presences[peerId];
+      if (cached == null) continue;
+      if (cached.presence == sdk.PresenceType.online ||
+          cached.currentlyActive == true) {
+        online = true;
+      }
+      final at = cached.lastActiveTimestamp;
+      if (at != null && (lastActive == null || at.isAfter(lastActive))) {
+        lastActive = at;
+      }
+    }
+    if (!online && lastActive == null) return null;
+    return (online: online, lastActiveAt: lastActive);
+  }
+
+  @override
   List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
     String chatId,
   ) {

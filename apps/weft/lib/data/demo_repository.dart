@@ -33,6 +33,15 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
   @override
+  List<String> typingIn(String chatId) => const [];
+
+  @override
+  Future<void> setTyping(String chatId, {required bool typing}) async {}
+
+  @override
+  ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) => null;
+
+  @override
   Future<void> editCalendarInvite(
     String roomId,
     String inviteEventId, {

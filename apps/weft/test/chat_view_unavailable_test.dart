@@ -16,6 +16,15 @@ import 'package:weft_merge/weft_merge.dart';
 /// rooms, standing in for a room the account has since left.
 class _NoRoomsRepository implements ChatRepository {
   @override
+  List<String> typingIn(String chatId) => const [];
+
+  @override
+  Future<void> setTyping(String chatId, {required bool typing}) async {}
+
+  @override
+  ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) => null;
+
+  @override
   Future<void> editCalendarInvite(
     String roomId,
     String inviteEventId, {

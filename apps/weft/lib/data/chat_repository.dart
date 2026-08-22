@@ -117,6 +117,19 @@ abstract class ChatRepository {
   /// turns the preference back off.
   void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
 
+  /// Display names of the people typing in [chatId] right now, the local
+  /// user excluded. Bridges relay the remote network's typing state as the
+  /// ghost typing, so this is WhatsApp's "typing…" too.
+  List<String> typingIn(String chatId) => const [];
+
+  /// Tells the conversation the local user is (or stopped) typing, on the
+  /// leg a message would ride.
+  Future<void> setTyping(String chatId, {required bool typing}) async {}
+
+  /// The DM partner's presence, when the homeserver (and, for a bridged
+  /// contact, the bridge) shares it. Null for groups and unknown peers.
+  ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) => null;
+
   /// Answers [inviteEventId]'s calendar invitation.
   Future<void> respondCalendarInvite(
     String roomId,

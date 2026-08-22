@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -163,7 +164,40 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // command, most visibly — appeared only after reopening the chat or
     // touching it in a way that happened to call [_refresh].
     ref.listenManual(chatsProvider, (_, _) => _syncRefresh());
+    _composer.addListener(_onComposerChanged);
     _open();
+  }
+
+  /// Who is typing and whether the peer is online, refreshed per sync tick.
+  List<String> _typing = const [];
+  bool _peerOnline = false;
+
+  /// Rate-limits the outgoing typing signal: one every few seconds while the
+  /// user keeps writing, an immediate "stopped" when the field empties. The
+  /// 25s server-side timeout picks up a signal a killed process never
+  /// retracted.
+  DateTime _typingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _typingSent = false;
+
+  void _onComposerChanged() {
+    final repository = ref.read(chatRepositoryProvider);
+    final hasText = _composer.text.trim().isNotEmpty;
+    if (hasText) {
+      final now = DateTime.now();
+      if (now.difference(_typingSentAt) > const Duration(seconds: 4)) {
+        _typingSentAt = now;
+        _typingSent = true;
+        unawaited(
+          repository.setTyping(_chatId, typing: true).catchError((Object e) {}),
+        );
+      }
+    } else if (_typingSent) {
+      _typingSent = false;
+      _typingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+      unawaited(
+        repository.setTyping(_chatId, typing: false).catchError((Object e) {}),
+      );
+    }
   }
 
   /// What of the loaded view can change underneath us between syncs.
@@ -202,6 +236,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
             _timelineEpoch != repository.timelineEpoch)) {
       _open();
       return;
+    }
+    // Ephemeral state rides the same heartbeat but not the same
+    // fingerprint: someone starting to type changes no message.
+    final typing = repository.typingIn(_chatId);
+    final online = repository.presenceFor(_chatId)?.online ?? false;
+    if (!listEquals(typing, _typing) || online != _peerOnline) {
+      setState(() {
+        _typing = typing;
+        _peerOnline = online;
+      });
     }
     final timeline = _timeline;
     if (timeline == null) return;
@@ -903,7 +947,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     return Scaffold(
       backgroundColor: context.colors.surfaceContainerLowest,
-      appBar: _ChatAppBar(chat: chat),
+      appBar: _ChatAppBar(chat: chat, typing: _typing, online: _peerOnline),
       body: _escapeCancels(
         // Ordered rather than reading order: the timeline comes before the
         // composer whichever way the text runs, and the banner above them both
@@ -1047,6 +1091,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                       )
                                     : null,
                                 showNetwork: chat.isMerged,
+                                showSender: chat.isGroup,
                                 groupedWithPrevious:
                                     older != null &&
                                     older.isOwn == message.isOwn &&
@@ -1404,6 +1449,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
       case null:
         await _run(() => repository.send(_chatId, text));
     }
+    // The message is the retraction: nothing is being typed any more.
+    _typingSent = false;
+    unawaited(
+      repository.setTyping(_chatId, typing: false).catchError((Object e) {}),
+    );
     _noteSend();
   }
 
@@ -1703,9 +1753,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
 const String _localSenderId = 'local:self';
 
 class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _ChatAppBar({required this.chat});
+  const _ChatAppBar({
+    required this.chat,
+    this.typing = const [],
+    this.online = false,
+  });
 
   final Chat chat;
+
+  /// Names currently typing. Non-empty replaces the subtitle — "typing…" is
+  /// the most current thing that can be said about a conversation.
+  final List<String> typing;
+
+  /// Whether the DM partner is online, where presence reaches this side.
+  final bool online;
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
@@ -1773,10 +1834,25 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (chat.isMerged)
+                    if (typing.isNotEmpty)
+                      Text(
+                        chat.isGroup
+                            ? '${typing.join(', ')} '
+                                  '${typing.length == 1 ? 'is' : 'are'} '
+                                  'typing…'
+                            : 'typing…',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.colors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else if (chat.isMerged)
                       Text(
                         'Merged · '
-                        '${chat.networks.map((n) => n.label).join(', ')}',
+                        '${chat.networks.map((n) => n.label).join(', ')}'
+                        '${online ? ' · online' : ''}',
                         style: context.text.labelSmall?.copyWith(
                           color: context.palette.mergedAccent,
                           fontWeight: FontWeight.w600,
@@ -1786,9 +1862,13 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                       )
                     else
                       Text(
-                        chat.networks.firstOrNull?.label ?? '',
+                        '${chat.networks.firstOrNull?.label ?? ''}'
+                        '${online ? ' · online' : ''}',
                         style: context.text.labelSmall?.copyWith(
-                          color: context.colors.onSurfaceVariant,
+                          color: online
+                              ? context.palette.online
+                              : context.colors.onSurfaceVariant,
+                          fontWeight: online ? FontWeight.w600 : null,
                         ),
                       ),
                   ],
@@ -2009,10 +2089,26 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 }
 
+/// A stable, readable colour for one sender, derived from their id.
+///
+/// Hue from the hash, saturation fixed, lightness picked per theme so the
+/// name clears the peer bubble's fill in both modes.
+Color _senderColor(BuildContext context, String senderId) {
+  final hue = (senderId.hashCode & 0x7fffffff) % 360;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return HSLColor.fromAHSL(
+    1,
+    hue.toDouble(),
+    0.55,
+    dark ? 0.72 : 0.34,
+  ).toColor();
+}
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.showNetwork,
+    this.showSender = false,
     required this.groupedWithPrevious,
     this.replyPreview,
     this.onVote,
@@ -2049,6 +2145,10 @@ class _MessageBubble extends StatelessWidget {
 
   /// Sender only: re-times this message's invitation.
   final VoidCallback? onEditInvite;
+
+  /// Whether to print the sender's name above the content — group chats,
+  /// where "who wrote this" is not answered by which side it sits on.
+  final bool showSender;
 
   /// What this message is answering, already resolved across every leg of a
   /// merged chat. Null when it is not a reply.
@@ -2239,6 +2339,25 @@ class _MessageBubble extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 3),
+                        ],
+                        // Groups say who wrote each message. Coloured by a
+                        // stable hash of the sender so the same person keeps
+                        // the same colour all the way up the thread; excluded
+                        // from semantics because the bubble's group node
+                        // already opens with the sender's name.
+                        if (showSender && !own && !groupedWithPrevious) ...[
+                          ExcludeSemantics(
+                            child: Text(
+                              message.senderName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.text.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: _senderColor(context, message.senderId),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
                         ],
                         // Inside the bubble, above everything: the quote is
                         // part of what this message says, not chrome around it.

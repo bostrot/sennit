@@ -32,6 +32,15 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  List<String> typingIn(String chatId) => const [];
+
+  @override
+  Future<void> setTyping(String chatId, {required bool typing}) async {}
+
+  @override
+  ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) => null;
+
+  @override
   Future<void> editCalendarInvite(
     String roomId,
     String inviteEventId, {
