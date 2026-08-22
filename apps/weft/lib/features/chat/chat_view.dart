@@ -967,66 +967,73 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           children: [
                             if (_needsDayDivider(message, older))
                               _DayDivider(date: message.timestamp),
-                            _MessageBubble(
-                              message: message,
-                              replyPreview: _replyPreviewFor(message),
-                              highlighted: message.eventId == _highlightEventId,
-                              transcribing: _transcribing.contains(
-                                message.eventId,
+                            _SwipeToReply(
+                              enabled: !message.redacted,
+                              onReply: () => _enterComposerContext(
+                                ComposerContext.reply(message),
                               ),
-                              onOpen: rendersAsAttachment(message)
-                                  ? () => _openMedia(message)
-                                  : null,
-                              onTranscribe:
-                                  message.canTranscribe &&
-                                      message.transcript == null
-                                  ? () => _transcribe(message)
-                                  : null,
-                              onRetranscribe:
-                                  message.canTranscribe &&
-                                      message.transcript != null
-                                  ? () => _retranscribe(message)
-                                  : null,
-                              onActions: () => _openActions(message),
-                              onJumpToReply: (eventId) => _jumpTo(eventId),
-                              onToggleReaction: (tally) =>
-                                  _toggleReaction(message, tally),
-                              onAddReaction: () => _pickReaction(message),
-                              onShowReactionSenders: (tally) =>
-                                  showReactionSendersSheet(
-                                    context,
-                                    tally: tally,
-                                    nameFor: _nameFor,
-                                  ),
-                              onTapLink: _openLink,
-                              onTapMention: _openMention,
-                              onRespondInvite: message.calendarInvite == null
-                                  ? null
-                                  : (reply, proposedStart) => _respondInvite(
-                                      message,
-                                      reply,
-                                      proposedStart,
+                              child: _MessageBubble(
+                                message: message,
+                                replyPreview: _replyPreviewFor(message),
+                                highlighted:
+                                    message.eventId == _highlightEventId,
+                                transcribing: _transcribing.contains(
+                                  message.eventId,
+                                ),
+                                onOpen: rendersAsAttachment(message)
+                                    ? () => _openMedia(message)
+                                    : null,
+                                onTranscribe:
+                                    message.canTranscribe &&
+                                        message.transcript == null
+                                    ? () => _transcribe(message)
+                                    : null,
+                                onRetranscribe:
+                                    message.canTranscribe &&
+                                        message.transcript != null
+                                    ? () => _retranscribe(message)
+                                    : null,
+                                onActions: () => _openActions(message),
+                                onJumpToReply: (eventId) => _jumpTo(eventId),
+                                onToggleReaction: (tally) =>
+                                    _toggleReaction(message, tally),
+                                onAddReaction: () => _pickReaction(message),
+                                onShowReactionSenders: (tally) =>
+                                    showReactionSendersSheet(
+                                      context,
+                                      tally: tally,
+                                      nameFor: _nameFor,
                                     ),
-                              onVote: message.kind == MessageKind.poll
-                                  ? (optionId) => _run(
-                                      () => ref
-                                          .read(chatRepositoryProvider)
-                                          .votePoll(
-                                            message.roomId,
-                                            message.eventId,
-                                            {optionId},
-                                          ),
-                                    )
-                                  : null,
-                              showNetwork: chat.isMerged,
-                              groupedWithPrevious:
-                                  older != null &&
-                                  older.isOwn == message.isOwn &&
-                                  older.network == message.network &&
-                                  message.timestamp
-                                          .difference(older.timestamp)
-                                          .inMinutes <
-                                      5,
+                                onTapLink: _openLink,
+                                onTapMention: _openMention,
+                                onRespondInvite: message.calendarInvite == null
+                                    ? null
+                                    : (reply, proposedStart) => _respondInvite(
+                                        message,
+                                        reply,
+                                        proposedStart,
+                                      ),
+                                onVote: message.kind == MessageKind.poll
+                                    ? (optionId) => _run(
+                                        () => ref
+                                            .read(chatRepositoryProvider)
+                                            .votePoll(
+                                              message.roomId,
+                                              message.eventId,
+                                              {optionId},
+                                            ),
+                                      )
+                                    : null,
+                                showNetwork: chat.isMerged,
+                                groupedWithPrevious:
+                                    older != null &&
+                                    older.isOwn == message.isOwn &&
+                                    older.network == message.network &&
+                                    message.timestamp
+                                            .difference(older.timestamp)
+                                            .inMinutes <
+                                        5,
+                              ),
                             ),
                             if (_seenAt(message) case final DateTime seen)
                               Padding(
@@ -1887,6 +1894,94 @@ class _DayDivider extends StatelessWidget {
             Expanded(child: Divider(color: context.palette.divider)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Drag a bubble towards the reading direction to quote it — the reply
+/// gesture every messenger has taught thumbs. The bubble follows the finger,
+/// a reply arrow fades in behind it, and passing the threshold ticks once
+/// and opens the composer in reply context; release before it and the bubble
+/// springs back with nothing sent. Purely an accelerator: Reply stays on the
+/// long-press sheet, which is also where switch access and screen readers
+/// already find it.
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({
+    required this.enabled,
+    required this.onReply,
+    required this.child,
+  });
+
+  final bool enabled;
+  final VoidCallback onReply;
+  final Widget child;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  double _drag = 0;
+  bool _armed = false;
+
+  static const double _trigger = 56;
+  static const double _max = 84;
+
+  void _update(DragUpdateDetails details, double direction) {
+    final next = (_drag + details.delta.dx * direction).clamp(0.0, _max);
+    if (next == _drag) return;
+    final arming = next >= _trigger;
+    if (arming && !_armed) unawaited(HapticFeedback.lightImpact());
+    setState(() {
+      _drag = next;
+      _armed = arming;
+    });
+  }
+
+  void _settle() {
+    if (_armed) widget.onReply();
+    setState(() {
+      _drag = 0;
+      _armed = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final direction = rtl ? -1.0 : 1.0;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: (details) => _update(details, direction),
+      onHorizontalDragEnd: (_) => _settle(),
+      onHorizontalDragCancel: _settle,
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            start: 0,
+            top: 0,
+            bottom: 0,
+            child: Opacity(
+              opacity: (_drag / _trigger).clamp(0.0, 1.0),
+              child: Icon(
+                Icons.reply_rounded,
+                color: _armed
+                    ? context.colors.primary
+                    : context.colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            // Instant under the finger, sprung on release.
+            duration: _drag == 0 ? WeftMotion.fast : Duration.zero,
+            curve: Curves.easeOut,
+            transform: Matrix4.translationValues(_drag * direction, 0, 0),
+            child: widget.child,
+          ),
+        ],
       ),
     );
   }
