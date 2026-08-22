@@ -144,8 +144,9 @@ void main() {
           signal.details.iOS!.threadIdentifier,
           whatsapp.details.iOS!.threadIdentifier,
         );
-        // …while staying two notifications, because they are two messages.
-        expect(whatsapp.id, isNot(signal.id));
+        // …and *one* notification: same conversation, same id, so the
+        // second replaces the first instead of standing beside it.
+        expect(whatsapp.id, signal.id);
       },
     );
 
@@ -367,20 +368,24 @@ void main() {
       });
     });
 
-    test('the second message for a chat brings a summary with it', () async {
+    test('the second message replaces the first, thread and all', () async {
       await service.start();
       await deliver(_message(eventId: r'$1', body: 'one'));
-      expect(
-        sink.shown,
-        hasLength(1),
-        reason: 'one message is its own summary',
-      );
-
       await deliver(_message(eventId: r'$2', body: 'two'));
 
-      final summary = sink.shown.last;
-      expect(summary.details.android!.setAsGroupSummary, isTrue);
-      expect(summary.body, '2 new messages');
+      // Two posts, one id: the platform swaps the row in place, so the shade
+      // holds a single conversation whose thread has grown to two lines.
+      expect(sink.shown, hasLength(2));
+      expect(sink.shown.first.id, sink.shown.last.id);
+      final style =
+          sink.shown.last.details.android!.styleInformation!
+              as MessagingStyleInformation;
+      expect(style.messages!.map((m) => m.text), ['one', 'two']);
+      // And no summary row: the conversation *is* one notification now.
+      expect(
+        sink.shown.every((p) => p.details.android!.setAsGroupSummary != true),
+        isTrue,
+      );
     });
 
     test('a backfill keeps the shade bounded', () async {
@@ -389,13 +394,16 @@ void main() {
         await deliver(_message(eventId: '\$e$i', body: 'm$i'));
       }
 
-      // Remembered in full, so the count is the truth…
+      // Remembered in full…
       expect(service.postedFor('merged:contact_1'), hasLength(9));
-      expect(sink.shown.last.body, '9 new messages');
-      // …while only the newest five keep a row of their own, and the four that
-      // fell out were cancelled rather than left behind the summary.
-      expect(sink.cancelled, hasLength(9 - kMaxNotificationsPerChat));
-      expect(sink.cancelled.first.id, stableNotificationId(r'$e0'));
+      // …while the one row shows only the newest window of the thread, and
+      // nothing needed cancelling because nothing else was ever posted.
+      final style =
+          sink.shown.last.details.android!.styleInformation!
+              as MessagingStyleInformation;
+      expect(style.messages, hasLength(kMaxNotificationsPerChat));
+      expect(style.messages!.last.text, 'm8');
+      expect(sink.cancelled, isEmpty);
     });
 
     test('an event arriving by push and by sync notifies once', () async {
@@ -546,11 +554,13 @@ void main() {
       );
       await pumpEventQueue();
 
-      // Two rows, each with its own event id, plus the summary a second
-      // message in one conversation always earns — exactly what two real
-      // messages would have produced, which is the point of the button.
+      // Both presses posted — the second replacing the first under the same
+      // id, its thread two lines long, exactly as two real messages would.
       expect(service.postedFor(kTestNotificationChatId), hasLength(2));
-      expect(sink.shown.map((s) => s.body).last, contains('2 new messages'));
+      final style =
+          sink.shown.last.details.android!.styleInformation!
+              as MessagingStyleInformation;
+      expect(style.messages, hasLength(2));
     });
 
     test('a suppressed test names the setting responsible', () async {
@@ -737,15 +747,16 @@ void main() {
           await deliver(_message(eventId: '\$e$i', body: 'm$i'));
         }
 
-        // The count and the row are different questions, and both are bounded.
+        // The memory is bounded, and the one row shows only the newest
+        // window of it.
         expect(
           service.postedFor('merged:contact_1'),
           hasLength(kMaxTrackedNotificationsPerChat),
         );
-        expect(
-          sink.shown.last.body,
-          '$kMaxTrackedNotificationsPerChat new messages',
-        );
+        final style =
+            sink.shown.last.details.android!.styleInformation!
+                as MessagingStyleInformation;
+        expect(style.messages, hasLength(kMaxNotificationsPerChat));
       },
     );
   });
@@ -1302,7 +1313,7 @@ void main() {
 
       final call = plugin.calls.lastWhere((c) => c.method == 'show');
       final args = call.arguments as Map;
-      expect(args['id'], stableNotificationId(r'$event_1'));
+      expect(args['id'], stableNotificationId(presentation.groupKey));
       expect(args['title'], 'Grace');
       expect(args['body'], 'hello');
       // The payload is a string by the time it is an intent extra, and it is

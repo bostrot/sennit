@@ -552,11 +552,16 @@ class WeftNotificationService {
     if (contents == null) return;
     for (final content in contents) {
       _avatars.remove(content.eventId);
+      // The conversation's one row — and, for notifications posted by builds
+      // that keyed per event, each of those too. Cancelling an id that was
+      // never posted is a no-op, so the sweep is cheap and the transition
+      // leaves nothing behind.
       await _sink.cancel(
         id: stableNotificationId(content.eventId),
         tag: groupKey,
       );
     }
+    await _sink.cancel(id: stableNotificationId(groupKey), tag: groupKey);
     await _sink.cancel(
       id: stableNotificationId('summary:$groupKey'),
       tag: 'summary:$groupKey',
@@ -617,18 +622,13 @@ class WeftNotificationService {
 
     final thread = _posted.putIfAbsent(group, () => [])..add(content);
 
-    // The message that has just fallen out of the posted window loses its own
-    // row and lives on only in the summary's count. Cancelled rather than left
-    // behind, so the shade agrees with what the summary says is in it.
-    final windowStart = thread.length - kMaxNotificationsPerChat;
-    if (windowStart > 0) {
-      final dropped = thread[windowStart - 1];
-      _avatars.remove(dropped.eventId);
-      await _sink.cancel(id: stableNotificationId(dropped.eventId), tag: group);
-    }
     if (thread.length > kMaxTrackedNotificationsPerChat) {
       thread.removeRange(0, thread.length - kMaxTrackedNotificationsPerChat);
     }
+    // One notification per conversation, re-posted under the same id with
+    // the thread's newest lines — the platform replaces it in place, which
+    // is what keeps one chat one row however many messages arrive.
+    final windowStart = thread.length - kMaxNotificationsPerChat;
     final visible = thread.sublist(windowStart < 0 ? 0 : windowStart);
 
     // Before the notification that names it: Android drops a `shortcutId`
@@ -670,13 +670,8 @@ class WeftNotificationService {
       ),
     );
 
-    // A single unread message is its own summary; the group row would say the
-    // same thing twice.
-    if (thread.length < 2) return;
-    final summary = summarise(thread);
-    if (summary != null) {
-      await _sink.show(NotificationPresentation.forSummary(summary));
-    }
+    // No per-chat summary any more: the conversation *is* one notification
+    // now, and a summary row beside it would say the same thing twice.
   }
 
   void _onActivation(NotificationActivation activation) {

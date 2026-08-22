@@ -204,7 +204,11 @@ class NotificationPresentation {
     final avatarPath = avatarPaths[content.eventId];
 
     return NotificationPresentation(
-      id: stableNotificationId(content.eventId),
+      // Keyed by *conversation*, not by event: a new message replaces the
+      // chat's notification with a fuller thread instead of standing beside
+      // it — four copies of "Familie 5", each one message longer, was what
+      // per-event ids looked like in the shade.
+      id: stableNotificationId(content.groupKey),
       groupKey: content.groupKey,
       title: content.title,
       body: content.body,
