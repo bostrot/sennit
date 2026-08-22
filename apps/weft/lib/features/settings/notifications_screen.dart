@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -208,6 +209,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(WeftSpace.lg),
         children: [
+          const _BuiltInConnectionSection(),
           const _UnifiedPushSection(),
           SwitchListTile(
             title: const Text('Notifications'),
@@ -833,6 +835,122 @@ class _SmartRepliesTile extends ConsumerWidget {
   }
 }
 
+/// The no-extra-app answer to background messages.
+///
+/// A switch over the native `WeftSyncService`: Weft itself holds the one
+/// connection the OS allows a reachable app (a specialUse foreground
+/// service), so messages arrive with the app closed and nothing else
+/// installed. The battery row appears while Doze could still cut the
+/// connection's network — the exemption dialog is the system's, and refusing
+/// it degrades delivery during deep sleep rather than breaking the feature.
+class _BuiltInConnectionSection extends StatefulWidget {
+  const _BuiltInConnectionSection();
+
+  @override
+  State<_BuiltInConnectionSection> createState() =>
+      _BuiltInConnectionSectionState();
+}
+
+class _BuiltInConnectionSectionState extends State<_BuiltInConnectionSection>
+    with WidgetsBindingObserver {
+  static const _channel = MethodChannel('com.bostrot.weft/sync_control');
+
+  bool _enabled = false;
+  bool _batteryExempt = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refresh());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The battery-exemption dialog is a system activity; its answer is only
+    // readable once the user comes back.
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final status = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'status',
+      );
+      if (!mounted || status == null) return;
+      setState(() {
+        _enabled = status['enabled'] == true;
+        _batteryExempt = status['batteryExempt'] == true;
+      });
+    } on Object {
+      // No native side — desktop, or a test. The section stays hidden via
+      // the platform check in build.
+    }
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    try {
+      await _channel.invokeMethod<void>('setEnabled', {'enabled': enabled});
+    } on Object catch (error) {
+      debugPrint('weft: could not toggle the connection service: $error');
+    }
+    await _refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!NotificationPlatform.isAndroid) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: WeftSpace.lg),
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: Icon(
+              _enabled ? Icons.sync_rounded : Icons.sync_disabled_rounded,
+              color: _enabled
+                  ? context.palette.online
+                  : context.colors.onSurfaceVariant,
+            ),
+            title: const Text('Stay connected in the background'),
+            subtitle: const Text(
+              'Weft keeps its own connection open behind a small permanent '
+              'notification, so messages arrive while the app is closed — '
+              'nothing else to install. Survives reboots.',
+            ),
+            value: _enabled,
+            onChanged: (v) => unawaited(_setEnabled(v)),
+          ),
+          if (_enabled && !_batteryExempt)
+            ListTile(
+              leading: Icon(
+                Icons.battery_alert_rounded,
+                color: context.colors.error,
+              ),
+              title: const Text('Allow unrestricted battery use'),
+              subtitle: const Text(
+                'Without this, deep sleep cuts the connection and messages '
+                'wait until the phone wakes. The dialog is Android\'s own.',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => unawaited(
+                _channel
+                    .invokeMethod<void>('requestBatteryExemption')
+                    .catchError((Object e) {}),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _UnifiedPushSection extends ConsumerStatefulWidget {
   const _UnifiedPushSection();
 
@@ -885,10 +1003,11 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
               configured
                   ? 'Messages reach this phone even with Weft closed, through '
                         'your UnifiedPush distributor.'
-                  : 'Right now messages only arrive while Weft is running. '
-                        'With a UnifiedPush distributor (the ntfy app works) '
-                        'your own server wakes this phone — no Google in the '
-                        'path.',
+                  : 'An alternative to the built-in connection: a UnifiedPush '
+                        'distributor (the ntfy app) wakes this phone through '
+                        'your own push server, and Weft holds no connection '
+                        'of its own. Lightest on battery when several apps '
+                        'share the distributor.',
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),

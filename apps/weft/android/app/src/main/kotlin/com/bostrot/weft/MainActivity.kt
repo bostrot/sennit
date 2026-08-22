@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.bostrot.weft.call.CallBridge
 import com.bostrot.weft.sms.SmsBridge
+import com.bostrot.weft.sync.SyncControlChannel
+import com.bostrot.weft.sync.SyncEngineHolder
 import com.bostrot.weft.wear.WeftWatchChannel
 import com.bostrot.weft.widget.WeftSnapshotChannel
 import io.flutter.embedding.android.FlutterActivity
@@ -37,6 +39,11 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // The UI engine owns the Matrix client from here on; the background
+        // daemon, if one is listening, hands over before this engine's client
+        // opens the same database.
+        SyncEngineHolder.onUiVisible()
+        SyncControlChannel.register(this, flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
         channel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -150,6 +157,9 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         SmsBridge.detach()
         CallBridge.detach()
+        // This engine — and its Matrix client — dies with the activity. When
+        // the built-in connection is on, the daemon takes the session back.
+        SyncEngineHolder.onUiGone(applicationContext)
         super.onDestroy()
     }
 

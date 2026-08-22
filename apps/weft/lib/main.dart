@@ -36,6 +36,12 @@ void main(List<String> args) async {
     await runBackgroundPush();
     return;
   }
+  // The built-in connection's engine: WeftSyncService starts this whenever
+  // the toggle is on and no UI is alive. Same headless stack, kept running.
+  if (args.contains('--weft-daemon')) {
+    await runSyncDaemon();
+    return;
+  }
   // Loads `intl`'s date symbols for every locale before anything can format a
   // timestamp. Awaited rather than fired off: a `DateFormat` built for a locale
   // whose data has not arrived throws, and the first frame of the inbox formats

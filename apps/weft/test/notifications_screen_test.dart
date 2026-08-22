@@ -177,7 +177,9 @@ void main() {
   ) async {
     final (:stores, :container) = await pump(tester);
 
-    await tester.tap(find.byType(SwitchListTile).first);
+    // By label, not position: the built-in-connection switch sits above the
+    // master switch on Android.
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Notifications'));
     await tester.pumpAndSettle();
 
     expect(container.read(notificationPolicyProvider).enabled, isFalse);

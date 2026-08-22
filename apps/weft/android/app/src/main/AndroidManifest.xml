@@ -48,6 +48,15 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <!-- The built-in background connection: a specialUse foreground service is
+         the one documented way an app whose purpose is staying reachable may
+         hold a connection, and specialUse (unlike dataSync) may still be
+         started from BOOT_COMPLETED on Android 15. The battery-exemption
+         permission only enables *asking* — the user answers a system dialog,
+         and saying no costs delivery during Doze, not the feature. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <!-- Bluetooth headsets are a call audio *route*, and from Android 12 the
          route cannot even be enumerated without this. Declared with
          `neverForLocation` because Weft has no interest in where the user is and
@@ -240,6 +249,27 @@
             android:name=".call.CallForegroundService"
             android:exported="false"
             android:foregroundServiceType="phoneCall"/>
+        <!-- The built-in background connection. Holds the process (and the
+             headless engine with the Matrix sync loop) alive behind a
+             minimum-importance notification. See WeftSyncService. -->
+        <service
+            android:name=".sync.WeftSyncService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains the user's own messaging connection so end-to-end encrypted messages arrive while the app is closed; there is no push service in the self-hosted deployment this app targets."/>
+        </service>
+        <!-- Brings the connection back after a reboot, only when the user
+             turned it on. Exported because BOOT_COMPLETED is a system
+             broadcast. -->
+        <receiver
+            android:name=".sync.SyncBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
         <!-- Answer and decline on the incoming-call notification. A receiver
              rather than an activity so a decline costs no engine start: it hands
              the action to `CallBridge`, which replays it if Dart is not
