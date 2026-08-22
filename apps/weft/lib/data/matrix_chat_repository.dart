@@ -1571,7 +1571,7 @@ class MatrixChatRepository implements ChatRepository {
           RegExp(
             r'\s*\((WA|WhatsApp|Signal|Telegram|TG|SMS|FB|'
             r'Messenger|IG|Instagram|Discord|Slack|GChat|iMessage|LinkedIn|'
-            r'Meta|X|Twitter)\)\s*$',
+            r'Meta|X|Twitter|MM|Mattermost)\)\s*$',
           ),
           '',
         )

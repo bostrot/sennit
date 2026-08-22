@@ -123,6 +123,7 @@ class NetworkGlyph extends StatelessWidget {
     ChatNetwork.twitter => SimpleIcons.x,
     ChatNetwork.bluesky => SimpleIcons.bluesky,
     ChatNetwork.matrix => SimpleIcons.matrix,
+    ChatNetwork.mattermost => SimpleIcons.mattermost,
     // Slack and LinkedIn asked to be removed from Simple Icons over trademark
     // policy, so those keep their lettermark.
     ChatNetwork.slack ||
@@ -147,6 +148,7 @@ class NetworkGlyph extends StatelessWidget {
     ChatNetwork.gmessages => 'Gm',
     ChatNetwork.messenger => 'M',
     ChatNetwork.matrix => 'Mx',
+    ChatNetwork.mattermost => 'Mm',
     ChatNetwork.whatsapp => 'W',
     ChatNetwork.discord => 'D',
     ChatNetwork.bluesky => 'B',

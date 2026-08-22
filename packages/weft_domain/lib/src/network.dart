@@ -18,6 +18,7 @@ enum ChatNetwork {
   gmessages('gmessages', 'Google Messages', 0xFF1B72E8),
   twitter('twitter', 'X', 0xFF1D9BF0),
   bluesky('bluesky', 'Bluesky', 0xFF0085FF),
+  mattermost('mattermost', 'Mattermost', 0xFF1C58D9),
   // SMS has no brand to borrow a colour from, so this one is chosen rather
   // than copied. It used to be the same grey as [unknown], which made a chat
   // whose network could not be resolved and a chat that is genuinely SMS the
@@ -65,6 +66,8 @@ enum ChatNetwork {
     'gvoice': ChatNetwork.sms,
     'x': ChatNetwork.twitter,
     'twitterx': ChatNetwork.twitter,
+    'mm': ChatNetwork.mattermost,
+    'mattermostgo': ChatNetwork.mattermost,
   };
 
   /// Resolves a bridge protocol identifier to a network.
