@@ -22,12 +22,20 @@ import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
+import 'services/notifications/background_push.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 import 'services/notifications/unified_push.dart';
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // A push woke the process with no user in sight: boot the headless push
+  // stack and never build a widget. See `background_push.dart` — this is how
+  // notifications work while the app is closed without the app *running*.
+  if (args.contains('--unifiedpush-bg')) {
+    await runBackgroundPush();
+    return;
+  }
   // Loads `intl`'s date symbols for every locale before anything can format a
   // timestamp. Awaited rather than fired off: a `DateFormat` built for a locale
   // whose data has not arrived throws, and the first frame of the inbox formats

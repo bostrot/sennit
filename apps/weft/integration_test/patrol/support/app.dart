@@ -121,7 +121,7 @@ Future<void> launchWeft(PatrolIntegrationTester $) async {
 
   // Not awaited, and it cannot be: `main` is declared `void`. It reaches
   // `runApp` a microtask later, which the pump below is waiting for.
-  app.main();
+  app.main(const []);
 
   await pumpUntil(
     $,

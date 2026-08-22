@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:unifiedpush/unifiedpush.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../../app/notification_providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import 'push_registration.dart';
@@ -22,10 +23,14 @@ import 'push_registration.dart';
 /// wakes this service, and the notification below is posted — app running or
 /// not.
 ///
-/// What the poke can *say* is limited on purpose: for E2EE rooms the payload
-/// is ciphertext the gateway cannot read, so the notification is "new
-/// message" with the room's unread count, and opening it lands in the
-/// conversation where the real decryption happens.
+/// The poke itself says almost nothing — for E2EE rooms the gateway only
+/// ever sees an event id — but that is all the pipeline needs: the event is
+/// fetched by id and decrypted *on this device*, so the posted notification
+/// is the full sender-and-text MessagingStyle one, not a blind "new
+/// message". With the app running that happens here; with the app dead the
+/// plugin cold-starts the process and `background_push.dart` does the same
+/// with a headless boot. The bare unread-count notification below survives
+/// only as the last-resort fallback for a session that is not up.
 class UnifiedPushService {
   UnifiedPushService(this._ref);
 
@@ -144,17 +149,39 @@ class UnifiedPushService {
     }
   }
 
-  /// A poke arrived — possibly with the app cold-started just for it.
+  /// A poke arrived while the app is running.
+  ///
+  /// (A poke that arrives with the app *dead* never reaches this instance —
+  /// the plugin cold-starts the process with `--unifiedpush-bg` and
+  /// `background_push.dart` answers it.)
   Future<void> _onMessage(PushMessage message, String _) async {
+    Map<String, Object?>? data;
     Map<String, Object?>? notification;
     try {
       final decoded = jsonDecode(utf8.decode(message.content));
       if (decoded is Map) {
+        data = decoded.cast<String, Object?>();
         final inner = decoded['notification'];
         if (inner is Map) notification = inner.cast<String, Object?>();
       }
     } on Object {
       // An undecodable poke still means "something happened".
+    }
+
+    // The full pipeline whenever the session is up: fetch the event by id,
+    // decrypt it here, run the policy, post the same MessagingStyle
+    // notification the sync path posts — deduped against it, so a message
+    // arriving both ways buzzes once.
+    if (data != null) {
+      try {
+        final service = await _ref.read(notificationServiceProvider.future);
+        if (service != null) {
+          await service.handlePush(data);
+          return;
+        }
+      } on Object catch (error) {
+        debugPrint('weft: push fell back to the bare notification: $error');
+      }
     }
 
     final roomId = notification?['room_id'] as String?;
