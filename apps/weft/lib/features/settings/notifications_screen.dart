@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -843,15 +844,16 @@ class _SmartRepliesTile extends ConsumerWidget {
 /// installed. The battery row appears while Doze could still cut the
 /// connection's network — the exemption dialog is the system's, and refusing
 /// it degrades delivery during deep sleep rather than breaking the feature.
-class _BuiltInConnectionSection extends StatefulWidget {
+class _BuiltInConnectionSection extends ConsumerStatefulWidget {
   const _BuiltInConnectionSection();
 
   @override
-  State<_BuiltInConnectionSection> createState() =>
+  ConsumerState<_BuiltInConnectionSection> createState() =>
       _BuiltInConnectionSectionState();
 }
 
-class _BuiltInConnectionSectionState extends State<_BuiltInConnectionSection>
+class _BuiltInConnectionSectionState
+    extends ConsumerState<_BuiltInConnectionSection>
     with WidgetsBindingObserver {
   static const _channel = MethodChannel('com.bostrot.weft/sync_control');
 
@@ -895,12 +897,99 @@ class _BuiltInConnectionSectionState extends State<_BuiltInConnectionSection>
   }
 
   Future<void> _setEnabled(bool enabled) async {
+    // A connection that cannot post is worse than none: it costs battery and
+    // delivers silence. So turning it on walks the two permissions in order —
+    // notifications first (spending the one OS prompt only if it is still
+    // unspent), then the battery exemption, each behind a sentence saying why.
+    if (enabled && !await _ensureNotificationsAllowed()) return;
     try {
       await _channel.invokeMethod<void>('setEnabled', {'enabled': enabled});
     } on Object catch (error) {
       debugPrint('weft: could not toggle the connection service: $error');
     }
     await _refresh();
+    if (enabled && mounted && !_batteryExempt) await _walkBatteryExemption();
+  }
+
+  /// True when Weft may post notifications — asking if the one prompt is
+  /// still unspent, and pointing at system settings when it is not.
+  Future<bool> _ensureNotificationsAllowed() async {
+    final android = FlutterLocalNotificationsPlugin()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return true;
+    if (await android.areNotificationsEnabled() ?? true) return true;
+
+    final granted = await android.requestNotificationsPermission() ?? false;
+    try {
+      markNotificationPermissionAsked(ref.read(storesProvider).settings);
+    } on Object {
+      // No stores in a test; the bookkeeping is best-effort.
+    }
+    if (granted || !mounted) return granted;
+
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications are off'),
+        content: const Text(
+          'The background connection exists to show you messages, and '
+          'Android is currently blocking every notification from Weft. '
+          'Allow notifications in system settings, then try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Open settings'),
+          ),
+        ],
+      ),
+    );
+    if (open == true) {
+      await _channel
+          .invokeMethod<void>('openNotificationSettings')
+          .catchError((Object e) {});
+    }
+    return false;
+  }
+
+  /// The one-more-step moment right after enabling: explains the battery
+  /// dialog before Android shows it, so the system prompt is never the first
+  /// the user hears of it. Declining costs delivery during deep sleep, and
+  /// the row below the switch stays as the way back in.
+  Future<void> _walkBatteryExemption() async {
+    final wanted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('One more step'),
+        content: const Text(
+          'When the phone sleeps deeply, Android cuts background '
+          'connections unless the app is allowed unrestricted battery use. '
+          'Android will now ask — allowing it is what makes messages arrive '
+          'at night too. You can change it any time in system settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (wanted == true) {
+      await _channel
+          .invokeMethod<void>('requestBatteryExemption')
+          .catchError((Object e) {});
+    }
   }
 
   @override

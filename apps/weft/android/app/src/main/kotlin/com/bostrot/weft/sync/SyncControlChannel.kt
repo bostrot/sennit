@@ -42,6 +42,19 @@ object SyncControlChannel {
                         }
                     }
                 }
+                "openNotificationSettings" -> {
+                    try {
+                        activity.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(
+                                Settings.EXTRA_APP_PACKAGE,
+                                activity.packageName,
+                            ),
+                        )
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("notification_settings", e.message, null)
+                    }
+                }
                 "requestBatteryExemption" -> {
                     try {
                         if (isBatteryExempt(activity)) {
