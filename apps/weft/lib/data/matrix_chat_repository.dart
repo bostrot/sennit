@@ -518,6 +518,43 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<String?> createDirectChat(String matrixUserId) async {
+    final roomId = await _client.startDirectChat(matrixUserId.trim());
+    _rebuild();
+    return chatForRoom(roomId)?.id ?? roomId;
+  }
+
+  @override
+  Future<String?> createGroupChat(
+    String name,
+    List<String> inviteMatrixIds,
+  ) async {
+    final roomId = await _client.createGroupChat(
+      groupName: name,
+      invite: inviteMatrixIds,
+      preset: sdk.CreateRoomPreset.privateChat,
+      enableEncryption: true,
+    );
+    _rebuild();
+    return chatForRoom(roomId)?.id ?? roomId;
+  }
+
+  @override
+  Future<bool> startBridgeChat(ChatNetwork network, String identifier) async {
+    for (final chatId in serviceChatIds) {
+      final room = _client.getRoomById(chatId);
+      if (room == null) continue;
+      final bot = _bridgeBotOf(room);
+      if (bot == null || networkFromBridgeBotId(bot) != network) continue;
+      // bridgev2's own verb; the portal room arrives by sync once the bridge
+      // has resolved the identifier.
+      await room.sendTextEvent('start-chat ${identifier.trim()}');
+      return true;
+    }
+    return false;
+  }
+
+  @override
   List<String> typingIn(String chatId) {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return const [];

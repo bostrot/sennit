@@ -16,6 +16,7 @@ import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../status/status_bar.dart';
 import 'label_sheet.dart';
+import 'new_chat_sheet.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
@@ -47,6 +48,13 @@ class InboxShell extends ConsumerWidget {
     // one to the end before entering the next instead of zig-zagging between
     // them.
     return Scaffold(
+      floatingActionButton: Consumer(
+        builder: (context, ref, _) => FloatingActionButton(
+          tooltip: 'New chat',
+          onPressed: () => showNewChatSheet(context, ref),
+          child: const Icon(Icons.edit_rounded),
+        ),
+      ),
       body: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Row(

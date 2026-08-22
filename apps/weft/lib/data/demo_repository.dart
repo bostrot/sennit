@@ -33,6 +33,19 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
   @override
+  Future<String?> createDirectChat(String matrixUserId) async => null;
+
+  @override
+  Future<String?> createGroupChat(
+    String name,
+    List<String> inviteMatrixIds,
+  ) async => null;
+
+  @override
+  Future<bool> startBridgeChat(ChatNetwork network, String identifier) async =>
+      false;
+
+  @override
   List<String> typingIn(String chatId) => const [];
 
   @override

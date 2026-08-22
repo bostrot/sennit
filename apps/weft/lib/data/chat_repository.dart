@@ -117,6 +117,22 @@ abstract class ChatRepository {
   /// turns the preference back off.
   void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
 
+  /// Opens (or finds) a direct conversation with a Matrix user and returns
+  /// its chat id, or null when this repository cannot create rooms.
+  Future<String?> createDirectChat(String matrixUserId) async => null;
+
+  /// Creates a named group with [inviteMatrixIds] and returns its chat id.
+  Future<String?> createGroupChat(
+    String name,
+    List<String> inviteMatrixIds,
+  ) async => null;
+
+  /// Asks [network]'s bridge bot to open a portal with [identifier] — a
+  /// phone number, usually. The portal arrives by sync; true means the ask
+  /// was sent, not that the chat exists yet.
+  Future<bool> startBridgeChat(ChatNetwork network, String identifier) async =>
+      false;
+
   /// Display names of the people typing in [chatId] right now, the local
   /// user excluded. Bridges relay the remote network's typing state as the
   /// ghost typing, so this is WhatsApp's "typing…" too.

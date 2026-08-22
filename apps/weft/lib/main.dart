@@ -17,6 +17,7 @@ import 'app/snapshot_providers.dart';
 import 'app/stores.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
+import 'features/auth/verification_screen.dart';
 import 'features/call/call_overlay.dart';
 import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
@@ -245,6 +246,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     if (_notificationsStarted) return;
     _notificationsStarted = true;
 
+    _listenForVerificationRequests();
+
     final service = await ref.read(notificationServiceProvider.future);
     if (service == null || !mounted) return;
 
@@ -280,6 +283,39 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       policy: ref.read(notificationPolicyProvider),
       chats: ref.read(chatsProvider).value ?? const [],
     );
+  }
+
+  /// Whether a verification screen for an incoming request is already up,
+  /// so a re-sent request does not stack a second one.
+  bool _verificationShowing = false;
+
+  /// Answers "verify this session?" started from the user's *other* device.
+  ///
+  /// Element on the laptop (or any client) sends a to-device verification
+  /// request; without this listener it expired silently and Weft looked
+  /// unable to verify. The push lands in the same screen the devices list
+  /// and the login flow use — one verification path, three doors.
+  void _listenForVerificationRequests() {
+    final session = ref.read(matrixSessionProvider);
+    if (!session.isInitialized) return;
+    session.client.onKeyVerificationRequest.stream.listen((request) {
+      if (!mounted || _verificationShowing) return;
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) return;
+      _verificationShowing = true;
+      unawaited(
+        navigator
+            .push(
+              MaterialPageRoute<void>(
+                builder: (context) => VerificationScreen(
+                  incoming: request,
+                  onContinue: () => Navigator.of(context).pop(),
+                ),
+              ),
+            )
+            .whenComplete(() => _verificationShowing = false),
+      );
+    });
   }
 
   /// Shows the rationale sheet, then spends the one OS prompt.

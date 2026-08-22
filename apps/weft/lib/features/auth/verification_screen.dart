@@ -19,10 +19,16 @@ class VerificationScreen extends ConsumerStatefulWidget {
     super.key,
     required this.onContinue,
     this.deviceId,
+    this.incoming,
   });
 
   /// Invoked when the user proceeds, verified or not.
   final VoidCallback onContinue;
+
+  /// A verification the *other* device started — Element on the laptop
+  /// asking this phone to confirm. Non-null skips the start button: the
+  /// request is already on the table and the first step is accepting it.
+  final KeyVerification? incoming;
 
   /// Which device to verify against, or null to ask *every* other device —
   /// which is what a fresh login wants, since whichever one the user is holding
@@ -42,9 +48,34 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   bool _starting = false;
 
   @override
+  void initState() {
+    super.initState();
+    final incoming = widget.incoming;
+    if (incoming != null) _attach(incoming);
+  }
+
+  @override
   void dispose() {
     _verification?.cancel();
     super.dispose();
+  }
+
+  /// Wires [verification] into this screen — ours or the other side's.
+  void _attach(KeyVerification verification) {
+    verification.onUpdate = () {
+      if (!mounted) return;
+      setState(() {});
+      // Every step of this flow replaces the body with a different one, and
+      // several of the transitions are driven by the *other* device rather
+      // than by anything the user here did. Without this, a screen-reader
+      // user watching for emoji to compare is given a page that quietly
+      // became the emoji page while they were still on the previous one.
+      final next = verification.state;
+      if (next == _announcedState) return;
+      _announcedState = next;
+      announce(context, verificationStateLabel(next));
+    };
+    _verification = verification;
   }
 
   Future<void> _start() async {
@@ -65,20 +96,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         );
         return;
       }
-      verification.onUpdate = () {
-        if (!mounted) return;
-        setState(() {});
-        // Every step of this flow replaces the body with a different one, and
-        // several of the transitions are driven by the *other* device rather
-        // than by anything the user here did. Without this, a screen-reader
-        // user watching for emoji to compare is given a page that quietly
-        // became the emoji page while they were still on the previous one.
-        final next = verification.state;
-        if (next == _announcedState) return;
-        _announcedState = next;
-        announce(context, verificationStateLabel(next));
-      };
-      setState(() => _verification = verification);
+      setState(() => _attach(verification));
     } on Exception catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
