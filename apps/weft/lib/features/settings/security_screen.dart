@@ -86,11 +86,24 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     }
   }
 
-  static String _sentence(Object error) => switch (error) {
-    KeyBackupException(:final message) => message,
-    DeviceActionException(:final message) => message,
-    _ => error.toString(),
-  };
+  static String _sentence(Object error) {
+    final raw = error.toString();
+    // The SDK reports an unreachable or erroring homeserver as a bare
+    // "http error response" (a 502 from a restarting reverse proxy, most
+    // often). Say what that means and what to do about it.
+    if (raw.contains('http error response') ||
+        raw.contains('SocketException') ||
+        raw.contains('Connection closed') ||
+        raw.contains('has not connection')) {
+      return 'Your homeserver could not be reached — it may be restarting. '
+          'Try again in a moment.';
+    }
+    return switch (error) {
+      KeyBackupException(:final message) => message,
+      DeviceActionException(:final message) => message,
+      _ => raw,
+    };
+  }
 
   void _say(String message) {
     // "Recovery key saved", "Restored" and every failure below reach the user

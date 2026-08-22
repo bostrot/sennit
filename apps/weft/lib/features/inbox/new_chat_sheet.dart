@@ -7,50 +7,228 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
 import '../../app/providers.dart';
+import '../../app/stores.dart';
+import '../../services/contacts/device_contacts.dart';
 import '../chat/chat_view.dart';
 
-/// Starts a conversation that does not exist yet.
+/// Starts a conversation — from a readable list of people, not a form.
 ///
-/// Three ways in, because that is how many kinds of "new chat" this app has:
-/// a Matrix user by id, a bridged contact by phone number (the bridge bot is
-/// asked to open the portal, which then arrives by sync), and a named Matrix
-/// group with invitees.
+/// The list is who the user already talks to (their existing conversations,
+/// by name and face) plus the device address book when they opted into it,
+/// searchable together. Identifiers stay out of sight: a Matrix id or a raw
+/// number lives behind the one "By ID or number" row at the bottom for the
+/// rare person no list has.
 Future<void> showNewChatSheet(BuildContext context, WidgetRef ref) {
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (sheet) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  return Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const NewChatScreen()));
+}
+
+class NewChatScreen extends ConsumerStatefulWidget {
+  const NewChatScreen({super.key});
+
+  @override
+  ConsumerState<NewChatScreen> createState() => _NewChatScreenState();
+}
+
+class _NewChatScreenState extends ConsumerState<NewChatScreen> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = ref.watch(chatRepositoryProvider);
+    final query = _search.text.trim().toLowerCase();
+
+    // People the user already talks to: their DM conversations, by name.
+    final chats =
+        (ref.watch(chatsProvider).value ?? const <Chat>[])
+            .where(
+              (c) =>
+                  !c.isGroup &&
+                  !c.archived &&
+                  !repository.serviceChatIds.contains(c.id) &&
+                  !c.title.toLowerCase().contains('status broadcast') &&
+                  (query.isEmpty || c.title.toLowerCase().contains(query)),
+            )
+            .toList()
+          ..sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          );
+
+    // The address book, minus the people already covered above. The cache is
+    // the one the address-book-names preference maintains; without that
+    // preference the section simply is not there.
+    final knownTitles = {for (final c in chats) c.title.toLowerCase()};
+    Map<String, Object?>? contactsJson;
+    try {
+      contactsJson = ref
+          .read(storesProvider)
+          .settings
+          .getJson(kContactNamesCacheKey);
+    } on Object {
+      contactsJson = null;
+    }
+    final fromBook = <(String name, String phone)>[];
+    if (contactsJson != null) {
+      final seen = <String>{};
+      for (final entry in contactsJson.entries) {
+        final name = entry.value;
+        if (name is! String || name.trim().isEmpty) continue;
+        final lower = name.toLowerCase();
+        if (knownTitles.contains(lower) || !seen.add(lower)) continue;
+        if (query.isNotEmpty && !lower.contains(query)) continue;
+        fromBook.add((name, entry.key));
+      }
+      fromBook.sort((a, b) => a.$1.toLowerCase().compareTo(b.$1.toLowerCase()));
+    }
+
+    final headers = ref.watch(mediaHeadersProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('New chat')),
+      body: ListView(
         children: [
-          ListTile(
-            leading: const Icon(Icons.person_add_alt_rounded),
-            title: const Text('New chat'),
-            subtitle: const Text(
-              'A Matrix user, or a phone number a bridge '
-              'can reach',
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              WeftSpace.lg,
+              WeftSpace.sm,
+              WeftSpace.lg,
+              WeftSpace.sm,
             ),
-            onTap: () {
-              Navigator.of(sheet).pop();
-              unawaited(_newDirectChat(context, ref));
-            },
+            child: TextField(
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search_rounded),
+                hintText: 'Search people',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.group_add_rounded),
             title: const Text('New group'),
-            subtitle: const Text(
-              'A named Matrix room with the people you '
-              'pick',
-            ),
-            onTap: () {
-              Navigator.of(sheet).pop();
-              unawaited(_newGroup(context, ref));
-            },
+            onTap: () => unawaited(_newGroup(context, ref)),
           ),
+          if (chats.isNotEmpty) _header(context, 'Your conversations'),
+          for (final chat in chats)
+            ListTile(
+              leading: WeftAvatar(
+                label: chat.title,
+                imageUrl: chat.avatarUrl,
+                imageHeaders: headers,
+                networks: chat.networks,
+                size: 40,
+              ),
+              title: Text(chat.title),
+              onTap: () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(
+                  builder: (_) => ChatView(chatId: chat.id),
+                ),
+              ),
+            ),
+          if (fromBook.isNotEmpty) _header(context, 'From your address book'),
+          for (final (name, phone) in fromBook)
+            ListTile(
+              leading: WeftAvatar(label: name, size: 40),
+              title: Text(name),
+              onTap: () => unawaited(_startWithNumber(name, phone)),
+            ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.alternate_email_rounded),
+            title: const Text('By ID or number'),
+            subtitle: const Text('A Matrix ID, or a number no list has'),
+            onTap: () => unawaited(_newDirectChat(context, ref)),
+          ),
+          const SizedBox(height: WeftSpace.xl),
         ],
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context, String title) => Padding(
+    padding: const EdgeInsetsDirectional.fromSTEB(
+      WeftSpace.lg,
+      WeftSpace.lg,
+      WeftSpace.lg,
+      WeftSpace.xs,
+    ),
+    child: Text(
+      title,
+      style: context.text.labelLarge?.copyWith(
+        color: context.colors.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
       ),
     ),
   );
+
+  /// A person from the address book: pick the bridge, ask its bot for the
+  /// portal. The name stays on screen; the number never has to be.
+  Future<void> _startWithNumber(String name, String phone) async {
+    final repository = ref.read(chatRepositoryProvider);
+    final bridged = repository.availableNetworks
+        .where(
+          (n) =>
+              n != ChatNetwork.matrix &&
+              n != ChatNetwork.sms &&
+              n != ChatNetwork.unknown,
+        )
+        .toList();
+    if (bridged.isEmpty) {
+      showWeftMessage(context, 'No bridge is connected to reach $name over.');
+      return;
+    }
+
+    final network = bridged.length == 1
+        ? bridged.single
+        : await showModalBottomSheet<ChatNetwork>(
+            context: context,
+            showDragHandle: true,
+            builder: (sheet) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(WeftSpace.md),
+                    child: Text(
+                      'Reach $name over…',
+                      style: context.text.titleSmall,
+                    ),
+                  ),
+                  for (final n in bridged)
+                    ListTile(
+                      leading: Icon(
+                        Icons.circle,
+                        size: 14,
+                        color: context.palette.networkColor(n),
+                      ),
+                      title: Text(n.label),
+                      onTap: () => Navigator.of(sheet).pop(n),
+                    ),
+                ],
+              ),
+            ),
+          );
+    if (network == null || !mounted) return;
+
+    final sent = await repository.startBridgeChat(network, '+$phone');
+    if (!mounted) return;
+    showWeftMessage(
+      context,
+      sent
+          ? 'Asked the ${network.label} bridge to open a chat with $name — '
+                'it will appear in the inbox in a moment.'
+          : 'No ${network.label} bridge is connected.',
+    );
+  }
 }
 
 Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
