@@ -17,6 +17,9 @@ enum MessageAction {
 
   edit,
   copy,
+
+  /// Copy *part* of the message: opens the text in a selectable view.
+  selectText,
   forward,
   delete,
   transcribe,
@@ -27,6 +30,10 @@ enum MessageAction {
 
   /// Fire the message at the user's Home Assistant as a `weft_message` event.
   sendToHomeAssistant,
+
+  /// Change the time of a calendar proposal already sent. Everyone else sees
+  /// it as an edit.
+  editInvite,
 
   /// The versions of a message that has been edited.
   ///
@@ -189,12 +196,24 @@ class _MessageActionsSheet extends StatelessWidget {
                     title: const Text('Edit'),
                     onTap: () => choose(MessageAction.edit),
                   ),
-                if (message.body.trim().isNotEmpty)
+                if (message.isOwn && message.calendarInvite != null)
+                  ListTile(
+                    leading: const Icon(Icons.edit_calendar_rounded),
+                    title: const Text('Change the time'),
+                    onTap: () => choose(MessageAction.editInvite),
+                  ),
+                if (message.body.trim().isNotEmpty) ...[
                   ListTile(
                     leading: const Icon(Icons.copy_rounded),
                     title: const Text('Copy text'),
                     onTap: () => choose(MessageAction.copy),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.text_fields_rounded),
+                    title: const Text('Select text'),
+                    onTap: () => choose(MessageAction.selectText),
+                  ),
+                ],
                 ListTile(
                   leading: const Icon(Icons.forward_rounded),
                   title: const Text('Forward'),

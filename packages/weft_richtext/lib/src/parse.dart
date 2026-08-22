@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:weft_domain/weft_domain.dart';
 
 import 'fallback.dart';
+import 'links.dart';
 import 'mentions.dart';
 import 'span.dart';
 import 'url_policy.dart';
@@ -118,7 +119,9 @@ RichDocument parsePlainBody(String plainBody) {
   final lines = plainBody.split('\n');
   for (var i = 0; i < lines.length; i++) {
     if (i > 0) children.add(const RichLineBreak());
-    if (lines[i].isNotEmpty) children.add(RichTextRun(lines[i]));
+    // Linkified, because a bare url is the only kind of link a bridge can
+    // deliver — WhatsApp and Signal have no anchors to preserve.
+    if (lines[i].isNotEmpty) children.addAll(linkifyPlainRun(lines[i]));
   }
   return parseMentions(
     RichDocument([

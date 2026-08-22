@@ -38,6 +38,8 @@
 	     The camera description above already covers a video call. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Weft shares your position only when you tap "share location" in a chat.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Weft shows your address book names for people instead of the names messaging networks assign them. Contacts are matched on this device and never uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Weft needs the microphone so you can talk in a voice or video call.</string>
 	<key>CFBundleName</key>

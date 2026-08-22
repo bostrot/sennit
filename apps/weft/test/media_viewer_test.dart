@@ -491,10 +491,25 @@ void main() {
     });
 
     // The viewer is also where Save and Share live for a file, so it opens for
-    // one — it just does not pretend to render it.
+    // one — it just does not pretend to render it. (A PDF is the exception:
+    // it gets a reader, so this placeholder is for everything else.)
     testWidgets('a file shows its name and size instead of a picture', (
       tester,
     ) async {
+      await pumpViewer(
+        tester,
+        items: [
+          media(kind: MessageKind.file, body: 'report.zip', sizeBytes: 96000),
+        ],
+      );
+
+      expect(find.text('report.zip'), findsOneWidget);
+      expect(find.text('94 kB'), findsOneWidget);
+      expect(find.byType(InteractiveViewer), findsNothing);
+    });
+
+    testWidgets('a PDF waits for its bytes instead of showing the '
+        'placeholder', (tester) async {
       await pumpViewer(
         tester,
         items: [
@@ -502,9 +517,11 @@ void main() {
         ],
       );
 
-      expect(find.text('report.pdf'), findsOneWidget);
-      expect(find.text('94 kB'), findsOneWidget);
-      expect(find.byType(InteractiveViewer), findsNothing);
+      // The file never stages in a test, so the reader sits at its loading
+      // (or, depending on how the fake store failed, its error) state — the
+      // point is that the name-and-size placeholder is gone.
+      expect(find.text('report.pdf'), findsNothing);
+      expect(find.text('94 kB'), findsNothing);
     });
 
     testWidgets('saving offers the name the file should have', (tester) async {

@@ -32,6 +32,23 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  Future<void> editCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+  }) async {}
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+    String chatId,
+  ) => const [];
+
+  @override
+  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+
+  @override
   String? avatarUrlFor(String userId, {String? roomId}) => null;
 
   @override

@@ -109,6 +109,8 @@ dependencies:
   weft_snapshot: ^0.1.0
   weft_store: ^0.1.0
   weft_transcribe: ^0.1.0
+  pdfrx: ^2.4.7
+  flutter_contacts: ^2.3.1
 
 dev_dependencies:
   build_runner: ^2.15.1

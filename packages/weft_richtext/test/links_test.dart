@@ -22,6 +22,27 @@ void main() {
       expect(urls, ['https://example.org/a']);
     });
 
+    test('a bare url in plain text renders as a tappable link', () {
+      final block =
+          parsePlainBody(
+                'have a look at https://example.org/a today',
+              ).children.single
+              as RichBlock;
+      final link = block.children.whereType<RichLink>().single;
+      expect(link.url, 'https://example.org/a');
+      expect(block.children.first, const RichTextRun('have a look at '));
+      expect(block.children.last, const RichTextRun(' today'));
+    });
+
+    test('trailing sentence punctuation stays out of the tappable link', () {
+      final block =
+          parsePlainBody('see https://example.org/a.').children.single
+              as RichBlock;
+      final link = block.children.whereType<RichLink>().single;
+      expect(link.url, 'https://example.org/a');
+      expect(block.children.last, const RichTextRun('.'));
+    });
+
     test('keeps reading order and drops repeats', () {
       final urls = extractLinkUrls(
         _doc(

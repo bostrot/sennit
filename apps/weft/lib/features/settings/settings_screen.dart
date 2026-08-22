@@ -5,9 +5,11 @@ import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/a11y.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
+import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
@@ -147,6 +149,7 @@ class SettingsScreen extends ConsumerWidget {
 
           header('Privacy & security'),
           const _ReadReceiptsToggle(),
+          const _ContactNamesToggle(),
           tile(
             icon: Icons.link_rounded,
             title: 'Link previews',
@@ -222,6 +225,58 @@ class _ReadReceiptsToggle extends ConsumerWidget {
       ),
       onChanged: (value) {
         stores.settings.setBool(WeftSettings.sendReadReceipts, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
+    );
+  }
+}
+
+/// The address-book-names switch.
+///
+/// Turning it on asks for the contacts permission there and then; a refusal
+/// flips the switch straight back rather than leaving it on and doing
+/// nothing. Matching runs entirely on the device.
+class _ContactNamesToggle extends ConsumerWidget {
+  const _ContactNamesToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      return const SizedBox.shrink();
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.person_pin_rounded),
+      title: const Text('Use address book names'),
+      subtitle: const Text(
+        'Name people the way your contacts app does when a phone number '
+        'matches, instead of the name WhatsApp or Signal reports. Matched on '
+        'this device only.',
+      ),
+      value: stores.settings.getBool(WeftSettings.useDeviceContactNames),
+      onChanged: (value) async {
+        if (value) {
+          // The permission prompt belongs to the tap, not to a later sync.
+          final names = await loadDeviceContactNames();
+          if (names == null) {
+            if (context.mounted) {
+              showWeftMessage(
+                context,
+                'Weft was not allowed to read your contacts.',
+              );
+            }
+            return;
+          }
+          stores.settings.setJson(kContactNamesCacheKey, names);
+        }
+        stores.settings.setBool(
+          WeftSettings.useDeviceContactNames,
+          value: value,
+        );
         ref.read(settingsRevisionProvider.notifier).bump();
       },
     );

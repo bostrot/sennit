@@ -95,6 +95,28 @@ abstract class ChatRepository {
     ChatNetwork? via,
   });
 
+  /// Moves an already-sent proposal to a new time, as an `m.replace` edit so
+  /// every other client — and every bridge — shows it the way they show any
+  /// edited message.
+  Future<void> editCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+  }) async {}
+
+  /// Where the other side has read up to, one entry per source room that has
+  /// a peer receipt at all: the event it points at and when it was sent.
+  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+    String chatId,
+  ) => const [];
+
+  /// Address-book names by phone digits, applied on top of whatever the
+  /// bridges call people. Set by the app when the user opts in; an empty map
+  /// turns the preference back off.
+  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+
   /// Answers [inviteEventId]'s calendar invitation.
   Future<void> respondCalendarInvite(
     String roomId,

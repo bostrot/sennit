@@ -148,6 +148,11 @@ abstract final class WeftSettings {
   /// embedding model — which is why it may default on.
   static const String agendaDetect = 'agenda.detect';
 
+  /// Whether people are named from the device address book when a phone
+  /// number matches, instead of whatever the network calls them. Off by
+  /// default: reading contacts is a permission the user grants knowingly.
+  static const String useDeviceContactNames = 'contacts.use_device_names';
+
   /// Whether bridge status broadcasts (WhatsApp statuses) show as story
   /// rings above the inbox instead of as the broadcast group chat.
   static const String statusRings = 'status.rings';

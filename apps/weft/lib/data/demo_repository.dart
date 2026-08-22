@@ -33,6 +33,23 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
   @override
+  Future<void> editCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+  }) async {}
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+    String chatId,
+  ) => const [];
+
+  @override
+  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+
+  @override
   String? avatarUrlFor(String userId, {String? roomId}) => null;
 
   @override

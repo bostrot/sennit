@@ -12,6 +12,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
@@ -471,6 +472,25 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
     // the same place, which is what the hero flight promised.
     if (message.kind == MessageKind.video && file != null) {
       return ref.watch(videoSurfaceProvider)(context, file);
+    }
+
+    // A PDF gets read in place instead of a filename on a black screen.
+    final looksLikePdf =
+        message.body.toLowerCase().endsWith('.pdf') ||
+        (file != null && stagedMimeType(file) == 'application/pdf');
+    if (looksLikePdf) {
+      if (file == null) {
+        return Center(
+          child: Semantics(
+            label: 'Document loading',
+            child: const CircularProgressIndicator(color: Colors.white),
+          ),
+        );
+      }
+      return PdfViewer.file(
+        file.path,
+        params: const PdfViewerParams(backgroundColor: Colors.black),
+      );
     }
 
     if (!kViewableMediaKinds.contains(message.kind)) {

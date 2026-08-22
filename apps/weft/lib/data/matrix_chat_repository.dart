@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:collection/collection.dart' show MapEquality;
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_attachments/weft_attachments.dart';
@@ -465,6 +466,123 @@ class MatrixChatRepository implements ChatRepository {
       };
       await room.sendTextEvent(line);
     }
+  }
+
+  @override
+  Future<void> editCalendarInvite(
+    String roomId,
+    String inviteEventId, {
+    required String title,
+    required DateTime start,
+    DateTime? end,
+  }) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) throw StateError('That conversation is gone');
+
+    final original = await room.getEventById(inviteEventId);
+    final oldBlock = original?.content[kCalendarInviteKey];
+    final when = start.toUtc();
+    final until = (end ?? start.add(const Duration(hours: 1))).toUtc();
+    final calendarBlock = {
+      // The uid survives the move — it is the same appointment at a new time,
+      // which is what lets a device calendar update instead of duplicating.
+      'uid': oldBlock is Map
+          ? (oldBlock['uid'] ?? 'weft-$inviteEventId')
+          : 'weft-$inviteEventId',
+      'title': title,
+      'start': when.toIso8601String(),
+      'end': until.toIso8601String(),
+    };
+    final readable =
+        '📅 $title — '
+        '${start.day}.${start.month}.${start.year}, '
+        '${start.hour.toString().padLeft(2, '0')}:'
+        '${start.minute.toString().padLeft(2, '0')}';
+
+    // A standard m.replace: Weft peers re-read the block from the newest
+    // version, everyone else — bridges included — shows an edited message.
+    await room.sendEvent({
+      'msgtype': sdk.MessageTypes.Text,
+      'body': '* $readable',
+      kCalendarInviteKey: calendarBlock,
+      'm.new_content': {
+        'msgtype': sdk.MessageTypes.Text,
+        'body': readable,
+        kCalendarInviteKey: calendarBlock,
+      },
+      'm.relates_to': {
+        'rel_type': sdk.RelationshipTypes.edit,
+        'event_id': inviteEventId,
+      },
+    });
+  }
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+    String chatId,
+  ) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return const [];
+    final markers = <({String roomId, String eventId, DateTime at})>[];
+    for (final source in chat.sources) {
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      // Bridge ghosts' receipts are the real ones: mautrix forwards the
+      // remote network's read state as the ghost user reading the room.
+      ({String eventId, DateTime at})? newest;
+      for (final entry in room.receiptState.global.otherUsers.entries) {
+        final at = DateTime.fromMillisecondsSinceEpoch(entry.value.ts);
+        if (newest == null || at.isAfter(newest.at)) {
+          newest = (eventId: entry.value.eventId, at: at);
+        }
+      }
+      if (newest != null) {
+        markers.add((
+          roomId: source.roomId,
+          eventId: newest.eventId,
+          at: newest.at,
+        ));
+      }
+    }
+    return markers;
+  }
+
+  /// Address-book names by phone digits; see [setContactNameOverrides].
+  Map<String, String> _contactNames = const {};
+
+  @override
+  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {
+    if (const MapEquality<String, String>().equals(
+      _contactNames,
+      namesByPhoneDigits,
+    )) {
+      return;
+    }
+    _contactNames = Map.unmodifiable(namesByPhoneDigits);
+    _scheduleRebuild();
+  }
+
+  /// The address-book name for any of [phones], or null.
+  ///
+  /// Suffix matching, because the two sides rarely agree on formatting: the
+  /// bridge says `4915112345678` where the address book says `0151 1234 5678`.
+  /// Seven digits of agreement is the threshold under which numbers collide.
+  String? _contactNameForPhones(Iterable<String?> phones) {
+    if (_contactNames.isEmpty) return null;
+    for (final phone in phones) {
+      if (phone == null) continue;
+      final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.length < 7) continue;
+      final direct = _contactNames[digits];
+      if (direct != null) return direct;
+      for (final entry in _contactNames.entries) {
+        if (entry.key.length < 7) continue;
+        if (digits.endsWith(entry.key) || entry.key.endsWith(digits)) {
+          return entry.value;
+        }
+      }
+    }
+    return null;
   }
 
   @override
@@ -1373,6 +1491,15 @@ class MatrixChatRepository implements ChatRepository {
   /// an unnamed conversation is named after the person it is with.
   String _titleFor(sdk.Room room) {
     final peerId = _peerOf(room);
+    // The user's own name for this person outranks whatever the network or
+    // the room state calls them.
+    if (peerId != null) {
+      final fromContacts = _contactNameForPhones([
+        _graph.handleFor(peerId)?.phoneE164,
+        _remoteIdFor(peerId, _networkOf(room)),
+      ]);
+      if (fromContacts != null) return fromContacts;
+    }
     if (peerId == null) return room.getLocalizedDisplayname();
 
     final explicit = room.getState(sdk.EventTypes.RoomName)?.content['name'];
@@ -1501,7 +1628,12 @@ class MatrixChatRepository implements ChatRepository {
       out.add(
         Chat(
           id: mergedId,
-          title: contact.displayName,
+          title:
+              _contactNameForPhones([
+                for (final handle in _graph.handlesInContact(contact.id))
+                  handle.phoneE164,
+              ]) ??
+              contact.displayName,
           contactId: contact.id,
           sources: [for (final leg in legs) leg.sources.single],
           avatarUrl: contact.avatarUrl ?? legs.first.avatarUrl,

@@ -127,6 +127,31 @@ String? previewableUrl(String? url) {
   return safe;
 }
 
+/// Splits one run of plain text into text and tappable links.
+///
+/// The other half of what [extractLinkUrls] already knew: a bare url in a
+/// bridged message — which is the only spelling WhatsApp or Signal can send —
+/// should be *tappable*, not merely previewable. Uses the same regex and the
+/// same trailing-punctuation rule, so the link the reader taps is exactly the
+/// one the preview card was fetched for.
+List<RichSpan> linkifyPlainRun(String text) {
+  if (text.isEmpty) return const [];
+  final spans = <RichSpan>[];
+  var cursor = 0;
+  for (final match in _bareUrl.allMatches(text)) {
+    final url = _trimTrailingPunctuation(match.group(0)!);
+    if (url.isEmpty || previewableUrl(url) == null) continue;
+    if (match.start > cursor) {
+      spans.add(RichTextRun(text.substring(cursor, match.start)));
+    }
+    spans.add(RichLink(url: url, children: [RichTextRun(url)]));
+    cursor = match.start + url.length;
+  }
+  if (cursor == 0) return [RichTextRun(text)];
+  if (cursor < text.length) spans.add(RichTextRun(text.substring(cursor)));
+  return spans;
+}
+
 /// Drops the punctuation a url picked up from the sentence around it.
 ///
 /// A closing bracket is only dropped when the url has no matching opener, so

@@ -168,8 +168,16 @@ WeftMessage? mapEvent(
   // so every other client still shows the text (and the .ics, where one was
   // attached). Weft peers additionally get the negotiation: answers arrive as
   // reference relations and fold onto the invite here.
-  if (event.content[kCalendarInviteKey] is Map) {
-    final invite = _calendarInviteFrom(event, timeline: timeline);
+  // The newest version of the event, because a moved appointment arrives as
+  // an m.replace and the block worth reading is the replacement's.
+  final display = timeline == null ? event : event.getDisplayEvent(timeline);
+  if (display.content[kCalendarInviteKey] is Map ||
+      event.content[kCalendarInviteKey] is Map) {
+    final invite = _calendarInviteFrom(
+      display.content[kCalendarInviteKey] is Map ? display : event,
+      relationsOf: event,
+      timeline: timeline,
+    );
     if (invite != null) {
       return WeftMessage(
         eventId: event.eventId,
@@ -180,7 +188,7 @@ WeftMessage? mapEvent(
         timestamp: event.originServerTs,
         kind: MessageKind.event,
         isOwn: event.senderId == ownUserId,
-        body: event.text,
+        body: display.text,
         redacted: event.redacted,
         deliveryState: _deliveryFor(event),
         calendarInvite: invite,
@@ -230,7 +238,11 @@ WeftMessage? mapEvent(
   // rendered, answers folding in from the local room's relations. Notice too:
   // some bridges echo relayed messages as m.notice.
   if (msgtype == sdk.MessageTypes.Text || msgtype == sdk.MessageTypes.Notice) {
-    final bridgedInvite = _bridgedCalendarInviteFrom(event, timeline: timeline);
+    final bridgedInvite = _bridgedCalendarInviteFrom(
+      display,
+      relationsOf: event,
+      timeline: timeline,
+    );
     if (bridgedInvite == null && event.text.contains('📅')) {
       // A calendar-looking body that did not parse. Kept quiet in release
       // builds by assert semantics being irrelevant here — this is a plain
@@ -251,7 +263,7 @@ WeftMessage? mapEvent(
         timestamp: event.originServerTs,
         kind: MessageKind.event,
         isOwn: event.senderId == ownUserId,
-        body: event.text,
+        body: display.text,
         redacted: event.redacted,
         deliveryState: _deliveryFor(event),
         calendarInvite: bridgedInvite,
@@ -676,6 +688,7 @@ final RegExp bridgedCalendarInvitePattern = RegExp(
 
 CalendarInvite? _bridgedCalendarInviteFrom(
   sdk.Event event, {
+  sdk.Event? relationsOf,
   sdk.Timeline? timeline,
 }) {
   // An event that still carries the custom key takes the native path.
@@ -696,11 +709,15 @@ CalendarInvite? _bridgedCalendarInviteFrom(
     title: match[1]!,
     start: start,
     end: null,
-    responses: _calendarResponsesFor(event, timeline: timeline),
+    responses: _calendarResponsesFor(relationsOf ?? event, timeline: timeline),
   );
 }
 
-CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
+CalendarInvite? _calendarInviteFrom(
+  sdk.Event event, {
+  sdk.Event? relationsOf,
+  sdk.Timeline? timeline,
+}) {
   final block = event.content[kCalendarInviteKey];
   if (block is! Map) return null;
   final uid = block['uid'];
@@ -713,7 +730,8 @@ CalendarInvite? _calendarInviteFrom(sdk.Event event, {sdk.Timeline? timeline}) {
     title: title,
     start: start.toLocal(),
     end: DateTime.tryParse(block['end'] as String? ?? '')?.toLocal(),
-    responses: _calendarResponsesFor(event, timeline: timeline),
+    // Answers reference the *original* event id, edits notwithstanding.
+    responses: _calendarResponsesFor(relationsOf ?? event, timeline: timeline),
   );
 }
 

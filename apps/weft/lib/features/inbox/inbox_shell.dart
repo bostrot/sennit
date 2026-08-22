@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -5,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/labels.dart';
+import '../../services/contacts/device_contacts.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../../app/providers.dart';
 import '../../app/shortcuts.dart';
@@ -28,6 +31,8 @@ class InboxShell extends ConsumerWidget {
     // Not used here — *held* here: the scheduler's timer only runs while
     // something watches it, and the shell is alive as long as the app is.
     ref.watch(messageSchedulerProvider);
+    // Same shape: keeps address-book names applied while the app shows chats.
+    ref.watch(contactNamesSyncProvider);
     final filter = ref.watch(networkFilterProvider);
     final unread = ref.watch(unreadByNetworkProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
@@ -441,6 +446,14 @@ class _InboxHeader extends ConsumerWidget {
                 onSelected: (choice) {
                   final navigator = Navigator.of(context);
                   switch (choice) {
+                    case 'read_all':
+                      final repository = ref.read(chatRepositoryProvider);
+                      final unread = ref
+                          .read(visibleChatsProvider)
+                          .where((c) => c.unreadCount > 0);
+                      for (final chat in unread) {
+                        unawaited(repository.markRead(chat.id));
+                      }
                     case 'archived':
                       ref.read(showArchivedProvider.notifier).toggle();
                     case 'merge':
@@ -469,6 +482,10 @@ class _InboxHeader extends ConsumerWidget {
                 // "Keyboard shortcuts" — configuration now has a screen of
                 // its own with room to be grouped and explained.
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'read_all',
+                    child: Text('Mark all as read'),
+                  ),
                   PopupMenuItem(
                     value: 'archived',
                     // The one entry in this menu that is a *state* rather than

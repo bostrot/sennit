@@ -4,6 +4,8 @@
          is spent deliberately, behind the rationale sheet, because the system
          gives an app exactly one. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Only read when the user turns on "Use address book names". -->
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <!-- The default-SMS-app role. All four are declared together deliberately:
          Android decides whether Weft is even *eligible* for the role by looking
          for the whole set — the two receivers, the service and these

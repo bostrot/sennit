@@ -473,6 +473,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
         await _pickReaction(message);
       case MessageAction.copy:
         await _copy(message);
+      case MessageAction.selectText:
+        await _selectText(message);
+      case MessageAction.editInvite:
+        await _editInvite(message);
       case MessageAction.forward:
         // The share sheet the rest of the app already uses: forwarding is
         // choosing a conversation and sending, which is exactly what it does.
@@ -630,6 +634,84 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final text = messageDocument(message).plainText;
     await Clipboard.setData(ClipboardData(text: text));
     _showMessage('Copied to the clipboard.');
+  }
+
+  /// When the other side read [message] — set only on the newest own message,
+  /// which is the one place a "Seen" line carries information rather than
+  /// noise down the whole column.
+  DateTime? _seenAt(WeftMessage message) {
+    if (!message.isOwn) return null;
+    final newestOwn = _view.messages.where((m) => m.isOwn).firstOrNull;
+    if (newestOwn == null || newestOwn.eventId != message.eventId) return null;
+    for (final marker
+        in ref.read(chatRepositoryProvider).peerReadUpTo(_chatId)) {
+      if (marker.roomId != message.roomId) continue;
+      if (marker.eventId == message.eventId) return marker.at;
+      // The receipt names some other event; if that event sits at or after
+      // ours in the same room, ours has been read on the way.
+      final receipted = _view.messages
+          .where(
+            (m) => m.eventId == marker.eventId && m.roomId == marker.roomId,
+          )
+          .firstOrNull;
+      if (receipted != null &&
+          !receipted.timestamp.isBefore(message.timestamp)) {
+        return marker.at;
+      }
+    }
+    return null;
+  }
+
+  static String _seenLabel(DateTime at) {
+    final now = DateTime.now();
+    final sameDay =
+        at.year == now.year && at.month == now.month && at.day == now.day;
+    return sameDay
+        ? 'Seen at ${DateFormat.Hm().format(at)}'
+        : 'Seen ${DateFormat.MMMEd().add_Hm().format(at)}';
+  }
+
+  /// The message in a view where a *part* of it can be selected and copied —
+  /// long-press on the bubble acts on the whole message, so partial copy
+  /// lives here.
+  Future<void> _selectText(WeftMessage message) async {
+    final text = messageDocument(message).plainText;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select text'),
+        content: SingleChildScrollView(
+          child: SelectableText(text, style: context.text.bodyMedium),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Moves a calendar proposal the user already sent. The room sees an edit;
+  /// a bridged peer sees their app's own edited-message treatment.
+  Future<void> _editInvite(WeftMessage message) async {
+    final invite = message.calendarInvite;
+    if (invite == null) return;
+    final when = await _pickDateTime(context, from: invite.start);
+    if (when == null || !mounted) return;
+    final end = invite.end;
+    await _run(
+      () => ref
+          .read(chatRepositoryProvider)
+          .editCalendarInvite(
+            message.roomId,
+            message.eventId,
+            title: invite.title,
+            start: when,
+            end: end == null ? null : when.add(end.difference(invite.start)),
+          ),
+    );
   }
 
   Future<void> _delete(WeftMessage message) async {
@@ -946,6 +1028,22 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                           .inMinutes <
                                       5,
                             ),
+                            if (_seenAt(message) case final DateTime seen)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  top: 2,
+                                  end: WeftSpace.xs,
+                                ),
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerEnd,
+                                  child: Text(
+                                    _seenLabel(seen),
+                                    style: context.text.labelSmall?.copyWith(
+                                      color: context.colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         );
                       },
