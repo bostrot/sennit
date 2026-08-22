@@ -3493,6 +3493,13 @@ class _CalendarInviteContent extends StatelessWidget {
               if (onEditTime != null)
                 OutlinedButton.icon(
                   onPressed: onEditTime,
+                  // Explicit ink: the theme's outlined-button colours are
+                  // picked for the surface, and on the sender's filled bubble
+                  // they vanished into it — a pill with no visible label.
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: onBubble,
+                    side: BorderSide(color: onBubble.withValues(alpha: 0.55)),
+                  ),
                   icon: const Icon(Icons.edit_calendar_rounded, size: 16),
                   label: const Text('Change time'),
                 ),
@@ -3510,6 +3517,10 @@ class _CalendarInviteContent extends StatelessWidget {
                   onPressed: () => onRespond!(
                     CalendarReply.accepted,
                     response.proposedStart,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: onBubble,
+                    side: BorderSide(color: onBubble.withValues(alpha: 0.55)),
                   ),
                   icon: const Icon(Icons.update_rounded, size: 16),
                   label: Text(

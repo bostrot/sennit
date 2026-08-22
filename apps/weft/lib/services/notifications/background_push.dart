@@ -6,12 +6,14 @@ import 'dart:ui' show DartPluginRegistrant;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:unifiedpush/unifiedpush.dart';
+import 'package:weft_domain/weft_domain.dart' show Chat;
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/stores.dart';
 import '../../data/matrix_chat_repository.dart';
+import '../status/status_feed.dart' show isStatusBroadcastChat;
 import 'notification_service.dart';
 
 /// The headless half of push.
@@ -95,9 +97,16 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
       store: stores.identity,
       settings: stores.settings,
     );
+    // Same rule as the foreground pipeline: a status broadcast never buzzes.
+    Chat? chatForRoom(String roomId) {
+      final chat = repository.chatForRoom(roomId);
+      if (chat == null || isStatusBroadcastChat(chat)) return null;
+      return chat;
+    }
+
     final pipeline = MatrixNotificationPipeline(
       session: MatrixNotificationSession.forClient(session.client),
-      chatForRoom: repository.chatForRoom,
+      chatForRoom: chatForRoom,
       policy: () => NotificationPolicy.fromJson(
         stores.settings.getJson(WeftSettings.notifyPolicy),
       ),
@@ -105,7 +114,7 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
     final service = WeftNotificationService(
       sink: LocalNotificationSink(),
       pipeline: pipeline,
-      chatForRoom: repository.chatForRoom,
+      chatForRoom: chatForRoom,
     );
     await service.start();
     return service;

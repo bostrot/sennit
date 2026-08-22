@@ -148,6 +148,11 @@ abstract final class WeftSettings {
   /// embedding model — which is why it may default on.
   static const String agendaDetect = 'agenda.detect';
 
+  /// Whether the first-start setup flow has run. It runs once per install —
+  /// including once on the update that introduced it, which is deliberate:
+  /// existing installs get the same defaults offered the same way.
+  static const String onboardingDone = 'onboarding.done';
+
   /// Whether people are named from the device address book when a phone
   /// number matches, instead of whatever the network calls them. Off by
   /// default: reading contacts is a permission the user grants knowingly.

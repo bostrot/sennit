@@ -81,10 +81,19 @@ final hiddenStatusSendersProvider =
 final statusChatProvider = Provider<Chat?>((ref) {
   final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
   for (final chat in chats) {
-    if (chat.title.toLowerCase().contains('status broadcast')) return chat;
+    if (isStatusBroadcastChat(chat)) return chat;
   }
   return null;
 });
+
+/// Whether [chat] is a bridge's status broadcast conversation.
+///
+/// One predicate for every consumer — the feed, the inbox filter, and the
+/// notification path, which must *never* notify for a status: statuses are
+/// ambient by design, and a phone that buzzes for every contact's story is a
+/// phone whose notifications stop being read.
+bool isStatusBroadcastChat(Chat chat) =>
+    chat.title.toLowerCase().contains('status broadcast');
 
 /// The ring row's content: recent statuses, grouped per contact.
 final statusFeedProvider = FutureProvider<List<StatusEntry>>((ref) async {

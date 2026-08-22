@@ -11,6 +11,7 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/smart_replies.dart';
+import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/push_registration.dart';
 import 'providers.dart';
@@ -147,11 +148,20 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   if (!session.isInitialized) return null;
 
   final repository = ref.watch(chatRepositoryProvider);
+  // Statuses are ambient: a story must never buzz, whatever mode the ring
+  // row is in. Resolving the broadcast room to "no chat" is how the pipeline
+  // drops its messages without a special case inside it.
+  Chat? chatForRoom(String roomId) {
+    final chat = repository.chatForRoom(roomId);
+    if (chat == null || isStatusBroadcastChat(chat)) return null;
+    return chat;
+  }
+
   final pipeline = MatrixNotificationPipeline(
     session: MatrixNotificationSession.forClient(session.client),
     // Injected, never derived: the merge fold lives in the repository and a
     // second answer here would split a merged contact into two threads.
-    chatForRoom: repository.chatForRoom,
+    chatForRoom: chatForRoom,
     // A function rather than a value — a mute applied from the notification
     // shade must affect the next message, not the next launch.
     policy: () => ref.read(notificationPolicyProvider),
@@ -160,7 +170,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   final service = WeftNotificationService(
     sink: ref.watch(notificationSinkProvider),
     pipeline: pipeline,
-    chatForRoom: repository.chatForRoom,
+    chatForRoom: chatForRoom,
     avatarLoader: await ref.watch(avatarFileLoaderProvider.future),
     push: await ref.watch(pushTransportProvider.future),
   );
@@ -177,7 +187,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       return const [];
     }
     final settings = stores.settings;
-    if (!settings.getBool(WeftSettings.notifySmartReplies)) {
+    if (!settings.getBool(WeftSettings.notifySmartReplies, fallback: true)) {
       debugPrint('weft: smart replies: the setting is off');
       return const [];
     }

@@ -812,7 +812,9 @@ class _SmartRepliesTile extends ConsumerWidget {
             .trim()
             .isNotEmpty &&
         (settings?.getString(WeftSettings.llmModel) ?? '').trim().isNotEmpty;
-    final enabled = settings?.getBool(WeftSettings.notifySmartReplies) ?? false;
+    final enabled =
+        settings?.getBool(WeftSettings.notifySmartReplies, fallback: true) ??
+        false;
 
     return SwitchListTile(
       title: const Text('AI reply suggestions'),

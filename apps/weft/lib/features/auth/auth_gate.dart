@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_store/weft_store.dart' show SettingsStore, WeftSettings;
 
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../inbox/inbox_shell.dart';
 import 'login_screen.dart';
+import 'setup_screen.dart';
 import 'verification_screen.dart';
 
 /// Chooses the screen for the current session state.
@@ -23,6 +25,28 @@ class AuthGate extends ConsumerStatefulWidget {
 
 class _AuthGateState extends ConsumerState<AuthGate> {
   bool _verificationDismissed = false;
+
+  SettingsStore? get _settings {
+    try {
+      return ref.read(storesProvider).settings;
+    } on Object {
+      return null;
+    }
+  }
+
+  bool get _setupDone {
+    if (kDemoMode) return true;
+    final settings = _settings;
+    // Stores not up yet: claim done rather than flashing setup on the way
+    // to the splash — the gate rebuilds when they open.
+    if (settings == null) return true;
+    return settings.getBool(WeftSettings.onboardingDone);
+  }
+
+  void _finishSetup() {
+    _settings?.setBool(WeftSettings.onboardingDone, value: true);
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +88,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           key: const ValueKey('verify'),
           onContinue: () => setState(() => _verificationDismissed = true),
         ),
+      _ when !_setupDone => SetupScreen(
+        key: const ValueKey('setup'),
+        onDone: _finishSetup,
+      ),
       _ => const InboxShell(key: ValueKey('inbox')),
     };
   }

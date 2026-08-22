@@ -123,6 +123,10 @@ class NotificationContent {
       senderName: disambiguatedSenderName(
         message,
         withNetwork: disambiguateSender ?? chat.isMerged,
+        // In a DM the chat title is the person, already resolved through
+        // handles and the address book — the rescue for a bridge ghost whose
+        // profile never backfilled and whose "name" is a raw identifier.
+        fallbackName: chat.isGroup ? null : chat.title,
       ),
       senderAvatarUrl:
           senderAvatarUrl ?? (chat.isGroup ? null : chat.avatarUrl),
@@ -404,10 +408,32 @@ NotificationSummary? summarise(
 String disambiguatedSenderName(
   WeftMessage message, {
   required bool withNetwork,
+  String? fallbackName,
 }) {
-  final name = message.senderName.trim();
+  var name = message.senderName.trim();
+  // "Whatsapp Lid-135575105487050" is a bridge ghost's raw identifier worn
+  // as a display name — WhatsApp's hidden-number ids and Signal's UUIDs both
+  // reach here when the ghost's profile has not backfilled. A caller who
+  // knows who the conversation is *with* supplies that instead.
+  if (looksLikeRawBridgeIdentifier(name)) {
+    final fallback = fallbackName?.trim() ?? '';
+    if (fallback.isNotEmpty && !looksLikeRawBridgeIdentifier(fallback)) {
+      name = fallback;
+    }
+  }
   if (name.isEmpty) return message.network.label;
   return withNetwork ? '$name (${message.network.label})' : name;
+}
+
+/// Whether [name] is a machine identifier rather than something a person is
+/// called: a long digit run (phone numbers, WhatsApp LIDs) or a UUID chunk.
+/// Deliberately conservative — a false positive here renames a real person.
+bool looksLikeRawBridgeIdentifier(String name) {
+  if (RegExp(r'\d{7,}').hasMatch(name)) return true;
+  return RegExp(
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}',
+    caseSensitive: false,
+  ).hasMatch(name);
 }
 
 /// The text of a notification for [message].
