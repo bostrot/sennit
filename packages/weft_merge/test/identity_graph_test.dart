@@ -277,23 +277,20 @@ void main() {
       expect(graph.contacts(), hasLength(2));
     });
 
-    test('when opted in, merges identity signals but not soft ones', () {
+    test('when opted in, merges only cross-network identical names', () {
       final graph = IdentityGraph(
         handles: [
-          handle('a', ChatNetwork.whatsapp, phone: '+4915112345678'),
-          handle('b', ChatNetwork.signal, phone: '+4915112345678'),
-          handle(
-            'c',
-            ChatNetwork.telegram,
-            displayName: 'Michael Johnson',
-            avatarDHash: 0x0F0F0F0F0F0F0F0F,
-          ),
-          handle(
-            'd',
-            ChatNetwork.discord,
-            displayName: 'Michael Johnsen',
-            avatarDHash: 0x0F0F0F0F0F0F0F0F,
-          ),
+          // The one shape that merges unattended: the same substantial name
+          // on two different messengers.
+          handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+          handle('b', ChatNetwork.signal, displayName: 'Joanne Trenkel'),
+          // A shared phone still only *suggests*: shared devices and family
+          // numbers are real.
+          handle('c', ChatNetwork.telegram, phone: '+4915112345678'),
+          handle('d', ChatNetwork.discord, phone: '+4915112345678'),
+          // Nearly identical is not identical.
+          handle('e', ChatNetwork.telegram, displayName: 'Michael Johnson'),
+          handle('f', ChatNetwork.discord, displayName: 'Michael Johnsen'),
         ],
         scorer: const MergeScorer(
           config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
@@ -308,8 +305,31 @@ void main() {
       expect(
         graph.contactIdOf('c'),
         isNot(graph.contactIdOf('d')),
-        reason: 'name + avatar is not strong enough to merge unattended',
+        reason: 'a shared number is a suggestion, never an unattended merge',
       );
+      expect(
+        graph.contactIdOf('e'),
+        isNot(graph.contactIdOf('f')),
+        reason: 'a similar name is a suggestion, never an unattended merge',
+      );
+    });
+
+    test('the same name on the same network never merges or suggests', () {
+      // Two colleagues named alike on one messenger are two people; a
+      // bridge gives one person exactly one handle per network.
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Anna Schmidt'),
+          handle('b', ChatNetwork.whatsapp, displayName: 'Anna Schmidt'),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      expect(graph.applyAutoMerges(), isEmpty);
+      expect(graph.suggestions(), isEmpty);
     });
   });
 }

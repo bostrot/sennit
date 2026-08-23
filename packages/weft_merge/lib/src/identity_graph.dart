@@ -179,13 +179,14 @@ class IdentityGraph {
     );
   }
 
-  /// Auto-merges candidates carrying a standalone identity signal, when the
+  /// Auto-merges the pairs [MergeCandidate.qualifiesForAutoMerge] accepts —
+  /// identical substantial name, different networks, one-to-one — when the
   /// user has opted in. Returns the pairs actually merged.
   List<MergeCandidate> applyAutoMerges({DateTime? now}) {
     if (!_scorer.config.autoMergeOnIdentitySignal) return const [];
     final applied = <MergeCandidate>[];
     for (final c in suggestions()) {
-      if (!c.hasIdentitySignal) continue;
+      if (!c.qualifiesForAutoMerge) continue;
       merge(c.a.id, c.b.id, source: MergeDecisionSource.auto, now: now);
       applied.add(c);
     }

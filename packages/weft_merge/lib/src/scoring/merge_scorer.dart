@@ -53,11 +53,18 @@ class MergeCandidate {
   /// Contributing signals, strongest first.
   final List<MergeSignal> signals;
 
-  /// True when at least one signal is strong enough to stand alone. Only these
-  /// are eligible for auto-merge, and only when the user has opted in.
+  /// True when at least one signal is strong enough to stand alone.
   bool get hasIdentitySignal => signals.any(
     (s) => s == MergeSignal.phoneExact || s == MergeSignal.emailExact,
   );
+
+  /// Whether this pair merges without asking: a one-to-one conversation
+  /// (handles only ever describe DM peers), the identical substantial name,
+  /// and two *different* messengers. Nothing else auto-merges — a phone or
+  /// email match still only suggests, because those can be shared devices
+  /// and family addresses.
+  bool get qualifiesForAutoMerge =>
+      a.network != b.network && signals.contains(MergeSignal.nameExact);
 
   String get explanation => signals.map((s) => s.explanation).join(' · ');
 
@@ -88,8 +95,9 @@ class MergeScoringConfig {
   /// Maximum avatar Hamming distance for [MergeSignal.avatarSimilar].
   final int avatarHammingThreshold;
 
-  /// When true, a phone- or email-exact match merges without asking. Off by
-  /// default: a wrong merge silently mixes two people's conversations.
+  /// When true, [MergeCandidate.qualifiesForAutoMerge] pairs — identical
+  /// substantial name, different networks, one-to-one — merge without
+  /// asking. Everything else stays a suggestion.
   final bool autoMergeOnIdentitySignal;
 
   /// Country calling code (no `+`) used to interpret national-format numbers.
@@ -137,7 +145,10 @@ class MergeScorer {
 
     final nameA = a.displayName == null ? '' : normalizeName(a.displayName!);
     final nameB = b.displayName == null ? '' : normalizeName(b.displayName!);
-    if (nameA.isNotEmpty && nameB.isNotEmpty) {
+    // Names are only evidence *across* networks: two same-network handles
+    // with one name are usually two people who share it, not one person
+    // twice — a bridge gives each person exactly one handle per network.
+    if (a.network != b.network && nameA.isNotEmpty && nameB.isNotEmpty) {
       // A bare first name is far too common to be evidence on its own; only
       // a name with more than one part counts.
       final substantial = nameA.contains(' ') || nameB.contains(' ');

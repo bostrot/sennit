@@ -56,6 +56,25 @@ class MatrixChatRepository implements ChatRepository {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     _graph = IdentityGraph(
+      // The scorer reads its two knobs from settings: the country code that
+      // makes national numbers comparable, and whether same-name pairs merge
+      // on their own. Auto-merge defaults on — its rule is narrow enough to
+      // trust (identical substantial name, different networks, one-to-one)
+      // and it is what makes a fresh login fold a person's three apps into
+      // one conversation without a tour through the merge screen.
+      scorer: MergeScorer(
+        config: MergeScoringConfig(
+          autoMergeOnIdentitySignal:
+              _settings?.getBool(
+                WeftSettings.autoMergeOnIdentitySignal,
+                fallback: true,
+              ) ??
+              true,
+          defaultCountryCode: _settings?.getString(
+            WeftSettings.defaultCountryCode,
+          ),
+        ),
+      ),
       handles: _store?.loadHandles() ?? const [],
       decisions: [
         for (final d in _store?.loadDecisions() ?? const <StoredDecision>[])
@@ -1402,6 +1421,7 @@ class MatrixChatRepository implements ChatRepository {
 
   void _rebuild() {
     _refreshIdentityGraph();
+    _applyAutoMerges();
 
     final service = <String>{};
     final byRoom = <String, Chat>{};
@@ -1451,6 +1471,23 @@ class MatrixChatRepository implements ChatRepository {
   /// is — bridge portals usually never enter `m.direct`, and skipping them
   /// here is why a WhatsApp chat and an SMS thread with the same person on
   /// them could not be offered as a merge at all.
+  /// Runs the narrow auto-merge after a handle refresh and persists what it
+  /// did, so the fold survives a restart exactly like a tapped merge — and
+  /// an unmerge stays sticky, because the graph records the user's verdict
+  /// and [IdentityGraph.suggestions] never re-offers a ruled pair.
+  void _applyAutoMerges() {
+    final applied = _graph.applyAutoMerges();
+    if (applied.isEmpty) return;
+    for (final candidate in applied) {
+      debugPrint(
+        'weft: auto-merged ${candidate.a.displayName} '
+        '(${candidate.a.network.id} + ${candidate.b.network.id})',
+      );
+    }
+    _invalidateTimelines();
+    _persistGraph();
+  }
+
   void _refreshIdentityGraph() {
     for (final room in _client.rooms) {
       if (room.isSpace) continue;
