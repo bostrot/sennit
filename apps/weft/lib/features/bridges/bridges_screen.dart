@@ -69,6 +69,17 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     _bridges = _loadBridges(ref.read(storesProvider).settings);
     _detect();
     _probeAll();
+    // Detection walks the *local* room list, and right after a cold start
+    // that list is still loading. One early call used to be the only call —
+    // open Bridges in the first seconds of a fresh install and every bridge
+    // read as absent until the screen was reopened. The inbox heartbeat
+    // re-runs it until the rooms are there.
+    ref.listenManual(chatsProvider, (_, _) {
+      if (!mounted) return;
+      final before = _detected.length;
+      _detect();
+      if (_detected.length != before) setState(() {});
+    });
   }
 
   /// What the server already runs, from m.bridge state in joined rooms.
@@ -79,6 +90,8 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
       _detected = detectBridges(session.client);
     } on StateError {
       // Demo mode has no session; the detected section simply stays empty.
+    } on Object {
+      // A half-loaded room mid-sync; the next heartbeat retries.
     }
   }
 
