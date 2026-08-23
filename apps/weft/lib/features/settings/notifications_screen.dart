@@ -824,7 +824,8 @@ class _SmartRepliesTile extends ConsumerWidget {
                   'written by your configured LLM. The message text is sent '
                   'to that endpoint.'
             : 'Needs an LLM endpoint under Settings → Endpoints → '
-                  'AI assistant first.',
+                  'AI assistant first — an Ollama on your own server '
+                  'works, and keeps message text on your network.',
       ),
       value: enabled && configured,
       onChanged: !configured || settings == null

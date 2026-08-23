@@ -231,10 +231,11 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
           SettingsSectionHeader(
             title: 'AI assistant (LLM)',
             subtitle:
-                'An OpenAI-compatible chat endpoint — a local Ollama works. '
-                'Features that use it, like reply suggestions in '
-                'notifications, have their own switches and stay off until '
-                'you turn them on.',
+                'Any OpenAI-compatible chat endpoint. Point it at an Ollama '
+                'or llama.cpp server on your own machine and message text '
+                'never leaves your network — the same self-hosted rule as '
+                'transcription and search above. Powers reply suggestions '
+                'in notifications.',
           ),
           _field(_llmUrl, 'Base URL', hint: 'http://localhost:11434/v1'),
           _field(_llmModel, 'Model', hint: 'llama3.2'),
