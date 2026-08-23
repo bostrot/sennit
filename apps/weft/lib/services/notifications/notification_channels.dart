@@ -106,20 +106,17 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 List<AndroidNotificationAction> weftAndroidMessageActions({
   List<String> aiReplies = const [],
 }) => [
-  // The one-tap AI answers, first so they sit where a thumb lands. Their id
-  // is an index; the text itself rides the payload, which is what makes the
-  // tap answerable in a process that has restarted since posting.
-  for (var i = 0; i < aiReplies.length; i++)
-    AndroidNotificationAction(
-      '${WeftNotificationActions.aiReplyPrefix}$i',
-      aiReplies[i],
-      showsUserInterface: true,
-      cancelNotification: false,
-    ),
   AndroidNotificationAction(
     WeftNotificationActions.reply,
     'Reply',
-    inputs: const [AndroidNotificationActionInput(label: 'Message')],
+    // The AI answers ride the reply input as *choices*: Android renders
+    // them as tappable chips above the action row — the smart-reply look —
+    // and a tapped chip arrives as ordinary reply text through the same
+    // handler typed replies use. Chips instead of extra actions, because
+    // three actions is all Android shows and Mark read is worth keeping.
+    inputs: [
+      AndroidNotificationActionInput(label: 'Message', choices: aiReplies),
+    ],
     // What tells Android Auto, Wear and the launcher's bubble that this is
     // *the* reply action rather than a button that happens to be first.
     semanticAction: SemanticAction.reply,
