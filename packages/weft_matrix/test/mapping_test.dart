@@ -52,6 +52,29 @@ void main() {
   });
 
   group('networkFromBridgeStateContent', () {
+    test('a repository-URL protocol id falls through to what resolves', () {
+      // bostrot/mautrix-mattermost stamps its id as the repo URL; the id
+      // itself resolves once the path is split, and even if it did not, the
+      // displayname and bridgebot beside it must get their turn.
+      expect(
+        networkFromBridgeStateContent({
+          'protocol': {
+            'id': 'github.com/bostrot/mautrix-mattermost',
+            'displayname': 'Mattermost',
+          },
+          'bridgebot': '@mattermostbot:example.org',
+        }),
+        ChatNetwork.mattermost,
+      );
+      expect(
+        networkFromBridgeStateContent({
+          'protocol': {'id': 'urn:something:nobody-knows'},
+          'bridgebot': '@signalbot:example.org',
+        }),
+        ChatNetwork.signal,
+      );
+    });
+
     test('reads the MSC2346 protocol object', () {
       expect(
         networkFromBridgeStateContent({

@@ -14,14 +14,24 @@ const List<String> bridgeStateEventTypes = ['m.bridge', 'uk.half-shot.bridge'];
 ChatNetwork networkFromBridgeStateContent(Map<String, Object?>? content) {
   if (content == null) return ChatNetwork.unknown;
 
+  // Every spelling the event carries, tried until one resolves: an id that
+  // is a repository URL — "github.com/bostrot/mautrix-mattermost" is real —
+  // must not eclipse the displayname and bridgebot sitting beside it.
   final protocol = content['protocol'];
-  if (protocol is String) return ChatNetwork.fromBridgeProtocol(protocol);
-  if (protocol is Map) {
-    final id = protocol['id'] ?? protocol['displayname'];
-    if (id is String) return ChatNetwork.fromBridgeProtocol(id);
+  final candidates = <String>[
+    if (protocol is String) protocol,
+    if (protocol is Map) ...[
+      if (protocol['id'] is String) protocol['id'] as String,
+      if (protocol['displayname'] is String)
+        protocol['displayname'] as String,
+    ],
+  ];
+  for (final candidate in candidates) {
+    final network = ChatNetwork.fromBridgeProtocol(candidate);
+    if (network != ChatNetwork.unknown) return network;
   }
 
-  // Older bridges only set the bridgebot; its localpart still names the network.
+  // The bridgebot's localpart still names the network.
   final bridgebot = content['bridgebot'];
   if (bridgebot is String) return networkFromBridgeBotId(bridgebot);
 
