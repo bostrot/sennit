@@ -73,13 +73,21 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     // that list is still loading. One early call used to be the only call —
     // open Bridges in the first seconds of a fresh install and every bridge
     // read as absent until the screen was reopened. The inbox heartbeat
-    // re-runs it until the rooms are there.
-    ref.listenManual(chatsProvider, (_, _) {
-      if (!mounted) return;
-      final before = _detected.length;
-      _detect();
-      if (_detected.length != before) setState(() {});
-    });
+    // re-runs it until the rooms are there. Only with a live session: a
+    // widget test (and demo mode) pumps this screen without one, and the
+    // heartbeat provider cannot even be built then.
+    try {
+      if (ref.read(matrixSessionProvider).isInitialized) {
+        ref.listenManual(chatsProvider, (_, _) {
+          if (!mounted) return;
+          final before = _detected.length;
+          _detect();
+          if (_detected.length != before) setState(() {});
+        });
+      }
+    } on Object {
+      // No heartbeat, no retries — the single detect above already ran.
+    }
   }
 
   /// What the server already runs, from m.bridge state in joined rooms.
