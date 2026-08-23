@@ -266,6 +266,34 @@ final showArchivedProvider = NotifierProvider<ShowArchivedNotifier, bool>(
   ShowArchivedNotifier.new,
 );
 
+/// Networks kept out of the "All" view; the rail is their only door.
+class HiddenFromAllNotifier extends Notifier<Set<ChatNetwork>> {
+  @override
+  Set<ChatNetwork> build() {
+    final json = storesOrNull(
+      ref,
+    )?.settings.getJson(WeftSettings.inboxHiddenFromAll);
+    final list = json?['networks'];
+    if (list is! List) return const {};
+    return {for (final id in list.whereType<String>()) ChatNetwork.fromId(id)}
+      ..remove(ChatNetwork.unknown);
+  }
+
+  void toggle(ChatNetwork network) {
+    final next = {...state};
+    if (!next.remove(network)) next.add(network);
+    state = next;
+    storesOrNull(ref)?.settings.setJson(WeftSettings.inboxHiddenFromAll, {
+      'networks': [for (final n in next) n.id]..sort(),
+    });
+  }
+}
+
+final hiddenFromAllProvider =
+    NotifierProvider<HiddenFromAllNotifier, Set<ChatNetwork>>(
+      HiddenFromAllNotifier.new,
+    );
+
 /// One-tap slices of the inbox: just what's unread, just the groups, just
 /// the one-on-ones. A second tap on the active chip turns it back off.
 enum InboxQuickFilter { unread, groups, people }
@@ -303,6 +331,12 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
       ? null
       : ref.watch(statusChatProvider)?.id;
   final quick = ref.watch(inboxQuickFilterProvider);
+  // A network hidden from "All" only appears when the rail filter names it
+  // (alone or with others) — the combined view stays clean, the door stays
+  // one tap away. A merged chat with any visible leg is not hidden: hiding
+  // a whole person because one of their networks is tucked away would be
+  // the wrong reading of the setting.
+  final hiddenFromAll = ref.watch(hiddenFromAllProvider);
   final filtered = filterChats(
     chats
         .where(
@@ -311,6 +345,10 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
               !service.contains(c.id) &&
               c.id != statusChatId &&
               (label == null || labels.ofChat(c.id).contains(label)) &&
+              (filter.isNotEmpty ||
+                  hiddenFromAll.isEmpty ||
+                  c.networks.isEmpty ||
+                  !c.networks.every(hiddenFromAll.contains)) &&
               switch (quick) {
                 null => true,
                 InboxQuickFilter.unread => c.unreadCount > 0,

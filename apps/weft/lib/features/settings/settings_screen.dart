@@ -5,7 +5,10 @@ import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_store/weft_store.dart';
 
+import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
+
 import '../../app/a11y.dart';
+import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
@@ -146,6 +149,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => push(const ModelsScreen()),
           ),
           const _AgendaToggle(),
+          const _HiddenNetworksSection(),
 
           header('Privacy & security'),
           const _ReadReceiptsToggle(),
@@ -227,6 +231,49 @@ class _ReadReceiptsToggle extends ConsumerWidget {
         stores.settings.setBool(WeftSettings.sendReadReceipts, value: value);
         ref.read(settingsRevisionProvider.notifier).bump();
       },
+    );
+  }
+}
+
+/// Per-network "keep out of All" switches.
+///
+/// A work bridge that should not mingle with private conversations: its
+/// chats leave the combined view and the network's spot in the rail becomes
+/// the one door to them. Unread badges on the rail still count them — hidden
+/// is not muted.
+class _HiddenNetworksSection extends ConsumerWidget {
+  const _HiddenNetworksSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<ChatNetwork> networks;
+    try {
+      networks = ref.watch(chatRepositoryProvider).availableNetworks;
+    } on Object {
+      return const SizedBox.shrink();
+    }
+    if (networks.isEmpty) return const SizedBox.shrink();
+    final hidden = ref.watch(hiddenFromAllProvider);
+
+    return ExpansionTile(
+      leading: const Icon(Icons.visibility_off_outlined),
+      title: const Text('Hide networks from All'),
+      subtitle: Text(
+        hidden.isEmpty
+            ? 'Every network shows in the combined inbox'
+            : 'Hidden: ${hidden.map((n) => n.label).join(', ')} — tap the '
+                  'network in the rail to see its chats',
+      ),
+      children: [
+        for (final network in networks)
+          SwitchListTile(
+            dense: true,
+            title: Text('Show ${network.label} in All'),
+            value: !hidden.contains(network),
+            onChanged: (_) =>
+                ref.read(hiddenFromAllProvider.notifier).toggle(network),
+          ),
+      ],
     );
   }
 }

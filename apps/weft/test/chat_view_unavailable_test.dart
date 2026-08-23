@@ -16,6 +16,9 @@ import 'package:weft_merge/weft_merge.dart';
 /// rooms, standing in for a room the account has since left.
 class _NoRoomsRepository implements ChatRepository {
   @override
+  Future<void> markUnread(String chatId) async {}
+
+  @override
   Future<String?> createDirectChat(String matrixUserId) async => null;
 
   @override

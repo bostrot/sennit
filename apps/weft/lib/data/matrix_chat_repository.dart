@@ -1279,6 +1279,25 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> markUnread(String chatId) async {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return;
+    for (final source in chat.sources) {
+      if (source.network == ChatNetwork.sms) continue;
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      // The optimistic receipt would zero the badge right back out.
+      _readUpTo.remove(room.id);
+      try {
+        await room.markUnread(true);
+      } on Object catch (error) {
+        debugPrint('weft: ${source.roomId} could not be marked unread: $error');
+      }
+    }
+    _scheduleRebuild();
+  }
+
+  @override
   Future<void> markRead(String chatId) async {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return;
@@ -1298,6 +1317,14 @@ class MatrixChatRepository implements ChatRepository {
       // and a merged chat summing three legs' stale server counts read as
       // "7 unread" for one new message until every receipt landed.
       _readUpTo[room.id] = lastEvent.eventId;
+      // Opening is the one thing that clears a deliberate unread flag.
+      if (room.markedUnread) {
+        try {
+          await room.markUnread(false);
+        } on Object catch (error) {
+          debugPrint('weft: unread flag stuck on ${room.id}: $error');
+        }
+      }
       // `public: false` sends only the private receipt: this account's other
       // devices still clear the unread badge, but the sender is not told.
       // Bridges relay the public receipt to the remote network as its native
@@ -1680,7 +1707,11 @@ class MatrixChatRepository implements ChatRepository {
       lastMessage: lastEvent == null
           ? null
           : mapEvent(lastEvent, network: network, ownUserId: _client.userID),
-      unreadCount: _readUpTo[room.id] == lastEvent?.eventId
+      // The marked-unread flag keeps at least a badge of one; otherwise the
+      // receipt we just wrote beats the server's stale count.
+      unreadCount: room.markedUnread
+          ? (room.notificationCount > 0 ? room.notificationCount : 1)
+          : _readUpTo[room.id] == lastEvent?.eventId
           ? 0
           : room.notificationCount,
       // A resolved peer means "conversation with a person", whatever the

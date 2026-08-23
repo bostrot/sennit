@@ -325,6 +325,11 @@ class _SelectionBar extends ConsumerWidget {
                       onPressed: () => _apply(ref, repository.markRead),
                     ),
                     IconButton(
+                      tooltip: 'Mark unread',
+                      icon: const Icon(Icons.mark_email_unread_outlined),
+                      onPressed: () => _apply(ref, repository.markUnread),
+                    ),
+                    IconButton(
                       tooltip: 'Mute',
                       icon: const Icon(Icons.notifications_off_outlined),
                       onPressed: () => _apply(

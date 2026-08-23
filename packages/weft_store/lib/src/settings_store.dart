@@ -148,6 +148,12 @@ abstract final class WeftSettings {
   /// embedding model — which is why it may default on.
   static const String agendaDetect = 'agenda.detect';
 
+  /// Networks whose chats stay out of the combined "All" inbox, as a JSON
+  /// list of ids under `networks`. Tapping the network in the rail is the
+  /// way in — a work bridge that should not mingle with private chats, most
+  /// of the time. Merged chats with a visible leg stay visible.
+  static const String inboxHiddenFromAll = 'inbox.hidden_from_all';
+
   /// Whether the first-start setup flow has run. It runs once per install —
   /// including once on the update that introduced it, which is deliberate:
   /// existing installs get the same defaults offered the same way.

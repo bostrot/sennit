@@ -32,6 +32,9 @@ class RecordedCall {
 /// would then be asserting its own arithmetic.
 class RecordingChatRepository implements ChatRepository {
   @override
+  Future<void> markUnread(String chatId) async {}
+
+  @override
   Future<String?> createDirectChat(String matrixUserId) async => null;
 
   @override

@@ -232,6 +232,10 @@ abstract class ChatRepository {
 
   Future<void> markRead(String chatId);
 
+  /// Flags the conversation unread again (MSC2867), so it wears its badge
+  /// until it is actually opened. Opening — [markRead] — clears it.
+  Future<void> markUnread(String chatId) async {}
+
   /// Moves a chat out of the inbox without leaving the room.
   Future<void> setArchived(String chatId, {required bool archived});
 
