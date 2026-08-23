@@ -144,7 +144,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
                 'Every message action "Send to Home Assistant" fires a '
                 'weft_message event on your instance — automate anything '
                 'against it. For the other direction, point a rest_command at '
-                'Weft\'s MCP server and call its send_message tool.',
+                'Braid\'s MCP server and call its send_message tool.',
           ),
           _field(_haUrl, 'Base URL', hint: 'http://homeassistant.local:8123'),
           _field(

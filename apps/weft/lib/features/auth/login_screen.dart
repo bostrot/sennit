@@ -253,7 +253,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: WeftSpace.xl),
                 Text(
-                  'Weft connects to your own Matrix server. It never proxies '
+                  'Braid connects to your own Matrix server. It never '
+                  'proxies '
                   'your messages through anyone else.',
                   textAlign: TextAlign.center,
                   style: context.text.bodySmall?.copyWith(
@@ -276,26 +277,10 @@ class _Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 68,
-          height: 68,
-          decoration: BoxDecoration(
-            borderRadius: WeftRadius.allXl,
-            gradient: LinearGradient(
-              begin: AlignmentDirectional.topStart,
-              end: AlignmentDirectional.bottomEnd,
-              colors: [context.colors.primary, context.colors.tertiary],
-            ),
-          ),
-          child: Icon(
-            Icons.forum_rounded,
-            size: 32,
-            color: context.colors.onPrimary,
-          ),
-        ),
+        const BrandMark(size: 76),
         const SizedBox(height: WeftSpace.lg),
         Text(
-          'Weft',
+          'Braid',
           style: context.text.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: -1,

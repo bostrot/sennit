@@ -18,7 +18,7 @@ import '../../services/attachments/send_attachments.dart';
 import '../chat/attachment_preview_sheet.dart';
 import '../chat/send_network_chip.dart';
 
-/// "Share to Weft": pick the conversation the shared content goes to.
+/// "Share to Braid": pick the conversation the shared content goes to.
 ///
 /// Text and files take the same route out — `send` and
 /// `sendAttachment`, exactly as the composer calls them — so a share is the

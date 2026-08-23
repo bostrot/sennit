@@ -47,7 +47,7 @@ void _saveBridges(SettingsStore settings, List<_StoredBridge> bridges) {
 
 /// The user's bridges: health, logins, and the GUI login flow.
 ///
-/// Weft hosts nothing — every bridge here is one the user runs. A bridge is
+/// Braid hosts nothing — every bridge here is one the user runs. A bridge is
 /// added by its provisioning URL; everything else (which network it serves,
 /// which login methods it offers) is asked of the bridge itself.
 class BridgesScreen extends ConsumerStatefulWidget {

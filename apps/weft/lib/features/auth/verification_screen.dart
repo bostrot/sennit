@@ -166,7 +166,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                             'chats stop warning about it.'
                       : session.crossSigningExists
                       ? 'Confirm it is really you from a device you already '
-                            'use. Until you do, Weft cannot read messages sent '
+                            'use. Until you do, Braid cannot read messages sent '
                             'before this device signed in.'
                       : 'This is your first device. Setting up encryption now '
                             'means you can verify future devices and recover your '
@@ -373,7 +373,7 @@ class _Choice extends StatelessWidget {
             )
           else
             Text(
-              'This build of Weft cannot open a camera to read a code. Show '
+              'This build of Braid cannot open a camera to read a code. Show '
               'the code above on whichever device has one, or compare emoji '
               'instead — both end up in the same place.',
               textAlign: TextAlign.center,

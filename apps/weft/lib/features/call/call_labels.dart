@@ -101,7 +101,7 @@ String? formatCallDuration(Duration? duration) {
 String callStartFailureLabel(CallStartFailure failure) => switch (failure) {
   CallStartFailure.busy => 'You are already on a call.',
   CallStartFailure.mediaUnavailable =>
-    'Weft could not open your microphone or camera.',
+    'Braid could not open your microphone or camera.',
   CallStartFailure.signallingFailed => 'The call could not be sent.',
 };
 

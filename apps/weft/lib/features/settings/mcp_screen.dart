@@ -114,7 +114,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'This is the only time the key is shown. Weft stores only a '
+              'This is the only time the key is shown. Braid stores only a '
               'hash; if it is lost, revoke it and create a new one.',
             ),
             const SizedBox(height: WeftSpace.md),

@@ -64,7 +64,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
             ? const [
                 SettingsMessage(
                   message:
-                      'This device has no SMS. Weft carries SMS only on '
+                      'This device has no SMS. Braid carries SMS only on '
                       'Android, where the system can hand one app the '
                       'messaging role — everywhere else your conversations '
                       'arrive over Matrix and its bridges.',
@@ -83,7 +83,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
         message:
             'SMS is not encrypted. Every message you send this way is readable '
             'by your carrier, by the recipient\'s carrier, and by anyone who '
-            'can see either network — and Weft cannot change that, because '
+            'can see either network — and Braid cannot change that, because '
             'there is no encryption in SMS to switch on. It is here so one '
             'person\'s texts and their bridged chats can be one conversation, '
             'not because it is safe.',
@@ -104,7 +104,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
         // back with nothing. An inbox that has mysteriously lost its SMS is
         // worse than a sentence saying why.
         Text(
-          'Weft holds the role but not the SMS permissions, so no threads can '
+          'Braid holds the role but not the SMS permissions, so no threads can '
           'be read. Grant them in Android\'s app settings and check again.',
           style: context.text.bodySmall?.copyWith(color: context.colors.error),
         ),
@@ -118,7 +118,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
               'Android gives it all at once. The default app receives every '
               'incoming message, is the only app allowed to write to the '
               'phone\'s message store, and answers the "send a message" action '
-              'from your contacts and dialler. Weft writes what it receives '
+              'from your contacts and dialler. Braid writes what it receives '
               'and sends into that same store, so switching back to another '
               'app leaves your history where it was.',
         ),
@@ -127,7 +127,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton.icon(
             icon: const Icon(Icons.sms_outlined, size: 18),
-            label: const Text('Make Weft the SMS app'),
+            label: const Text('Make Braid the SMS app'),
             onPressed: _busy ? null : () => _request(repository),
           ),
         ),
@@ -136,7 +136,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
       if (_declined) ...[
         const SizedBox(height: WeftSpace.md),
         Text(
-          'Nothing changed. Weft is not your SMS app, the SMS network stays '
+          'Nothing changed. Braid is not your SMS app, the SMS network stays '
           'out of your inbox, and every other conversation works exactly as '
           'it did. You can come back here whenever you like.',
           style: context.text.bodySmall?.copyWith(
@@ -150,15 +150,15 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
   /// The sentence under the section header, which is the state in words.
   String _explain(SmsPlatformStatus status) => switch (status.availability) {
     SmsAvailability.ready =>
-      'Weft is your default messaging app. Texts arrive in the same inbox as '
+      'Braid is your default messaging app. Texts arrive in the same inbox as '
           'every bridged network, and a number that also has a WhatsApp or '
           'Signal chat can be merged with it.',
     SmsAvailability.notDefault when status.defaultPackage != null =>
       'Another app holds the role: ${status.defaultPackage}. Until that '
-          'changes, Weft cannot read or send texts and the SMS network is '
+          'changes, Braid cannot read or send texts and the SMS network is '
           'absent from your inbox.',
     SmsAvailability.notDefault =>
-      'Weft is not your messaging app, so the SMS network is absent from your '
+      'Braid is not your messaging app, so the SMS network is absent from your '
           'inbox. Everything else is unaffected.',
     SmsAvailability.unsupported =>
       'This device cannot hand out the messaging role — it has no telephony, '
@@ -211,9 +211,9 @@ class _StatusRow extends StatelessWidget {
     return Semantics(
       container: true,
       label: switch (status.availability) {
-        SmsAvailability.ready => 'SMS is on. Weft is your messaging app.',
+        SmsAvailability.ready => 'SMS is on. Braid is your messaging app.',
         SmsAvailability.notDefault =>
-          'SMS is off. Weft is not your messaging app.',
+          'SMS is off. Braid is not your messaging app.',
         SmsAvailability.unsupported => 'SMS is not available on this device.',
       },
       excludeSemantics: true,

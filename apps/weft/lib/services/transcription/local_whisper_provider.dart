@@ -14,7 +14,7 @@ import 'package:whisper_ggml/whisper_ggml.dart';
 ///
 /// Uses the package's lower-level [Whisper] rather than `WhisperController`:
 /// the controller insists on a `WhisperModel` enum and calls `initModel`,
-/// which consults *its own* download registry. Weft downloads its models
+/// which consults *its own* download registry. Braid downloads its models
 /// itself, so that registry is always empty and the controller would report a
 /// model this app had already installed as missing. [Whisper.transcribe]
 /// takes an explicit `modelPath`, which is the seam that makes our files

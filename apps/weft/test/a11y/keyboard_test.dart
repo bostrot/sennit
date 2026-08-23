@@ -325,7 +325,7 @@ void main() {
           },
           expectFired: (tester, container) => expect(
             FocusManager.instance.primaryFocus?.debugLabel,
-            'Weft composer',
+            'Braid composer',
           ),
         ),
         'Keyboard shortcuts': (
@@ -443,7 +443,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await press(tester, 'Write a message');
-      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Weft composer');
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Braid composer');
     });
   });
 
@@ -511,7 +511,7 @@ void main() {
       // Entering reply mode puts the caret in the composer, which is both the
       // obvious behaviour and what makes Escape reachable: it is bound inside
       // the conversation, so it only fires while the focus is in one.
-      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Weft composer');
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Braid composer');
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
@@ -559,7 +559,7 @@ void main() {
 
       expect(find.byType(SearchScreen), findsNothing);
       expect(find.text('New line'), findsNothing);
-      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Weft composer');
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Braid composer');
       final field = tester.widget<TextField>(find.byType(TextField));
       expect(field.controller!.text, 'draft');
     });

@@ -1,7 +1,7 @@
 /// Weft's localisation surface: the locales it declares, and what declaring
 /// them actually turns on.
 ///
-/// Weft ships **no translated strings**. Every user-facing word in the app is a
+/// Braid ships **no translated strings**. Every user-facing word in the app is a
 /// Dart literal, and extracting the ~400 of them into ARB files is a phase of
 /// its own. That is deliberately not what this file is for, and it is worth
 /// being precise about the difference, because a `supportedLocales` list is
@@ -9,7 +9,7 @@
 ///
 /// - Without it, `Directionality` resolves to left-to-right for *every* locale
 ///   the device can be set to. Switching a phone to Arabic changed nothing in
-///   Weft, and no amount of `EdgeInsetsDirectional` downstream would have made a
+///   Braid, and no amount of `EdgeInsetsDirectional` downstream would have made a
 ///   difference, because nothing was ever going to set the direction.
 /// - Without it, `Localizations.localeOf` is always `en_US`, so Material's own
 ///   strings — the back button's semantics label, the text selection menu, the
@@ -29,7 +29,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' show DateFormat, Intl;
 
-/// The locales Weft declares.
+/// The locales Braid declares.
 ///
 /// English first: it is both the fallback and the language the app's literals
 /// are written in, and `basicLocaleListResolution` returns the first entry when
@@ -58,7 +58,7 @@ const List<LocalizationsDelegate<dynamic>> weftLocalizationsDelegates = [
 
 /// Points `intl`'s date formatting at [locale], when it has data for it.
 ///
-/// Every `DateFormat` in Weft is constructed without a locale — `DateFormat.Hm()`
+/// Every `DateFormat` in Braid is constructed without a locale — `DateFormat.Hm()`
 /// on a bubble, `DateFormat.yMMMd()` on a device row — which means they all read
 /// `Intl.defaultLocale`. Setting it here is what makes a timestamp in an Arabic
 /// UI an Arabic timestamp rather than an English one sitting in a mirrored

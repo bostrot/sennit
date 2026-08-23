@@ -107,23 +107,7 @@ class _Splash extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: WeftRadius.allXl,
-                gradient: LinearGradient(
-                  begin: AlignmentDirectional.topStart,
-                  end: AlignmentDirectional.bottomEnd,
-                  colors: [context.colors.primary, context.colors.tertiary],
-                ),
-              ),
-              child: Icon(
-                Icons.forum_rounded,
-                size: 30,
-                color: context.colors.onPrimary,
-              ),
-            ),
+            const BrandMark(size: 72),
             const SizedBox(height: WeftSpace.xl),
             SizedBox(
               height: 20,
@@ -131,7 +115,7 @@ class _Splash extends StatelessWidget {
               // A slow start is a blank screen with a spinner on it, and a
               // spinner with no label is a screen with nothing on it at all.
               child: Semantics(
-                label: 'Starting Weft',
+                label: 'Starting Braid',
                 child: const CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
@@ -163,7 +147,7 @@ class _StartupError extends StatelessWidget {
                 color: context.colors.error,
               ),
               const SizedBox(height: WeftSpace.lg),
-              Text('Weft could not start', style: context.text.titleMedium),
+              Text('Braid could not start', style: context.text.titleMedium),
               const SizedBox(height: WeftSpace.sm),
               Text(
                 '$error',

@@ -9,7 +9,9 @@ import 'package:weft_matrix/weft_matrix.dart';
 const bool kDemoMode = bool.fromEnvironment('WEFT_DEMO');
 
 final matrixSessionProvider = Provider<WeftMatrixSession>((ref) {
-  final session = WeftMatrixSession();
+  // The clientName stays 'Weft' — it keys the session database, and a
+  // rename there is a logout. The device name is what other clients list.
+  final session = WeftMatrixSession(deviceDisplayName: 'Braid');
   ref.onDispose(session.dispose);
   return session;
 });

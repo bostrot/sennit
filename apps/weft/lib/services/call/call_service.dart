@@ -27,7 +27,7 @@ typedef IceConfigurationLoader = Future<IceConfiguration> Function();
 /// nothing to tell the far end. They are a sentence next to the button that was
 /// just pressed.
 enum CallStartFailure {
-  /// A call is already in progress. Weft carries one at a time.
+  /// A call is already in progress. Braid carries one at a time.
   busy,
 
   /// The microphone or camera could not be opened — permission denied, or
@@ -201,7 +201,7 @@ class CallService {
 
   /// Where an invite for a call id arrived, so a reject can be addressed.
   ///
-  /// Not derivable from the session: the invite Weft rejects with `user_busy`
+  /// Not derivable from the session: the invite Braid rejects with `user_busy`
   /// belongs to a *different* room from the call already in progress, and
   /// sending its reject to the active call's room would leave the second caller
   /// ringing until their invite expired.

@@ -57,7 +57,7 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
     if (!ok) {
       showWeftMessage(
         context,
-        'Weft needs the microphone to record a voice message.',
+        'Braid needs the microphone to record a voice message.',
       );
       widget.onCancel();
       return;

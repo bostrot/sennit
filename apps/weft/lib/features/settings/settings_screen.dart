@@ -185,7 +185,7 @@ class SettingsScreen extends ConsumerWidget {
           tile(
             icon: Icons.terminal_rounded,
             title: 'MCP server',
-            subtitle: 'Let your own agents read and send through Weft',
+            subtitle: 'Let your own agents read and send through Braid',
             onTap: () => push(const McpScreen()),
           ),
         ],
@@ -266,7 +266,7 @@ class _ContactNamesToggle extends ConsumerWidget {
             if (context.mounted) {
               showWeftMessage(
                 context,
-                'Weft was not allowed to read your contacts.',
+                'Braid was not allowed to read your contacts.',
               );
             }
             return;

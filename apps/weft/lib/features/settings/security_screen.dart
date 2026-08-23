@@ -358,7 +358,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         const SettingsSectionHeader(
           title: 'Your recovery key',
           subtitle:
-              'Write it down or put it in a password manager now. Weft cannot '
+              'Write it down or put it in a password manager now. Braid cannot '
               'show it again, and nobody — not your homeserver, not us — can '
               'reissue it.',
         ),
@@ -369,7 +369,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             color: context.colors.surfaceContainerHigh,
             borderRadius: WeftRadius.allMd,
           ),
-          // Spelled out. This is the one string in Weft a user has to
+          // Spelled out. This is the one string in Braid a user has to
           // reproduce character for character and will never be shown again,
           // and as a single monospace run a screen reader announced it as one
           // word — which makes the screen whose entire purpose is "write this
@@ -426,7 +426,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           title: 'Check you have it',
           subtitle:
               'Paste the key back in. This is the only chance to find out that '
-              'what you saved is not what Weft generated.',
+              'what you saved is not what Braid generated.',
         ),
         const SizedBox(height: WeftSpace.lg),
         TextField(
@@ -530,7 +530,7 @@ String backupExplanation(KeyBackupState state) => switch (state) {
         'key to unlock the history it holds.',
   KeyBackupState.outOfDate =>
     'This device is holding keys the backup does not have yet. They upload '
-        'on their own; leave Weft open for a minute.',
+        'on their own; leave Braid open for a minute.',
   KeyBackupState.upToDate =>
     'Everything this device knows how to decrypt is in the backup, and your '
         'recovery key opens it on any new device.',

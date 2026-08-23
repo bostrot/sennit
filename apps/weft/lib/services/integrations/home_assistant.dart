@@ -4,10 +4,10 @@ import 'package:http/http.dart' as http;
 
 /// Talks to the user's own Home Assistant instance.
 ///
-/// One verb, deliberately: Weft *fires an event* (`weft_message`) on the HA
+/// One verb, deliberately: Braid *fires an event* (`weft_message`) on the HA
 /// bus, and everything else — lights, TTS, notifications on the wall tablet —
 /// is an automation the user writes against that event. The reverse direction
-/// needs no client at all: Home Assistant reaches Weft through the MCP
+/// needs no client at all: Home Assistant reaches Braid through the MCP
 /// server's `send_message` tool with a `rest_command`.
 class HomeAssistantClient {
   HomeAssistantClient({

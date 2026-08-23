@@ -8,7 +8,7 @@ import 'package:weft_sms/weft_sms.dart';
 ///
 /// Three states, not a boolean, because the two "no" answers lead to different
 /// screens: a device with no radio can never carry SMS and must not be offered
-/// it, while a phone where Weft simply is not the default app is one tap away
+/// it, while a phone where Braid simply is not the default app is one tap away
 /// from carrying it. Conflating them produces either a button that cannot work
 /// or a missing feature with no explanation.
 enum SmsAvailability {
@@ -16,14 +16,14 @@ enum SmsAvailability {
   /// where the channel has no handler. Nothing to offer and nothing to ask.
   unsupported,
 
-  /// The device can do SMS and Weft is not the app doing it.
+  /// The device can do SMS and Braid is not the app doing it.
   ///
-  /// **This is a normal, fully supported state, not a degraded one.** Weft is a
+  /// **This is a normal, fully supported state, not a degraded one.** Braid is a
   /// Matrix client that can also carry SMS; every other network works exactly
   /// as before and the SMS network is simply absent from the inbox.
   notDefault,
 
-  /// Weft holds `ROLE_SMS`: threads are readable, messages sendable, and
+  /// Braid holds `ROLE_SMS`: threads are readable, messages sendable, and
   /// received messages arrive on [SmsPlatform.incoming].
   ready,
 }
@@ -105,7 +105,7 @@ class SmsPlatformStatus {
 
 /// An MMS that reached the device and cannot be fetched.
 ///
-/// Weft does not download MMS yet — Android exposes the transport but not the
+/// Braid does not download MMS yet — Android exposes the transport but not the
 /// PDU parser, so retrieval means vendoring AOSP's — and this is what says so.
 /// It exists rather than being dropped because the alternative is a message the
 /// sender watched leave their phone and the recipient never hears about.
@@ -143,7 +143,7 @@ class SmsMmsPush {
 abstract interface class SmsGateway {
   Future<SmsPlatformStatus> status();
 
-  /// Shows the system's default-SMS-app dialog and resolves to whether Weft
+  /// Shows the system's default-SMS-app dialog and resolves to whether Braid
   /// holds the role afterwards. False is a decline, and a decline is an answer,
   /// not an error.
   Future<bool> requestRole();
@@ -161,13 +161,13 @@ abstract interface class SmsGateway {
 
   Future<int> markThreadRead(String threadId);
 
-  /// Messages received while Weft is running.
+  /// Messages received while Braid is running.
   Stream<SmsMessage> get incoming;
 
   /// Send outcomes and delivery reports for messages already shown.
   Stream<SmsMessage> get statusUpdates;
 
-  /// MMS notifications Weft cannot retrieve.
+  /// MMS notifications Braid cannot retrieve.
   Stream<SmsMmsPush> get mmsPushes;
 
   /// Replays anything that arrived before Dart was listening.

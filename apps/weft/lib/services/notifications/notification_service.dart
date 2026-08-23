@@ -35,7 +35,7 @@ const int kMaxTrackedNotificationsPerChat = 99;
 /// The conversation a test notification belongs to.
 ///
 /// A real id would be better in exactly one respect — the tap would land in a
-/// real chat — and worse in every other. Attributing Weft's own sample text to
+/// real chat — and worse in every other. Attributing Braid's own sample text to
 /// a friend puts words in their mouth in the shade, counts a message they never
 /// sent into their summary, and makes the verdict depend on *their* mute rather
 /// than on the settings the user is looking at. So the test gets a conversation
@@ -81,7 +81,7 @@ class NotificationActivation {
 
 /// Where a rendered notification is actually posted.
 ///
-/// The one seam between Weft's notification logic and a plugin that needs a
+/// The one seam between Braid's notification logic and a plugin that needs a
 /// device. Everything interesting — which channel, which group, what the body
 /// says, whether there should be a summary — is decided above this and arrives
 /// as a [NotificationPresentation]; this interface has four methods and no
@@ -161,7 +161,7 @@ class LocalNotificationSink implements NotificationSink {
         ),
         linux: const LinuxInitializationSettings(defaultActionName: 'Open'),
         windows: const WindowsInitializationSettings(
-          appName: 'Weft',
+          appName: 'Braid',
           appUserModelId: 'com.bostrot.weft',
           // Identifies the COM activation callback. Fixed, because Windows
           // matches a toast's activation against the GUID that posted it: a
@@ -527,11 +527,11 @@ class WeftNotificationService {
         roomId: kTestNotificationRoomId,
         network: network,
         senderId: '@weft-test:weft.invalid',
-        senderName: 'Weft',
+        senderName: 'Braid',
         timestamp: stamp,
         kind: MessageKind.text,
         isOwn: false,
-        body: 'This is what a notification from Weft looks like.',
+        body: 'This is what a notification from Braid looks like.',
       ),
       chat: Chat(
         id: kTestNotificationChatId,

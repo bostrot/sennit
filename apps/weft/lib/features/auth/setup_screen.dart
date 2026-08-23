@@ -47,7 +47,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         icon: Icons.notifications_active_outlined,
         title: 'Get told about messages',
         body:
-            'Weft shows who wrote and what they said, with reply buttons '
+            'Braid shows who wrote and what they said, with reply buttons '
             'right on the notification. Android asks once — this is that '
             'moment.',
         action: 'Allow notifications',
@@ -58,10 +58,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         icon: Icons.sync_rounded,
         title: 'Stay connected',
         body:
-            'Messages arrive while Weft is closed: the app keeps its own '
+            'Messages arrive while Braid is closed: the app keeps its own '
             'connection open behind a small silent notification — nothing '
             'else to install, survives reboots. Android will also ask to '
-            'exempt Weft from battery limits so messages arrive at night '
+            'exempt Braid from battery limits so messages arrive at night '
             'too.',
         action: 'Stay connected',
         run: _enableConnection,

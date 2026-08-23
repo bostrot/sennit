@@ -25,7 +25,7 @@ typedef AttachmentBytesLoader =
 
 /// Reads the file [AttachmentSource.filename] names.
 ///
-/// The pickers Weft uses hand over a real path, and Android's share-in copies a
+/// The pickers Braid uses hand over a real path, and Android's share-in copies a
 /// `content://` grant to a temp file before building a source, so by the time a
 /// source reaches the repository its name is always openable. Read per upload
 /// attempt rather than held: a twenty-photo share must not pin twenty files in
@@ -93,7 +93,7 @@ class MatrixChatRepository implements ChatRepository {
       _smsSub = sms.updates.listen((_) => _rebuild());
       // Not awaited, and it must not be: reading the provider is a method
       // channel round trip, and the inbox has four other networks to draw
-      // meanwhile. A phone where Weft is not the default SMS app settles
+      // meanwhile. A phone where Braid is not the default SMS app settles
       // immediately on "no threads" and nothing here ever fires again.
       unawaited(sms.start());
     }
@@ -105,7 +105,7 @@ class MatrixChatRepository implements ChatRepository {
   final SearchStore? _searchStore;
   final AttachmentBytesLoader _readBytes;
 
-  /// SMS, when this device has it and Weft holds the role. Null everywhere
+  /// SMS, when this device has it and Braid holds the role. Null everywhere
   /// else, which is the state every path below has to work in anyway.
   final SmsChatRepository? _sms;
 
@@ -378,7 +378,7 @@ class MatrixChatRepository implements ChatRepository {
         '${t.hour.toString().padLeft(2, '0')}'
         '${t.minute.toString().padLeft(2, '0')}00Z';
     final ics =
-        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Weft//EN\r\n'
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Braid//EN\r\n'
         'METHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:$uid\r\n'
         'DTSTART:${stamp(when)}\r\nDTEND:${stamp(until)}\r\n'
         'SUMMARY:${title.replaceAll(RegExp(r'[\r\n]'), ' ')}\r\n'
@@ -398,7 +398,7 @@ class MatrixChatRepository implements ChatRepository {
 
     if (room.encrypted) {
       // No plain-media upload in an encrypted room; the custom key carries
-      // everything a Weft peer needs and the body carries it for humans.
+      // everything a Braid peer needs and the body carries it for humans.
       await room.sendEvent({
         'msgtype': sdk.MessageTypes.Text,
         'body': readable,
@@ -1095,7 +1095,7 @@ class MatrixChatRepository implements ChatRepository {
     // stops incoming MMS being retrieved — and a photo that quietly went out
     // over WhatsApp instead is worse than one that did not go.
     if (target.network == ChatNetwork.sms) {
-      throw StateError('Weft cannot send MMS attachments yet');
+      throw StateError('Braid cannot send MMS attachments yet');
     }
     final room = _roomFor(target);
 

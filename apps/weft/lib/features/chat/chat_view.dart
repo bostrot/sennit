@@ -93,7 +93,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// one reason: `FocusComposerIntent` is pressed while the user is in the
   /// inbox list, which on a two-pane window is a *sibling* of this widget. The
   /// registry in `shortcuts.dart` is how the shortcut reaches across.
-  final _composerFocus = FocusNode(debugLabel: 'Weft composer');
+  final _composerFocus = FocusNode(debugLabel: 'Braid composer');
 
   final _scroll = ScrollController();
 
@@ -1416,7 +1416,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.clear();
     _showMessage(
       'Scheduled for ${DateFormat.MMMEd().add_Hm().format(when)}. '
-      'It sends while Weft is running.',
+      'It sends while Braid is running.',
     );
   }
 
@@ -1582,7 +1582,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _showMessage('Weft has no location permission.');
+        _showMessage('Braid has no location permission.');
         return;
       }
       _showMessage('Getting your position…');
@@ -1881,7 +1881,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         // Disabled rather than hidden, with the reason in its tooltip: a
         // conversation with no Matrix-native leg cannot carry a call, and a
-        // button that quietly disappeared for bridged chats would read as Weft
+        // button that quietly disappeared for bridged chats would read as Braid
         // having lost the feature.
         Consumer(
           builder: (context, ref, _) {

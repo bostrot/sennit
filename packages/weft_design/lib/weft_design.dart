@@ -9,6 +9,7 @@ export 'src/components/chat_tile.dart';
 export 'src/components/network_glyph.dart';
 export 'src/components/network_rail.dart';
 export 'src/components/unread_badge.dart';
+export 'src/components/brand_mark.dart';
 export 'src/components/weft_avatar.dart';
 export 'src/contrast.dart';
 export 'src/focus.dart';

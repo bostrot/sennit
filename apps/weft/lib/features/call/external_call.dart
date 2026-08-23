@@ -2,7 +2,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 /// Where a bridged conversation's call actually happens.
 ///
-/// Weft's own calls ride Matrix, and a bridged contact's ghost will never
+/// Braid's own calls ride Matrix, and a bridged contact's ghost will never
 /// answer an `m.call.invite` — the call has to happen in the network's own
 /// app. This resolves the deep link that gets the user there: the contact in
 /// WhatsApp, the number in Signal, and failing anything better, the dialler.

@@ -33,7 +33,7 @@ class WeftAppearance {
   }
 
   /// [highContrast] and [reduceMotion] are the platform's own accessibility
-  /// switches, not Weft settings — they arrive from `MediaQuery` at the app
+  /// switches, not Braid settings — they arrive from `MediaQuery` at the app
   /// root and are folded into the theme so no widget below has to ask.
   ThemeData themeFor(
     Brightness platformBrightness, {

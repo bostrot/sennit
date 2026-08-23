@@ -117,7 +117,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
         children: [
           Text(
             'When the same person reaches you on several networks, their '
-            'conversations can be woven into one thread. Weft suggests '
+            'conversations can be woven into one thread. Braid suggests '
             'matches; only you confirm them.',
             style: context.text.bodySmall?.copyWith(
               color: context.colors.onSurfaceVariant,

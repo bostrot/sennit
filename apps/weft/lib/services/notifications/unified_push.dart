@@ -15,8 +15,8 @@ import 'push_registration.dart';
 /// Push that arrives while Weft is dead, without Google in the path.
 ///
 /// A UnifiedPush distributor on the device — ntfy is the usual one — holds a
-/// long-lived connection to the user's own push server and wakes Weft with
-/// the poke. Weft registers the endpoint as an ordinary Matrix HTTP pusher,
+/// long-lived connection to the user's own push server and wakes Braid with
+/// the poke. Braid registers the endpoint as an ordinary Matrix HTTP pusher,
 /// pointed at the endpoint host's own Matrix gateway when it has one (ntfy
 /// does) and at the public UnifiedPush gateway otherwise. The homeserver then
 /// pokes the gateway, the gateway pokes the distributor, the distributor
@@ -97,7 +97,7 @@ class UnifiedPushService {
           appId: kAndroidPushAppId,
           pushKey: endpointUrl,
           gatewayUrl: gateway,
-          deviceDisplayName: 'Weft (UnifiedPush)',
+          deviceDisplayName: 'Braid (UnifiedPush)',
         ),
         append: false,
       );
@@ -198,7 +198,7 @@ class UnifiedPushService {
     );
     await plugin.show(
       id: roomId?.hashCode ?? 0,
-      title: roomName ?? sender ?? 'Weft',
+      title: roomName ?? sender ?? 'Braid',
       body: unread is int && unread > 1
           ? '$unread new messages'
           : 'New message — open to read',
@@ -207,7 +207,7 @@ class UnifiedPushService {
           'weft.push',
           'Messages (push)',
           channelDescription:
-              'Messages that arrived while Weft was not running',
+              'Messages that arrived while Braid was not running',
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.message,

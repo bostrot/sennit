@@ -356,7 +356,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               title: 'Muted chats',
               subtitle:
                   'Everything currently silenced, whichever way it was muted. '
-                  'A timed mute is Weft\'s own — Matrix push rules cannot '
+                  'A timed mute is Braid\'s own — Matrix push rules cannot '
                   'express an expiry.',
             ),
             _MutedChats(policy: policy, chats: chats),
@@ -366,7 +366,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           const SettingsSectionHeader(
             title: 'Push',
             subtitle:
-                'How this device is woken when Weft is not running. Weft hosts '
+                'How this device is woken when Braid is not running. Braid hosts '
                 'no gateway; point this at a sygnal instance you run, exactly '
                 'as you do your homeserver. Left empty, notifications still '
                 'arrive while the app is open.',
@@ -397,7 +397,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           const SettingsSectionHeader(
             title: 'Check it works',
             subtitle:
-                'Runs a message Weft made up through the same rules, the same '
+                'Runs a message Braid made up through the same rules, the same '
                 'rendering and the same channel a real one takes. If nothing '
                 'appears, the reason is below.',
           ),
@@ -660,7 +660,7 @@ class _TestResult extends StatelessWidget {
     final text = switch (decision) {
       NotifyDecision() =>
         'Posted on the ${network.label} channel. If nothing '
-            'appeared, the block is the operating system rather than Weft — '
+            'appeared, the block is the operating system rather than Braid — '
             'check its notification settings for this app.',
       SilentDecision() =>
         'Posted silently: quiet hours are in force and set to deliver without '
@@ -730,7 +730,7 @@ String _muteDetail(
 }) {
   final parts = <String>[];
   if (override.muted) {
-    parts.add('Muted in Weft');
+    parts.add('Muted in Braid');
   } else if (override.mutedUntil case final until?) {
     parts.add('Muted for another ${_remaining(until.difference(now))}');
   }
@@ -754,7 +754,7 @@ String _pushStatusLabel(PushRegistrationStatus status) => switch (status) {
   PushRegistrationStatus.registered => 'Registered with your homeserver.',
   PushRegistrationStatus.unchanged => 'Registered with your homeserver.',
   PushRegistrationStatus.unsupportedPlatform =>
-    'This platform has no push. Notifications arrive while Weft is running.',
+    'This platform has no push. Notifications arrive while Braid is running.',
   PushRegistrationStatus.notConfigured =>
     'No push gateway configured, so this device is not woken.',
   PushRegistrationStatus.noToken =>
@@ -840,7 +840,7 @@ class _SmartRepliesTile extends ConsumerWidget {
 
 /// The no-extra-app answer to background messages.
 ///
-/// A switch over the native `WeftSyncService`: Weft itself holds the one
+/// A switch over the native `WeftSyncService`: Braid itself holds the one
 /// connection the OS allows a reachable app (a specialUse foreground
 /// service), so messages arrive with the app closed and nothing else
 /// installed. The battery row appears while Doze could still cut the
@@ -913,7 +913,7 @@ class _BuiltInConnectionSectionState
     if (enabled && mounted && !_batteryExempt) await _walkBatteryExemption();
   }
 
-  /// True when Weft may post notifications — asking if the one prompt is
+  /// True when Braid may post notifications — asking if the one prompt is
   /// still unspent, and pointing at system settings when it is not.
   Future<bool> _ensureNotificationsAllowed() async {
     final android = FlutterLocalNotificationsPlugin()
@@ -937,7 +937,7 @@ class _BuiltInConnectionSectionState
         title: const Text('Notifications are off'),
         content: const Text(
           'The background connection exists to show you messages, and '
-          'Android is currently blocking every notification from Weft. '
+          'Android is currently blocking every notification from Braid. '
           'Allow notifications in system settings, then try again.',
         ),
         actions: [
@@ -1011,7 +1011,7 @@ class _BuiltInConnectionSectionState
             ),
             title: const Text('Stay connected in the background'),
             subtitle: const Text(
-              'Weft keeps its own connection open behind a small permanent '
+              'Braid keeps its own connection open behind a small permanent '
               'notification, so messages arrive while the app is closed — '
               'nothing else to install. Survives reboots.',
             ),
@@ -1092,11 +1092,11 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
             const SizedBox(height: WeftSpace.xs),
             Text(
               configured
-                  ? 'Messages reach this phone even with Weft closed, through '
+                  ? 'Messages reach this phone even with Braid closed, through '
                         'your UnifiedPush distributor.'
                   : 'An alternative to the built-in connection: a UnifiedPush '
                         'distributor (the ntfy app) wakes this phone through '
-                        'your own push server, and Weft holds no connection '
+                        'your own push server, and Braid holds no connection '
                         'of its own. Lightest on battery when several apps '
                         'share the distributor.',
               style: context.text.bodySmall?.copyWith(

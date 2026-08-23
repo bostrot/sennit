@@ -153,7 +153,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       title: 'Sign out ${device.label}?',
       message: device.isCurrent
           ? 'This is the device you are using. Signing it out logs you out of '
-                'Weft here, and any messages only this device can decrypt stay '
+                'Braid here, and any messages only this device can decrypt stay '
                 'unreadable unless you have a key backup.'
           : 'That session loses access immediately. If you did not recognise '
                 'it, change your account password afterwards as well — a '

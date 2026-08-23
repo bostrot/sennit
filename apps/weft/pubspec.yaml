@@ -1,7 +1,7 @@
 name: weft
 description: "Weft — every conversation, one thread."
 publish_to: none
-version: 0.1.0+1
+version: 1.0.0+1
 resolution: workspace
 
 environment:
@@ -114,6 +114,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.15.1
+  flutter_launcher_icons: ^0.14.4
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
@@ -151,3 +152,14 @@ patrol:
     package_name: com.bostrot.weft
   ios:
     bundle_id: com.bostrot.weft
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: assets/brand/icon.png
+  adaptive_icon_background: "#3D6FD8"
+  adaptive_icon_foreground: assets/brand/icon_foreground.png
+  macos:
+    generate: true
+    image_path: assets/brand/icon.png

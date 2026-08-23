@@ -78,7 +78,7 @@ void main() {
     // has to arrive before the button that asks for it.
     expect(find.byType(PrivacyNotice), findsOneWidget);
     expect(find.textContaining('SMS is not encrypted'), findsOneWidget);
-    expect(find.text('Make Weft the SMS app'), findsOneWidget);
+    expect(find.text('Make Braid the SMS app'), findsOneWidget);
   });
 
   testWidgets('the app that holds the role is named', (tester) async {
@@ -100,7 +100,7 @@ void main() {
     await repository.start();
     await pump(tester);
 
-    await tester.tap(find.text('Make Weft the SMS app'));
+    await tester.tap(find.text('Make Braid the SMS app'));
     await tester.pumpAndSettle();
 
     expect(channel.calls, contains('requestRole'));
@@ -109,7 +109,7 @@ void main() {
     // their choice as a failure is what makes a decline feel like a mistake.
     expect(find.byType(SnackBar), findsNothing);
     // Still offered, because the answer is allowed to change later.
-    expect(find.text('Make Weft the SMS app'), findsOneWidget);
+    expect(find.text('Make Braid the SMS app'), findsOneWidget);
     expect(repository.isReady, isFalse);
     expect(repository.chats, isEmpty);
   });
@@ -126,12 +126,12 @@ void main() {
     channel.roleGranted = true;
     channel.status = isDefault;
     channel.threads = [smsThreadRow()];
-    await tester.tap(find.text('Make Weft the SMS app'));
+    await tester.tap(find.text('Make Braid the SMS app'));
     await tester.pumpAndSettle();
 
     expect(find.text('On'), findsOneWidget);
     // The offer is gone rather than disabled: there is no dialog left to raise.
-    expect(find.text('Make Weft the SMS app'), findsNothing);
+    expect(find.text('Make Braid the SMS app'), findsNothing);
     expect(repository.chats, hasLength(1));
   });
 
@@ -178,7 +178,7 @@ void main() {
     await pump(tester);
 
     expect(find.text('Not available'), findsOneWidget);
-    expect(find.text('Make Weft the SMS app'), findsNothing);
+    expect(find.text('Make Braid the SMS app'), findsNothing);
   });
 
   testWidgets('a platform with no SMS at all explains itself', (tester) async {

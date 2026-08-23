@@ -55,7 +55,7 @@ class _NotificationRationaleSheet extends StatelessWidget {
             ),
             const SizedBox(height: WeftSpace.md),
             Text(
-              'Weft can notify you when a message arrives on any of your '
+              'Braid can notify you when a message arrives on any of your '
               'networks. A merged contact is one notification, not one per '
               'network, and anything you have already read elsewhere stays '
               'quiet.',
@@ -66,7 +66,7 @@ class _NotificationRationaleSheet extends StatelessWidget {
             Text(
               // The one thing worth saying about the mechanism, because it is
               // the thing a self-hoster actually wants to know before granting.
-              'Message text is never sent to a push service — Weft is told only '
+              'Message text is never sent to a push service — Braid is told only '
               'that something happened, then fetches and decrypts it on this '
               'device.',
               style: theme.textTheme.bodySmall?.copyWith(

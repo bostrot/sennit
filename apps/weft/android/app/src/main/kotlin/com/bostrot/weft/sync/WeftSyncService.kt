@@ -94,7 +94,7 @@ class WeftSyncService : Service() {
                 // user can silence or shade-hide it entirely from settings.
                 NotificationManager.IMPORTANCE_MIN,
             ).apply {
-                description = "Keeps Weft connected so messages arrive while it is closed."
+                description = "Keeps Braid connected so messages arrive while it is closed."
                 setShowBadge(false)
             },
         )
@@ -118,7 +118,7 @@ class WeftSyncService : Service() {
         }
         return builder
             .setContentTitle("Listening for messages")
-            .setContentText("Weft stays connected in the background.")
+            .setContentText("Braid stays connected in the background.")
             .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
             .setContentIntent(pending)
             .setOngoing(true)

@@ -43,7 +43,7 @@ class SurfacesScreen extends ConsumerWidget {
         children: [
           const PrivacyNotice(
             message:
-                'A widget and a watch cannot decrypt your messages, so Weft has '
+                'A widget and a watch cannot decrypt your messages, so Braid has '
                 'to write what they show into a file outside the encrypted '
                 'store. That file sits on this device where the system, and any '
                 'backup of this device, can read it — and a home screen is '

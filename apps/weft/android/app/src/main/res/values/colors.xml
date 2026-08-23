@@ -44,4 +44,5 @@
     <color name="weft_widget_inverse_surface">#FF313036</color>
     <color name="weft_widget_inverse_on_surface">#FFF4EFF7</color>
     <color name="weft_widget_inverse_primary">#FFC6BFFF</color>
+	<color name="ic_launcher_background">#3D6FD8</color>
 </resources>

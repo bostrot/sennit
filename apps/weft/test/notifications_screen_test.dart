@@ -449,7 +449,7 @@ void main() {
           policy: NotificationPolicy().muteChat(chat.id),
         );
 
-        expect(find.text('Muted in Weft'), findsOneWidget);
+        expect(find.text('Muted in Braid'), findsOneWidget);
         expect(find.textContaining('for another'), findsNothing);
       });
     });
@@ -587,7 +587,7 @@ void main() {
       ),
       (
         PushRegistrationStatus.unsupportedPlatform,
-        'This platform has no push. Notifications arrive while Weft is '
+        'This platform has no push. Notifications arrive while Braid is '
             'running.',
       ),
       (PushRegistrationStatus.registered, 'Registered with your homeserver.'),

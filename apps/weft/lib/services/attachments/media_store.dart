@@ -60,7 +60,7 @@ String attachmentFileName(WeftMessage message, {String? mimeType}) {
 /// Everything a file system might object to, flattened to `_`.
 ///
 /// Matrix event ids start with `$` and contain `:` and `/`, none of which belong
-/// in a path component on every platform Weft runs on.
+/// in a path component on every platform Braid runs on.
 String _sanitise(String value) {
   final cleaned = value.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
   return cleaned.isEmpty ? 'attachment' : cleaned;

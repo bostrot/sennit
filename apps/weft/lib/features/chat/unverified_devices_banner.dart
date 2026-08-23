@@ -34,7 +34,7 @@ class UnverifiedDevicesBanner extends StatelessWidget {
 
     final devices = trust.unverifiedDevices;
     final message = trust.includesOwnDevice
-        ? 'One of your own devices is not verified, so Weft cannot promise the '
+        ? 'One of your own devices is not verified, so Braid cannot promise the '
               'messages here are only reaching you.'
         : devices == 1
         ? 'Someone in this chat is using a device nobody has verified. It can '

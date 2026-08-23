@@ -9,7 +9,7 @@ import 'call_service.dart';
 
 /// What the *platform's* call UI is allowed to do to a call.
 ///
-/// Deliberately not [CallControls]. That interface is the set of buttons a Weft
+/// Deliberately not [CallControls]. That interface is the set of buttons a Braid
 /// screen draws — camera, camera switch, video upgrade — and none of those
 /// exist on a CallKit call screen or in Android's call log. This is the set both
 /// systems actually offer, and it is a different five: CallKit's `CXAnswerCall`,
@@ -306,7 +306,7 @@ class CallPlatformBridge {
     }
 
     // Mute and hold round-trip: the system UI has its own buttons for both, so
-    // a change made in Weft has to go back out or the two disagree. The
+    // a change made in Braid has to go back out or the two disagree. The
     // equality checks are what stops that becoming a loop — the platform's own
     // action arrives, is applied, comes back here as state, and matches.
     final held = session.state == CallState.onHold;
@@ -352,7 +352,7 @@ class CallPlatformBridge {
   ///
   /// Reached when the service publishes a state with no session at all, which
   /// only happens on disposal — an ended call keeps its session so the screen
-  /// can say why. So this is the "Weft went away mid-call" path, and a system
+  /// can say why. So this is the "Braid went away mid-call" path, and a system
   /// left holding a call nobody can hang up is the failure it exists to avoid.
   Future<void> _clear() async {
     final callId = _reportedCallId;
@@ -379,7 +379,7 @@ class CallPlatformBridge {
       // predating it. A call without a system call screen is a working call.
     } on PlatformException catch (error) {
       // Reported, not thrown. Neither CallKit nor Telecom is load-bearing: the
-      // call is already happening over WebRTC and Weft's own UI is already
+      // call is already happening over WebRTC and Braid's own UI is already
       // drawing it. What is lost is the lock-screen answer button.
       debugPrint(
         'weft: platform call integration refused $method: '
