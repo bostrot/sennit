@@ -8,6 +8,7 @@ import 'package:weft_search/weft_search.dart'
 import 'package:weft_store/weft_store.dart';
 import 'package:weft_transcribe/weft_transcribe.dart';
 
+import '../../app/a11y.dart';
 import '../../app/stores.dart';
 import '../../services/ai/smart_replies.dart' show probeLlm;
 import 'models_screen.dart';
@@ -245,6 +246,12 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     final stores = ref.read(storesProvider);
     final oldModel = _settings.getString(WeftSettings.embeddingModel);
 
+    // Every plain setting first, then the keychain. The keys go through the
+    // system keychain, which can refuse (macOS is touchy about it for apps
+    // signed the development way) — and one refusal used to abort this whole
+    // method halfway, silently losing every section after the one that
+    // threw. Now a keychain failure loses only the key it was for, and says
+    // so.
     _settings.setBool(WeftSettings.embeddingEnabled, value: _embeddingEnabled);
     _settings.setString(
       WeftSettings.embeddingBaseUrl,
@@ -258,23 +265,35 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       'search.embedding_dimensions',
       int.tryParse(_embeddingDims.text) ?? 1536,
     );
-    if (_embeddingKey.text.isNotEmpty) {
-      await stores.setEmbeddingApiKey(_embeddingKey.text);
-    }
-
     _settings.setBool(WeftSettings.transcriptionEnabled, value: _sttEnabled);
     _settings.setBool(WeftSettings.transcriptionAutoRun, value: _sttAuto);
     _settings.setString(WeftSettings.transcriptionBaseUrl, _sttUrl.text.trim());
     _settings.setString(WeftSettings.transcriptionModel, _sttModel.text.trim());
-    if (_sttKey.text.isNotEmpty) {
-      await stores.setTranscriptionApiKey(_sttKey.text);
-    }
-
     _settings.setString(WeftSettings.llmBaseUrl, _llmUrl.text.trim());
     _settings.setString(WeftSettings.llmModel, _llmModel.text.trim());
-    if (_llmKey.text.isNotEmpty) {
-      await stores.setLlmApiKey(_llmKey.text);
+
+    final keyFailures = <String>[];
+    Future<void> writeKey(
+      String label,
+      String value,
+      Future<void> Function(String) write,
+    ) async {
+      if (value.isEmpty) return;
+      try {
+        await write(value);
+      } on Object catch (error) {
+        debugPrint('weft: $label API key not stored: $error');
+        keyFailures.add(label);
+      }
     }
+
+    await writeKey('embeddings', _embeddingKey.text, stores.setEmbeddingApiKey);
+    await writeKey(
+      'transcription',
+      _sttKey.text,
+      stores.setTranscriptionApiKey,
+    );
+    await writeKey('LLM', _llmKey.text, stores.setLlmApiKey);
 
     // A model change invalidates every stored vector: different models share
     // no coordinate space, and mixing them silently corrupts ranking.
@@ -284,7 +303,15 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     }
 
     ref.read(settingsRevisionProvider.notifier).bump();
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (keyFailures.isNotEmpty) {
+      showWeftMessage(
+        context,
+        'Saved — but the system keychain refused the '
+        '${keyFailures.join(', ')} API key. Everything else is stored.',
+      );
+    }
+    Navigator.of(context).pop();
   }
 
   @override
