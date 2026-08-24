@@ -3,6 +3,14 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  # Build output is not ours to lint. With Swift Package Manager on — the
+  # default on stable — `flutter pub get` checks plugin *sources* out into
+  # build/{ios,macos}/SourcePackages, and analysing the tree then reports
+  # errors from other people's example apps. Whether `flutter analyze` passes
+  # must not depend on which artifacts happen to sit in the checkout.
+  exclude:
+    - build/**
+    - "**/build/**"
   errors:
     # Treat unused code as an error rather than a note — in a codebase this
     # young, a dangling symbol is nearly always an incomplete refactor.

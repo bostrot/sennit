@@ -25,7 +25,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed .
+      # Tracked sources only. `dart format` has no exclude of its own, and a
+      # macOS build leaves generated Dart inside build/ (vodozemac's build
+      # tool) that is not ours to format — which made passing depend on which
+      # artifacts sat in the checkout.
+      - name: Check formatting
+        run: git ls-files '*.dart' -z | xargs -0 dart format --output=none --set-exit-if-changed
       - run: flutter analyze
 
   unit:

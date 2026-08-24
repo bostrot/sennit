@@ -123,4 +123,37 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+
+  # onnxruntime-c is a static archive dressed as a framework, and under dynamic
+  # use_frameworks! CocoaPods never hands it to the plugin's own link — the
+  # very situation the disabled validator above was refusing. Without this the
+  # app fails at link with every ORT symbol missing (`_OrtGetApiBase`,
+  # `_OrtSessionOptionsAppendExecutionProvider_CoreML`, …).
+  #
+  # Appended into the plugin's own xcconfig values, because a target-level
+  # build setting would shadow them instead. Unlike the macOS xcframework this
+  # one carries a device slice and a simulator slice, so the search path is
+  # written per SDK — a single path would link the wrong architecture into
+  # whichever of the two was not chosen. Each conditional repeats the base
+  # value rather than saying `$(inherited)`, which at this level would inherit
+  # from the *project*, not from the line above it.
+  root = '"${PODS_ROOT}/onnxruntime-c/onnxruntime.xcframework'
+  device = "#{root}/ios-arm64\""
+  simulator = "#{root}/ios-arm64_x86_64-simulator\""
+  Dir.glob(File.join(installer.sandbox.root,
+                     'Target Support Files/flutter_onnxruntime/*.xcconfig')) do |f|
+    text = File.read(f)
+    text = text.sub(/^FRAMEWORK_SEARCH_PATHS = (.*)$/) do
+      base = Regexp.last_match(1)
+      [
+        "FRAMEWORK_SEARCH_PATHS = #{base}",
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*] = #{base} #{device}",
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = #{base} #{simulator}",
+      ].join("\n")
+    end
+    text = text.sub(/^OTHER_LDFLAGS = (.*)$/) do
+      "OTHER_LDFLAGS = #{Regexp.last_match(1)} -framework \"onnxruntime\""
+    end
+    File.write(f, text)
+  end
 end
