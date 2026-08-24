@@ -203,6 +203,9 @@ jobs:
           done
           find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
             -exec codesign --force --sign - {} +
+          for appex in "$APP/Contents/PlugIns"/*.appex; do
+            [ -e "$appex" ] && codesign --force --sign - "$appex"
+          done
           codesign --force --sign - "$APP"
           codesign --verify --strict "$APP"
       - name: Import the Developer ID certificate
@@ -236,6 +239,10 @@ jobs:
           find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
             -exec codesign --force --options runtime --timestamp \
             --sign "Developer ID Application" {} +
+          for appex in "$APP/Contents/PlugIns"/*.appex; do
+            [ -e "$appex" ] && codesign --force --options runtime --timestamp \
+              --sign "Developer ID Application" "$appex"
+          done
           codesign --force --options runtime --timestamp \
             --sign "Developer ID Application" "$APP"
       - name: Package
@@ -306,7 +313,7 @@ jobs:
         # every watchOS-only API. A generic iOS destination lets each target
         # pick its own SDK, exactly as an Xcode archive would.
         run: |
-          (cd apps/weft && flutter build ios --release --config-only)
+          (cd apps/weft && flutter build ios --release --config-only --no-codesign)
           xcodebuild -workspace apps/weft/ios/Runner.xcworkspace \
             -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' \
