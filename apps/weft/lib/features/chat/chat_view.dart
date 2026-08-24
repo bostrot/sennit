@@ -415,6 +415,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
       _indexed.add(m.eventId);
     }
 
+    // Auto-transcription rides the same "something new is on screen" moment.
+    // The service applies its own gates — the setting, a configured or local
+    // model, a per-call cap, and in-flight/failed bookkeeping — so this call
+    // is cheap when there is nothing to do. It had never been wired: the
+    // setting, the cap and the plumbing all existed, and nothing ever called
+    // it, which read as "automatic transcription stopped working".
+    unawaited(
+      ref
+          .read(transcriptionServiceProvider)
+          .autoTranscribe(
+            messages.take(12).toList(growable: false),
+            onEach: () {
+              if (mounted) setState(() {});
+            },
+          )
+          .catchError((Object error) {
+            debugPrint('weft: auto-transcribe pass failed: $error');
+          }),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final title = ref
