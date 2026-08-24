@@ -42,11 +42,26 @@ Future<List<String>> suggestSmartReplies({
               {
                 'role': 'system',
                 'content':
-                    'You write short chat replies. Output ONLY this JSON, '
-                    'nothing else — no analysis, no commentary, no '
-                    'markdown: {"replies": ["…", "…"]} with one or two '
-                    'replies, each a complete sentence of at most eight '
-                    'words, in the same language as the conversation.',
+                    'You write short chat replies the user could send. '
+                    'Output ONLY a JSON object with a "replies" list of one '
+                    'or two strings — no analysis, no commentary, no '
+                    'markdown. Each reply is a complete sentence of at most '
+                    'eight words, in the same language as the conversation.',
+              },
+              // One worked example pins the format better than any amount
+              // of instruction — and gives the template no placeholder text
+              // to parrot back, which is how "…" became a chip.
+              {
+                'role': 'user',
+                'content':
+                    'Conversation (newest message last):\n'
+                    'Anna: Kommst du morgen mit?\n\nJSON:',
+              },
+              {
+                'role': 'assistant',
+                'content':
+                    '{"replies": ["Ja, gerne!", "Ich sage dir heute Abend '
+                    'Bescheid."]}',
               },
               {
                 'role': 'user',
@@ -152,6 +167,10 @@ bool _looksLikeReply(String line) {
   // A label prefix — 'Sender: …', 'User name: …' — is the model describing
   // the conversation, not answering it.
   if (RegExp(r'^[A-Za-z][A-Za-z ]{1,20}:\s').hasMatch(line)) return false;
+  // Template débris: placeholder ellipses and angle brackets are the format
+  // being parroted, not a reply. A reply has letters in it.
+  if (line.contains('<') || line.contains('>')) return false;
+  if (!RegExp(r'\p{L}', unicode: true).hasMatch(line)) return false;
   return true;
 }
 
