@@ -73,6 +73,12 @@ final contactNamesSyncProvider = Provider<void>((ref) {
         if (entry.value is String) entry.key: entry.value as String,
   });
 
+  // One fresh read of the address book per app run. The provider recomputes
+  // on every settings bump, and re-walking a thousand contacts over the
+  // platform channel each time was launch jank nobody ordered; the cache
+  // applied above already carries the last run's answer.
+  if (_refreshedThisRun) return;
+  _refreshedThisRun = true;
   unawaited(() async {
     final fresh = await loadDeviceContactNames();
     if (fresh == null) return;
@@ -80,3 +86,5 @@ final contactNamesSyncProvider = Provider<void>((ref) {
     repository.setContactNameOverrides(fresh);
   }());
 });
+
+bool _refreshedThisRun = false;

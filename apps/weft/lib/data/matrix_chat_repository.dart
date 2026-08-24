@@ -674,8 +674,20 @@ class MatrixChatRepository implements ChatRepository {
       return;
     }
     _contactNames = Map.unmodifiable(namesByPhoneDigits);
+    _contactNamesBySuffix = {
+      for (final entry in namesByPhoneDigits.entries)
+        if (entry.key.length >= 9)
+          entry.key.substring(entry.key.length - 9): entry.value
+        else
+          entry.key: entry.value,
+    };
     _scheduleRebuild();
   }
+
+  /// The same names keyed by the last nine digits, so a lookup is a hash
+  /// probe instead of a scan — the scan ran per room per rebuild, which the
+  /// launch stutter could feel.
+  Map<String, String> _contactNamesBySuffix = const {};
 
   /// The address-book name for any of [phones], or null.
   ///
@@ -690,12 +702,11 @@ class MatrixChatRepository implements ChatRepository {
       if (digits.length < 7) continue;
       final direct = _contactNames[digits];
       if (direct != null) return direct;
-      for (final entry in _contactNames.entries) {
-        if (entry.key.length < 7) continue;
-        if (digits.endsWith(entry.key) || entry.key.endsWith(digits)) {
-          return entry.value;
-        }
-      }
+      final suffix = digits.length >= 9
+          ? digits.substring(digits.length - 9)
+          : digits;
+      final bySuffix = _contactNamesBySuffix[suffix];
+      if (bySuffix != null) return bySuffix;
     }
     return null;
   }
@@ -1471,11 +1482,19 @@ class MatrixChatRepository implements ChatRepository {
   /// is — bridge portals usually never enter `m.direct`, and skipping them
   /// here is why a WhatsApp chat and an SMS thread with the same person on
   /// them could not be offered as a merge at all.
+  /// Set by the handle refresh whenever any handle actually changed; the
+  /// scorer only runs then. It walks every pair with a string-similarity
+  /// metric — running that on each of the initial sync storm's rebuilds was
+  /// most of a thirty-second stutter after launch.
+  bool _handlesDirty = false;
+
   /// Runs the narrow auto-merge after a handle refresh and persists what it
   /// did, so the fold survives a restart exactly like a tapped merge — and
   /// an unmerge stays sticky, because the graph records the user's verdict
   /// and [IdentityGraph.suggestions] never re-offers a ruled pair.
   void _applyAutoMerges() {
+    if (!_handlesDirty) return;
+    _handlesDirty = false;
     final applied = _graph.applyAutoMerges();
     if (applied.isEmpty) return;
     for (final candidate in applied) {
@@ -1525,6 +1544,7 @@ class MatrixChatRepository implements ChatRepository {
           '${_graph.contactIdOf(handle.id)}';
       if (_handleFingerprints[handle.id] != fingerprint) {
         _handleFingerprints[handle.id] = fingerprint;
+        _handlesDirty = true;
         _store?.upsertHandle(
           handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
         );
