@@ -183,17 +183,28 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
         working-directory: apps/weft
       - name: Ad-hoc sign
-        # Nested code first, then the app — not --deep: codesign trips over
-        # the vodozemac framework's layout when it recurses ("bundle format
-        # is ambiguous"), but signing each bundle directly is unambiguous.
+        # Nested code first, then the app — never --deep, and via Versions/A
+        # where one exists: the runner's vodozemac framework loses symlinks in
+        # its bundle, which makes the bundle "ambiguous" to codesign, while
+        # the version directory never is. The repair loop puts the canonical
+        # links back first so the sealed layout is also a valid one.
         run: |
           APP=apps/weft/build/macos/Build/Products/Release/Braid.app
-          find "$APP/Contents/Frameworks" -maxdepth 1 \
-            \( -name '*.framework' -o -name '*.dylib' \) -print0 |
-            while IFS= read -r -d '' item; do
-              codesign --force --sign - "$item"
-            done
+          for fw in "$APP/Contents/Frameworks"/*.framework; do
+            name=$(basename "$fw" .framework)
+            if [ -d "$fw/Versions/A" ]; then
+              ln -sfn A "$fw/Versions/Current"
+              [ -e "$fw/$name" ] || ln -s "Versions/Current/$name" "$fw/$name"
+              [ -d "$fw/Versions/A/Resources" ] && { [ -e "$fw/Resources" ] || ln -s "Versions/Current/Resources" "$fw/Resources"; }
+              codesign --force --sign - "$fw/Versions/A"
+            else
+              codesign --force --sign - "$fw"
+            fi
+          done
+          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
+            -exec codesign --force --sign - {} +
           codesign --force --sign - "$APP"
+          codesign --verify --strict "$APP"
       - name: Import the Developer ID certificate
         if: env.HAS_SIGNING == 'true'
         run: |
@@ -213,12 +224,18 @@ jobs:
         if: env.HAS_SIGNING == 'true'
         run: |
           APP=apps/weft/build/macos/Build/Products/Release/Braid.app
-          find "$APP/Contents/Frameworks" -maxdepth 1 \
-            \( -name '*.framework' -o -name '*.dylib' \) -print0 |
-            while IFS= read -r -d '' item; do
+          for fw in "$APP/Contents/Frameworks"/*.framework; do
+            if [ -d "$fw/Versions/A" ]; then
               codesign --force --options runtime --timestamp \
-                --sign "Developer ID Application" "$item"
-            done
+                --sign "Developer ID Application" "$fw/Versions/A"
+            else
+              codesign --force --options runtime --timestamp \
+                --sign "Developer ID Application" "$fw"
+            fi
+          done
+          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
+            -exec codesign --force --options runtime --timestamp \
+            --sign "Developer ID Application" {} +
           codesign --force --options runtime --timestamp \
             --sign "Developer ID Application" "$APP"
       - name: Package
@@ -284,10 +301,19 @@ jobs:
         working-directory: apps/weft
       - name: Build an unsigned IPA
         if: env.HAS_SIGNING != 'true'
+        # Not `flutter build ios`: the tool passes `-sdk iphoneos`, which
+        # forces the *watch companion* target onto the iOS SDK and fails on
+        # every watchOS-only API. A generic iOS destination lets each target
+        # pick its own SDK, exactly as an Xcode archive would.
         run: |
-          (cd apps/weft && flutter build ios --release --no-codesign)
+          (cd apps/weft && flutter build ios --release --config-only)
+          xcodebuild -workspace apps/weft/ios/Runner.xcworkspace \
+            -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath apps/weft/build/ios_dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
           mkdir -p Payload
-          cp -R apps/weft/build/ios/iphoneos/Runner.app Payload/
+          cp -R apps/weft/build/ios_dd/Build/Products/Release-iphoneos/Runner.app Payload/
           zip -qry unsigned.ipa Payload
       - name: Collect artifacts
         run: |
