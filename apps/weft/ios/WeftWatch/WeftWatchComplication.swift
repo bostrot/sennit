@@ -30,6 +30,20 @@ struct WeftWatchComplicationBundle: WidgetBundle {
 }
 
 struct WeftWatchUnreadComplication: Widget {
+  // The corner family exists only on watchOS, and this file has to survive an
+  // iOS compile too: the target itself is watchOS-only, but `flutter build
+  // ios` builds the whole workspace and a bare `.accessoryCorner` fails it.
+  private static var families: [WidgetFamily] {
+    #if os(watchOS)
+      return [
+        .accessoryCircular, .accessoryCorner, .accessoryInline,
+        .accessoryRectangular,
+      ]
+    #else
+      return [.accessoryCircular, .accessoryInline, .accessoryRectangular]
+    #endif
+  }
+
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "WeftWatchUnread", provider: WeftWatchComplicationProvider()) { entry in
       WeftWatchComplicationView(entry: entry)
@@ -37,12 +51,7 @@ struct WeftWatchUnreadComplication: Widget {
     }
     .configurationDisplayName(WeftWatchStrings.complicationDisplayName)
     .description(WeftWatchStrings.complicationDescription)
-    .supportedFamilies([
-      .accessoryCircular,
-      .accessoryCorner,
-      .accessoryInline,
-      .accessoryRectangular,
-    ])
+    .supportedFamilies(Self.families)
   }
 }
 
