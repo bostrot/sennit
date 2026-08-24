@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -516,14 +517,23 @@ class _ChatViewState extends ConsumerState<ChatView> {
     return senderId;
   }
 
-  Future<void> _openActions(WeftMessage message) async {
-    final choice = await showMessageActionsSheet(
-      context,
-      message: message,
-      canTranscribe: message.canTranscribe,
-      hasTranscript: message.transcript != null,
-      homeAssistant: ref.read(homeAssistantProvider) != null,
-    );
+  Future<void> _openActions(WeftMessage message, {Offset? at}) async {
+    final choice = _isDesktop && at != null
+        ? await showDesktopMessageMenu(
+            context,
+            position: at,
+            message: message,
+            canTranscribe: message.canTranscribe,
+            hasTranscript: message.transcript != null,
+            homeAssistant: ref.read(homeAssistantProvider) != null,
+          )
+        : await showMessageActionsSheet(
+            context,
+            message: message,
+            canTranscribe: message.canTranscribe,
+            hasTranscript: message.transcript != null,
+            homeAssistant: ref.read(homeAssistantProvider) != null,
+          );
     if (choice == null || !mounted) return;
 
     switch (choice.action) {
@@ -1085,6 +1095,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                     ? () => _retranscribe(message)
                                     : null,
                                 onActions: () => _openActions(message),
+                                onActionsAt: (position) => unawaited(
+                                  _openActions(message, at: position),
+                                ),
+                                onQuickReply: () => _enterComposerContext(
+                                  ComposerContext.reply(message),
+                                ),
+                                onQuickReact: () =>
+                                    unawaited(_pickReaction(message)),
                                 onJumpToReply: (eventId) => _jumpTo(eventId),
                                 onToggleReaction: (tally) =>
                                     _toggleReaction(message, tally),
@@ -2083,7 +2101,7 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
+    if (!widget.enabled || _isDesktop) return widget.child;
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final direction = rtl ? -1.0 : 1.0;
 
@@ -2121,6 +2139,128 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
   }
 }
 
+/// Hover and right-click, for platforms that have a pointer.
+///
+/// The Slack shape: resting, the bubble is clean; hovering slides in a small
+/// cluster — reply, react, more — at the bubble's shoulder, and a secondary
+/// click anywhere on the bubble opens the full context menu at the cursor.
+/// On touch platforms this is a pass-through and costs one widget.
+class _BubbleHoverShell extends StatefulWidget {
+  const _BubbleHoverShell({
+    required this.own,
+    required this.child,
+    this.onQuickReply,
+    this.onQuickReact,
+    this.onActionsAt,
+  });
+
+  final bool own;
+  final Widget child;
+  final VoidCallback? onQuickReply;
+  final VoidCallback? onQuickReact;
+  final void Function(Offset globalPosition)? onActionsAt;
+
+  @override
+  State<_BubbleHoverShell> createState() => _BubbleHoverShellState();
+}
+
+class _BubbleHoverShellState extends State<_BubbleHoverShell> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isDesktop) return widget.child;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onSecondaryTapUp: widget.onActionsAt == null
+            ? null
+            : (details) => widget.onActionsAt!(details.globalPosition),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            widget.child,
+            PositionedDirectional(
+              top: -10,
+              // At the bubble's shoulder: the side away from the screen edge,
+              // so the cluster never hangs outside the window.
+              start: widget.own ? 0 : null,
+              end: widget.own ? null : 0,
+              child: IgnorePointer(
+                ignoring: !_hovered,
+                child: AnimatedOpacity(
+                  opacity: _hovered ? 1 : 0,
+                  duration: WeftMotion.fast,
+                  child: Material(
+                    elevation: 3,
+                    borderRadius: WeftRadius.pill,
+                    color: context.colors.surfaceContainerHigh,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.onQuickReply != null)
+                          IconButton(
+                            tooltip: 'Reply',
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 17,
+                            icon: const Icon(Icons.reply_rounded),
+                            onPressed: widget.onQuickReply,
+                          ),
+                        if (widget.onQuickReact != null)
+                          IconButton(
+                            tooltip: 'React',
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 17,
+                            icon: const Icon(Icons.add_reaction_outlined),
+                            onPressed: widget.onQuickReact,
+                          ),
+                        if (widget.onActionsAt != null)
+                          Builder(
+                            builder: (buttonContext) => IconButton(
+                              tooltip: 'More',
+                              visualDensity: VisualDensity.compact,
+                              iconSize: 17,
+                              icon: const Icon(Icons.more_horiz_rounded),
+                              onPressed: () {
+                                final box =
+                                    buttonContext.findRenderObject()!
+                                        as RenderBox;
+                                widget.onActionsAt!(
+                                  box.localToGlobal(
+                                    box.size.bottomCenter(Offset.zero),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Whether this platform drives with a pointer: right-click opens the
+/// context menu, hovering reveals the quick actions, and the swipe-to-reply
+/// gesture stays out of the way of text selection and scrolling.
+bool get _isDesktop =>
+    !kIsWeb &&
+    switch (defaultTargetPlatform) {
+      TargetPlatform.macOS ||
+      TargetPlatform.windows ||
+      TargetPlatform.linux => true,
+      _ => false,
+    };
+
 /// A stable, readable colour for one sender, derived from their id.
 ///
 /// Hue from the hash, saturation fixed, lightness picked per theme so the
@@ -2154,6 +2294,9 @@ class _MessageBubble extends StatelessWidget {
     this.onTranscribe,
     this.onRetranscribe,
     this.onActions,
+    this.onActionsAt,
+    this.onQuickReply,
+    this.onQuickReact,
     this.onJumpToReply,
     this.onToggleReaction,
     this.onAddReaction,
@@ -2188,6 +2331,14 @@ class _MessageBubble extends StatelessWidget {
 
   /// Long-press: the action sheet.
   final VoidCallback? onActions;
+
+  /// Right-click and the hover cluster's "more": the context menu, at the
+  /// pointer.
+  final void Function(Offset globalPosition)? onActionsAt;
+
+  /// The hover cluster's one-click verbs.
+  final VoidCallback? onQuickReply;
+  final VoidCallback? onQuickReact;
 
   /// Reply-chip tap. Takes the target's event id rather than closing over it,
   /// so the bubble does not need to know how the list scrolls.
@@ -2275,265 +2426,274 @@ class _MessageBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Flexible(
-                child: WeftFocusable(
-                  // The bubble is a group, not a control: it holds a body whose
-                  // links and mention pills must stay individually reachable,
-                  // so its children keep speaking and keep their own focus
-                  // nodes. What the group adds is the header a sighted user
-                  // reads off the bubble's position and colour — who, and on
-                  // what leg.
-                  button: false,
-                  excludeSemantics: false,
-                  label: _senderLabel,
-                  // Long-press rather than a visible affordance: a button per
-                  // bubble is six controls per screen the reader has to look
-                  // past to read the conversation. On a keyboard the same
-                  // sheet is Enter, since there is no long-press to make — and
-                  // deliberately not a tap, which would put a menu in front of
-                  // anyone who touched a message.
-                  onActivate: onActions,
-                  onLongPress: onActions,
-                  onLongPressHint: 'show actions',
-                  borderRadius: WeftRadius.allLg,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: WeftSpace.md,
-                      vertical: WeftSpace.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: own ? palette.ownBubble : palette.peerBubble,
-                      // The tail is on the corner nearest the side of the thread
-                      // the bubble sits on, and both are resolved from the
-                      // reader's direction rather than from physical space: the
-                      // row above already puts an own message at the *end*, so
-                      // a physically-computed tail would point away from the
-                      // speaker the moment the app is mirrored.
-                      borderRadius: BorderRadiusDirectional.only(
-                        topStart: WeftRadius.lg,
-                        topEnd: WeftRadius.lg,
-                        bottomStart: own ? WeftRadius.lg : WeftRadius.xs,
-                        bottomEnd: own ? WeftRadius.xs : WeftRadius.lg,
+                child: _BubbleHoverShell(
+                  own: own,
+                  onQuickReply: onQuickReply,
+                  onQuickReact: onQuickReact,
+                  onActionsAt: onActionsAt,
+                  child: WeftFocusable(
+                    // The bubble is a group, not a control: it holds a body whose
+                    // links and mention pills must stay individually reachable,
+                    // so its children keep speaking and keep their own focus
+                    // nodes. What the group adds is the header a sighted user
+                    // reads off the bubble's position and colour — who, and on
+                    // what leg.
+                    button: false,
+                    excludeSemantics: false,
+                    label: _senderLabel,
+                    // Long-press rather than a visible affordance: a button per
+                    // bubble is six controls per screen the reader has to look
+                    // past to read the conversation. On a keyboard the same
+                    // sheet is Enter, since there is no long-press to make — and
+                    // deliberately not a tap, which would put a menu in front of
+                    // anyone who touched a message.
+                    onActivate: onActions,
+                    onLongPress: onActions,
+                    onLongPressHint: 'show actions',
+                    borderRadius: WeftRadius.allLg,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: WeftSpace.md,
+                        vertical: WeftSpace.sm,
                       ),
-                      // A merged chat marks each bubble's origin with a
-                      // hairline in the network's colour — readable without
-                      // stealing attention. On the leading edge, which is the
-                      // one facing the middle of the thread in either
-                      // direction.
-                      border: showNetwork
-                          ? BorderDirectional(
-                              start: BorderSide(color: accent, width: 3),
-                            )
-                          : null,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (showNetwork && !groupedWithPrevious) ...[
-                          // Silent, all of it. The bubble's group node opens
-                          // with "Anna Maven, on WhatsApp"; the glyph carries
-                          // the network's name and the caption beside it
-                          // repeats the same word, so on a device a merged
-                          // thread announced every leg three times over —
-                          // "Anna Maven, on WhatsApp. WhatsApp. WhatsApp."
-                          // This row is how a *sighted* reader learns which
-                          // network a bubble came from, and a reader who has
-                          // already been told does not need it twice more.
-                          ExcludeSemantics(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                NetworkGlyph(
-                                  network: message.network,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: WeftSpace.xs),
-                                Text(
-                                  message.network.label,
-                                  style: context.text.labelSmall?.copyWith(
-                                    // The label is text and owes 4.5:1; the
-                                    // hairline beside it is a graphic and owes
-                                    // 3:1, which is why they are two tokens.
-                                    color: own
-                                        ? palette.mutedOnBubble(
-                                            true,
-                                            alpha: 0.8,
-                                          )
-                                        : palette.networkTextColor(
-                                            message.network,
-                                          ),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                        ],
-                        // Groups say who wrote each message. Coloured by a
-                        // stable hash of the sender so the same person keeps
-                        // the same colour all the way up the thread; excluded
-                        // from semantics because the bubble's group node
-                        // already opens with the sender's name.
-                        if (showSender && !own && !groupedWithPrevious) ...[
-                          ExcludeSemantics(
-                            child: Text(
-                              message.senderName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.text.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: _senderColor(context, message.senderId),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                        ],
-                        // Inside the bubble, above everything: the quote is
-                        // part of what this message says, not chrome around it.
-                        if (replyPreview != null)
-                          ReplyChip(
-                            preview: replyPreview!,
-                            own: own,
-                            onTap: onJumpToReply == null
-                                ? null
-                                : () => onJumpToReply!(replyPreview!.eventId),
-                          ),
-                        if (content != null)
-                          content!
-                        // Before the attachment and voice branches, not after:
-                        // a redacted event keeps whatever `attachmentUrl` it
-                        // was mapped with, and a deleted photo that still drew
-                        // its own bubble would be a deletion that did nothing.
-                        else if (message.redacted)
-                          Text(
-                            'Message deleted',
-                            style: context.text.bodyMedium?.copyWith(
-                              fontStyle: FontStyle.italic,
-                              color: palette.mutedOnBubble(own),
-                            ),
-                          )
-                        else if (rendersAsAttachment(message))
-                          AttachmentBubble(
-                            message: message,
-                            own: own,
-                            onOpen: onOpen,
-                            transcribing: transcribing,
-                            onTranscribe: onTranscribe,
-                            onRetranscribe: onRetranscribe,
-                          )
-                        else if (message.kind == MessageKind.location)
-                          _LocationContent(message: message, own: own)
-                        else if (message.calendarInvite != null)
-                          _CalendarInviteContent(
-                            message: message,
-                            own: own,
-                            onRespond: onRespondInvite,
-                            onAddToCalendar: onAddInviteToCalendar,
-                            onEditTime: own ? onEditInvite : null,
-                          )
-                        else if (message.kind == MessageKind.poll &&
-                            message.poll != null)
-                          _PollContent(
-                            message: message,
-                            own: own,
-                            onVote: onVote ?? (_) {},
-                          )
-                        else if (message.kind == MessageKind.voice)
-                          _VoiceContent(
-                            message: message,
-                            own: own,
-                            transcribing: transcribing,
-                            onTranscribe: onTranscribe,
-                            onRetranscribe: onRetranscribe,
-                          )
-                        else
-                          RichTextView.message(
-                            message: message,
-                            baseStyle:
-                                context.text.bodyMedium?.copyWith(
-                                  color: own
-                                      ? palette.ownBubbleText
-                                      : palette.peerBubbleText,
-                                ) ??
-                                TextStyle(
-                                  color: own
-                                      ? palette.ownBubbleText
-                                      : palette.peerBubbleText,
-                                ),
-                            // Links and mention pills take the network's colour
-                            // on a peer bubble and the bubble's own ink on the
-                            // user's, where the accent would be invisible
-                            // against the primary fill it is derived from.
-                            accent: own ? palette.ownBubbleText : accent,
-                            onTapLink: onTapLink,
-                            onTapMention: onTapMention,
-                          ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (message.isEdited && !message.redacted) ...[
-                              _EditedMarker(message: message, own: own),
-                              const SizedBox(width: WeftSpace.xs),
-                            ],
-                            // The time and the tick are one clause — "Sent
-                            // 14:32, Read" — rather than a bare number followed
-                            // by an unlabelled 13dp glyph whose only difference
-                            // between delivered and read is its colour.
-                            Semantics(
-                              container: true,
-                              excludeSemantics: true,
-                              label: _metaLabel,
+                      decoration: BoxDecoration(
+                        color: own ? palette.ownBubble : palette.peerBubble,
+                        // The tail is on the corner nearest the side of the thread
+                        // the bubble sits on, and both are resolved from the
+                        // reader's direction rather than from physical space: the
+                        // row above already puts an own message at the *end*, so
+                        // a physically-computed tail would point away from the
+                        // speaker the moment the app is mirrored.
+                        borderRadius: BorderRadiusDirectional.only(
+                          topStart: WeftRadius.lg,
+                          topEnd: WeftRadius.lg,
+                          bottomStart: own ? WeftRadius.lg : WeftRadius.xs,
+                          bottomEnd: own ? WeftRadius.xs : WeftRadius.lg,
+                        ),
+                        // A merged chat marks each bubble's origin with a
+                        // hairline in the network's colour — readable without
+                        // stealing attention. On the leading edge, which is the
+                        // one facing the middle of the thread in either
+                        // direction.
+                        border: showNetwork
+                            ? BorderDirectional(
+                                start: BorderSide(color: accent, width: 3),
+                              )
+                            : null,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (showNetwork && !groupedWithPrevious) ...[
+                            // Silent, all of it. The bubble's group node opens
+                            // with "Anna Maven, on WhatsApp"; the glyph carries
+                            // the network's name and the caption beside it
+                            // repeats the same word, so on a device a merged
+                            // thread announced every leg three times over —
+                            // "Anna Maven, on WhatsApp. WhatsApp. WhatsApp."
+                            // This row is how a *sighted* reader learns which
+                            // network a bubble came from, and a reader who has
+                            // already been told does not need it twice more.
+                            ExcludeSemantics(
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  NetworkGlyph(
+                                    network: message.network,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: WeftSpace.xs),
                                   Text(
-                                    DateFormat.Hm().format(message.timestamp),
+                                    message.network.label,
                                     style: context.text.labelSmall?.copyWith(
+                                      // The label is text and owes 4.5:1; the
+                                      // hairline beside it is a graphic and owes
+                                      // 3:1, which is why they are two tokens.
+                                      color: own
+                                          ? palette.mutedOnBubble(
+                                              true,
+                                              alpha: 0.8,
+                                            )
+                                          : palette.networkTextColor(
+                                              message.network,
+                                            ),
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 10,
-                                      color: palette.mutedOnBubble(own),
                                     ),
                                   ),
-                                  if (own) ...[
-                                    const SizedBox(width: 3),
-                                    Tooltip(
-                                      message: deliveryStateLabel(
-                                        message.deliveryState,
-                                      ),
-                                      excludeFromSemantics: true,
-                                      child: Icon(
-                                        // An upload still on the wire, and one
-                                        // that failed, must not wear the same
-                                        // double tick a delivered message does.
-                                        switch (message.deliveryState) {
-                                          DeliveryState.sending =>
-                                            Icons.schedule_rounded,
-                                          DeliveryState.failed =>
-                                            Icons.error_outline_rounded,
-                                          _ => Icons.done_all_rounded,
-                                        },
-                                        size: 13,
-                                        color:
-                                            message.deliveryState ==
-                                                DeliveryState.failed
-                                            ? context.colors.error
-                                            : palette.mutedOnBubble(
-                                                true,
-                                                alpha: 0.7,
-                                              ),
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
+                            const SizedBox(height: 3),
                           ],
-                        ),
-                      ],
+                          // Groups say who wrote each message. Coloured by a
+                          // stable hash of the sender so the same person keeps
+                          // the same colour all the way up the thread; excluded
+                          // from semantics because the bubble's group node
+                          // already opens with the sender's name.
+                          if (showSender && !own && !groupedWithPrevious) ...[
+                            ExcludeSemantics(
+                              child: Text(
+                                message.senderName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.text.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: _senderColor(
+                                    context,
+                                    message.senderId,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          // Inside the bubble, above everything: the quote is
+                          // part of what this message says, not chrome around it.
+                          if (replyPreview != null)
+                            ReplyChip(
+                              preview: replyPreview!,
+                              own: own,
+                              onTap: onJumpToReply == null
+                                  ? null
+                                  : () => onJumpToReply!(replyPreview!.eventId),
+                            ),
+                          if (content != null)
+                            content!
+                          // Before the attachment and voice branches, not after:
+                          // a redacted event keeps whatever `attachmentUrl` it
+                          // was mapped with, and a deleted photo that still drew
+                          // its own bubble would be a deletion that did nothing.
+                          else if (message.redacted)
+                            Text(
+                              'Message deleted',
+                              style: context.text.bodyMedium?.copyWith(
+                                fontStyle: FontStyle.italic,
+                                color: palette.mutedOnBubble(own),
+                              ),
+                            )
+                          else if (rendersAsAttachment(message))
+                            AttachmentBubble(
+                              message: message,
+                              own: own,
+                              onOpen: onOpen,
+                              transcribing: transcribing,
+                              onTranscribe: onTranscribe,
+                              onRetranscribe: onRetranscribe,
+                            )
+                          else if (message.kind == MessageKind.location)
+                            _LocationContent(message: message, own: own)
+                          else if (message.calendarInvite != null)
+                            _CalendarInviteContent(
+                              message: message,
+                              own: own,
+                              onRespond: onRespondInvite,
+                              onAddToCalendar: onAddInviteToCalendar,
+                              onEditTime: own ? onEditInvite : null,
+                            )
+                          else if (message.kind == MessageKind.poll &&
+                              message.poll != null)
+                            _PollContent(
+                              message: message,
+                              own: own,
+                              onVote: onVote ?? (_) {},
+                            )
+                          else if (message.kind == MessageKind.voice)
+                            _VoiceContent(
+                              message: message,
+                              own: own,
+                              transcribing: transcribing,
+                              onTranscribe: onTranscribe,
+                              onRetranscribe: onRetranscribe,
+                            )
+                          else
+                            RichTextView.message(
+                              message: message,
+                              baseStyle:
+                                  context.text.bodyMedium?.copyWith(
+                                    color: own
+                                        ? palette.ownBubbleText
+                                        : palette.peerBubbleText,
+                                  ) ??
+                                  TextStyle(
+                                    color: own
+                                        ? palette.ownBubbleText
+                                        : palette.peerBubbleText,
+                                  ),
+                              // Links and mention pills take the network's colour
+                              // on a peer bubble and the bubble's own ink on the
+                              // user's, where the accent would be invisible
+                              // against the primary fill it is derived from.
+                              accent: own ? palette.ownBubbleText : accent,
+                              onTapLink: onTapLink,
+                              onTapMention: onTapMention,
+                            ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (message.isEdited && !message.redacted) ...[
+                                _EditedMarker(message: message, own: own),
+                                const SizedBox(width: WeftSpace.xs),
+                              ],
+                              // The time and the tick are one clause — "Sent
+                              // 14:32, Read" — rather than a bare number followed
+                              // by an unlabelled 13dp glyph whose only difference
+                              // between delivered and read is its colour.
+                              Semantics(
+                                container: true,
+                                excludeSemantics: true,
+                                label: _metaLabel,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      DateFormat.Hm().format(message.timestamp),
+                                      style: context.text.labelSmall?.copyWith(
+                                        fontSize: 10,
+                                        color: palette.mutedOnBubble(own),
+                                      ),
+                                    ),
+                                    if (own) ...[
+                                      const SizedBox(width: 3),
+                                      Tooltip(
+                                        message: deliveryStateLabel(
+                                          message.deliveryState,
+                                        ),
+                                        excludeFromSemantics: true,
+                                        child: Icon(
+                                          // An upload still on the wire, and one
+                                          // that failed, must not wear the same
+                                          // double tick a delivered message does.
+                                          switch (message.deliveryState) {
+                                            DeliveryState.sending =>
+                                              Icons.schedule_rounded,
+                                            DeliveryState.failed =>
+                                              Icons.error_outline_rounded,
+                                            _ => Icons.done_all_rounded,
+                                          },
+                                          size: 13,
+                                          color:
+                                              message.deliveryState ==
+                                                  DeliveryState.failed
+                                              ? context.colors.error
+                                              : palette.mutedOnBubble(
+                                                  true,
+                                                  alpha: 0.7,
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

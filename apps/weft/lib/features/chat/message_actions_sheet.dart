@@ -294,6 +294,130 @@ class _MessageActionsSheet extends StatelessWidget {
   }
 }
 
+/// The same decisions as the sheet, shaped for a pointer: a context menu at
+/// the cursor. Desktop's right-click and the hover cluster's "more" both
+/// land here; the sheet stays for touch and for keyboard activation, where
+/// there is no cursor position worth anchoring to.
+Future<MessageActionChoice?> showDesktopMessageMenu(
+  BuildContext context, {
+  required Offset position,
+  required WeftMessage message,
+  bool canTranscribe = false,
+  bool hasTranscript = false,
+  bool homeAssistant = false,
+}) {
+  final overlay =
+      Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final live = !message.redacted;
+
+  PopupMenuItem<MessageActionChoice> item(
+    MessageAction action,
+    IconData icon,
+    String label, {
+    Color? color,
+  }) => PopupMenuItem(
+    value: MessageActionChoice(action),
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: WeftSpace.sm),
+        Text(label, style: color == null ? null : TextStyle(color: color)),
+      ],
+    ),
+  );
+
+  return showMenu<MessageActionChoice>(
+    context: context,
+    position: RelativeRect.fromRect(
+      position & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      if (live)
+        PopupMenuItem<MessageActionChoice>(
+          enabled: false,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final key in kQuickReactions)
+                InkWell(
+                  borderRadius: WeftRadius.pill,
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop(MessageActionChoice(MessageAction.react, emoji: key)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(WeftSpace.xs),
+                    child: Text(key, style: const TextStyle(fontSize: 20)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      if (message.isOwn && message.deliveryState == DeliveryState.failed) ...[
+        item(MessageAction.retrySend, Icons.refresh_rounded, 'Retry sending'),
+        item(
+          MessageAction.discardSend,
+          Icons.close_rounded,
+          'Discard unsent message',
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ],
+      if (live) ...[
+        item(MessageAction.reply, Icons.reply_rounded, 'Reply'),
+        if (message.isOwn && message.kind == MessageKind.text)
+          item(MessageAction.edit, Icons.edit_outlined, 'Edit'),
+        if (message.isOwn && message.calendarInvite != null)
+          item(
+            MessageAction.editInvite,
+            Icons.edit_calendar_rounded,
+            'Change the time',
+          ),
+        if (message.body.trim().isNotEmpty) ...[
+          item(MessageAction.copy, Icons.copy_rounded, 'Copy text'),
+          item(
+            MessageAction.selectText,
+            Icons.text_fields_rounded,
+            'Select text',
+          ),
+        ],
+        item(MessageAction.forward, Icons.forward_rounded, 'Forward'),
+        item(MessageAction.remind, Icons.alarm_add_rounded, 'Remind me'),
+        if (homeAssistant)
+          item(
+            MessageAction.sendToHomeAssistant,
+            Icons.home_outlined,
+            'Send to Home Assistant',
+          ),
+        if (message.editHistory.isNotEmpty)
+          item(
+            MessageAction.editHistory,
+            Icons.history_rounded,
+            'Edit history',
+          ),
+        if (canTranscribe && !hasTranscript)
+          item(
+            MessageAction.transcribe,
+            Icons.graphic_eq_rounded,
+            'Transcribe',
+          ),
+        if (canTranscribe && hasTranscript)
+          item(
+            MessageAction.retranscribe,
+            Icons.translate_rounded,
+            'Re-transcribe in…',
+          ),
+      ],
+      if (message.isOwn)
+        item(
+          MessageAction.delete,
+          Icons.delete_outline_rounded,
+          'Delete',
+          color: Theme.of(context).colorScheme.error,
+        ),
+    ],
+  );
+}
+
 /// Confirms a redaction.
 ///
 /// A dialog rather than an undo toast: a redaction is sent to the homeserver
