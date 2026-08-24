@@ -20,5 +20,16 @@ export 'package:sqflite_common_ffi/sqflite_ffi.dart'
 Future<Database> openWeftSqfliteDatabase(String path) async {
   // Idempotent, and cheap enough to call on every open.
   sqfliteFfiInit();
-  return databaseFactoryFfi.openDatabase(path);
+  final db = await databaseFactoryFfi.openDatabase(path);
+  // Two engines touch this file during a handoff: the background daemon is
+  // closing its client while the UI's opens. Without a busy timeout the
+  // newcomer's BEGIN IMMEDIATE fails instantly with "database is locked"
+  // and the whole app refuses to start; with one it simply waits out the
+  // handoff. WAL sharpens the same edge — readers and the writer stop
+  // excluding each other at all.
+  if (path != inMemoryDatabasePath) {
+    await db.execute('PRAGMA journal_mode = WAL');
+  }
+  await db.execute('PRAGMA busy_timeout = 15000');
+  return db;
 }
