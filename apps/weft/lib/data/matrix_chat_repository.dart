@@ -1783,6 +1783,21 @@ class MatrixChatRepository implements ChatRepository {
     return mapped;
   }
 
+  /// Whether the user has read [room] up to (at least) [lastEvent].
+  ///
+  /// Three witnesses, any of which settles it: the receipt this session just
+  /// wrote, the stored own receipt naming the event itself, or a stored own
+  /// receipt *younger* than the event — receipts sometimes point at trailing
+  /// reactions and edits rather than the message the preview shows.
+  bool _isReadLocally(sdk.Room room, sdk.Event? lastEvent) {
+    if (lastEvent == null) return true;
+    if (_readUpTo[room.id] == lastEvent.eventId) return true;
+    final own = room.receiptState.global.latestOwnReceipt;
+    if (own == null) return false;
+    if (own.eventId == lastEvent.eventId) return true;
+    return own.ts >= lastEvent.originServerTs.millisecondsSinceEpoch;
+  }
+
   Chat _chatFromRoom(sdk.Room room) {
     final network = _networkOf(room);
     final lastEvent = room.lastEvent;
@@ -1810,11 +1825,14 @@ class MatrixChatRepository implements ChatRepository {
       lastMessage: lastEvent == null
           ? null
           : _previewFor(room, lastEvent, network),
-      // The marked-unread flag keeps at least a badge of one; otherwise the
-      // receipt we just wrote beats the server's stale count.
+      // The marked-unread flag keeps at least a badge of one; otherwise a
+      // conversation the user has read is read — this session's optimistic
+      // receipt, or the *persisted* one the SDK synced back, both beat the
+      // server's cached count, which goes stale the moment the app is killed
+      // before the next sync and resurrected every chat as unread.
       unreadCount: room.markedUnread
           ? (room.notificationCount > 0 ? room.notificationCount : 1)
-          : _readUpTo[room.id] == lastEvent?.eventId
+          : _isReadLocally(room, lastEvent)
           ? 0
           : room.notificationCount,
       // A resolved peer means "conversation with a person", whatever the
