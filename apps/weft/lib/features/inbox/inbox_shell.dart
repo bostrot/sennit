@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -20,6 +21,119 @@ import 'new_chat_sheet.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
+
+/// Whether this platform drives with a pointer — right-click then owns the
+/// per-conversation verbs, mirroring what long-press-selection offers.
+bool get _isDesktopPointer =>
+    !kIsWeb &&
+    switch (defaultTargetPlatform) {
+      TargetPlatform.macOS ||
+      TargetPlatform.windows ||
+      TargetPlatform.linux => true,
+      _ => false,
+    };
+
+/// The conversation's verbs, at the cursor.
+Future<void> _showChatContextMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Chat chat,
+  Offset position,
+) async {
+  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final repository = ref.read(chatRepositoryProvider);
+
+  PopupMenuItem<String> item(
+    String value,
+    IconData icon,
+    String label, {
+    Color? color,
+  }) => PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: WeftSpace.sm),
+        Text(label, style: color == null ? null : TextStyle(color: color)),
+      ],
+    ),
+  );
+
+  final choice = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromRect(
+      position & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      if (chat.unreadCount > 0)
+        item('read', Icons.mark_email_read_outlined, 'Mark read')
+      else
+        item('unread', Icons.mark_email_unread_outlined, 'Mark unread'),
+      if (chat.muted)
+        item('unmute', Icons.notifications_active_outlined, 'Unmute')
+      else
+        item('mute', Icons.notifications_off_outlined, 'Mute'),
+      if (chat.archived)
+        item('unarchive', Icons.unarchive_outlined, 'Unarchive')
+      else
+        item('archive', Icons.archive_outlined, 'Archive'),
+      item('label', Icons.label_outline_rounded, 'Labels…'),
+      item('select', Icons.check_circle_outline_rounded, 'Select'),
+      item(
+        'delete',
+        Icons.delete_outline_rounded,
+        'Delete',
+        color: Theme.of(context).colorScheme.error,
+      ),
+    ],
+  );
+  if (choice == null || !context.mounted) return;
+
+  switch (choice) {
+    case 'read':
+      await repository.markRead(chat.id);
+    case 'unread':
+      await repository.markUnread(chat.id);
+    case 'mute':
+      await repository.setMuted(chat.id, muted: true);
+    case 'unmute':
+      await repository.setMuted(chat.id, muted: false);
+    case 'archive':
+      await repository.setArchived(chat.id, archived: true);
+    case 'unarchive':
+      await repository.setArchived(chat.id, archived: false);
+    case 'label':
+      await showLabelSheet(context, ref, {chat.id});
+    case 'select':
+      ref.read(chatSelectionProvider.notifier).toggle(chat.id);
+    case 'delete':
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: Text('Delete "${chat.title}"?'),
+          content: const Text(
+            'The conversation leaves this app. History on the network is '
+            'not affected.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialog).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialog).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(dialog).colorScheme.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) await repository.deleteChat(chat.id);
+  }
+}
 
 /// The app's home: network rail, inbox, and — when there's room — the open
 /// conversation beside it.
@@ -202,51 +316,66 @@ class _InboxPane extends ConsumerWidget {
                         final picked = selection.contains(chat.id);
                         return _StaggeredIn(
                           index: i,
-                          child: ChatTile(
-                            chat: chat,
-                            avatarHeaders: mediaHeaders,
-                            selected:
-                                picked || (wide && chat.id == selectedChatId),
-                            // The tick's state has to reach the row's merged
-                            // node: the `Checkbox` below is inside it and
-                            // therefore silent, which is an improvement on
-                            // announcing "checkbox" with no conversation name.
-                            checked: selecting ? picked : null,
-                            leading: selecting
-                                ? Checkbox(
-                                    value: picked,
-                                    onChanged: (_) => ref
-                                        .read(chatSelectionProvider.notifier)
-                                        .toggle(chat.id),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onSecondaryTapUp: _isDesktopPointer
+                                ? (details) => unawaited(
+                                    _showChatContextMenu(
+                                      context,
+                                      ref,
+                                      chat,
+                                      details.globalPosition,
+                                    ),
                                   )
                                 : null,
-                            onLongPress: () => ref
-                                .read(chatSelectionProvider.notifier)
-                                .toggle(chat.id),
-                            timeLabel: _formatTime(chat.lastMessage?.timestamp),
-                            onTap: () {
-                              // While selecting, a tap toggles rather than opens
-                              // — otherwise the mode is a trap you fall out of.
-                              if (selecting) {
+                            child: ChatTile(
+                              chat: chat,
+                              avatarHeaders: mediaHeaders,
+                              selected:
+                                  picked || (wide && chat.id == selectedChatId),
+                              // The tick's state has to reach the row's merged
+                              // node: the `Checkbox` below is inside it and
+                              // therefore silent, which is an improvement on
+                              // announcing "checkbox" with no conversation name.
+                              checked: selecting ? picked : null,
+                              leading: selecting
+                                  ? Checkbox(
+                                      value: picked,
+                                      onChanged: (_) => ref
+                                          .read(chatSelectionProvider.notifier)
+                                          .toggle(chat.id),
+                                    )
+                                  : null,
+                              onLongPress: () => ref
+                                  .read(chatSelectionProvider.notifier)
+                                  .toggle(chat.id),
+                              timeLabel: _formatTime(
+                                chat.lastMessage?.timestamp,
+                              ),
+                              onTap: () {
+                                // While selecting, a tap toggles rather than opens
+                                // — otherwise the mode is a trap you fall out of.
+                                if (selecting) {
+                                  ref
+                                      .read(chatSelectionProvider.notifier)
+                                      .toggle(chat.id);
+                                  return;
+                                }
                                 ref
-                                    .read(chatSelectionProvider.notifier)
-                                    .toggle(chat.id);
-                                return;
-                              }
-                              ref
-                                  .read(selectedChatProvider.notifier)
-                                  .select(chat.id);
-                              ref
-                                  .read(chatRepositoryProvider)
-                                  .markRead(chat.id);
-                              if (!wide) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ChatView(chatId: chat.id),
-                                  ),
-                                );
-                              }
-                            },
+                                    .read(selectedChatProvider.notifier)
+                                    .select(chat.id);
+                                ref
+                                    .read(chatRepositoryProvider)
+                                    .markRead(chat.id);
+                                if (!wide) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => ChatView(chatId: chat.id),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         );
                       },
@@ -355,13 +484,29 @@ class _SelectionBar extends ConsumerWidget {
                       icon: const Icon(Icons.mark_email_unread_outlined),
                       onPressed: () => _apply(ref, repository.markUnread),
                     ),
-                    IconButton(
-                      tooltip: 'Mute',
-                      icon: const Icon(Icons.notifications_off_outlined),
-                      onPressed: () => _apply(
-                        ref,
-                        (id) => repository.setMuted(id, muted: true),
-                      ),
+                    // One toggle, read off the selection: with every
+                    // selected chat already muted the same button unmutes —
+                    // there used to be no way back at all from here.
+                    Builder(
+                      builder: (context) {
+                        final chosen = visible
+                            .where((c) => selected.contains(c.id))
+                            .toList();
+                        final allMuted =
+                            chosen.isNotEmpty && chosen.every((c) => c.muted);
+                        return IconButton(
+                          tooltip: allMuted ? 'Unmute' : 'Mute',
+                          icon: Icon(
+                            allMuted
+                                ? Icons.notifications_active_outlined
+                                : Icons.notifications_off_outlined,
+                          ),
+                          onPressed: () => _apply(
+                            ref,
+                            (id) => repository.setMuted(id, muted: !allMuted),
+                          ),
+                        );
+                      },
                     ),
                     IconButton(
                       tooltip: 'Label',
