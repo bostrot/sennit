@@ -134,6 +134,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # CocoaPods, never Swift Package Manager: the SPM path loses
+  # flutter_vodozemac's Versions/Current symlink inside its framework and
+  # every code-signing step downstream breaks on the "ambiguous" bundle. The
+  # ios and macos Podfiles carry the CocoaPods arrangement that works; this
+  # pin is what `flutter config --no-enable-swift-package-manager` did on the
+  # development machine, made portable to CI and fresh checkouts.
+  config:
+    enable-swift-package-manager: false
 
 # Patrol's own configuration, read by `patrol_cli`, not by pub. The ids must
 # match the built artefacts or the CLI installs one app and instruments another:
