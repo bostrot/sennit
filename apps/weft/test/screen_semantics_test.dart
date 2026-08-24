@@ -57,7 +57,7 @@ void main() {
       ).firstWhere((label) => label.contains('may be the same person'));
       expect(proposal, contains('Michael Johnson on WhatsApp'));
       expect(proposal, contains('% confident'));
-      expect(proposal, contains('Very similar name'));
+      expect(proposal, contains('Identical name'));
       handle.dispose();
     });
 

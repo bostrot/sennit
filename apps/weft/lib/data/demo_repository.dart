@@ -699,8 +699,9 @@ class DemoChatRepository implements ChatRepository {
     _handle('james_ig', ChatNetwork.instagram, 'Dr. James Anderson', null),
     _handle('isabella_tg', ChatNetwork.telegram, 'Isabella Garcia', null),
     _handle('david_wa', ChatNetwork.whatsapp, 'Prof. David Wilson', null),
-    // Michael appears twice with a near-identical name — the scorer should
-    // suggest this merge but never make it unattended.
+    // Michael appears twice with the identical name — the exact signal a
+    // suggestion needs since resemblance alone stopped opening one. The demo
+    // scorer runs without auto-merge, so it stays a suggestion to exercise.
     _handle(
       'michael_wa',
       ChatNetwork.whatsapp,
@@ -711,7 +712,7 @@ class DemoChatRepository implements ChatRepository {
     _handle(
       'michael_dc',
       ChatNetwork.discord,
-      'Michael Johnsen',
+      'Michael Johnson',
       null,
       dHash: 0x0F0F0F0F0F0F0F0E,
     ),

@@ -25,7 +25,7 @@ void main() {
     // The demo fixtures include Michael on WhatsApp and Discord with a
     // near-identical name and matching avatar — the scorer should propose it.
     expect(find.text('Michael Johnson'), findsWidgets);
-    expect(find.text('Very similar name'), findsOneWidget);
+    expect(find.text('Identical name'), findsOneWidget);
     expect(find.text('Nearly identical avatar'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Merge'), findsOneWidget);
 

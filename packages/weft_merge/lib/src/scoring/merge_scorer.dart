@@ -182,6 +182,19 @@ class MergeScorer {
 
     if (signals.isEmpty) return null;
 
+    // At least one signal must be *exact* — a name, a number or an email
+    // matching to the letter. Resemblance alone (similar names, similar
+    // avatars, shared groups) used to clear the score bar in combination,
+    // and the result was an endless drip of look-alike pairs: merge one,
+    // the next weak candidate takes its place. Soft signals still raise
+    // confidence and still show as evidence; they no longer open the door.
+    const exact = {
+      MergeSignal.phoneExact,
+      MergeSignal.emailExact,
+      MergeSignal.nameExact,
+    };
+    if (!signals.any(exact.contains)) return null;
+
     var inverse = 1.0;
     for (final s in signals) {
       inverse *= 1 - s.weight;

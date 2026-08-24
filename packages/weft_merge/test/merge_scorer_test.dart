@@ -88,7 +88,10 @@ void main() {
       expect(candidate, isNull);
     });
 
-    test('name plus avatar combine past the threshold', () {
+    test('resemblance alone opens no suggestion', () {
+      // Similar name plus similar avatar clears the score bar numerically —
+      // and is exactly the look-alike drip that made the merge screen feel
+      // endless. Without one *exact* signal there is no candidate at all.
       final candidate = scorer.score(
         handle(
           'a',
@@ -104,18 +107,7 @@ void main() {
         ),
       );
 
-      // Noisy-OR: 1 - (1-0.5)(1-0.4) = 0.70
-      expect(candidate, isNotNull);
-      expect(candidate!.score, closeTo(0.70, 0.001));
-      expect(
-        candidate.signals,
-        containsAll([MergeSignal.nameSimilar, MergeSignal.avatarSimilar]),
-      );
-      expect(
-        candidate.hasIdentitySignal,
-        isFalse,
-        reason: 'soft signals must never qualify for auto-merge',
-      );
+      expect(candidate, isNull);
     });
 
     test('a bare first name is not treated as evidence', () {
@@ -181,7 +173,8 @@ void main() {
         handle(
           'd',
           ChatNetwork.discord,
-          displayName: 'Michael Johnsen',
+          // Exact name; the shared avatar raises the score above name alone.
+          displayName: 'Michael Johnson',
           avatarDHash: 0x0F0F0F0F0F0F0F0F,
         ),
       ];
