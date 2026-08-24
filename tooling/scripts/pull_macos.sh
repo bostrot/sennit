@@ -5,10 +5,10 @@
 #
 # One-time setup:
 #   • On the BUILD Mac: System Settings → General → Sharing → "Remote Login".
-#   • On this (test) Mac:  ssh-copy-id user@build-host
+#   • On this (test) Mac:  ssh-copy-id user@build-mac
 #   • Get this script over once, using those same credentials:
-#       ssh user@build-host cat \
-#         /Users/me/Documents/projects/messenger/tooling/scripts/pull_macos.sh \
+#       ssh user@build-mac cat \
+#         <repo>/tooling/scripts/pull_macos.sh \
 #         > ~/braid-pull.sh && chmod +x ~/braid-pull.sh
 #   • First launch only: right-click Braid.app → Open past Gatekeeper.
 #
@@ -18,11 +18,10 @@
 
 set -euo pipefail
 
-# Adjust these two lines if the build host or checkout ever moves. If the
-# "build-host" name does not resolve from this subnet, use the IP:
-# user@192.0.2.10.
-HOST="${BRAID_HOST:-user@build-host}"
-REPO="/Users/me/Documents/projects/messenger"
+# Point these at your build host and checkout — or export BRAID_HOST and
+# BRAID_REPO instead of editing.
+HOST="${BRAID_HOST:-user@build-mac}"
+REPO="${BRAID_REPO:-$HOME/braid}"
 
 APP="$REPO/apps/weft/build/macos/Build/Products/Release/Braid.app"
 

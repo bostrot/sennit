@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Build Braid for macOS on this Mac and push it to the test Mac.
 #
-# The iteration loop this exists for: the build Mac (192.0.2.10) compiles,
-# rsync ships only the changed bytes across to the test Mac in the
-# 192.0.2.0/24 subnet, and the app is relaunched there — a few seconds per
-# round after the first full copy.
+# The iteration loop this exists for: the build Mac compiles, rsync ships
+# only the changed bytes across to the test Mac, and the app is relaunched
+# there — a few seconds per round after the first full copy.
 #
 # One-time setup on the TEST Mac:
 #   1. System Settings → General → Sharing → enable "Remote Login".
@@ -15,9 +14,9 @@
 #      subsequent updates launch without ceremony.
 #
 # Usage:
-#   tooling/scripts/deploy_macos.sh user@192.0.2.20
-#   BRAID_MAC=user@192.0.2.20 tooling/scripts/deploy_macos.sh
-#   tooling/scripts/deploy_macos.sh --no-build user@192.0.2.20   # ship as-is
+#   tooling/scripts/deploy_macos.sh user@test-mac
+#   BRAID_MAC=user@test-mac tooling/scripts/deploy_macos.sh
+#   tooling/scripts/deploy_macos.sh --no-build user@test-mac   # ship as-is
 
 set -euo pipefail
 
