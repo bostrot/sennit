@@ -56,7 +56,23 @@ class TranscriptionService {
   /// [languageOverride] backs the "re-transcribe in the right language" action:
   /// auto-detection sometimes picks wrong on short clips, and the fix is a
   /// context action, not a settings hunt.
+  /// One transcription at a time. whisper.cpp saturates the big cores on
+  /// its own; two jobs at once are both slower than the same two run back
+  /// to back — and the auto pass plus a manual tap was exactly that.
+  Future<void> _jobQueue = Future<void>.value();
+
   Future<Transcript> transcribe(
+    WeftMessage message, {
+    String? languageOverride,
+  }) {
+    final job = _jobQueue.then(
+      (_) => _transcribeNow(message, languageOverride: languageOverride),
+    );
+    _jobQueue = job.then((_) {}, onError: (_) {});
+    return job;
+  }
+
+  Future<Transcript> _transcribeNow(
     WeftMessage message, {
     String? languageOverride,
   }) async {

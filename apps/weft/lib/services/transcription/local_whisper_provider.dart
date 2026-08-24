@@ -35,7 +35,11 @@ class LocalWhisperProvider implements TranscriptionProvider {
   /// Null asks whisper to detect the language.
   final String? languageHint;
 
-  Whisper get _whisper => Whisper(model: sizeHint);
+  /// One instance for the provider's lifetime, with the model kept loaded:
+  /// constructing a fresh `Whisper` per call re-read the 60–190 MB model
+  /// from disk for every single voice note, which was most of "a minute for
+  /// a fifty-second clip".
+  late final Whisper _whisper = Whisper(model: sizeHint);
 
   @override
   String get id => 'local-whisper';
@@ -84,6 +88,7 @@ class LocalWhisperProvider implements TranscriptionProvider {
           // Voice notes are short; letting whisper hallucinate non-speech
           // tokens on silence produces confident nonsense.
           suppressNonSpeechTokens: true,
+          keepModelLoaded: true,
         ),
         modelPath: modelPath,
       );
