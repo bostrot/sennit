@@ -314,6 +314,25 @@ void main() {
       );
     });
 
+    test('a number wearing a name is not name evidence', () {
+      // Bridge ghosts without a profile show their phone number as the
+      // display name; two strangers formatting alike must not merge.
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: '+49 151 234 5678'),
+          handle('b', ChatNetwork.signal, displayName: '+49 151 234 5678'),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      // The *number* itself is still phone-exact evidence — a suggestion —
+      // but nothing merges unattended on it.
+      expect(graph.applyAutoMerges(), isEmpty);
+    });
+
     test('the same name on the same network never merges or suggests', () {
       // Two colleagues named alike on one messenger are two people; a
       // bridge gives one person exactly one handle per network.

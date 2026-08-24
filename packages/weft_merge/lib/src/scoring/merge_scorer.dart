@@ -150,9 +150,15 @@ class MergeScorer {
     // twice — a bridge gives each person exactly one handle per network.
     if (a.network != b.network && nameA.isNotEmpty && nameB.isNotEmpty) {
       // A bare first name is far too common to be evidence on its own; only
-      // a name with more than one part counts.
+      // a name with more than one part counts. And a "name" with a digit in
+      // it is not a name at all — bridge ghosts wear formatted phone numbers
+      // and account ids as display names, two *different* people render as
+      // the same number-shaped string, and one such match poisons a contact
+      // that every later merge then drags along.
       final substantial = nameA.contains(' ') || nameB.contains(' ');
-      if (substantial) {
+      final identifierShaped =
+          RegExp(r'\d').hasMatch(nameA) || RegExp(r'\d').hasMatch(nameB);
+      if (substantial && !identifierShaped) {
         if (nameA == nameB) {
           signals.add(MergeSignal.nameExact);
         } else if (jaroWinkler(nameA, nameB) >=
