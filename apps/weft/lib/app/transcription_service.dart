@@ -144,7 +144,13 @@ class TranscriptionService {
     int cap = 5,
     void Function()? onEach,
   }) async {
-    final settings = _ref.read(storesProvider).settings;
+    // Read the bootstrap gate, not storesProvider: a chat view can page while
+    // the stores are still opening (or, in a widget test, never open at all),
+    // and reading the erroring provider reports a StateError to the zone that
+    // no try/catch here can intercept. No stores means nobody opted in.
+    final stores = _ref.read(storesBootstrapProvider).value;
+    if (stores == null) return;
+    final settings = stores.settings;
     if (!settings.getBool('transcribe.auto')) return;
     if (await _ref.read(transcriptionProviderProvider.future) == null) return;
 
