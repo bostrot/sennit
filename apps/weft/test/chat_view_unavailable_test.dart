@@ -16,6 +16,12 @@ import 'package:weft_merge/weft_merge.dart';
 /// rooms, standing in for a room the account has since left.
 class _NoRoomsRepository implements ChatRepository {
   @override
+  Future<void> retryFailedSend(String roomId, String eventId) async {}
+
+  @override
+  Future<void> discardFailedSend(String roomId, String eventId) async {}
+
+  @override
   Future<void> markUnread(String chatId) async {}
 
   @override

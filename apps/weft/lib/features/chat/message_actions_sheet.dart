@@ -28,6 +28,12 @@ enum MessageAction {
   /// Schedule a local notification pointing back at this message.
   remind,
 
+  /// Re-attempt a send that failed.
+  retrySend,
+
+  /// Drop a failed local echo — it never reached the room.
+  discardSend,
+
   /// Fire the message at the user's Home Assistant as a `weft_message` event.
   sendToHomeAssistant,
 
@@ -185,6 +191,25 @@ class _MessageActionsSheet extends StatelessWidget {
                   ),
                 ),
                 Divider(color: context.palette.divider, height: WeftSpace.lg),
+                if (message.isOwn &&
+                    message.deliveryState == DeliveryState.failed) ...[
+                  ListTile(
+                    leading: const Icon(Icons.refresh_rounded),
+                    title: const Text('Retry sending'),
+                    onTap: () => choose(MessageAction.retrySend),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.close_rounded,
+                      color: context.colors.error,
+                    ),
+                    title: Text(
+                      'Discard unsent message',
+                      style: TextStyle(color: context.colors.error),
+                    ),
+                    onTap: () => choose(MessageAction.discardSend),
+                  ),
+                ],
                 ListTile(
                   leading: const Icon(Icons.reply_rounded),
                   title: const Text('Reply'),

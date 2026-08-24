@@ -42,18 +42,17 @@ Future<List<String>> suggestSmartReplies({
               {
                 'role': 'system',
                 'content':
-                    'You suggest quick replies the user could send in a '
-                    'messaging app. Answer with ONLY a JSON array of one or '
-                    'two strings, each a complete reply of at most eight '
-                    'words, in the same language as the conversation. No '
-                    'explanations.',
+                    'You write short chat replies. Output ONLY this JSON, '
+                    'nothing else — no analysis, no commentary, no '
+                    'markdown: {"replies": ["…", "…"]} with one or two '
+                    'replies, each a complete sentence of at most eight '
+                    'words, in the same language as the conversation.',
               },
               {
                 'role': 'user',
                 'content':
-                    'Conversation "$chatTitle" (the user is "You", newest '
-                    'message last):\n${transcript.join('\n')}\n\n'
-                    'Suggest replies the user could send now.',
+                    'Conversation (newest message last):\n'
+                    '${transcript.join('\n')}\n\nJSON:',
               },
             ],
           }),
@@ -107,24 +106,33 @@ List<String> parseSmartReplies(String content) {
   final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(text);
   if (fence != null) text = fence[1]!.trim();
 
+  // JSON or nothing. The old line-scraping fallback turned a model's prompt
+  // analysis into chips — 'Sender: Joanne (Signal)' on a real notification —
+  // and no suggestion beats a nonsensical one every time.
   List<String> candidates = const [];
-  final arrayStart = text.indexOf('[');
-  final arrayEnd = text.lastIndexOf(']');
-  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+  final objStart = text.indexOf('{');
+  final objEnd = text.lastIndexOf('}');
+  if (objStart >= 0 && objEnd > objStart) {
     try {
-      final parsed = jsonDecode(text.substring(arrayStart, arrayEnd + 1));
-      if (parsed is List) candidates = parsed.whereType<String>().toList();
+      final parsed = jsonDecode(text.substring(objStart, objEnd + 1));
+      if (parsed is Map && parsed['replies'] is List) {
+        candidates = (parsed['replies'] as List).whereType<String>().toList();
+      }
     } on FormatException {
-      // Fall through to the line parser.
+      // Try the bare-array spelling below.
     }
   }
   if (candidates.isEmpty) {
-    candidates = [
-      for (final line in text.split('\n'))
-        line
-            .replaceFirst(RegExp(r'''^\s*(?:[-*•\d.)]+\s*)?["']?'''), '')
-            .replaceFirst(RegExp(r'''["']?\s*$'''), ''),
-    ];
+    final arrayStart = text.indexOf('[');
+    final arrayEnd = text.lastIndexOf(']');
+    if (arrayStart >= 0 && arrayEnd > arrayStart) {
+      try {
+        final parsed = jsonDecode(text.substring(arrayStart, arrayEnd + 1));
+        if (parsed is List) candidates = parsed.whereType<String>().toList();
+      } on FormatException {
+        // Not JSON: no chips.
+      }
+    }
   }
 
   return [
@@ -141,6 +149,9 @@ bool _looksLikeReply(String line) {
   if (line.isEmpty || line.length > 60) return false;
   if (line.endsWith(':')) return false;
   if (line.contains('**') || line.startsWith('#')) return false;
+  // A label prefix — 'Sender: …', 'User name: …' — is the model describing
+  // the conversation, not answering it.
+  if (RegExp(r'^[A-Za-z][A-Za-z ]{1,20}:\s').hasMatch(line)) return false;
   return true;
 }
 

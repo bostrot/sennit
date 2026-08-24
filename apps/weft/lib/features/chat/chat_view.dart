@@ -539,6 +539,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
         await _copy(message);
       case MessageAction.selectText:
         await _selectText(message);
+      case MessageAction.retrySend:
+        await _run(
+          () => ref
+              .read(chatRepositoryProvider)
+              .retryFailedSend(message.roomId, message.eventId),
+        );
+      case MessageAction.discardSend:
+        await _run(
+          () => ref
+              .read(chatRepositoryProvider)
+              .discardFailedSend(message.roomId, message.eventId),
+        );
       case MessageAction.editInvite:
         await _editInvite(message);
       case MessageAction.forward:

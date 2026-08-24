@@ -1325,6 +1325,22 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> retryFailedSend(String roomId, String eventId) async {
+    final event = await _client.getRoomById(roomId)?.getEventById(eventId);
+    if (event == null) return;
+    await event.sendAgain();
+    _scheduleRebuild();
+  }
+
+  @override
+  Future<void> discardFailedSend(String roomId, String eventId) async {
+    final event = await _client.getRoomById(roomId)?.getEventById(eventId);
+    if (event == null) return;
+    await event.cancelSend();
+    _scheduleRebuild();
+  }
+
+  @override
   Future<void> markUnread(String chatId) async {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return;

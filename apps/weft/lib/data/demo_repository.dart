@@ -33,6 +33,12 @@ const int kDemoMaxUploadBytes = 100 * 1024 * 1024;
 /// path once M1 lands.
 class DemoChatRepository implements ChatRepository {
   @override
+  Future<void> retryFailedSend(String roomId, String eventId) async {}
+
+  @override
+  Future<void> discardFailedSend(String roomId, String eventId) async {}
+
+  @override
   Future<void> markUnread(String chatId) async {}
 
   @override

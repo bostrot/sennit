@@ -232,6 +232,13 @@ abstract class ChatRepository {
 
   Future<void> markRead(String chatId);
 
+  /// Re-attempts a send that failed — the red-flagged local echo.
+  Future<void> retryFailedSend(String roomId, String eventId) async {}
+
+  /// Drops a failed local echo without a trace: it never reached the room,
+  /// so there is nothing to redact — just the stuck bubble to let go of.
+  Future<void> discardFailedSend(String roomId, String eventId) async {}
+
   /// Flags the conversation unread again (MSC2867), so it wears its badge
   /// until it is actually opened. Opening — [markRead] — clears it.
   Future<void> markUnread(String chatId) async {}
