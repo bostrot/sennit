@@ -222,8 +222,26 @@ jobs:
           export "$(dbus-launch)"
           echo -n "" | gnome-keyring-daemon --unlock --replace --components=secrets || true
           pulseaudio --start --exit-idle-time=-1 || true
-          xvfb-run -a flutter test integration_test/*_test.dart -d linux \
-            --dart-define=WEFT_DEMO=true
+          # One flutter test invocation per file, each with its own XDG tree
+          # and no survivor processes: a leftover app from the previous file
+          # holds the database and the next launch dies before the harness
+          # connects. On failure, launch the built bundle directly so its
+          # stderr — which the harness swallows — lands in the log.
+          fail=0
+          for f in integration_test/*_test.dart; do
+            echo "::group::$f"
+            pkill -f 'bundle/weft' 2>/dev/null || true
+            scratch="$(mktemp -d)"
+            if ! XDG_DATA_HOME="$scratch/data" XDG_CONFIG_HOME="$scratch/config" \
+                XDG_CACHE_HOME="$scratch/cache" \
+                xvfb-run -a flutter test "$f" -d linux --dart-define=WEFT_DEMO=true; then
+              fail=1
+              echo "--- direct launch of the bundle for $f ---"
+              timeout 15 xvfb-run -a ./build/linux/x64/debug/bundle/weft 2>&1 | head -40 || true
+            fi
+            echo "::endgroup::"
+          done
+          exit "$fail"
       - name: Homeserver logs on failure
         if: failure()
         run: docker compose -f tooling/docker/compose.yaml logs synapse
