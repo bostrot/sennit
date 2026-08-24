@@ -48,13 +48,18 @@ class InboxShell extends ConsumerWidget {
     // one to the end before entering the next instead of zig-zagging between
     // them.
     return Scaffold(
-      floatingActionButton: Consumer(
-        builder: (context, ref, _) => FloatingActionButton(
-          tooltip: 'New chat',
-          onPressed: () => showNewChatSheet(context, ref),
-          child: const Icon(Icons.edit_rounded),
-        ),
-      ),
+      // On a phone the whole window is the inbox and the FAB floats over it;
+      // in two-pane layouts it would land on the chat pane's composer, so
+      // there it lives inside the inbox pane instead (see below).
+      floatingActionButton: wide
+          ? null
+          : Consumer(
+              builder: (context, ref, _) => FloatingActionButton(
+                tooltip: 'New chat',
+                onPressed: () => showNewChatSheet(context, ref),
+                child: const Icon(Icons.edit_rounded),
+              ),
+            ),
       body: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Row(
@@ -77,7 +82,28 @@ class InboxShell extends ConsumerWidget {
               flex: wide ? 2 : 1,
               child: FocusTraversalOrder(
                 order: const NumericFocusOrder(2),
-                child: FocusTraversalGroup(child: const _InboxPane()),
+                child: FocusTraversalGroup(
+                  child: wide
+                      ? Stack(
+                          children: [
+                            const _InboxPane(),
+                            PositionedDirectional(
+                              end: WeftSpace.lg,
+                              bottom: WeftSpace.lg,
+                              child: Consumer(
+                                builder: (context, ref, _) =>
+                                    FloatingActionButton(
+                                      tooltip: 'New chat',
+                                      onPressed: () =>
+                                          showNewChatSheet(context, ref),
+                                      child: const Icon(Icons.edit_rounded),
+                                    ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : const _InboxPane(),
+                ),
               ),
             ),
             if (wide) ...[
