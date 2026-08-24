@@ -96,10 +96,30 @@ ChatNetwork networkForRoom(sdk.Room room) {
     }
   }
 
+  // Who *created* the room outranks who is in it: a bridge portal is created
+  // by the bridge bot, while a Matrix-native room a bridge merely relays
+  // into is created by a person.
+  final creator = room.getState(sdk.EventTypes.RoomCreate)?.senderId;
+  if (creator != null) {
+    final fromCreator = networkFromBridgeBotId(creator);
+    if (fromCreator != ChatNetwork.unknown) return fromCreator;
+  }
+
+  // Ghost-localpart fallback, by *majority*: one bridged ghost invited into
+  // a Matrix room must not re-badge the whole room — that is exactly how a
+  // native group with a single relay ghost stopped being a Matrix chat.
+  final tally = <ChatNetwork, int>{};
+  var others = 0;
   for (final participant in room.getParticipants()) {
     if (participant.id == room.client.userID) continue;
+    others++;
     final network = networkFromUserId(participant.id);
-    if (network != ChatNetwork.matrix) return network;
+    if (network != ChatNetwork.matrix) {
+      tally[network] = (tally[network] ?? 0) + 1;
+    }
+  }
+  for (final entry in tally.entries) {
+    if (entry.value * 2 > others) return entry.key;
   }
 
   return ChatNetwork.matrix;
