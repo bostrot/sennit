@@ -160,6 +160,13 @@ class IdentityGraph {
   }
 
   /// Merge suggestions the user hasn't already ruled on.
+  ///
+  /// Ruled on at the *contact* level, not the handle level. A contact spans
+  /// several handles, and a rejection recorded against one of them used to
+  /// leave the scorer free to re-propose the same two people through
+  /// another: dismiss "C + A", get "C + B" — the identical card, back
+  /// again, however many times the user said no. A verdict between any two
+  /// handles now silences every pair that bridges the same two contacts.
   List<MergeCandidate> suggestions({
     Map<String, Set<String>> sharedGroupsByPair = const {},
   }) {
@@ -168,15 +175,37 @@ class IdentityGraph {
         .map((e) => e.key)
         .toSet();
 
+    final rejectedContactPairs = <String>{};
+    for (final key in rejected) {
+      final parts = key.split('|');
+      if (parts.length != 2) continue;
+      final ca = _contactOf[parts[0]];
+      final cb = _contactOf[parts[1]];
+      if (ca != null && cb != null && ca != cb) {
+        rejectedContactPairs.add(pairKey(ca, cb));
+      }
+    }
+
     final withContacts = _handles.values
         .map((h) => h.copyWith(unifiedContactId: _contactOf[h.id]))
         .toList(growable: false);
 
-    return _scorer.scoreAll(
+    final scored = _scorer.scoreAll(
       withContacts,
       rejectedPairs: rejected,
       sharedGroupsByPair: sharedGroupsByPair,
     );
+    if (rejectedContactPairs.isEmpty) return scored;
+    return [
+      for (final candidate in scored)
+        if (!rejectedContactPairs.contains(
+          pairKey(
+            _contactOf[candidate.a.id] ?? candidate.a.id,
+            _contactOf[candidate.b.id] ?? candidate.b.id,
+          ),
+        ))
+          candidate,
+    ];
   }
 
   /// Auto-merges the pairs [MergeCandidate.qualifiesForAutoMerge] accepts —

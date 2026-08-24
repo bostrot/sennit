@@ -333,6 +333,55 @@ void main() {
       expect(graph.applyAutoMerges(), isEmpty);
     });
 
+    test('an unmerge outlives the scorer: no re-suggest, no re-merge', () {
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+          handle('b', ChatNetwork.signal, displayName: 'Joanne Trenkel'),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      expect(graph.applyAutoMerges(), hasLength(1));
+      graph.unmerge('a');
+
+      // The strongest possible evidence still stands — and the user's verdict
+      // still wins, pass after pass.
+      expect(graph.applyAutoMerges(), isEmpty);
+      expect(graph.suggestions(), isEmpty);
+      expect(graph.contactIdOf('a'), isNot(graph.contactIdOf('b')));
+    });
+
+    test('a rejection silences every handle pair of the same two people', () {
+      final graph = IdentityGraph(
+        handles: [
+          // One person, two handles, already one contact.
+          handle('a_wa', ChatNetwork.whatsapp, displayName: 'Anna Maven'),
+          handle('a_sg', ChatNetwork.signal, displayName: 'Anna Maven'),
+          // The look-alike stranger.
+          handle('other', ChatNetwork.telegram, displayName: 'Anna Maven'),
+        ],
+        idFactory: counterIds(),
+      );
+      graph.merge('a_wa', 'a_sg');
+
+      // Dismiss the stranger against ONE handle…
+      graph.reject('other', 'a_wa');
+
+      // …and the same two people must not come back through the other one.
+      expect(
+        graph.suggestions().where(
+          (c) => c.a.id == 'other' || c.b.id == 'other',
+        ),
+        isEmpty,
+        reason: 'the identical card returned through the second handle',
+      );
+      expect(graph.applyAutoMerges(), isEmpty);
+    });
+
     test('the same name on the same network never merges or suggests', () {
       // Two colleagues named alike on one messenger are two people; a
       // bridge gives one person exactly one handle per network.
