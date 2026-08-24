@@ -3205,15 +3205,23 @@ class _Composer extends StatelessWidget {
                       // and Telegram hide it, and harmless to discover: a
                       // long-press that does nothing was doing nothing anyway.
                       onLongPress: editing ? null : onSendLater,
-                      child: IconButton.filled(
-                        onPressed: onSend,
-                        icon: Icon(
-                          editing ? Icons.check_rounded : Icons.send_rounded,
-                          size: 18,
-                        ),
-                        tooltip: editing
+                      child: Tooltip(
+                        message: editing
                             ? 'Save edit'
                             : 'Send — hold to schedule',
+                        // Hover still shows it; touch no longer does. A
+                        // `Tooltip` claims long presses by default, and as the
+                        // deeper widget it won the gesture arena against the
+                        // handler above — holding Send showed the tip that
+                        // says to hold Send, and scheduled nothing.
+                        triggerMode: TooltipTriggerMode.manual,
+                        child: IconButton.filled(
+                          onPressed: onSend,
+                          icon: Icon(
+                            editing ? Icons.check_rounded : Icons.send_rounded,
+                            size: 18,
+                          ),
+                        ),
                       ),
                     );
                   },
