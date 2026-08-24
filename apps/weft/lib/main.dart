@@ -372,13 +372,23 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     }
   }
 
+  /// A share that arrived before the app was ready for it.
+  ///
+  /// The cold-start case: sharing a photo into a closed Braid delivers the
+  /// intent while the session is still initialising, and the guard below
+  /// used to *drop* it — the app opened onto a plain inbox and the user had
+  /// to pick their files all over again inside it. Held here instead, and
+  /// replayed the moment the chat list exists.
+  SharedPayload? _pendingShare;
+
   void _handleShare(SharedPayload payload) {
     final context = _navigatorKey.currentContext;
-    if (context == null) return;
-    // Guard: sharing into a logged-out app lands on the login screen; the
-    // sheet needs the repository, which exists only past the gate.
-    final chats = ref.read(chatsProvider);
-    if (chats.value == null) return;
+    // The sheet needs the repository, which exists only past the auth gate —
+    // and on a cold start that is seconds away, not never. Hold the share.
+    if (context == null || ref.read(chatsProvider).value == null) {
+      _pendingShare = payload;
+      return;
+    }
     showShareTargetSheet(context, payload);
   }
 
@@ -391,6 +401,15 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // checking `MediaQuery` for itself and half of them forgetting to.
     final highContrast = MediaQuery.highContrastOf(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    // The held share replays on the first chat-list emission — the same
+    // signal the sheet's guard was checking for.
+    ref.listen(chatsProvider, (_, next) {
+      final pending = _pendingShare;
+      if (next.value == null || pending == null) return;
+      _pendingShare = null;
+      _handleShare(pending);
+    });
 
     // Listened to rather than watched: this starts a service, it does not
     // decide what to draw, and a rebuild must not restart it.

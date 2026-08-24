@@ -306,8 +306,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
   bool hasTranscript = false,
   bool homeAssistant = false,
 }) {
-  final overlay =
-      Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final live = !message.redacted;
 
   PopupMenuItem<MessageActionChoice> item(
