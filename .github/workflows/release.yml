@@ -57,6 +57,22 @@ jobs:
             /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY/CodeQL" || true
           sudo docker image prune -af > /dev/null 2>&1 || true
           df -h / | tail -1
+      - name: Keep the build inside the runner's memory
+        # gradle.properties asks for an 8G heap and 4G metaspace, sized for a
+        # development machine. With the Kotlin daemon, R8 and four Rust
+        # cross-compiles alongside, that OOM-kills the 16G runner — twice now,
+        # both times as a bare "runner received a shutdown signal" ~35 minutes
+        # into assembleRelease. Properties files take the last occurrence of a
+        # key, so appending overrides for CI only; the swapfile absorbs the
+        # peak that remains.
+        run: |
+          printf '\norg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g\norg.gradle.workers.max=2\n' \
+            >> apps/weft/android/gradle.properties
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile > /dev/null
+          sudo swapon /swapfile
+          free -h | head -3
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
