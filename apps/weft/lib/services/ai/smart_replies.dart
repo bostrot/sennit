@@ -95,6 +95,15 @@ Future<List<String>> suggestSmartReplies({
 /// bulleted list — small local models do both.
 List<String> parseSmartReplies(String content) {
   var text = content.trim();
+  // Thinking models narrate before they answer. The tagged form is easy;
+  // an unclosed <think> means the reasoning ran to the end and there is no
+  // answer in there at all.
+  text = text
+      .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
+      .trim();
+  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) {
+    return const [];
+  }
   final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(text);
   if (fence != null) text = fence[1]!.trim();
 
@@ -120,6 +129,59 @@ List<String> parseSmartReplies(String content) {
 
   return [
     for (final reply in candidates)
-      if (reply.trim().isNotEmpty && reply.trim().length <= 60) reply.trim(),
+      if (_looksLikeReply(reply.trim())) reply.trim(),
   ].take(2).toList(growable: false);
+}
+
+/// Whether [line] reads as something a person would send — and not a heading
+/// out of a model's untagged reasoning ("Here's a thinking process:",
+/// "**Analyze User Input:**"), which is what ended up on the notification as
+/// a chip.
+bool _looksLikeReply(String line) {
+  if (line.isEmpty || line.length > 60) return false;
+  if (line.endsWith(':')) return false;
+  if (line.contains('**') || line.startsWith('#')) return false;
+  return true;
+}
+
+/// Asks the endpoint for a trivial completion, purely to prove the wiring.
+///
+/// Returns null on success and the failure spelled out otherwise — the test
+/// button's whole vocabulary.
+Future<String?> probeLlm({
+  required String baseUrl,
+  required String model,
+  String? apiKey,
+}) async {
+  final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+  if (base.isEmpty) return 'No base URL';
+  if (model.trim().isEmpty) return 'No model name';
+  final client = http.Client();
+  try {
+    final response = await client
+        .post(
+          Uri.parse('$base/chat/completions'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (apiKey != null && apiKey.isNotEmpty)
+              'Authorization': 'Bearer $apiKey',
+          },
+          body: jsonEncode({
+            'model': model,
+            'max_tokens': 8,
+            'messages': [
+              {'role': 'user', 'content': 'Reply with the word OK.'},
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 12));
+    if (response.statusCode != 200) {
+      return 'The server answered ${response.statusCode}';
+    }
+    return null;
+  } on Object catch (error) {
+    return 'Could not reach the server: $error';
+  } finally {
+    client.close();
+  }
 }

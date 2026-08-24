@@ -1,9 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_search/weft_search.dart'
+    show OpenAiCompatibleEmbeddingProvider;
 import 'package:weft_store/weft_store.dart';
+import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../../app/stores.dart';
+import '../../services/ai/smart_replies.dart' show probeLlm;
 import 'models_screen.dart';
 import 'settings_section.dart';
 
@@ -72,6 +78,167 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  final Map<String, String?> _testResult = {};
+  final Set<String> _testing = {};
+
+  Future<void> _runTest(String key, Future<String?> Function() probe) async {
+    setState(() {
+      _testing.add(key);
+      _testResult.remove(key);
+    });
+    String? result;
+    try {
+      result = await probe();
+    } on Object catch (error) {
+      result = '$error';
+    }
+    if (!mounted) return;
+    setState(() {
+      _testing.remove(key);
+      _testResult[key] = result;
+    });
+  }
+
+  /// Probes run against what is *typed*, saved or not — testing is why the
+  /// fields are being filled in.
+  Future<String?> _probeEmbeddings() async {
+    final uri = Uri.tryParse(_embeddingUrl.text.trim());
+    if (uri == null || uri.host.isEmpty) return 'Enter a base URL first';
+    final provider = OpenAiCompatibleEmbeddingProvider(
+      baseUrl: uri,
+      modelId: _embeddingModel.text.trim(),
+      dimensions: int.tryParse(_embeddingDims.text) ?? 1536,
+      apiKey: _embeddingKey.text.isNotEmpty
+          ? _embeddingKey.text
+          : ref.read(storesProvider).embeddingApiKey,
+    );
+    try {
+      final vectors = await provider.embed(['connection test']);
+      if (vectors.isEmpty || vectors.first.isEmpty) {
+        return 'The server answered without a vector';
+      }
+      return null;
+    } finally {
+      provider.dispose();
+    }
+  }
+
+  Future<String?> _probeLlmEndpoint() => probeLlm(
+    baseUrl: _llmUrl.text,
+    model: _llmModel.text,
+    apiKey: _llmKey.text.isNotEmpty
+        ? _llmKey.text
+        : ref.read(storesProvider).llmApiKey,
+  );
+
+  Future<String?> _probeWhisper() async {
+    final provider = buildTranscriptionProvider(
+      TranscriptionSettings(
+        enabled: true,
+        backend: TranscriptionBackend.fromId(
+          _settings.getString(WeftSettings.transcriptionProvider),
+        ),
+        baseUrl: _sttUrl.text.trim(),
+        model: _sttModel.text.trim(),
+        autoTranscribe: false,
+      ),
+      apiKey: _sttKey.text.isNotEmpty
+          ? _sttKey.text
+          : ref.read(storesProvider).transcriptionApiKey,
+    );
+    if (provider == null) return 'Enter a base URL first';
+    try {
+      // A quarter second of valid silence: enough for the server to accept
+      // and answer, without a real message leaving this phone.
+      await provider.transcribe(
+        TranscriptionRequest(
+          audio: _silentWav(),
+          filename: 'probe.wav',
+          mimeType: 'audio/wav',
+        ),
+      );
+      return null;
+    } on TranscriptionException catch (e) {
+      // "Nothing recognisable" from a silence probe IS the success case.
+      final message = e.message.toLowerCase();
+      if (message.contains('nothing') || message.contains('recognis')) {
+        return null;
+      }
+      return e.message;
+    } finally {
+      provider.dispose();
+    }
+  }
+
+  /// 16 kHz mono 16-bit PCM silence, 0.25 s, with a correct RIFF header.
+  static Uint8List _silentWav() {
+    const sampleRate = 16000;
+    const samples = sampleRate ~/ 4;
+    const dataBytes = samples * 2;
+    final bytes = BytesBuilder();
+    void ascii(String s) => bytes.add(s.codeUnits);
+    void u32(int v) => bytes.add([
+      v & 0xff,
+      (v >> 8) & 0xff,
+      (v >> 16) & 0xff,
+      (v >> 24) & 0xff,
+    ]);
+    void u16(int v) => bytes.add([v & 0xff, (v >> 8) & 0xff]);
+    ascii('RIFF');
+    u32(36 + dataBytes);
+    ascii('WAVE');
+    ascii('fmt ');
+    u32(16);
+    u16(1);
+    u16(1);
+    u32(sampleRate);
+    u32(sampleRate * 2);
+    u16(2);
+    u16(16);
+    ascii('data');
+    u32(dataBytes);
+    bytes.add(Uint8List(dataBytes));
+    return bytes.toBytes();
+  }
+
+  Widget _testRow(String key, Future<String?> Function() probe) {
+    final busy = _testing.contains(key);
+    final hasResult = _testResult.containsKey(key);
+    final result = _testResult[key];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: WeftSpace.md),
+      child: Row(
+        children: [
+          OutlinedButton.icon(
+            onPressed: busy ? null : () => _runTest(key, probe),
+            icon: busy
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.network_check_rounded, size: 16),
+            label: const Text('Test connection'),
+          ),
+          const SizedBox(width: WeftSpace.md),
+          if (hasResult)
+            Expanded(
+              child: Text(
+                result ?? 'Connected',
+                style: context.text.bodySmall?.copyWith(
+                  color: result == null
+                      ? context.palette.online
+                      : context.colors.error,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -186,6 +353,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
               secret: true,
               hint: 'leave blank to keep the current key',
             ),
+            _testRow('embeddings', _probeEmbeddings),
           ],
           const SizedBox(height: WeftSpace.xl),
 
@@ -216,6 +384,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
               secret: true,
               hint: 'leave blank to keep the current key',
             ),
+            _testRow('whisper', _probeWhisper),
             SwitchListTile(
               title: const Text('Transcribe voice messages automatically'),
               subtitle: const Text(
@@ -245,6 +414,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             secret: true,
             hint: 'leave blank to keep the current key',
           ),
+          _testRow('llm', _probeLlmEndpoint),
         ],
       ),
     );

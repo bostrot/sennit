@@ -180,6 +180,8 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   // failure path is an empty list, because the notification must never wait
   // on an error.
   service.suggestReplies = (content, thread) async {
+    // A bridge bot's login prompts are not a conversation to be witty in.
+    if (repository.serviceChatIds.contains(content.groupKey)) return const [];
     final WeftStores stores;
     try {
       stores = ref.read(storesProvider);
