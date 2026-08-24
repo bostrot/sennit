@@ -12,3 +12,8 @@ PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.bostrot. All rights reserved.
+
+// Apple Silicon only. The ONNX pods' x86_64 slice is missing the CoreML
+// execution-provider symbol and breaks the universal link; both the build
+// and the test Mac are arm64, so the Intel slice buys nothing.
+EXCLUDED_ARCHS = x86_64
