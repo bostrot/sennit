@@ -22,8 +22,7 @@ ChatNetwork networkFromBridgeStateContent(Map<String, Object?>? content) {
     if (protocol is String) protocol,
     if (protocol is Map) ...[
       if (protocol['id'] is String) protocol['id'] as String,
-      if (protocol['displayname'] is String)
-        protocol['displayname'] as String,
+      if (protocol['displayname'] is String) protocol['displayname'] as String,
     ],
   ];
   for (final candidate in candidates) {

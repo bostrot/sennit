@@ -11,6 +11,7 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		48D2D4336432A5C24A2467D5 /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A6D5B4F206D3964CE1D3F20 /* RunnerUITests.m */; };
+		573D5CB27D07A6FF9930BB9A /* Pods_ShareExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 138B9DA8D3253921DA2F67C1 /* Pods_ShareExtension.framework */; };
 		5F10000000000000000000EE /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F10000000000000000000E1 /* ShareViewController.swift */; };
 		5F10000000000000000000EF /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F10000000000000000000E4 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5F20000000000000000000EE /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F20000000000000000000E1 /* NotificationService.swift */; };
@@ -21,6 +22,8 @@
 		5F30000000000000000000F3 /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000F2 /* CallManager.swift */; };
 		5F40000000000000000000F1 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
 		5F40000000000000000000F2 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E2 /* SnapshotChannel.swift */; };
+		5F40000000000000000000F3 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* WatchProtocol.swift */; };
+		5F40000000000000000000F4 /* WatchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* WatchChannel.swift */; };
 		5F50000000000000000000F1 /* WeftWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E1 /* WeftWidget.swift */; };
 		5F50000000000000000000F2 /* SnapshotPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E2 /* SnapshotPayload.swift */; };
 		5F50000000000000000000F3 /* WeftWidgetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E3 /* WeftWidgetState.swift */; };
@@ -31,8 +34,6 @@
 		5F50000000000000000000F8 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
 		5F50000000000000000000F9 /* WeftWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000EE /* WeftWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5F50000000000000000000FD /* SnapshotViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000EF /* SnapshotViews.swift */; };
-		5F40000000000000000000F3 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* WatchProtocol.swift */; };
-		5F40000000000000000000F4 /* WatchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* WatchChannel.swift */; };
 		5F60000000000000000000F1 /* WeftWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E1 /* WeftWatchApp.swift */; };
 		5F60000000000000000000F2 /* WeftWatchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E2 /* WeftWatchState.swift */; };
 		5F60000000000000000000F3 /* WeftWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000E3 /* WeftWatchStore.swift */; };
@@ -52,12 +53,16 @@
 		5F70000000000000000000F6 /* ShareContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000E2 /* ShareContainer.swift */; };
 		5F70000000000000000000F7 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* WatchProtocol.swift */; };
 		5F70000000000000000000FF /* WeftWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F70000000000000000000EE /* WeftWatchComplication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		640D4A6BD3114DD04F3E2290 /* Pods_Runner_RunnerUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EE85BD85B7FC03D5923DAC96 /* Pods_Runner_RunnerUITests.framework */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		B7C310826F5ECC056F5CD8D9 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FF3523A96A524EFE8370CA3D /* Pods_Runner.framework */; };
+		C5B1CF050E96626B688BF83A /* Pods_WeftWidget.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 917AE08CCF411E73FB8A1E70 /* Pods_WeftWidget.framework */; };
+		FA04F18D1F5ABAB6BCB7933F /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017597C2A4952B94EC1FFF99 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,15 +118,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		5F60000000000000000000FD /* Embed Watch Content */ = {
+		5F30000000000000000000E6 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
+			dstPath = "";
+			dstSubfolderSpec = 13;
 			files = (
-				5F60000000000000000000FF /* WeftWatch.app in Embed Watch Content */,
+				5F10000000000000000000EF /* ShareExtension.appex in Embed Foundation Extensions */,
+				5F20000000000000000000EF /* NotificationService.appex in Embed Foundation Extensions */,
+				5F50000000000000000000F9 /* WeftWidget.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed Watch Content";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5F60000000000000000000FC /* Embed Foundation Extensions */ = {
@@ -135,17 +142,15 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		5F30000000000000000000E6 /* Embed Foundation Extensions */ = {
+		5F60000000000000000000FD /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
 			files = (
-				5F10000000000000000000EF /* ShareExtension.appex in Embed Foundation Extensions */,
-				5F20000000000000000000EF /* NotificationService.appex in Embed Foundation Extensions */,
-				5F50000000000000000000F9 /* WeftWidget.appex in Embed Foundation Extensions */,
+				5F60000000000000000000FF /* WeftWatch.app in Embed Watch Content */,
 			);
-			name = "Embed Foundation Extensions";
+			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		9705A1C41CF9048500538489 /* Embed Frameworks */ = {
@@ -161,13 +166,24 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		017597C2A4952B94EC1FFF99 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		094ADF3B28C6D595E1A59429 /* Pods-Runner-RunnerUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.debug.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		138B9DA8D3253921DA2F67C1 /* Pods_ShareExtension.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ShareExtension.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		1D75504A2E521F92ED299A2E /* Pods-ShareExtension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ShareExtension.debug.xcconfig"; path = "Target Support Files/Pods-ShareExtension/Pods-ShareExtension.debug.xcconfig"; sourceTree = "<group>"; };
 		2409B564CFADD6E18FB3C1A7 /* RunnerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		28671E48C3A515E4700D0856 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
+		2F023B9AA94CE3DBB26E30D4 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A6D5B4F206D3964CE1D3F20 /* RunnerUITests.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = RunnerUITests.m; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		3F463C11A888A4A01CB8DB6E /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		4C4D014D7206306A9F9EE964 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		4CC6FF6C800235824505A9A4 /* Pods-WeftWidget.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeftWidget.debug.xcconfig"; path = "Target Support Files/Pods-WeftWidget/Pods-WeftWidget.debug.xcconfig"; sourceTree = "<group>"; };
+		4F597EA4AF7D39930CE3EEA2 /* Pods-ShareExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ShareExtension.release.xcconfig"; path = "Target Support Files/Pods-ShareExtension/Pods-ShareExtension.release.xcconfig"; sourceTree = "<group>"; };
+		51643519E2119D501EE4E97C /* Pods-Runner-RunnerUITests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.profile.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.profile.xcconfig"; sourceTree = "<group>"; };
 		5F10000000000000000000E1 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		5F10000000000000000000E2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5F10000000000000000000E3 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
@@ -186,6 +202,8 @@
 		5F30000000000000000000F2 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E1 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotContainer.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E2 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotChannel.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E3 /* WatchProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProtocol.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E4 /* WatchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchChannel.swift; sourceTree = "<group>"; };
 		5F50000000000000000000E1 /* WeftWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget.swift; sourceTree = "<group>"; };
 		5F50000000000000000000E2 /* SnapshotPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotPayload.swift; sourceTree = "<group>"; };
 		5F50000000000000000000E3 /* WeftWidgetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidgetState.swift; sourceTree = "<group>"; };
@@ -201,8 +219,6 @@
 		5F50000000000000000000ED /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		5F50000000000000000000EE /* WeftWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeftWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F50000000000000000000EF /* SnapshotViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotViews.swift; sourceTree = "<group>"; };
-		5F40000000000000000000E3 /* WatchProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProtocol.swift; sourceTree = "<group>"; };
-		5F40000000000000000000E4 /* WatchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchChannel.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E1 /* WeftWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWatchApp.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E2 /* WeftWatchState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWatchState.swift; sourceTree = "<group>"; };
 		5F60000000000000000000E3 /* WeftWatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWatchStore.swift; sourceTree = "<group>"; };
@@ -217,11 +233,15 @@
 		5F60000000000000000000EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		5F60000000000000000000EE /* WeftWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WeftWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F70000000000000000000EE /* WeftWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeftWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		735C6D103AFEED4AF8AC2807 /* Pods-WeftWidget.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeftWidget.release.xcconfig"; path = "Target Support Files/Pods-WeftWidget/Pods-WeftWidget.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		806C049F0EB54B68040A1C8E /* Pods-Runner-RunnerUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.release.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.release.xcconfig"; sourceTree = "<group>"; };
+		917AE08CCF411E73FB8A1E70 /* Pods_WeftWidget.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WeftWidget.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		969C39F50F9641B17BE92649 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -229,20 +249,19 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B91F2F930EC40C25929E5089 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		BCFD7965322F5D279240A1E5 /* Pods-WeftWidget.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeftWidget.profile.xcconfig"; path = "Target Support Files/Pods-WeftWidget/Pods-WeftWidget.profile.xcconfig"; sourceTree = "<group>"; };
+		EA72DB5E5E434CA818503EED /* Pods-ShareExtension.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ShareExtension.profile.xcconfig"; path = "Target Support Files/Pods-ShareExtension/Pods-ShareExtension.profile.xcconfig"; sourceTree = "<group>"; };
+		EE85BD85B7FC03D5923DAC96 /* Pods_Runner_RunnerUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner_RunnerUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		FF3523A96A524EFE8370CA3D /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		5F60000000000000000000FB /* Frameworks */ = {
+		04F56781B56BDEDF555C7265 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5F70000000000000000000FB /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
+				FA04F18D1F5ABAB6BCB7933F /* Pods_RunnerTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,6 +269,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				573D5CB27D07A6FF9930BB9A /* Pods_ShareExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,6 +284,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5B1CF050E96626B688BF83A /* Pods_WeftWidget.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F60000000000000000000FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F70000000000000000000FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,6 +307,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
+				B7C310826F5ECC056F5CD8D9 /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,6 +315,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				640D4A6BD3114DD04F3E2290 /* Pods_Runner_RunnerUITests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -326,6 +363,16 @@
 			path = NotificationService;
 			sourceTree = "<group>";
 		};
+		5F30000000000000000000E1 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				5F30000000000000000000E2 /* ShareContainer.swift */,
+				5F40000000000000000000E1 /* SnapshotContainer.swift */,
+				5F40000000000000000000E3 /* WatchProtocol.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		5F50000000000000000000E0 /* WeftWidget */ = {
 			isa = PBXGroup;
 			children = (
@@ -366,14 +413,27 @@
 			path = WeftWatch;
 			sourceTree = "<group>";
 		};
-		5F30000000000000000000E1 /* Shared */ = {
+		6D5D5C08AA39AF69F9820DE3 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				5F30000000000000000000E2 /* ShareContainer.swift */,
-				5F40000000000000000000E1 /* SnapshotContainer.swift */,
-				5F40000000000000000000E3 /* WatchProtocol.swift */,
+				3F463C11A888A4A01CB8DB6E /* Pods-Runner.debug.xcconfig */,
+				B91F2F930EC40C25929E5089 /* Pods-Runner.release.xcconfig */,
+				4C4D014D7206306A9F9EE964 /* Pods-Runner.profile.xcconfig */,
+				806C049F0EB54B68040A1C8E /* Pods-Runner-RunnerUITests.release.xcconfig */,
+				094ADF3B28C6D595E1A59429 /* Pods-Runner-RunnerUITests.debug.xcconfig */,
+				51643519E2119D501EE4E97C /* Pods-Runner-RunnerUITests.profile.xcconfig */,
+				28671E48C3A515E4700D0856 /* Pods-RunnerTests.debug.xcconfig */,
+				2F023B9AA94CE3DBB26E30D4 /* Pods-RunnerTests.release.xcconfig */,
+				969C39F50F9641B17BE92649 /* Pods-RunnerTests.profile.xcconfig */,
+				1D75504A2E521F92ED299A2E /* Pods-ShareExtension.debug.xcconfig */,
+				4F597EA4AF7D39930CE3EEA2 /* Pods-ShareExtension.release.xcconfig */,
+				EA72DB5E5E434CA818503EED /* Pods-ShareExtension.profile.xcconfig */,
+				4CC6FF6C800235824505A9A4 /* Pods-WeftWidget.debug.xcconfig */,
+				735C6D103AFEED4AF8AC2807 /* Pods-WeftWidget.release.xcconfig */,
+				BCFD7965322F5D279240A1E5 /* Pods-WeftWidget.profile.xcconfig */,
 			);
-			path = Shared;
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -401,6 +461,8 @@
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				0B72D16D0CE02E7D132FCF11 /* RunnerUITests */,
+				6D5D5C08AA39AF69F9820DE3 /* Pods */,
+				A6F6B2FAF190577031A7FD92 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -440,6 +502,18 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		A6F6B2FAF190577031A7FD92 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FF3523A96A524EFE8370CA3D /* Pods_Runner.framework */,
+				EE85BD85B7FC03D5923DAC96 /* Pods_Runner_RunnerUITests.framework */,
+				017597C2A4952B94EC1FFF99 /* Pods_RunnerTests.framework */,
+				138B9DA8D3253921DA2F67C1 /* Pods_ShareExtension.framework */,
+				917AE08CCF411E73FB8A1E70 /* Pods_WeftWidget.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -447,8 +521,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
 			buildPhases = (
+				0EF813A69167C3FB5BDF1ADC /* [CP] Check Pods Manifest.lock */,
 				331C807D294A63A400263BE5 /* Sources */,
 				331C807F294A63A400263BE5 /* Resources */,
+				04F56781B56BDEDF555C7265 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -464,6 +540,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5F10000000000000000000EA /* Build configuration list for PBXNativeTarget "ShareExtension" */;
 			buildPhases = (
+				37F39E1DA834936E30B84AF4 /* [CP] Check Pods Manifest.lock */,
 				5F10000000000000000000E6 /* Sources */,
 				5F10000000000000000000E7 /* Frameworks */,
 				5F10000000000000000000E8 /* Resources */,
@@ -498,6 +575,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5F50000000000000000000D2 /* Build configuration list for PBXNativeTarget "WeftWidget" */;
 			buildPhases = (
+				5119D4D62BADA9262F1442EA /* [CP] Check Pods Manifest.lock */,
 				5F50000000000000000000FA /* Sources */,
 				5F50000000000000000000FB /* Frameworks */,
 				5F50000000000000000000FC /* Resources */,
@@ -551,9 +629,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C251A9F02FAD72103EE6C2FF /* Build configuration list for PBXNativeTarget "RunnerUITests" */;
 			buildPhases = (
+				0D584B5D08A5CF8D324E401E /* [CP] Check Pods Manifest.lock */,
 				FD3A568B5166C276358D37C0 /* Sources */,
 				BFB7BCD9DF70BEB1DAA24E2B /* Frameworks */,
 				8BDFD63E28C05FBDF7160E98 /* Resources */,
+				E69454F7E2380DEBC7586144 /* [CP] Embed Pods Frameworks */,
+				7846E3B6FA1A277316892754 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -569,6 +650,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
+				FFE05B524F83AEACDC24561E /* [CP] Check Pods Manifest.lock */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
@@ -577,6 +659,8 @@
 				5F30000000000000000000E6 /* Embed Foundation Extensions */,
 				5F60000000000000000000FD /* Embed Watch Content */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				828FACEC0F66EDF7871CE698 /* [CP] Embed Pods Frameworks */,
+				BAC1818419193254978C3396 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -655,20 +739,6 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		5F60000000000000000000F0 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5F70000000000000000000F0 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		331C807F294A63A400263BE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -697,6 +767,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F60000000000000000000F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F70000000000000000000F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8BDFD63E28C05FBDF7160E98 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -718,6 +802,72 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		0D584B5D08A5CF8D324E401E /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Runner-RunnerUITests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		0EF813A69167C3FB5BDF1ADC /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RunnerTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		37F39E1DA834936E30B84AF4 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-ShareExtension-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
 		3B06AD1E1E4923F5004D2608 /* Thin Binary */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -734,6 +884,62 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
 		};
+		5119D4D62BADA9262F1442EA /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-WeftWidget-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		7846E3B6FA1A277316892754 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		828FACEC0F66EDF7871CE698 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		9740EEB61CF901F6004384FC /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -749,40 +955,65 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
+		BAC1818419193254978C3396 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E69454F7E2380DEBC7586144 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		FFE05B524F83AEACDC24561E /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Runner-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		5F60000000000000000000FA /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				5F60000000000000000000F1 /* WeftWatchApp.swift in Sources */,
-				5F60000000000000000000F4 /* WeftWatchViews.swift in Sources */,
-				5F60000000000000000000F3 /* WeftWatchStore.swift in Sources */,
-				5F60000000000000000000F2 /* WeftWatchState.swift in Sources */,
-				5F60000000000000000000F7 /* SnapshotViews.swift in Sources */,
-				5F60000000000000000000F6 /* WeftWidgetTokens.swift in Sources */,
-				5F60000000000000000000F5 /* SnapshotPayload.swift in Sources */,
-				5F60000000000000000000FE /* WatchProtocol.swift in Sources */,
-				5F60000000000000000000F8 /* SnapshotContainer.swift in Sources */,
-				5F60000000000000000000F9 /* ShareContainer.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		5F70000000000000000000FA /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				5F70000000000000000000F1 /* WeftWatchComplication.swift in Sources */,
-				5F70000000000000000000F2 /* WeftWatchState.swift in Sources */,
-				5F70000000000000000000F4 /* WeftWidgetTokens.swift in Sources */,
-				5F70000000000000000000F3 /* SnapshotPayload.swift in Sources */,
-				5F70000000000000000000F7 /* WatchProtocol.swift in Sources */,
-				5F70000000000000000000F5 /* SnapshotContainer.swift in Sources */,
-				5F70000000000000000000F6 /* ShareContainer.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		331C807D294A63A400263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -821,6 +1052,37 @@
 				5F50000000000000000000FD /* SnapshotViews.swift in Sources */,
 				5F50000000000000000000F8 /* SnapshotContainer.swift in Sources */,
 				5F50000000000000000000F7 /* ShareContainer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F60000000000000000000FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F60000000000000000000F1 /* WeftWatchApp.swift in Sources */,
+				5F60000000000000000000F4 /* WeftWatchViews.swift in Sources */,
+				5F60000000000000000000F3 /* WeftWatchStore.swift in Sources */,
+				5F60000000000000000000F2 /* WeftWatchState.swift in Sources */,
+				5F60000000000000000000F7 /* SnapshotViews.swift in Sources */,
+				5F60000000000000000000F6 /* WeftWidgetTokens.swift in Sources */,
+				5F60000000000000000000F5 /* SnapshotPayload.swift in Sources */,
+				5F60000000000000000000FE /* WatchProtocol.swift in Sources */,
+				5F60000000000000000000F8 /* SnapshotContainer.swift in Sources */,
+				5F60000000000000000000F9 /* ShareContainer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F70000000000000000000FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F70000000000000000000F1 /* WeftWatchComplication.swift in Sources */,
+				5F70000000000000000000F2 /* WeftWatchState.swift in Sources */,
+				5F70000000000000000000F4 /* WeftWidgetTokens.swift in Sources */,
+				5F70000000000000000000F3 /* SnapshotPayload.swift in Sources */,
+				5F70000000000000000000F7 /* WatchProtocol.swift in Sources */,
+				5F70000000000000000000F5 /* SnapshotContainer.swift in Sources */,
+				5F70000000000000000000F6 /* ShareContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -910,175 +1172,6 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		5F60000000000000000000D3 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */;
-			buildSettings = {
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Debug;
-		};
-		5F60000000000000000000D4 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
-			buildSettings = {
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Release;
-		};
-		5F60000000000000000000D5 /* Profile */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
-			buildSettings = {
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Profile;
-		};
-		5F70000000000000000000D3 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Complication-Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Debug;
-		};
-		5F70000000000000000000D4 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Complication-Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Release;
-		};
-		5F70000000000000000000D5 /* Profile */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
-				ENABLE_BITCODE = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = WeftWatch/Complication-Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 11.0;
-			};
-			name = Profile;
-		};
 		249021D3217E4FDB00AE95B9 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1122,7 +1215,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -1155,6 +1248,7 @@
 		};
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 28671E48C3A515E4700D0856 /* Pods-RunnerTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -1172,6 +1266,7 @@
 		};
 		331C8089294A63A400263BE5 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2F023B9AA94CE3DBB26E30D4 /* Pods-RunnerTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -1187,6 +1282,7 @@
 		};
 		331C808A294A63A400263BE5 /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 969C39F50F9641B17BE92649 /* Pods-RunnerTests.profile.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -1431,6 +1527,175 @@
 			};
 			name = Profile;
 		};
+		5F60000000000000000000D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		5F60000000000000000000D4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		5F60000000000000000000D5 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WeftWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Profile;
+		};
+		5F70000000000000000000D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "WeftWatch/Complication-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Debug;
+		};
+		5F70000000000000000000D4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "WeftWatch/Complication-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Release;
+		};
+		5F70000000000000000000D5 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5F60000000000000000000EB /* WeftWatch-Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WeftWatch/WeftWatchComplication.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "WeftWatch/Complication-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp.WeftWatchComplication;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			};
+			name = Profile;
+		};
 		5FB46B01572D12C66DDDC88C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
@@ -1441,7 +1706,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1501,7 +1766,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -1552,7 +1817,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -1618,7 +1883,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1640,7 +1905,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";

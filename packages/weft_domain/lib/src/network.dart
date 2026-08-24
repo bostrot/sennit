@@ -79,7 +79,7 @@ enum ChatNetwork {
     if (raw == null || raw.isEmpty) return ChatNetwork.unknown;
     var key = raw.toLowerCase().trim();
     // A repository URL — `github.com/bostrot/mautrix-mattermost` — names the
-    // bridge in its last path segment; a reverse-domain id — 
+    // bridge in its last path segment; a reverse-domain id —
     // `sh.puppet.whatsapp` — in its last dot segment. Path first, so the
     // dots of a URL's host never shred the part that matters.
     if (key.contains('/')) key = key.split('/').last;

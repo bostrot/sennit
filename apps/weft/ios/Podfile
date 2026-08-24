@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+platform :ios, '16.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -26,6 +26,21 @@ end
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
 flutter_ios_podfile_setup
+
+# ONNX Runtime ships prebuilt *static* binaries, which CocoaPods' target
+# validator refuses as transitive dependencies of dynamic frameworks — while
+# flutter_vodozemac's Rust dylib is only embedded when frameworks are
+# dynamic: building the whole graph static would ship an app without it, dead
+# at first dlopen. Each pod builds as its own framework here, so the static
+# ONNX archives link into flutter_onnxruntime.framework and work; the check
+# is simply stricter than the layout it is checking. The same bypass, for the
+# same plugin pairing, as in `../macos/Podfile`.
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(
+    :define_method,
+    :verify_no_static_framework_transitive_dependencies,
+  ) {}
+end
 
 target 'Runner' do
   use_frameworks!

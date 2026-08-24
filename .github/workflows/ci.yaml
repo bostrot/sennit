@@ -60,7 +60,9 @@ jobs:
 
   widget:
     name: Widget & golden tests
-    runs-on: ubuntu-latest
+    # macOS, not ubuntu: the golden files are rendered on macOS and font
+    # rasterization differs per platform — Linux fails every golden on pixels.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -101,7 +103,9 @@ jobs:
 
   a11y:
     name: Accessibility & RTL
-    runs-on: ubuntu-latest
+    # Same macOS constraint as the widget job: the contrast sweep samples
+    # rendered pixels, and Linux text rasterization shifts them.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -162,6 +166,9 @@ jobs:
             matrixdotorg/synapse:latest generate
       - name: Open registration for the test stack
         run: |
+          # `generate` ran inside the container as root, so the tree it wrote
+          # is root-owned and the append below would be refused.
+          sudo chown -R "$(id -u):$(id -g)" tooling/docker/synapse-data
           cat >> tooling/docker/synapse-data/homeserver.yaml <<'EOF'
 
           enable_registration: true

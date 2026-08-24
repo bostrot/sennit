@@ -55,6 +55,10 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Accept the Android SDK licenses
+        # whisper_ggml pins an NDK the runner image does not preinstall, and
+        # its download stops at the unaccepted license.
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Install the release keystore
         if: env.HAS_SIGNING == 'true'
         run: |
@@ -156,8 +160,21 @@ jobs:
           cache: true
       - run: flutter pub get
         working-directory: apps/weft
-      - run: flutter build macos --release
+      - name: Build (signing deferred)
+        # The runner has no signing identity, so the in-build CodeSign step
+        # would fail on the first embedded framework. Build with signing off,
+        # then seal the whole bundle ad hoc below; the Developer ID step
+        # re-signs on top when the secrets exist.
+        run: |
+          flutter build macos --release --config-only
+          xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
+            -configuration Release -derivedDataPath build/macos \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
         working-directory: apps/weft
+      - name: Ad-hoc sign
+        run: |
+          codesign --force --deep --sign - \
+            apps/weft/build/macos/Build/Products/Release/Braid.app
       - name: Import the Developer ID certificate
         if: env.HAS_SIGNING == 'true'
         run: |
