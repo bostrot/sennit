@@ -1,0 +1,280 @@
+name: Release
+
+# Cutting a release: run tooling/scripts/release.sh <version>, then
+#   git push && git push origin v<version>
+# The tag drives everything below; pubspec.yaml stays the single source of
+# truth and the verify job refuses a tag that doesn't match it.
+#
+# workflow_dispatch builds all platforms without publishing — a dry run.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)\+.*/\1/p' apps/weft/pubspec.yaml)
+          [ -n "$VERSION" ] || { echo "pubspec version is not semver+build" >&2; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "pubspec says $VERSION"
+      - name: The tag must match pubspec.yaml
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          [ "$TAG" = "${{ steps.version.outputs.version }}" ] || {
+            echo "tag v$TAG != pubspec ${{ steps.version.outputs.version }} — run tooling/scripts/release.sh" >&2
+            exit 1
+          }
+
+  android:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install the release keystore
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > apps/weft/android/app/upload-keystore.jks
+          cat > apps/weft/android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+      - run: flutter pub get
+        working-directory: apps/weft
+      - run: flutter build apk --release
+        working-directory: apps/weft
+      - run: flutter build appbundle --release
+        working-directory: apps/weft
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp apps/weft/build/app/outputs/flutter-apk/app-release.apk "dist/Braid-$VERSION-android.apk"
+          cp apps/weft/build/app/outputs/bundle/release/app-release.aab "dist/Braid-$VERSION-android.aab"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*
+
+  linux:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
+            libsqlite3-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/weft
+      - run: flutter build linux --release
+        working-directory: apps/weft
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          tar -czf "dist/Braid-$VERSION-linux-x64.tar.gz" \
+            -C apps/weft/build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/weft
+      - run: flutter build windows --release
+        working-directory: apps/weft
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path apps/weft/build/windows/x64/runner/Release/* `
+            -DestinationPath "dist/Braid-$env:VERSION-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  macos:
+    needs: verify
+    runs-on: macos-latest
+    env:
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_ID != '' }}
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/weft
+      - run: flutter build macos --release
+        working-directory: apps/weft
+      - name: Import the Developer ID certificate
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "${{ secrets.MACOS_CERTIFICATE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+      - name: Codesign
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          codesign --force --deep --options runtime --timestamp \
+            --sign "Developer ID Application" \
+            apps/weft/build/macos/Build/Products/Release/Braid.app
+      - name: Package
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent \
+            apps/weft/build/macos/Build/Products/Release/Braid.app \
+            "dist/Braid-$VERSION-macos.zip"
+      - name: Notarize and staple
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        run: |
+          xcrun notarytool submit "dist/Braid-$VERSION-macos.zip" --wait \
+            --apple-id "${{ secrets.APPLE_ID }}" \
+            --password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" \
+            --team-id "${{ secrets.APPLE_TEAM_ID }}"
+          xcrun stapler staple \
+            apps/weft/build/macos/Build/Products/Release/Braid.app
+          rm dist/*.zip
+          ditto -c -k --keepParent \
+            apps/weft/build/macos/Build/Products/Release/Braid.app \
+            "dist/Braid-$VERSION-macos.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  ios:
+    needs: verify
+    runs-on: macos-latest
+    env:
+      HAS_SIGNING: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/weft
+      - name: Import the distribution certificate and profile
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/braid.mobileprovision
+      - name: Build a signed IPA
+        if: env.HAS_SIGNING == 'true'
+        run: flutter build ipa --release
+        working-directory: apps/weft
+      - name: Build an unsigned IPA
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          (cd apps/weft && flutter build ios --release --no-codesign)
+          mkdir -p Payload
+          cp -R apps/weft/build/ios/iphoneos/Runner.app Payload/
+          zip -qry unsigned.ipa Payload
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          if [ "$HAS_SIGNING" = "true" ]; then
+            cp apps/weft/build/ios/ipa/*.ipa "dist/Braid-$VERSION-ios.ipa"
+          else
+            cp unsigned.ipa "dist/Braid-$VERSION-ios-unsigned.ipa"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: dist/*
+
+  publish:
+    needs: [verify, android, linux, windows, macos, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist/
+      - name: Publish the GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Braid ${{ needs.verify.outputs.version }}
+          generate_release_notes: true
+          files: dist/*

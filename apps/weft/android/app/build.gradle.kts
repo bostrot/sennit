@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // Declared explicitly rather than left to the Flutter Gradle Plugin, which
@@ -11,6 +13,18 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing reads android/key.properties (gitignored) first and the
+// environment second — the latter is how CI provides it. With neither, the
+// debug keystore signs, so `flutter run --release` works on a fresh checkout
+// without any setup.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { stream -> load(stream) }
+}
+
+fun signingValue(key: String, env: String): String? =
+    keystoreProperties.getProperty(key) ?: System.getenv(env)
 
 android {
     namespace = "com.bostrot.weft"
@@ -75,11 +89,26 @@ android {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
+    signingConfigs {
+        create("release") {
+            val storePath = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
+            if (storePath != null) {
+                storeFile = file(storePath)
+                storePassword = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "ANDROID_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (signingConfigs.getByName("release").storeFile != null) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
             // R8 runs on release; the rules keep the classes native code
             // resolves reflectively (ONNX Runtime above all — see the file).
             proguardFiles(
