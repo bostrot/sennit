@@ -382,6 +382,72 @@ void main() {
       expect(graph.applyAutoMerges(), isEmpty);
     });
 
+    test('colliding stored contact ids are split apart on load', () {
+      // What the broken id factory wrote: two strangers wearing one contact
+      // id with no merge decision anywhere — and a legitimate merged pair,
+      // which must survive the repair.
+      final graph = IdentityGraph(
+        handles: [
+          handle(
+            'stranger1',
+            ChatNetwork.whatsapp,
+            displayName: 'Garten',
+          ).copyWith(unifiedContactId: 'contact_00'),
+          handle(
+            'stranger2',
+            ChatNetwork.telegram,
+            displayName: 'Lin',
+          ).copyWith(unifiedContactId: 'contact_00'),
+          handle(
+            'real_a',
+            ChatNetwork.whatsapp,
+            displayName: 'Anna Maven',
+          ).copyWith(unifiedContactId: 'contact_11'),
+          handle(
+            'real_b',
+            ChatNetwork.signal,
+            displayName: 'Anna Maven',
+          ).copyWith(unifiedContactId: 'contact_11'),
+        ],
+        decisions: [
+          MergeDecision(
+            pair: pairKey('real_a', 'real_b'),
+            verdict: MergeVerdict.merged,
+            source: MergeDecisionSource.user,
+            decidedAt: DateTime(2026, 8, 20),
+          ),
+        ],
+        idFactory: counterIds(),
+      );
+
+      expect(
+        graph.contactIdOf('stranger1'),
+        isNot(graph.contactIdOf('stranger2')),
+        reason: 'no decision ever joined them — the id collision did',
+      );
+      expect(graph.contactIdOf('real_a'), graph.contactIdOf('real_b'));
+    });
+
+    test('a fresh id is never one somebody already wears', () {
+      // A factory that returns a taken id — the graph must refuse it.
+      var calls = 0;
+      final graph = IdentityGraph(
+        handles: [
+          handle(
+            'a',
+            ChatNetwork.whatsapp,
+            displayName: 'Anna Maven',
+          ).copyWith(unifiedContactId: 'dup'),
+        ],
+        idFactory: () => ['dup', 'dup', 'fresh'][calls++],
+      );
+
+      graph.upsertHandle(handle('b', ChatNetwork.signal, displayName: 'Ben'));
+
+      expect(graph.contactIdOf('b'), 'fresh');
+      expect(graph.contactIdOf('a'), isNot(graph.contactIdOf('b')));
+    });
+
     test('the same name on the same network never merges or suggests', () {
       // Two colleagues named alike on one messenger are two people; a
       // bridge gives one person exactly one handle per network.

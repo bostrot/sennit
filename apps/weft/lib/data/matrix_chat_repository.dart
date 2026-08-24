@@ -266,8 +266,13 @@ class MatrixChatRepository implements ChatRepository {
   final Map<String, List<TimelineSource>> _sources = {};
 
   static String Function() _idFactory() {
+    // Stamped per run: the old counter restarted at zero every launch and
+    // collided with ids already persisted, which dropped freshly unmerged
+    // (and brand-new) handles into strangers' contacts. The graph now also
+    // refuses colliding ids outright; this makes them not happen at all.
     var n = 0;
-    return () => 'contact_$n${n++}';
+    final run = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    return () => 'contact_${run}_${n++}';
   }
 
   sdk.Client get _client => _session.client;

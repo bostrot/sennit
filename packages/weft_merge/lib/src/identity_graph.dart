@@ -50,7 +50,7 @@ class IdentityGraph {
     for (final h in handles) {
       _handles[h.id] = h;
       _byMatrixUserId[h.matrixUserId] = h.id;
-      _contactOf[h.id] = h.unifiedContactId ?? _nextId();
+      _contactOf[h.id] = h.unifiedContactId ?? _freshId();
     }
     for (final d in decisions) {
       _decisions[d.pair] = d;
@@ -61,6 +61,65 @@ class IdentityGraph {
         }
       }
     }
+    _repairCollisions();
+  }
+
+  /// Splits apart contacts that were never merged.
+  ///
+  /// A broken id factory once handed out contact ids that collided with ones
+  /// already persisted, silently dropping strangers into each other's
+  /// contacts — no merge, no decision, just two handles wearing the same id.
+  /// A *real* merge always records a decision, so within every multi-handle
+  /// contact the members must be connected through merged-pair decisions;
+  /// any component that is not connected to the rest is split back out. This
+  /// also heals the databases the broken factory already wrote.
+  void _repairCollisions() {
+    final byContact = <String, List<String>>{};
+    _contactOf.forEach(
+      (handle, contact) => byContact.putIfAbsent(contact, () => []).add(handle),
+    );
+    for (final members in byContact.values) {
+      if (members.length < 2) continue;
+      // Connected components over the merged decisions among these members.
+      final unassigned = {...members};
+      var first = true;
+      while (unassigned.isNotEmpty) {
+        final seed = unassigned.first;
+        final component = <String>{seed};
+        final queue = [seed];
+        unassigned.remove(seed);
+        while (queue.isNotEmpty) {
+          final current = queue.removeLast();
+          for (final other in [...unassigned]) {
+            final decision = _decisions[pairKey(current, other)];
+            if (decision?.verdict == MergeVerdict.merged) {
+              component.add(other);
+              unassigned.remove(other);
+              queue.add(other);
+            }
+          }
+        }
+        if (first) {
+          // The first component keeps the stored contact id.
+          first = false;
+          continue;
+        }
+        final fresh = _freshId();
+        for (final handle in component) {
+          _contactOf[handle] = fresh;
+        }
+      }
+    }
+  }
+
+  /// A new contact id that provably belongs to nobody, whatever the factory
+  /// returns — the guard that makes an id collision structurally impossible.
+  String _freshId() {
+    var id = _nextId();
+    while (_contactOf.containsValue(id)) {
+      id = _nextId();
+    }
+    return id;
   }
 
   final MergeScorer _scorer;
@@ -266,7 +325,7 @@ class IdentityGraph {
       );
     }
 
-    final fresh = _nextId();
+    final fresh = _freshId();
     _contactOf[handleId] = fresh;
     return fresh;
   }
@@ -291,7 +350,7 @@ class IdentityGraph {
     _byMatrixUserId[handle.matrixUserId] = handle.id;
     _contactOf.putIfAbsent(
       handle.id,
-      () => handle.unifiedContactId ?? _nextId(),
+      () => handle.unifiedContactId ?? _freshId(),
     );
   }
 
