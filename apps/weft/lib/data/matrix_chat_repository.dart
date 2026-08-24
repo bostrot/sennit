@@ -142,11 +142,22 @@ class MatrixChatRepository implements ChatRepository {
   /// the inbox as fresh as an eye can tell and cuts the work by an order of
   /// magnitude.
   Timer? _rebuildDebounce;
+  final DateTime _bornAt = DateTime.now();
   void _scheduleRebuild() {
-    _rebuildDebounce ??= Timer(const Duration(milliseconds: 300), () {
-      _rebuildDebounce = null;
-      _rebuild();
-    });
+    // The whole room scan runs on the UI thread, so its cadence *is* the
+    // scroll's frame budget. While the initial sync storm is still landing —
+    // the first half minute — one rebuild every 1.5s keeps the inbox alive
+    // without re-scanning the world under the user's finger; after that the
+    // 300ms trailing edge is imperceptible again.
+    final settling =
+        DateTime.now().difference(_bornAt) < const Duration(seconds: 30);
+    _rebuildDebounce ??= Timer(
+      Duration(milliseconds: settling ? 1500 : 300),
+      () {
+        _rebuildDebounce = null;
+        _rebuild();
+      },
+    );
   }
 
   final Map<String, ChatNetwork> _sendNetworks = {};
@@ -1628,7 +1639,17 @@ class MatrixChatRepository implements ChatRepository {
   /// The bridge bot does not count as a person: a portal DM has *three*
   /// members — the user, the contact's ghost, and the bot — and counting the
   /// bot made every such DM look like a group.
+  /// Cached per room: the peer of a DM never changes, and this walks the
+  /// member summary and participants — six times per room per rebuild before
+  /// the cache, all of it on the UI thread during the initial sync storm.
+  final Map<String, String?> _peerCache = {};
+
   String? _peerOf(sdk.Room room) {
+    if (_peerCache.containsKey(room.id)) return _peerCache[room.id];
+    return _peerCache[room.id] = _computePeerOf(room);
+  }
+
+  String? _computePeerOf(sdk.Room room) {
     final direct = room.directChatMatrixID;
     if (direct != null) return direct;
 
@@ -1737,6 +1758,26 @@ class MatrixChatRepository implements ChatRepository {
     return null;
   }
 
+  /// The inbox preview, re-mapped only when the room's last event moves —
+  /// mapping every room's tail on every rebuild was pure repeat work.
+  final Map<String, (String, WeftMessage?)> _previewCache = {};
+
+  WeftMessage? _previewFor(
+    sdk.Room room,
+    sdk.Event lastEvent,
+    ChatNetwork network,
+  ) {
+    final cached = _previewCache[room.id];
+    if (cached != null && cached.$1 == lastEvent.eventId) return cached.$2;
+    final mapped = mapEvent(
+      lastEvent,
+      network: network,
+      ownUserId: _client.userID,
+    );
+    _previewCache[room.id] = (lastEvent.eventId, mapped);
+    return mapped;
+  }
+
   Chat _chatFromRoom(sdk.Room room) {
     final network = _networkOf(room);
     final lastEvent = room.lastEvent;
@@ -1763,7 +1804,7 @@ class MatrixChatRepository implements ChatRepository {
       avatarUrl: _avatarFor(room),
       lastMessage: lastEvent == null
           ? null
-          : mapEvent(lastEvent, network: network, ownUserId: _client.userID),
+          : _previewFor(room, lastEvent, network),
       // The marked-unread flag keeps at least a badge of one; otherwise the
       // receipt we just wrote beats the server's stale count.
       unreadCount: room.markedUnread
