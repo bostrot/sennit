@@ -167,7 +167,9 @@ jobs:
       - name: Open registration for the test stack
         run: |
           # `generate` ran inside the container as root, so the tree it wrote
-          # is root-owned and the append below would be refused.
+          # is root-owned and the append below would be refused. And once the
+          # append is done the tree has to open up again: the server runs as
+          # the container's synapse user (991), which is nobody here.
           sudo chown -R "$(id -u):$(id -g)" tooling/docker/synapse-data
           cat >> tooling/docker/synapse-data/homeserver.yaml <<'EOF'
 
@@ -181,6 +183,7 @@ jobs:
             per_second: 100
             burst_count: 100
           EOF
+          sudo chmod -R a+rwX tooling/docker/synapse-data
       - name: Start homeserver
         run: docker compose -f tooling/docker/compose.yaml up -d --wait
       - name: Seed test accounts
