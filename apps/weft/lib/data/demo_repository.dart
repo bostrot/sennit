@@ -789,10 +789,8 @@ class DemoChatRepository implements ChatRepository {
           '!konrad_wa_room:example.org',
           ChatNetwork.whatsapp,
           'Konrad Majewski',
-          '',
+          'Hey, are we still on for Thursday?',
           14,
-          kind: MessageKind.voice,
-          transcript: 'Hey, are we still on for Thursday?',
         ),
       ),
       Chat(
@@ -937,7 +935,7 @@ class DemoChatRepository implements ChatRepository {
           '!design_room:example.org',
           ChatNetwork.matrix,
           'Priya',
-          'Pushed the new rail animation 🎨',
+          'Pushed the new rail animation',
           35,
         ),
       ),
@@ -1009,7 +1007,7 @@ class DemoChatRepository implements ChatRepository {
     ],
     ChatNetwork.telegram: [
       'Quick update from my side.',
-      'Sounds good 👍',
+      'Sounds good, ship it',
       'Are we still meeting Thursday?',
       'Yes, 14:00 works.',
     ],
@@ -1023,7 +1021,7 @@ class DemoChatRepository implements ChatRepository {
       'Appreciate it.',
       'Following up on the action items.',
     ],
-    ChatNetwork.instagram: ['Saw your story — congrats!', 'Thank you! 🙏'],
+    ChatNetwork.instagram: ['Saw your story — congrats!', 'Thank you!'],
     ChatNetwork.matrix: [
       'Pushed a fix for the timeline watermark.',
       'Nice, tests green?',

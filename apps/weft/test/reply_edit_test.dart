@@ -22,7 +22,7 @@ void main() {
   const mergedChat = 'merged:anna';
   const telegramRoom = '!anna_tg_room:example.org';
   const peerLine = 'Quick update from my side.';
-  const ownLine = 'Sounds good 👍';
+  const ownLine = 'Sounds good, ship it';
 
   late DemoChatRepository demo;
   late RecordingChatRepository repository;

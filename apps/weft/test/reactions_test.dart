@@ -256,7 +256,7 @@ void main() {
     // A different message, so the picker is reached from a bubble with no
     // reactions of its own.
     await tester.longPress(
-      find.text('Sounds good 👍', findRichText: true).first,
+      find.text('Sounds good, ship it', findRichText: true).first,
       warnIfMissed: false,
     );
     await tester.pumpAndSettle();
