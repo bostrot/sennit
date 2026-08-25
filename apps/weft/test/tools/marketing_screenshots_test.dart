@@ -134,4 +134,73 @@ void main() {
       mode: WeftThemeMode.dark,
     );
   });
+
+  // Google Play is strict about aspect ratio: phone shots must be 16:9 or
+  // 9:16, and the Apple sets above are 9:19.6 — the shape of a modern iPhone,
+  // which Play rejects outright. These are exactly 9:16 and 16:9.
+  const playPhone = Size(360, 640);
+  const playTablet = Size(960, 540);
+
+  testWidgets('play phone inbox light', (tester) async {
+    await capture(
+      tester,
+      'play_phone_01_inbox_light',
+      child: const InboxShell(),
+      logical: playPhone,
+      scale: 3,
+    );
+  });
+
+  testWidgets('play phone chat light', (tester) async {
+    await capture(
+      tester,
+      'play_phone_02_chat_light',
+      child: const ChatView(chatId: 'merged:anna'),
+      logical: playPhone,
+      scale: 3,
+    );
+  });
+
+  testWidgets('play phone inbox dark', (tester) async {
+    await capture(
+      tester,
+      'play_phone_03_inbox_dark',
+      child: const InboxShell(),
+      logical: playPhone,
+      scale: 3,
+      mode: WeftThemeMode.dark,
+    );
+  });
+
+  testWidgets('play phone chat dark', (tester) async {
+    await capture(
+      tester,
+      'play_phone_04_chat_dark',
+      child: const ChatView(chatId: 'merged:anna'),
+      logical: playPhone,
+      scale: 3,
+      mode: WeftThemeMode.dark,
+    );
+  });
+
+  testWidgets('play tablet inbox light', (tester) async {
+    await capture(
+      tester,
+      'play_tablet_01_inbox_light',
+      child: const InboxShell(),
+      logical: playTablet,
+      scale: 2,
+    );
+  });
+
+  testWidgets('play tablet inbox dark', (tester) async {
+    await capture(
+      tester,
+      'play_tablet_02_inbox_dark',
+      child: const InboxShell(),
+      logical: playTablet,
+      scale: 2,
+      mode: WeftThemeMode.dark,
+    );
+  });
 }
