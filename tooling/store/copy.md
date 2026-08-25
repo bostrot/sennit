@@ -77,7 +77,7 @@ inbox on your own Matrix server. No cloud between you and your messages.
 |---|---|
 | Support URL | https://github.com/bostrot/braid |
 | Marketing URL | https://github.com/bostrot/braid |
-| Privacy policy | https://github.com/bostrot/braid/blob/main/PRIVACY.md |
+| Privacy policy | https://erictrenkel.com/apps/braid/privacy.html |
 
 ## Categories
 

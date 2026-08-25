@@ -1,5 +1,8 @@
 # Braid Privacy Policy
 
+*Published at <https://erictrenkel.com/apps/braid/privacy.html> — that
+hosted copy is the one the app stores link to.*
+
 *Effective: 25 August 2026*
 
 Braid is a self-hosted messenger. It is designed so that the developer of
