@@ -17,6 +17,12 @@ environment so they are never written into a file or shell history:
     export BRAID_SEED_PARTNER_PASSWORD=...
     python3 tooling/scripts/seed_review_account.py
 
+Set BRAID_SEED_REGISTRATION_SECRET as well and the script registers
+whichever of the two accounts does not exist yet, using Synapse's
+shared-secret admin endpoint — the same one `register_new_matrix_user`
+drives. That value is the homeserver's `registration_shared_secret`.
+An account that already exists is left alone.
+
 Re-running is safe: rooms carrying this script's marker topic are reused
 rather than duplicated, so the inbox does not fill with copies.
 
@@ -25,6 +31,8 @@ Standard library only — no pip install on whatever machine runs this.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import sys
@@ -40,6 +48,49 @@ def env(name: str) -> str:
     if not value:
         sys.exit(f"{name} is not set — see the docstring at the top of this file.")
     return value
+
+
+def register(server: str, secret: str, user: str, password: str) -> None:
+    """Creates one account through Synapse's shared-secret admin endpoint.
+
+    The endpoint hands out a nonce and expects it back inside an HMAC over
+    the account details, which is what stops a leaked URL from being enough
+    to register with. A user that already exists comes back as an error the
+    caller can ignore — this is meant to be safe to re-run.
+    """
+    server = server.rstrip("/")
+    path = "/_synapse/admin/v1/register"
+    with urllib.request.urlopen(f"{server}{path}", timeout=30) as response:
+        nonce = json.loads(response.read())["nonce"]
+
+    # Synapse joins the fields with NUL rather than terminating each, so this
+    # is a join and not a loop of update-then-NUL.
+    mac = hmac.new(
+        secret.encode(),
+        b"\x00".join(part.encode() for part in (nonce, user, password, "notadmin")),
+        hashlib.sha1,
+    ).hexdigest()
+    payload = {
+        "nonce": nonce,
+        "username": user,
+        "password": password,
+        "admin": False,
+        "mac": mac,
+    }
+    request = urllib.request.Request(
+        f"{server}{path}", data=json.dumps(payload).encode(), method="POST"
+    )
+    request.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            json.loads(response.read())
+        print(f"registered {user}")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode(errors="replace")
+        if "User ID already taken" in detail or error.code == 400:
+            print(f"{user} already exists — leaving it alone")
+        else:
+            raise SystemExit(f"registering {user} failed: {error.code} {detail}")
 
 
 class Client:
@@ -173,10 +224,17 @@ CONVERSATIONS = [
 
 def main() -> None:
     server = env("BRAID_SEED_SERVER")
-    me = Client(server, env("BRAID_SEED_USER"), env("BRAID_SEED_PASSWORD"))
-    them = Client(
-        server, env("BRAID_SEED_PARTNER"), env("BRAID_SEED_PARTNER_PASSWORD")
-    )
+    user, password = env("BRAID_SEED_USER"), env("BRAID_SEED_PASSWORD")
+    partner = env("BRAID_SEED_PARTNER")
+    partner_password = env("BRAID_SEED_PARTNER_PASSWORD")
+
+    secret = os.environ.get("BRAID_SEED_REGISTRATION_SECRET", "").strip()
+    if secret:
+        register(server, secret, user, password)
+        register(server, secret, partner, partner_password)
+
+    me = Client(server, user, password)
+    them = Client(server, partner, partner_password)
     print(f"signed in as {me.user_id} and {them.user_id}")
 
     me.set_display_name("Braid Demo")
