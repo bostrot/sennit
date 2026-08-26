@@ -213,7 +213,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           children: [
             const _BuiltInConnectionSection(),
             const _UnifiedPushSection(),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const Text('Notifications'),
               subtitle: const Text(
                 'The master switch. Off means nothing is posted, on any device '
@@ -254,7 +254,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     'Applies everywhere. A single chat can disagree with this '
                     'from its own screen.',
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const Text('Only notify for mentions'),
                 subtitle: const Text(
                   'Matches your name, your Matrix id, the name each bridge gives '
@@ -264,7 +264,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 onChanged: (v) => _update((p) => p.copyWith(mentionsOnly: v)),
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const Text('Mentions break through a mute'),
                 subtitle: const Text(
                   'On: mute a busy group and still get paged in it. Off: a mute '
@@ -275,7 +275,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     _update((p) => p.copyWith(mentionsBypassMute: v)),
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const Text('Show message text on the lock screen'),
                 subtitle: const Text(
                   'Off still notifies — it says "New message" instead of what was '
@@ -295,7 +295,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     'notification decided in the background agrees with one '
                     'decided while the app is open.',
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const Text('Quiet hours'),
                 value: quiet != null,
                 onChanged: (v) => _update(
@@ -323,7 +323,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   title: 'Until',
                   onTap: () => _pickQuietHour(start: false),
                 ),
-                SwitchListTile.adaptive(
+                SwitchListTile(
                   title: const Text('Let mentions through'),
                   value: quiet.allowMentions,
                   onChanged: (v) => _update(
@@ -335,7 +335,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
-                SwitchListTile.adaptive(
+                SwitchListTile(
                   title: const Text('Deliver silently instead of hiding'),
                   subtitle: const Text(
                     'The notification is waiting in the shade in the morning, '
@@ -819,7 +819,7 @@ class _SmartRepliesTile extends ConsumerWidget {
         settings?.getBool(WeftSettings.notifySmartReplies, fallback: true) ??
         false;
 
-    return SwitchListTile.adaptive(
+    return SwitchListTile(
       title: const Text('AI reply suggestions'),
       subtitle: Text(
         configured
@@ -1006,7 +1006,7 @@ class _BuiltInConnectionSectionState
       margin: const EdgeInsets.only(bottom: WeftSpace.lg),
       child: Column(
         children: [
-          SwitchListTile.adaptive(
+          SwitchListTile(
             secondary: Icon(
               _enabled ? Icons.sync_rounded : Icons.sync_disabled_rounded,
               color: _enabled

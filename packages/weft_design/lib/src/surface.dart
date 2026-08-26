@@ -113,6 +113,14 @@ abstract final class MacMetrics {
   /// into a rounded window.
   static const double windowRadius = 12;
 
+  /// One row in a pop-up menu.
+  ///
+  /// `PopupMenuItem` defaults to `kMinInteractiveDimension` — 48 points, a
+  /// thumb's target — and no theme field overrides it, so a menu of five verbs
+  /// came out 240 points tall where the system's is nearer 120. Each call site
+  /// has to state it.
+  static const double menuItemHeight = 28;
+
   /// Sheets and popovers.
   static const double popoverRadius = 12;
   static const double sheetRadius = 12;

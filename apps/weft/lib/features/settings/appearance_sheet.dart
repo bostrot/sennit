@@ -121,7 +121,7 @@ class _AppearanceSheet extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.xl),
 
-            SwitchListTile.adaptive(
+            SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Select several networks at once'),
               subtitle: const Text('Off: the rail is one-network-at-a-time.'),

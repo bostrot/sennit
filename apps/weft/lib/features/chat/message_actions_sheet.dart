@@ -316,9 +316,10 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
     Color? color,
   }) => PopupMenuItem(
     value: MessageActionChoice(action),
+    height: MacMetrics.menuItemHeight,
     child: Row(
       children: [
-        Icon(icon, size: 18, color: color),
+        Icon(icon, size: 16, color: color),
         const SizedBox(width: WeftSpace.sm),
         Text(label, style: color == null ? null : TextStyle(color: color)),
       ],

@@ -488,6 +488,12 @@ abstract final class WeftTheme {
       listTileTheme: ListTileThemeData(
         dense: true,
         minVerticalPadding: 2,
+        // `dense` shrinks the *text* and leaves the box: a menu of five items
+        // still came out 240 points tall, where the system's is nearer 120.
+        // The height and the density are what actually move it.
+        minTileHeight: 30,
+        visualDensity: VisualDensity.compact,
+        iconColor: scheme.onSurfaceVariant,
         horizontalTitleGap: WeftSpace.sm,
         titleTextStyle: text.bodyMedium,
         subtitleTextStyle: text.labelSmall?.copyWith(
@@ -516,22 +522,6 @@ abstract final class WeftTheme {
       ),
       switchTheme: SwitchThemeData(
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        // `Switch.adaptive` draws a `CupertinoSwitch` here, which is the right
-        // shape and the wrong colour: its "on" is the system green, and Braid's
-        // is whatever seed the user chose. Stated rather than inherited,
-        // because a green switch beside a purple everything reads as a control
-        // borrowed from another app.
-        trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? scheme.primary
-              : scheme.surfaceContainerHighest,
-        ),
-        thumbColor: const WidgetStatePropertyAll(Colors.white),
-        trackOutlineColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? Colors.transparent
-              : palette.border,
-        ),
       ),
       checkboxTheme: CheckboxThemeData(
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

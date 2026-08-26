@@ -41,7 +41,7 @@ class LinkPreviewsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.lg),
 
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const PrivacyGatedTitle(
                 title: 'Show link previews',
                 warning:

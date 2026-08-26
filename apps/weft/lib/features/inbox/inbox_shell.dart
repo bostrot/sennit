@@ -55,9 +55,10 @@ Future<void> showChatContextMenu(
     Color? color,
   }) => PopupMenuItem(
     value: value,
+    height: MacMetrics.menuItemHeight,
     child: Row(
       children: [
-        Icon(icon, size: 18, color: color),
+        Icon(icon, size: 16, color: color),
         const SizedBox(width: WeftSpace.sm),
         Text(label, style: color == null ? null : TextStyle(color: color)),
       ],

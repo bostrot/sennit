@@ -54,7 +54,7 @@ class SurfacesScreen extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.lg),
 
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const PrivacyGatedTitle(
                 title: 'Home screen widgets',
                 warning:
@@ -69,7 +69,7 @@ class SurfacesScreen extends ConsumerWidget {
               onChanged: (v) => _write(ref, settings.copyWith(widgets: v)),
               contentPadding: EdgeInsets.zero,
             ),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const PrivacyGatedTitle(
                 title: 'Watch',
                 warning:
@@ -95,7 +95,7 @@ class SurfacesScreen extends ConsumerWidget {
                     'how many unread messages you have and nothing else — no '
                     'names, no words, no faces.',
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const PrivacyGatedTitle(
                   title: 'Message previews',
                   warning:
@@ -110,7 +110,7 @@ class SurfacesScreen extends ConsumerWidget {
                     _write(ref, settings.copyWith(includePreviews: v)),
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const PrivacyGatedTitle(
                   title: 'Names and faces',
                   warning:

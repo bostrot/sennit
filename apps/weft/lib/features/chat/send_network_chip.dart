@@ -53,6 +53,9 @@ class SendNetworkChip extends StatelessWidget {
           for (final n in networks ?? chat.networks)
             PopupMenuItem(
               value: n,
+              height: context.isDesktop
+                  ? MacMetrics.menuItemHeight
+                  : kMinInteractiveDimension,
               // The tick beside the current entry is purely visual; `selected`
               // is how a reader is told which of the legs it is already on.
               child: Semantics(

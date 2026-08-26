@@ -211,7 +211,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
               ),
             ),
             const SizedBox(height: WeftSpace.lg),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const Text('Run the MCP server'),
               subtitle: Text(
                 running

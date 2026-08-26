@@ -360,7 +360,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                   'local model installed and switched on, leave this off — the '
                   'device does the work and nothing is sent anywhere.',
             ),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const PrivacyGatedTitle(
                 title: 'Enable embeddings',
                 warning:
@@ -396,7 +396,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                   'Whisper model switched on for voice always takes precedence '
                   'over anything configured here.',
             ),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               title: const PrivacyGatedTitle(
                 title: 'Enable transcription',
                 warning:
@@ -417,7 +417,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 hint: 'leave blank to keep the current key',
               ),
               _testRow('whisper', _probeWhisper),
-              SwitchListTile.adaptive(
+              SwitchListTile(
                 title: const Text('Transcribe voice messages automatically'),
                 subtitle: const Text(
                   'Otherwise each voice message has a Transcribe action.',

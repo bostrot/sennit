@@ -181,13 +181,13 @@ class ContactProfileScreen extends ConsumerWidget {
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => showLabelSheet(context, ref, {chat.id}),
             ),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               secondary: const Icon(Icons.notifications_off_outlined),
               title: const Text('Mute'),
               value: chat.muted,
               onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
             ),
-            SwitchListTile.adaptive(
+            SwitchListTile(
               secondary: const Icon(Icons.archive_outlined),
               title: const Text('Archive'),
               value: chat.archived,

@@ -284,7 +284,7 @@ class _ModelCard extends StatelessWidget {
                     ],
                   ),
                   if (onUseForVoice != null)
-                    SwitchListTile.adaptive(
+                    SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('Use for voice messages'),
@@ -295,7 +295,7 @@ class _ModelCard extends StatelessWidget {
                       onChanged: (_) => onUseForVoice!(),
                     ),
                   if (onUseForSearch != null)
-                    SwitchListTile.adaptive(
+                    SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('Use for search'),

@@ -165,7 +165,7 @@ class NetworkToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile.adaptive(
+    return SwitchListTile(
       // The tile is one merged node, and the title beside the glyph is already
       // the network's name — a labelled glyph here reads "WhatsApp, WhatsApp".
       secondary: NetworkGlyph(network: network, size: 28, semanticsLabel: ''),

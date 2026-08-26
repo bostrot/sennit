@@ -218,7 +218,7 @@ class _ReadReceiptsToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile.adaptive(
+    return SwitchListTile(
       secondary: const Icon(Icons.done_all_rounded),
       title: const Text('Send read receipts'),
       subtitle: const Text(
@@ -268,7 +268,7 @@ class _HiddenNetworksSection extends ConsumerWidget {
       ),
       children: [
         for (final network in networks)
-          SwitchListTile.adaptive(
+          SwitchListTile(
             dense: true,
             title: Text('Show ${network.label} in All'),
             value: !hidden.contains(network),
@@ -298,7 +298,7 @@ class _ContactNamesToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile.adaptive(
+    return SwitchListTile(
       secondary: const Icon(Icons.person_pin_rounded),
       title: const Text('Use address book names'),
       subtitle: const Text(
@@ -351,7 +351,7 @@ class _AgendaToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile.adaptive(
+    return SwitchListTile(
       secondary: const Icon(Icons.event_available_rounded),
       title: const Text('Detect appointments'),
       subtitle: const Text(
