@@ -11,10 +11,12 @@ import 'package:intl/intl.dart' show Intl;
 import 'package:path/path.dart' as p;
 import 'package:weft_design/weft_design.dart';
 
-import 'package:weft_matrix/weft_matrix.dart' show DeviceManager, KeyBackup;
+import 'package:weft_matrix/weft_matrix.dart'
+    show DetectedBridge, DeviceManager, KeyBackup;
 import 'package:weft_richtext/weft_richtext.dart' show LinkPreviewFetch;
 
 import 'package:weft/app/localisation.dart';
+import 'package:weft/features/bridges/bridges_screen.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/session_providers.dart';
 import 'package:weft/app/settings.dart';
@@ -259,6 +261,7 @@ Future<void> pumpWeft(
   LinkPreviewFetch? linkPreviewFetch,
   DeviceManager? deviceManager,
   KeyBackup? keyBackup,
+  List<DetectedBridge>? detectedBridges,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -297,6 +300,11 @@ Future<void> pumpWeft(
         if (deviceManager != null)
           deviceManagerProvider.overrideWithValue(deviceManager),
         if (keyBackup != null) keyBackupProvider.overrideWithValue(keyBackup),
+        // What the homeserver appears to run. Without this the bridges screen
+        // can only ever be drawn empty, which is the one state a person who
+        // runs bridges never sees.
+        if (detectedBridges != null)
+          detectedBridgesProvider.overrideWithValue(detectedBridges),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -307,10 +315,7 @@ Future<void> pumpWeft(
         locale: variant.locale,
         localizationsDelegates: weftLocalizationsDelegates,
         supportedLocales: weftSupportedLocales,
-        theme: WeftAppearance(
-          mode: mode,
-          seed: seed,
-        ).themeFor(
+        theme: WeftAppearance(mode: mode, seed: seed).themeFor(
           Brightness.dark,
           highContrast: variant.highContrast,
           surface: surface,

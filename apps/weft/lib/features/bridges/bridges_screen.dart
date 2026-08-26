@@ -90,17 +90,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   }
 
   /// What the server already runs, from m.bridge state in joined rooms.
-  void _detect() {
-    try {
-      final session = ref.read(matrixSessionProvider);
-      if (!session.isInitialized) return;
-      _detected = detectBridges(session.client);
-    } on StateError {
-      // Demo mode has no session; the detected section simply stays empty.
-    } on Object {
-      // A half-loaded room mid-sync; the next heartbeat retries.
-    }
-  }
+  void _detect() => _detected = ref.read(detectedBridgesProvider);
 
   BridgeProvisioningClient _clientFor(_StoredBridge bridge) {
     final session = ref.read(matrixSessionProvider);
@@ -364,98 +354,228 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                 ),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.all(WeftSpace.md),
-              children: [
-                if (_detected.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.all(WeftSpace.sm),
-                    child: Text(
-                      'Detected on your server',
-                      style: context.text.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+          : WeftReadingPane(
+              child: ListView(
+                padding: const EdgeInsets.all(WeftSpace.md),
+                children: [
+                  if (_detected.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(WeftSpace.sm),
+                      child: Text(
+                        'Detected on your server',
+                        style: context.text.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  for (final found in _detected)
-                    if (!_bridges.any((b) => b.networkId == found.network.id))
-                      ListTile(
-                        // The tile's title is the network's name — same
-                        // duplication the chat bubble had.
-                        leading: NetworkGlyph(
-                          network: found.network,
-                          size: 30,
-                          semanticsLabel: '',
+                    for (final found in _detected)
+                      if (!_bridges.any((b) => b.networkId == found.network.id))
+                        _DetectedBridgeCard(
+                          found: found,
+                          onSignIn: found.botUserId == null
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => BridgeBotLoginScreen(
+                                      botUserId: found.botUserId!,
+                                      network: found.network,
+                                    ),
+                                  ),
+                                ),
+                          onOpenChat: found.botUserId == null
+                              ? null
+                              : () => _openBotChat(found.botUserId!),
+                          onAddUrl: _addBridge,
                         ),
-                        title: Text(found.network.label),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${found.roomCount} bridged chat(s)'
-                              '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
-                            ),
-                            const SizedBox(height: WeftSpace.xs),
-                            // Sign-in first: the guided flow talks to the
-                            // bot's management room, which every mautrix
-                            // bridge has, no provisioning URL required. The
-                            // plain chat stays for everything else the bot
-                            // can do, and the URL flow lives behind the
-                            // "Add bridge" button for the richer API.
-                            Wrap(
-                              spacing: WeftSpace.sm,
-                              children: [
-                                if (found.botUserId != null) ...[
-                                  FilledButton.tonalIcon(
-                                    onPressed: () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => BridgeBotLoginScreen(
-                                          botUserId: found.botUserId!,
-                                          network: found.network,
-                                        ),
-                                      ),
-                                    ),
-                                    icon: const WeftMirroredIcon(
-                                      Icons.login_rounded,
-                                      size: 16,
-                                    ),
-                                    label: const Text('Sign in'),
-                                  ),
-                                  OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _openBotChat(found.botUserId!),
-                                    icon: const Icon(
-                                      Icons.chat_bubble_outline_rounded,
-                                      size: 16,
-                                    ),
-                                    label: const Text('Open chat'),
-                                  ),
-                                ] else
-                                  OutlinedButton(
-                                    onPressed: _addBridge,
-                                    child: const Text('Add provisioning URL'),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                  const Divider(height: WeftSpace.xl),
+                    // Only when something follows it. A divider under the last
+                    // detected bridge with no configured ones after it is a rule
+                    // separating a list from nothing.
+                    if (_bridges.isNotEmpty)
+                      const Divider(height: WeftSpace.xl),
+                  ],
+                  for (final bridge in _bridges)
+                    _BridgeCard(
+                      bridge: bridge,
+                      whoami: _health[bridge.id],
+                      error: _errors[bridge.id],
+                      onLogin: () => _startLogin(bridge),
+                      onRemove: () => _removeBridge(bridge),
+                      onLogout: (loginId) async {
+                        await _clientFor(bridge).logout(loginId);
+                        await _probe(bridge);
+                      },
+                    ),
                 ],
-                for (final bridge in _bridges)
-                  _BridgeCard(
-                    bridge: bridge,
-                    whoami: _health[bridge.id],
-                    error: _errors[bridge.id],
-                    onLogin: () => _startLogin(bridge),
-                    onRemove: () => _removeBridge(bridge),
-                    onLogout: (loginId) async {
-                      await _clientFor(bridge).logout(loginId);
-                      await _probe(bridge);
-                    },
-                  ),
-              ],
+              ),
             ),
+    );
+  }
+}
+
+/// The bridges this homeserver appears to run.
+///
+/// A provider rather than a call inside the screen, and that is the whole
+/// point of it: reading the session directly meant this list was empty in
+/// every build that has no session — a demo run, a widget test, a golden — so
+/// the only state anyone could ever *look* at was the empty one. The section
+/// went unexamined for exactly as long as it stayed unfillable, and a person
+/// running five bridges saw a layout nobody had seen.
+final detectedBridgesProvider = Provider<List<DetectedBridge>>((ref) {
+  if (kDemoMode) return _demoDetected;
+  try {
+    final session = ref.read(matrixSessionProvider);
+    if (!session.isInitialized) return const [];
+    return detectBridges(session.client);
+  } on Object {
+    // No session, or a half-loaded room mid-sync. The screen's heartbeat asks
+    // again.
+    return const [];
+  }
+});
+
+/// What a homeserver with bridges on it looks like, for the demo build.
+///
+/// Five, because that is the case worth drawing: one is a row and five is a
+/// list with rhythm to get wrong.
+const List<DetectedBridge> _demoDetected = [
+  DetectedBridge(
+    network: ChatNetwork.whatsapp,
+    botUserId: '@whatsappbot:example.org',
+    roomCount: 64,
+  ),
+  DetectedBridge(
+    network: ChatNetwork.signal,
+    botUserId: '@signalbot:example.org',
+    roomCount: 31,
+  ),
+  DetectedBridge(
+    network: ChatNetwork.telegram,
+    botUserId: '@telegrambot:example.org',
+    roomCount: 39,
+  ),
+  DetectedBridge(
+    network: ChatNetwork.instagram,
+    botUserId: '@instagrambot:example.org',
+    roomCount: 12,
+  ),
+  // No bot id: the case that offers a provisioning URL instead of a sign-in.
+  DetectedBridge(network: ChatNetwork.discord, roomCount: 7),
+];
+
+/// A bridge found on the homeserver that Braid is not configured for yet.
+///
+/// Was a `ListTile` with two buttons inside its `subtitle`, which is a slot for
+/// one line of secondary text. Under the desktop's compact density the tile
+/// could not size itself around them, so each row's buttons ended up eleven
+/// points from the *next* row's name and read as belonging to it — five
+/// bridges as one run of interleaved text and controls.
+///
+/// It is a card now, the same one a configured bridge gets, with its actions
+/// at the trailing edge where a wide window has room for them.
+class _DetectedBridgeCard extends StatelessWidget {
+  const _DetectedBridgeCard({
+    required this.found,
+    required this.onSignIn,
+    required this.onOpenChat,
+    required this.onAddUrl,
+  });
+
+  final DetectedBridge found;
+  final VoidCallback? onSignIn;
+  final VoidCallback? onOpenChat;
+  final VoidCallback onAddUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    // Sign-in first: the guided flow talks to the bot's management room, which
+    // every mautrix bridge has and which needs no provisioning URL. The plain
+    // chat stays for everything else the bot can do, and the URL flow lives
+    // behind "Add bridge" for the richer API.
+    final actions = <Widget>[
+      if (onSignIn != null) ...[
+        FilledButton.tonalIcon(
+          onPressed: onSignIn,
+          icon: const WeftMirroredIcon(Icons.login_rounded, size: 15),
+          label: const Text('Sign in'),
+        ),
+        const SizedBox(width: WeftSpace.sm),
+        OutlinedButton.icon(
+          onPressed: onOpenChat,
+          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
+          label: const Text('Open chat'),
+        ),
+      ] else
+        OutlinedButton(
+          onPressed: onAddUrl,
+          child: const Text('Add provisioning URL'),
+        ),
+    ];
+
+    final name = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(found.network.label, style: context.text.titleSmall),
+        const SizedBox(height: 2),
+        Text(
+          '${found.roomCount} bridged chat(s)'
+          '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.labelSmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: WeftSpace.sm),
+      child: Padding(
+        padding: const EdgeInsets.all(WeftSpace.md),
+        // Trailing on a desktop, where the row is wide enough to hold them;
+        // under the name on a phone, since two buttons and a bot id do not
+        // share four hundred points.
+        child: context.isDesktop
+            ? Row(
+                children: [
+                  NetworkGlyph(
+                    network: found.network,
+                    size: 28,
+                    semanticsLabel: '',
+                  ),
+                  const SizedBox(width: WeftSpace.md),
+                  Expanded(child: name),
+                  const SizedBox(width: WeftSpace.md),
+                  Row(mainAxisSize: MainAxisSize.min, children: actions),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      NetworkGlyph(
+                        network: found.network,
+                        size: 30,
+                        semanticsLabel: '',
+                      ),
+                      const SizedBox(width: WeftSpace.md),
+                      Expanded(child: name),
+                    ],
+                  ),
+                  const SizedBox(height: WeftSpace.sm),
+                  Wrap(
+                    spacing: WeftSpace.sm,
+                    runSpacing: WeftSpace.sm,
+                    children: actions
+                        .where((w) => w is! SizedBox)
+                        .toList(growable: false),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

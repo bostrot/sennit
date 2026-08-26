@@ -118,8 +118,10 @@ void main() {
   // Light as well as dark for the two screens that are looked at all day. A
   // palette does not change a layout, but a *theme* carries the type scale and
   // the density, and those do.
-  for (final entry in {'inbox': InboxShell.new, 'settings': SettingsScreen.new}
-      .entries) {
+  for (final entry in {
+    'inbox': InboxShell.new,
+    'settings': SettingsScreen.new,
+  }.entries) {
     testWidgets('${entry.key} lays out in light', (tester) async {
       await check(
         tester,

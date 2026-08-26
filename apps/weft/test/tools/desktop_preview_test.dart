@@ -9,6 +9,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_matrix/weft_matrix.dart' show DetectedBridge;
+import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
+
 import 'package:weft/app/stores.dart';
 import 'package:weft/features/bridges/bridges_screen.dart';
 import 'package:weft/features/chat/chat_view.dart';
@@ -43,6 +46,27 @@ void main() {
   const out = '/tmp/braid'
       '/fe50cf4a-2741-4781-85cc-71325a1d67dd/scratchpad/ui';
 
+  /// A homeserver with bridges on it — the state this screen is actually in
+  /// for anyone who runs any, and the one it was never drawn in.
+  const detected = [
+    DetectedBridge(
+      network: ChatNetwork.whatsapp,
+      botUserId: '@whatsappbot:example.org',
+      roomCount: 64,
+    ),
+    DetectedBridge(
+      network: ChatNetwork.signal,
+      botUserId: '@signalbot:example.org',
+      roomCount: 31,
+    ),
+    DetectedBridge(
+      network: ChatNetwork.telegram,
+      botUserId: '@telegrambot:example.org',
+      roomCount: 39,
+    ),
+    DetectedBridge(network: ChatNetwork.discord, roomCount: 7),
+  ];
+
   Future<void> shot(
     WidgetTester tester,
     String name,
@@ -57,6 +81,7 @@ void main() {
       mode: mode,
       surface: WeftSurface.mac,
       stores: WeftStores.inMemory(),
+      detectedBridges: detected,
     );
     await tester.pumpAndSettle();
 
