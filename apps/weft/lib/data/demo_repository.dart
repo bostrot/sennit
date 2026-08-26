@@ -133,7 +133,14 @@ class DemoChatRepository implements ChatRepository {
   final Map<String, List<EditEvent>> _edits = {};
   final Set<String> _redacted = {};
 
-  static final DateTime _now = DateTime(2026, 8, 15, 16, 42);
+  /// The instant every demo fixture is dated against.
+  ///
+  /// Public so a golden can put the *clock* at the same instant: a timestamp
+  /// fixed against a moving now produces "16:40" today and "8/15/2026" next
+  /// week, which is a golden that fails on a Tuesday.
+  static final DateTime fixtureNow = DateTime(2026, 8, 15, 16, 42);
+
+  static final DateTime _now = fixtureNow;
 
   /// The local user, as every demo fixture spells them.
   static const String _localUserId = '@me:example.org';

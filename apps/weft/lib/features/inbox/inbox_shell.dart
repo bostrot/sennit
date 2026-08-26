@@ -142,9 +142,16 @@ Future<void> showChatContextMenu(
 
 /// Today shows a clock; this week a weekday; older a date. Matches how people
 /// actually reason about when a message arrived.
-String? formatInboxTime(DateTime? ts) {
+///
+/// [now] is required rather than defaulted, and that is the whole fix: it used
+/// to be a constant instant in the body of this function — the one the demo
+/// fixtures are dated against, put there so goldens would settle. Every real
+/// message is newer than that instant, so every real conversation came out as
+/// "Now". A default here would be a place for the same mistake to be made
+/// again quietly; a required argument makes each caller say which clock it
+/// means.
+String? formatInboxTime(DateTime? ts, {required DateTime now}) {
   if (ts == null) return null;
-  final now = DateTime(2026, 8, 15, 16, 42);
   final delta = now.difference(ts);
   if (delta.inMinutes < 1) return 'Now';
   if (delta.inHours < 24) return DateFormat.Hm().format(ts);
@@ -375,6 +382,7 @@ class _InboxPane extends ConsumerWidget {
                                   .toggle(chat.id),
                               timeLabel: formatInboxTime(
                                 chat.lastMessage?.timestamp,
+                                now: ref.watch(clockProvider)(),
                               ),
                               onTap: () {
                                 // While selecting, a tap toggles rather than opens

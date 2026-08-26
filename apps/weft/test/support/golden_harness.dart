@@ -275,6 +275,10 @@ Future<void> pumpWeft(
         chatRepositoryProvider.overrideWithValue(
           repository ?? DemoChatRepository(),
         ),
+        // Held at the instant the demo fixtures are dated against. A real
+        // clock here would label the inbox "16:40" today and "8/15/2026" next
+        // week — a golden that fails on a Tuesday.
+        clockProvider.overrideWithValue(() => DemoChatRepository.fixtureNow),
         if (fileReader != null)
           attachmentFileReaderProvider.overrideWithValue(fileReader),
         // Both faces of the same store. `storesProvider` is the synchronous one

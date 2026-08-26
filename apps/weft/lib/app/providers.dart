@@ -179,6 +179,15 @@ final attachmentFileReaderProvider = Provider<AttachmentBytesLoader>(
   (ref) => readAttachmentFile,
 );
 
+/// What time it is.
+///
+/// A provider because two things need to disagree about it: the app, which
+/// wants the real clock, and a golden, which wants the instant its fixtures
+/// are dated against. Before this the *formatter* held a fixed instant so the
+/// goldens would settle — and shipped it, so every real message in the inbox
+/// was newer than "now" and every conversation was labelled "Now".
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// Networks selected in the left rail. Empty means "show everything".
 class NetworkFilterNotifier extends Notifier<Set<ChatNetwork>> {
   @override

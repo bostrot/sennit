@@ -426,10 +426,22 @@ class _MergedStrip extends StatelessWidget {
           ),
         ),
         const SizedBox(width: WeftSpace.sm),
-        for (final n in networks) ...[
-          NetworkGlyph(network: n, size: 14),
-          const SizedBox(width: 3),
-        ],
+        // Wrapped and flexible, because the row above it is not fixed: the
+        // trailing column holds a timestamp, and a conversation last spoken in
+        // last month is "8/15/2026" where one from this morning is "09:05".
+        // The wider label squeezes this strip, and a plain `Row` answers that
+        // by overflowing — three and a half pixels of yellow-and-black stripe
+        // on a real inbox, which the demo fixtures' short labels never
+        // provoked.
+        Expanded(
+          child: Wrap(
+            spacing: 3,
+            runSpacing: 3,
+            children: [
+              for (final n in networks) NetworkGlyph(network: n, size: 14),
+            ],
+          ),
+        ),
       ],
     );
   }

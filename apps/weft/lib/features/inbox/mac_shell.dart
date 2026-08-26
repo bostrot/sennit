@@ -401,7 +401,10 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
                   onChanged: (_) =>
                       ref.read(chatSelectionProvider.notifier).toggle(chat.id),
                 ),
-          timeLabel: formatInboxTime(chat.lastMessage?.timestamp),
+          timeLabel: formatInboxTime(
+            chat.lastMessage?.timestamp,
+            now: ref.watch(clockProvider)(),
+          ),
           onTap: () {
             if (selection.isNotEmpty) {
               ref.read(chatSelectionProvider.notifier).toggle(chat.id);
