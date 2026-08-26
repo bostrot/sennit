@@ -44,6 +44,16 @@ class BridgeLoginSession {
   String? _error;
   bool _cancelled = false;
 
+  /// The pause between two polls of a waiting step, as something that can be
+  /// interrupted.
+  ///
+  /// `Future.delayed` cannot be cancelled, so a login abandoned while its QR
+  /// code was on screen left a timer running and a suspended loop waiting on
+  /// it — which a widget test reports as a pending timer and a phone reports
+  /// as a wakeup it did not need.
+  Timer? _delay;
+  Completer<void>? _wake;
+
   /// Emits this session whenever anything the UI shows has changed.
   Stream<BridgeLoginSession> get updates => _controller.stream;
 
@@ -135,6 +145,7 @@ class BridgeLoginSession {
   /// Abandons the attempt. Safe to call at any point.
   void cancel() {
     _cancelled = true;
+    _stopWaiting();
     if (_status != BridgeLoginStatus.complete) {
       _status = BridgeLoginStatus.failed;
       _error ??= 'Cancelled';
@@ -144,7 +155,29 @@ class BridgeLoginSession {
 
   Future<void> dispose() async {
     _cancelled = true;
+    _stopWaiting();
     await _controller.close();
+  }
+
+  /// Sleeps for [duration], or until the attempt is abandoned.
+  Future<void> _sleep(Duration duration) {
+    final wake = Completer<void>();
+    _wake = wake;
+    _delay = Timer(duration, () {
+      _delay = null;
+      _wake = null;
+      if (!wake.isCompleted) wake.complete();
+    });
+    return wake.future;
+  }
+
+  /// Ends any sleep in progress, releasing the loop waiting on it.
+  void _stopWaiting() {
+    _delay?.cancel();
+    _delay = null;
+    final wake = _wake;
+    _wake = null;
+    if (wake != null && !wake.isCompleted) wake.complete();
   }
 
   /// Moves to [step], polling on the user's behalf when the bridge is simply
@@ -197,7 +230,7 @@ class BridgeLoginSession {
             _emit();
             return _pollUntilAdvanced(next);
           }
-          await Future<void>.delayed(pollInterval);
+          await _sleep(pollInterval);
           continue;
         }
 

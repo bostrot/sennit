@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_bridges/weft_bridges.dart';
 import 'package:weft_design/weft_design.dart';
@@ -14,8 +13,8 @@ import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../chat/chat_view.dart';
-import '../components/qr_card.dart';
 import 'bot_login_screen.dart';
+import 'bridge_login_flow.dart';
 
 /// One configured bridge, as stored in settings.
 typedef _StoredBridge = ({String id, String url, String networkId});
@@ -279,30 +278,40 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     }
     if (!mounted || flows.isEmpty) return;
 
-    final flow = flows.length == 1
-        ? flows.single
-        : await showModalBottomSheet<BridgeLoginFlow>(
-            context: context,
-            showDragHandle: true,
-            builder: (context) => ListView(
-              shrinkWrap: true,
-              children: [
-                for (final f in flows)
-                  ListTile(
-                    title: Text(f.name),
-                    subtitle: f.description == null
-                        ? null
-                        : Text(f.description!),
-                    onTap: () => Navigator.of(context).pop(f),
-                  ),
-              ],
-            ),
-          );
-    if (flow == null || !mounted) return;
+    final network = ChatNetwork.values.firstWhere(
+      (n) => n.id == bridge.networkId,
+      orElse: () => ChatNetwork.matrix,
+    );
+    // The management-room fallback needs the bot's id, which discovery finds
+    // and a hand-typed provisioning URL does not carry. Null means the cookie
+    // step has nowhere to send the user, and it says so rather than offering a
+    // button that goes nowhere.
+    final botUserId = _detected
+        .where((d) => d.network.id == bridge.networkId)
+        .map((d) => d.botUserId)
+        .firstWhere((id) => id != null, orElse: () => null);
 
+    // One screen for the whole journey — picking a flow included. It used to
+    // start with a sheet of untitled list rows and continue on a different
+    // screen, which made "sign in to WhatsApp" read as two unrelated tasks.
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BridgeLoginScreen(client: client, flow: flow),
+        builder: (_) => BridgeLoginFlowScreen(
+          client: client,
+          network: network,
+          flows: flows,
+          bridgeLabel: _health[bridge.id]?.networkName,
+          onUseAdminRoom: botUserId == null
+              ? null
+              : () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BridgeBotLoginScreen(
+                      botUserId: botUserId,
+                      network: network,
+                    ),
+                  ),
+                ),
+        ),
       ),
     );
     await _probe(bridge);
@@ -634,265 +643,3 @@ class _BridgeCard extends StatelessWidget {
 }
 
 /// Renders a bridge's declarative login flow, step by step.
-class BridgeLoginScreen extends StatefulWidget {
-  const BridgeLoginScreen({
-    super.key,
-    required this.client,
-    required this.flow,
-  });
-
-  final BridgeProvisioningClient client;
-  final BridgeLoginFlow flow;
-
-  @override
-  State<BridgeLoginScreen> createState() => _BridgeLoginScreenState();
-}
-
-class _BridgeLoginScreenState extends State<BridgeLoginScreen> {
-  late final BridgeLoginSession _session = BridgeLoginSession(
-    client: widget.client,
-    flowId: widget.flow.id,
-  );
-  final Map<String, TextEditingController> _inputs = {};
-  StreamSubscription<BridgeLoginSession>? _updates;
-
-  @override
-  void initState() {
-    super.initState();
-    _updates = _session.updates.listen((_) {
-      if (mounted) setState(() {});
-    });
-    _session.start();
-  }
-
-  @override
-  void dispose() {
-    _updates?.cancel();
-    _session.dispose();
-    for (final c in _inputs.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final step = _session.currentStep;
-
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.flow.name)),
-      body: Padding(
-        padding: const EdgeInsets.all(WeftSpace.xl),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: switch (_session.status) {
-              BridgeLoginStatus.idle ||
-              BridgeLoginStatus.running => const CircularProgressIndicator(),
-              BridgeLoginStatus.complete => _done(context),
-              BridgeLoginStatus.failed => _failed(context),
-              BridgeLoginStatus.waitingForUser when step != null => _inputStep(
-                context,
-                step,
-              ),
-              BridgeLoginStatus.waitingForRemote when step != null => _waitStep(
-                context,
-                step,
-              ),
-              _ => const CircularProgressIndicator(),
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _inputStep(BuildContext context, LoginStep step) {
-    return ListView(
-      shrinkWrap: true,
-      children: [
-        if (step.instructions != null) ...[
-          Text(step.instructions!, style: context.text.bodyMedium),
-          const SizedBox(height: WeftSpace.lg),
-        ],
-        for (final field in step.fields) ...[
-          TextField(
-            controller: _inputs.putIfAbsent(
-              field.id,
-              TextEditingController.new,
-            ),
-            obscureText: field.isSecret,
-            autocorrect: false,
-            keyboardType: switch (field.keyboardHint) {
-              'phone' => TextInputType.phone,
-              'email' => TextInputType.emailAddress,
-              'number' => TextInputType.number,
-              _ => TextInputType.text,
-            },
-            decoration: InputDecoration(
-              labelText: field.name,
-              helperText: field.description,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.md),
-        ],
-        if (_session.error != null) ...[
-          Text(
-            _session.error!,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.error,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.md),
-        ],
-        FilledButton(
-          onPressed: () => _session.submitInput({
-            for (final entry in _inputs.entries) entry.key: entry.value.text,
-          }),
-          child: const Text('Continue'),
-        ),
-      ],
-    );
-  }
-
-  Widget _waitStep(BuildContext context, LoginStep step) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (step.instructions != null) ...[
-          Text(step.instructions!, textAlign: TextAlign.center),
-          const SizedBox(height: WeftSpace.lg),
-        ],
-        if (step.displayData != null) ...[
-          if (step.displayType == 'qr') ...[
-            // The code and its text form are two nodes with nothing joining
-            // them: a reader who finds the square is told it is a square, and
-            // has no reason to think the answer is one node further on.
-            QrCard.data(
-              step.displayData!,
-              semanticsLabel:
-                  'QR code for ${widget.flow.name}. Scan it with the other '
-                  'device, or use the pairing code just below, which can be '
-                  'copied.',
-            ),
-            const SizedBox(height: WeftSpace.md),
-          ],
-          // The raw payload stays available under the image: some networks
-          // accept pasting the code, and it is the fallback if a camera has
-          // trouble with a screen.
-          Container(
-            padding: const EdgeInsets.all(WeftSpace.md),
-            decoration: BoxDecoration(
-              color: context.colors.surfaceContainerHigh,
-              borderRadius: WeftRadius.allMd,
-            ),
-            child: SelectableText(
-              step.displayData!,
-              style: context.text.bodySmall?.copyWith(fontFamily: 'monospace'),
-            ),
-          ),
-          const SizedBox(height: WeftSpace.sm),
-          TextButton.icon(
-            onPressed: () =>
-                Clipboard.setData(ClipboardData(text: step.displayData!)),
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy code'),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-        ],
-        // One live node over the spinner and its caption. This step ends when
-        // the *other* device does something, so the user is waiting on an
-        // event they cannot see coming — and every transition out of here
-        // replaces the whole body.
-        Semantics(
-          liveRegion: true,
-          container: true,
-          label: 'Waiting for the other side to confirm',
-          excludeSemantics: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(height: WeftSpace.md),
-              Text(
-                'Waiting for the other side…',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        TextButton(
-          onPressed: () {
-            _session.cancel();
-            Navigator.of(context).pop();
-          },
-          child: const Text('Cancel'),
-        ),
-      ],
-    );
-  }
-
-  Widget _done(BuildContext context) {
-    // Live, because the step before it was "waiting for something you cannot
-    // see", and this is that something having happened.
-    return Semantics(
-      liveRegion: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ExcludeSemantics(
-            child: Icon(
-              Icons.check_circle_rounded,
-              size: 48,
-              color: context.palette.online,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          const Text(
-            'Signed in. The bridge is syncing your chats now — '
-            'they will appear in the inbox as they arrive.',
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _failed(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ExcludeSemantics(
-            child: Icon(
-              Icons.error_rounded,
-              size: 48,
-              color: context.colors.error,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          Text(
-            _session.error ?? 'Sign-in failed.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-}
