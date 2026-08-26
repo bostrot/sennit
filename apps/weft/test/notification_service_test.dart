@@ -1238,6 +1238,43 @@ void main() {
         contains(stableNotificationId(r'$e1')),
       );
     });
+
+    test('a row this isolate never posted is still cleared', () async {
+      // What a notification tap almost always looks like: the poke arrived
+      // while Braid was not running, the background isolate posted the row and
+      // exited with its ledger, and the isolate now asked to dismiss has no
+      // record of it. The ids are stable so it can be cancelled regardless —
+      // and it has to be, or the row the user just tapped stays in the shade.
+      final sink = RecordingNotificationSink();
+      final session = FakeNotificationSession();
+      addTearDown(session.close);
+
+      final pipeline = MatrixNotificationPipeline(
+        session: session,
+        chatForRoom: _chatForRoom,
+        policy: NotificationPolicy.new,
+        now: () => _now,
+      );
+      final service = WeftNotificationService(
+        sink: sink,
+        pipeline: pipeline,
+        chatForRoom: _chatForRoom,
+      );
+      addTearDown(pipeline.dispose);
+      addTearDown(service.dispose);
+      await service.start();
+
+      expect(service.postedFor('merged:contact_1'), isEmpty);
+      await service.dismissChat('merged:contact_1');
+
+      expect(
+        sink.cancelled.map((c) => c.id),
+        containsAll([
+          stableNotificationId('merged:contact_1'),
+          stableNotificationId('summary:merged:contact_1'),
+        ]),
+      );
+    });
   });
 
   // ------------------------------------------------------- the plugin itself

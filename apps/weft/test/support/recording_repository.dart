@@ -212,7 +212,10 @@ class RecordingChatRepository implements ChatRepository {
   Future<void> setSendNetwork(String chatId, ChatNetwork network) =>
       inner.setSendNetwork(chatId, network);
   @override
-  Future<void> markRead(String chatId) => inner.markRead(chatId);
+  Future<void> markRead(String chatId) {
+    calls.add(RecordedCall('markRead', key: chatId));
+    return inner.markRead(chatId);
+  }
   @override
   Future<void> setArchived(String chatId, {required bool archived}) =>
       inner.setArchived(chatId, archived: archived);

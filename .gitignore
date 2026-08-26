@@ -37,3 +37,6 @@ apps/weft/macos/Pods/
 apps/weft/macos/Flutter/ephemeral/
 apps/weft/ios/Pods/
 apps/weft/ios/Flutter/ephemeral/
+.slim/deepwork/
+__pycache__/
+*.pyc

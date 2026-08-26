@@ -11,6 +11,8 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/smart_replies.dart';
+import '../services/notifications/notification_actions.dart'
+    show NotificationDismisser;
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/push_registration.dart';
@@ -89,6 +91,27 @@ final notificationPolicyProvider =
 final notificationSinkProvider = Provider<NotificationSink>(
   (ref) => LocalNotificationSink(),
 );
+
+/// Clears the shade for one chat, once the service that can do it exists.
+///
+/// A hole punched deliberately rather than a reach into
+/// [notificationServiceProvider]: opening a conversation has to clear its
+/// notifications, and a screen that awaited the service future would build the
+/// whole notification stack — a live Matrix session included — just to read a
+/// chat. Null until `main` fills it in, which is also what makes every widget
+/// test a silent no-op instead of a session error.
+class NotificationDismisserNotifier extends Notifier<NotificationDismisser?> {
+  @override
+  NotificationDismisser? build() => null;
+
+  /// Called once, when the notification service comes up.
+  void use(NotificationDismisser dismiss) => state = dismiss;
+}
+
+final notificationDismisserProvider =
+    NotifierProvider<NotificationDismisserNotifier, NotificationDismisser?>(
+      NotificationDismisserNotifier.new,
+    );
 
 /// The push gateway the user configured, or null.
 final pushGatewayProvider = Provider<Uri?>((ref) {

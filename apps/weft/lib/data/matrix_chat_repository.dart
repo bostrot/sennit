@@ -1801,17 +1801,29 @@ class MatrixChatRepository implements ChatRepository {
 
   /// Whether the user has read [room] up to (at least) [lastEvent].
   ///
-  /// Three witnesses, any of which settles it: the receipt this session just
-  /// wrote, the stored own receipt naming the event itself, or a stored own
-  /// receipt *younger* than the event — receipts sometimes point at trailing
-  /// reactions and edits rather than the message the preview shows.
+  /// Four witnesses, any of which settles it: the newest event being one the
+  /// user sent, the receipt this session just wrote, the stored own receipt
+  /// naming the event itself, or a stored own receipt *younger* than the event
+  /// — receipts sometimes point at trailing reactions and edits rather than
+  /// the message the preview shows.
+  ///
+  /// Sending is the first witness because it needs no receipt at all. Writing
+  /// a message moves `lastEvent` past every receipt the room holds, so a chat
+  /// the user had just caught up on went unread again the moment they replied
+  /// — and then reported whatever `notificationCount` still held as the count
+  /// of messages they had not seen, which was their own.
   bool _isReadLocally(sdk.Room room, sdk.Event? lastEvent) {
     if (lastEvent == null) return true;
-    if (_readUpTo[room.id] == lastEvent.eventId) return true;
     final own = room.receiptState.global.latestOwnReceipt;
-    if (own == null) return false;
-    if (own.eventId == lastEvent.eventId) return true;
-    return own.ts >= lastEvent.originServerTs.millisecondsSinceEpoch;
+    return isReadLocally(
+      lastEventId: lastEvent.eventId,
+      lastEventSenderId: lastEvent.senderId,
+      lastEventTs: lastEvent.originServerTs.millisecondsSinceEpoch,
+      ownUserId: _client.userID,
+      readUpToEventId: _readUpTo[room.id],
+      receiptEventId: own?.eventId,
+      receiptTs: own?.ts,
+    );
   }
 
   Chat _chatFromRoom(sdk.Room room) {
@@ -1915,4 +1927,31 @@ class MatrixChatRepository implements ChatRepository {
     }
     return out;
   }
+}
+
+/// Whether a room's newest event has already been read, from facts alone.
+///
+/// Lifted out of the repository so it can be tested without a homeserver: the
+/// rule is four small clauses and every one of them was reachable only through
+/// a live sync before, which is how the send-makes-it-unread case survived.
+///
+/// [readUpToEventId] is the receipt this session wrote and has not seen come
+/// back down sync yet; [receiptEventId] and [receiptTs] are the newest own
+/// receipt the room does hold. A null receipt means "no idea", which is not
+/// the same as "never read" — but the caller has nothing better to go on, so
+/// it counts as unread.
+bool isReadLocally({
+  required String lastEventId,
+  required String lastEventSenderId,
+  required int lastEventTs,
+  required String? ownUserId,
+  required String? readUpToEventId,
+  required String? receiptEventId,
+  required int? receiptTs,
+}) {
+  if (ownUserId != null && lastEventSenderId == ownUserId) return true;
+  if (readUpToEventId == lastEventId) return true;
+  if (receiptEventId == null || receiptTs == null) return false;
+  if (receiptEventId == lastEventId) return true;
+  return receiptTs >= lastEventTs;
 }

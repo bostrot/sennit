@@ -19,6 +19,7 @@ import 'package:weft_richtext/weft_richtext.dart';
 import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
 import '../../app/intents.dart';
+import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
@@ -298,6 +299,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
         _unavailable = null;
         _view = timeline.view();
       });
+      _readConversation(chatId);
       await _loadOlder();
       if (widget.initialEventId != null) await _jumpTo(widget.initialEventId!);
     } on ArgumentError {
@@ -307,6 +309,31 @@ class _ChatViewState extends ConsumerState<ChatView> {
       if (!mounted) return;
       setState(() => _unavailable = e.message);
     }
+  }
+
+  /// Marks the open conversation read and takes its notifications down.
+  ///
+  /// Here rather than on the inbox tile that used to own it, because the tile
+  /// is only one of the doors: a notification tap routes through the deep-link
+  /// handler straight to this screen, and a conversation the user is reading
+  /// kept both its badge and its row in the shade. The badge outliving the
+  /// visit is also why a reply looked like it had marked the chat unread — the
+  /// count was the old one, still standing.
+  ///
+  /// Both calls are fire-and-forget: a receipt that fails to reach the
+  /// homeserver must not stop the messages from being drawn.
+  void _readConversation(String chatId) {
+    unawaited(
+      ref
+          .read(chatRepositoryProvider)
+          .markRead(chatId)
+          .catchError(
+            (Object error) =>
+                debugPrint('weft: could not mark $chatId read: $error'),
+          ),
+    );
+    final dismiss = ref.read(notificationDismisserProvider);
+    if (dismiss != null) unawaited(dismiss(chatId));
   }
 
   /// Loads history until [eventId] is visible, then scrolls to and highlights

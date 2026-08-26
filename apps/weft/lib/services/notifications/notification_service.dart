@@ -547,9 +547,14 @@ class WeftNotificationService {
   ///
   /// The chat's, not the room's: reading a merged conversation clears both
   /// legs, because the user read the conversation.
+  /// Nothing in [_posted] does not mean nothing in the shade. A poke that
+  /// arrived while Braid was not running is posted by the background isolate,
+  /// which keeps its own ledger and takes it with it when it exits — so the
+  /// row the user is looking at, and tapped, is very often one this isolate
+  /// has no record of. The ids are stable precisely so it can be cancelled
+  /// anyway, and cancelling one that was never posted costs nothing.
   Future<void> dismissChat(String groupKey) async {
-    final contents = _posted.remove(groupKey);
-    if (contents == null) return;
+    final contents = _posted.remove(groupKey) ?? const <NotificationContent>[];
     for (final content in contents) {
       _avatars.remove(content.eventId);
       // The conversation's one row — and, for notifications posted by builds

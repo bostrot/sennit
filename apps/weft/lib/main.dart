@@ -270,6 +270,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       dismiss: service.dismissChat,
     );
     service.onAction = (activation) => unawaited(actions.handle(activation));
+    // Opening a conversation has to clear its row in the shade, and the screen
+    // that shows the messages cannot reach the service without building the
+    // whole notification stack. Handing it the one function it needs keeps
+    // that dependency one-way.
+    ref.read(notificationDismisserProvider.notifier).use(service.dismissChat);
 
     await service.start();
 
