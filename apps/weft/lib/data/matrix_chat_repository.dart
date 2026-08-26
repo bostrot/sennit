@@ -255,8 +255,16 @@ class MatrixChatRepository implements ChatRepository {
       if (supported == _authenticatedMedia) return;
       _authenticatedMedia = supported;
       _rebuild();
-    } on Exception {
+    } on Object catch (error) {
       // Probe failed; the assumed default stands.
+      //
+      // `Object`, not `Exception`. The repository is built before the client
+      // necessarily has a homeserver, and asking one that is not there throws
+      // a `TypeError` from inside the SDK — an `Error`, which an `on Exception`
+      // clause does not catch. That escaped as an unhandled exception on every
+      // launch of a signed-out app: loud, alarming, and about a probe whose
+      // failure this method is written to tolerate.
+      debugPrint('weft: media-auth probe failed, assuming default: $error');
     }
   }
 
