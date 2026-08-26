@@ -1,0 +1,10 @@
+# Tags that are not part of an ordinary run.
+#
+# `preview` renders the desktop shell to disk so it can be looked at while its
+# layout is being worked on. It asserts nothing and writes files outside the
+# repository, so it is excluded here and asked for by name:
+#
+#     flutter test test/tools/mac_preview_test.dart --tags preview
+tags:
+  preview:
+    skip: "run with --tags preview"

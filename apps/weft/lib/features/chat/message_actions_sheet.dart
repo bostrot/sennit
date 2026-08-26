@@ -86,7 +86,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   bool hasTranscript = false,
   bool homeAssistant = false,
 }) {
-  return showModalBottomSheet<MessageActionChoice>(
+  return showWeftPanel<MessageActionChoice>(
     context: context,
     showDragHandle: true,
     // Scroll-controlled so the sheet sizes to its actions. At the default cap

@@ -54,6 +54,18 @@ Future<void> loadGoldenFonts() async {
     '${fonts.path}/Roboto-Bold.ttf',
   ]);
   await _load('MaterialIcons', ['${fonts.path}/MaterialIcons-Regular.otf']);
+  // The desktop theme asks for the system face, which a test runner has no
+  // copy of — every glyph in a macOS golden would be a placeholder box.
+  // Registering Roboto under the family the theme names keeps the *layout*
+  // honest, which is what an image of a layout is for; the shapes are not the
+  // ones a Mac draws and are not what these goldens assert.
+  for (final system in const ['.AppleSystemUIFont', 'CupertinoSystemText']) {
+    await _load(system, [
+      '${fonts.path}/Roboto-Regular.ttf',
+      '${fonts.path}/Roboto-Medium.ttf',
+      '${fonts.path}/Roboto-Bold.ttf',
+    ]);
+  }
   // The SDK cache ships no monospace face, and `monospace` is the first family
   // of the stack `rich_text_view.dart` asks for — so without this every inline
   // code run and every code block in a golden is a row of placeholder boxes,
@@ -240,6 +252,7 @@ Future<void> pumpWeft(
   WeftThemeMode mode = WeftThemeMode.dark,
   Color seed = WeftTheme.defaultSeed,
   WeftGoldenVariant variant = weftGoldenBaseline,
+  WeftSurface surface = WeftSurface.touch,
   ChatRepository? repository,
   AttachmentBytesLoader? fileReader,
   WeftStores? stores,
@@ -293,7 +306,11 @@ Future<void> pumpWeft(
         theme: WeftAppearance(
           mode: mode,
           seed: seed,
-        ).themeFor(Brightness.dark, highContrast: variant.highContrast),
+        ).themeFor(
+          Brightness.dark,
+          highContrast: variant.highContrast,
+          surface: surface,
+        ),
         // Under the navigator rather than over the app, which is where the app
         // itself reads these: a `MediaQuery` above `MaterialApp` is rebuilt
         // from the view by `MediaQuery.fromView`, so a text scaler set there

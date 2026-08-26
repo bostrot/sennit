@@ -143,7 +143,7 @@ class ContactProfileScreen extends ConsumerWidget {
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () async {
-                final network = await showModalBottomSheet<ChatNetwork>(
+                final network = await showWeftPanel<ChatNetwork>(
                   context: context,
                   showDragHandle: true,
                   builder: (context) => SafeArea(

@@ -17,6 +17,7 @@ import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../status/status_bar.dart';
 import 'label_sheet.dart';
+import 'mac_shell.dart';
 import 'new_chat_sheet.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
@@ -34,7 +35,11 @@ bool get _isDesktopPointer =>
     };
 
 /// The conversation's verbs, at the cursor.
-Future<void> _showChatContextMenu(
+///
+/// Public because both shells raise the same menu: right-clicking a row means
+/// the same thing whichever layout drew it, and a second copy of these seven
+/// actions would drift from this one.
+Future<void> showChatContextMenu(
   BuildContext context,
   WidgetRef ref,
   Chat chat,
@@ -135,6 +140,18 @@ Future<void> _showChatContextMenu(
   }
 }
 
+/// Today shows a clock; this week a weekday; older a date. Matches how people
+/// actually reason about when a message arrived.
+String? formatInboxTime(DateTime? ts) {
+  if (ts == null) return null;
+  final now = DateTime(2026, 8, 15, 16, 42);
+  final delta = now.difference(ts);
+  if (delta.inMinutes < 1) return 'Now';
+  if (delta.inHours < 24) return DateFormat.Hm().format(ts);
+  if (delta.inDays < 7) return DateFormat.E().format(ts);
+  return DateFormat.yMd().format(ts);
+}
+
 /// The app's home: network rail, inbox, and — when there's room — the open
 /// conversation beside it.
 class InboxShell extends ConsumerWidget {
@@ -142,6 +159,13 @@ class InboxShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Two shells, not one shell with thirty conditions in it. The desktop
+    // layout shares this app's providers, its repository and its components,
+    // and none of its chrome — a rail is not a narrow sidebar and a header
+    // that scrolls away is not a toolbar, so expressing one as the other would
+    // be a worse description of both.
+    if (context.isMac) return const MacInboxShell();
+
     final repository = ref.watch(chatRepositoryProvider);
     // Not used here — *held* here: the scheduler's timer only runs while
     // something watches it, and the shell is alive as long as the app is.
@@ -272,7 +296,7 @@ class _InboxPane extends ConsumerWidget {
         children: [
           // The action bar replaces the header rather than stacking under it,
           // so the row of destructive actions is never off screen.
-          if (selecting) _SelectionBar(selected: selection, visible: chats),
+          if (selecting) InboxSelectionBar(selected: selection, visible: chats),
           Expanded(
             // One scroll surface for everything above the chats too: the
             // title, the stories and the filter rows ride away with the list
@@ -320,7 +344,7 @@ class _InboxPane extends ConsumerWidget {
                             behavior: HitTestBehavior.translucent,
                             onSecondaryTapUp: _isDesktopPointer
                                 ? (details) => unawaited(
-                                    _showChatContextMenu(
+                                    showChatContextMenu(
                                       context,
                                       ref,
                                       chat,
@@ -349,7 +373,7 @@ class _InboxPane extends ConsumerWidget {
                               onLongPress: () => ref
                                   .read(chatSelectionProvider.notifier)
                                   .toggle(chat.id),
-                              timeLabel: _formatTime(
+                              timeLabel: formatInboxTime(
                                 chat.lastMessage?.timestamp,
                               ),
                               onTap: () {
@@ -389,22 +413,15 @@ class _InboxPane extends ConsumerWidget {
     );
   }
 
-  /// Today shows a clock; this week a weekday; older a date. Matches how people
-  /// actually reason about when a message arrived.
-  static String? _formatTime(DateTime? ts) {
-    if (ts == null) return null;
-    final now = DateTime(2026, 8, 15, 16, 42);
-    final delta = now.difference(ts);
-    if (delta.inMinutes < 1) return 'Now';
-    if (delta.inHours < 24) return DateFormat.Hm().format(ts);
-    if (delta.inDays < 7) return DateFormat.E().format(ts);
-    return DateFormat.yMd().format(ts);
-  }
 }
 
 /// Bulk actions for the selected chats.
-class _SelectionBar extends ConsumerWidget {
-  const _SelectionBar({required this.selected, required this.visible});
+class InboxSelectionBar extends ConsumerWidget {
+  const InboxSelectionBar({
+    super.key,
+    required this.selected,
+    required this.visible,
+  });
 
   final Set<String> selected;
   final List<Chat> visible;

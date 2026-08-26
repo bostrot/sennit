@@ -36,7 +36,7 @@ class StatusBar extends ConsumerWidget {
               ),
             ),
             onLongPress: () async {
-              final hide = await showModalBottomSheet<bool>(
+              final hide = await showWeftPanel<bool>(
                 context: context,
                 showDragHandle: true,
                 builder: (context) => SafeArea(

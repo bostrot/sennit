@@ -17,7 +17,7 @@ Future<AttachmentSource?> showPaperlessPickerSheet(
 ) {
   final client = ref.read(paperlessProvider);
   if (client == null) return Future.value();
-  return showModalBottomSheet<AttachmentSource>(
+  return showWeftPanel<AttachmentSource>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

@@ -30,7 +30,7 @@ Future<List<AttachmentSource>?> showAttachmentPreviewSheet(
   required List<AttachmentSource> sources,
   required ValueChanged<ChatNetwork> onPickNetwork,
 }) {
-  return showModalBottomSheet<List<AttachmentSource>>(
+  return showWeftPanel<List<AttachmentSource>>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

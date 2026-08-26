@@ -637,7 +637,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final now = DateTime.now();
     final tonight = DateTime(now.year, now.month, now.day, 19);
     final tomorrow = DateTime(now.year, now.month, now.day + 1, 9);
-    final choice = await showModalBottomSheet<DateTime>(
+    final choice = await showWeftPanel<DateTime>(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -1016,7 +1016,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     return Scaffold(
       backgroundColor: context.colors.surfaceContainerLowest,
-      appBar: _ChatAppBar(chat: chat, typing: _typing, online: _peerOnline),
+      appBar: _ChatAppBar(
+        chat: chat,
+        mac: context.isMac,
+        typing: _typing,
+        online: _peerOnline,
+      ),
       body: _escapeCancels(
         // Ordered rather than reading order: the timeline comes before the
         // composer whichever way the text runs, and the banner above them both
@@ -1053,7 +1058,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
                       }
                       return false;
                     },
-                    child: ListView.builder(
+                    // A window is not a phone, and a bubble run to the full
+                    // width of one is unreadable: the eye has to travel back
+                    // across a 27" display for every line. Every desktop
+                    // messenger caps this, and the cap is what stops a wide
+                    // window from looking like a stretched phone screen.
+                    child: _ReadingColumn(
+                      enabled: context.isMac,
+                      child: ListView.builder(
                       controller: _scroll,
                       reverse: true,
                       padding: const EdgeInsets.symmetric(
@@ -1198,6 +1210,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           ],
                         );
                       },
+                    ),
                     ),
                   ),
                 ),
@@ -1394,7 +1407,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       'zh': '中文',
       'ja': '日本語',
     };
-    final language = await showModalBottomSheet<String>(
+    final language = await showWeftPanel<String>(
       context: context,
       showDragHandle: true,
       builder: (context) => ListView(
@@ -1832,11 +1845,19 @@ const String _localSenderId = 'local:self';
 class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _ChatAppBar({
     required this.chat,
+    required this.mac,
     this.typing = const [],
     this.online = false,
   });
 
   final Chat chat;
+
+  /// Whether to draw the desktop's toolbar instead of a Material app bar.
+  ///
+  /// Passed in rather than read from the context because [preferredSize] is
+  /// consulted without one, and a bar that reports 64 and draws 52 leaves a
+  /// gap the conversation scrolls into.
+  final bool mac;
 
   /// Names currently typing. Non-empty replaces the subtitle — "typing…" is
   /// the most current thing that can be said about a conversation.
@@ -1846,10 +1867,25 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool online;
 
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize =>
+      Size.fromHeight(mac ? MacMetrics.toolbarHeight : 64);
+
+  /// One toolbar verb, in whichever button this surface uses.
+  Widget _action({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) => mac
+      ? MacToolbarButton(icon: icon, tooltip: tooltip, onPressed: onPressed)
+      : IconButton(
+          tooltip: tooltip,
+          icon: Icon(icon),
+          onPressed: onPressed,
+        );
 
   @override
   Widget build(BuildContext context) {
+    if (mac) return _macBar(context);
     return AppBar(
       toolbarHeight: 64,
       backgroundColor: context.colors.surfaceContainerLowest,
@@ -1955,7 +1991,13 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
-      actions: [
+      actions: _actions(context),
+    );
+  }
+
+  /// The conversation's verbs. Shared by both bars — a call is a call, and the
+  /// only thing the surface changes is which button shape draws it.
+  List<Widget> _actions(BuildContext context) => [
         // Disabled rather than hidden, with the reason in its tooltip: a
         // conversation with no Matrix-native leg cannot carry a call, and a
         // button that quietly disappeared for bridged chats would read as Braid
@@ -1965,9 +2007,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             final availability = ref.watch(callAvailabilityProvider(chat.id));
             final target = availability.target;
             if (target != null) {
-              return IconButton(
+              return _action(
                 tooltip: availability.message,
-                icon: const Icon(Icons.call_rounded),
+                icon: Icons.call_rounded,
                 onPressed: () => startCall(context, ref, target),
               );
             }
@@ -1979,9 +2021,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             // its members are on.
             if (availability is! CallBlocked ||
                 availability.reason != CallBlocker.bridged) {
-              return IconButton(
+              return _action(
                 tooltip: availability.message,
-                icon: const Icon(Icons.call_rounded),
+                icon: Icons.call_rounded,
                 onPressed: null,
               );
             }
@@ -1995,15 +2037,15 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                       .firstOrNull;
             final external = externalCallRouteFor(chat, contact);
             if (external == null) {
-              return IconButton(
+              return _action(
                 tooltip: availability.message,
-                icon: const Icon(Icons.call_rounded),
+                icon: Icons.call_rounded,
                 onPressed: null,
               );
             }
-            return IconButton(
+            return _action(
               tooltip: external.label,
-              icon: const Icon(Icons.phone_forwarded_rounded),
+              icon: Icons.phone_forwarded_rounded,
               onPressed: () async {
                 final opened = await launchUrl(
                   external.uri,
@@ -2019,9 +2061,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
           },
         ),
-        IconButton(
+        _action(
           tooltip: chat.isMerged ? 'Manage merge' : 'Merge with…',
-          icon: const Icon(Icons.merge_rounded),
+          icon: Icons.merge_rounded,
           onPressed: () => Navigator.of(
             context,
           ).push(MaterialPageRoute<void>(builder: (_) => const MergeScreen())),
@@ -2031,12 +2073,99 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         // reader has no way to distinguish from a tap that failed. There is no
         // in-conversation search yet; the tooltip says so and the button says
         // so by being unavailable. Search across every chat is on the inbox.
-        IconButton(
+        _action(
           tooltip: 'Search in conversation — not available yet',
-          icon: const Icon(Icons.search_rounded),
+          icon: Icons.search_rounded,
           onPressed: null,
         ),
-      ],
+      ];
+
+  /// The thread's slice of the window's toolbar.
+  ///
+  /// The same three facts the phone's bar carries — who, on what, and what can
+  /// be done about it — at a quarter of the height. A 48pt avatar and a 22pt
+  /// name over a window is a phone screen's proportions; the system puts the
+  /// conversation's name at 13pt and gets on with showing the conversation.
+  Widget _macBar(BuildContext context) {
+    final subtitle = switch ((typing.isNotEmpty, chat.isMerged)) {
+      (true, _) => chat.isGroup
+          ? '${typing.join(', ')} '
+                '${typing.length == 1 ? 'is' : 'are'} typing…'
+          : 'typing…',
+      (_, true) =>
+        'Merged · ${chat.networks.map((n) => n.label).join(', ')}'
+            '${online ? ' · online' : ''}',
+      _ =>
+        '${chat.networks.firstOrNull?.label ?? ''}'
+            '${online ? ' · online' : ''}',
+    };
+    final subtitleColor = switch ((typing.isNotEmpty, chat.isMerged, online)) {
+      (true, _, _) => context.colors.primary,
+      (_, true, _) => context.palette.mergedAccent,
+      (_, _, true) => context.palette.online,
+      _ => context.colors.onSurfaceVariant,
+    };
+
+    return MacGlass(
+      kind: MacGlassKind.toolbar,
+      border: Border(
+        bottom: BorderSide(color: context.palette.divider, width: 0.5),
+      ),
+      child: MacToolbar(
+        leading: Consumer(
+          builder: (context, ref, _) => Semantics(
+            button: true,
+            label: 'Contact details',
+            child: MouseRegion(
+              cursor: SystemMouseCursors.basic,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ContactProfileScreen(chatId: chat.id),
+                  ),
+                ),
+                child: ExcludeSemantics(
+                  child: WeftAvatar(
+                    label: chat.title,
+                    imageUrl: chat.avatarUrl,
+                    imageHeaders: ref.watch(mediaHeadersProvider),
+                    networks: chat.networks,
+                    size: 26,
+                    semanticsLabel: '',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        titleWidget: MergeSemantics(
+          child: Semantics(
+            header: true,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  chat.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.titleSmall,
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.labelSmall?.copyWith(
+                      color: subtitleColor,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [MacToolbarGroup(children: _actions(context))],
+      ),
     );
   }
 }
@@ -3088,14 +3217,22 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     final sendNetwork = chat.sendNetwork;
     final editing = composing?.mode == ComposerMode.edit;
+    final mac = context.isMac;
 
     return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        WeftSpace.md,
-        WeftSpace.sm,
-        WeftSpace.md,
-        WeftSpace.md,
-      ),
+      padding: mac
+          ? const EdgeInsetsDirectional.fromSTEB(
+              WeftSpace.sm,
+              WeftSpace.xs,
+              WeftSpace.sm,
+              WeftSpace.sm,
+            )
+          : const EdgeInsetsDirectional.fromSTEB(
+              WeftSpace.md,
+              WeftSpace.sm,
+              WeftSpace.md,
+              WeftSpace.md,
+            ),
       decoration: BoxDecoration(
         color: context.colors.surface,
         // `border`, not `divider`: this bounds the composer rather than
@@ -3105,7 +3242,11 @@ class _Composer extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
+        child: _ReadingColumn(
+          // Lined up with the thread rather than spanning the pane: a composer
+          // that starts where the bubbles stop looks like a bar bolted on.
+          enabled: mac,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (composing != null)
@@ -3135,6 +3276,10 @@ class _Composer extends StatelessWidget {
                 ],
                 IconButton(
                   icon: const Icon(Icons.add_rounded),
+                  iconSize: mac ? 16 : null,
+                  visualDensity: mac ? VisualDensity.compact : null,
+                  constraints: mac ? _macButton : null,
+                  padding: mac ? EdgeInsets.zero : null,
                   tooltip: 'Attach',
                   // An edit replaces one event's text. There is no such thing
                   // as editing a message into a photo, so the picker is closed
@@ -3221,9 +3366,13 @@ class _Composer extends StatelessWidget {
                         onRecordVoice != null &&
                         value.text.trim().isEmpty;
                     if (showMic) {
-                      return IconButton.filled(
+                        return IconButton.filled(
                         onPressed: onRecordVoice,
-                        icon: const Icon(Icons.mic_rounded, size: 18),
+                        iconSize: mac ? 13 : 18,
+                        visualDensity: mac ? VisualDensity.compact : null,
+                        constraints: mac ? _macButton : null,
+                        padding: mac ? EdgeInsets.zero : null,
+                        icon: const Icon(Icons.mic_rounded),
                         tooltip: 'Record voice message',
                       );
                     }
@@ -3244,9 +3393,12 @@ class _Composer extends StatelessWidget {
                         triggerMode: TooltipTriggerMode.manual,
                         child: IconButton.filled(
                           onPressed: onSend,
+                          iconSize: mac ? 13 : 18,
+                          visualDensity: mac ? VisualDensity.compact : null,
+                          constraints: mac ? _macButton : null,
+                          padding: mac ? EdgeInsets.zero : null,
                           icon: Icon(
                             editing ? Icons.check_rounded : Icons.send_rounded,
-                            size: 18,
                           ),
                         ),
                       ),
@@ -3256,6 +3408,7 @@ class _Composer extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );
@@ -3875,6 +4028,38 @@ class _CalendarInviteContent extends StatelessWidget {
                 ),
               ),
       ],
+    );
+  }
+}
+
+/// The composer's round buttons at the system's size.
+///
+/// `IconButton` sizes itself from a 48dp tap target, which is a thumb. Nothing
+/// on this surface is pressed with a thumb, and a 34pt circle beside a 24pt
+/// field is the composer's loudest remaining phone tell.
+const BoxConstraints _macButton = BoxConstraints.tightFor(
+  width: 24,
+  height: 24,
+);
+
+/// Caps how wide the thread is allowed to run, and centres what is left.
+///
+/// A pass-through when [enabled] is false, so the phone's full-bleed timeline
+/// is untouched and there is no second layout to keep in step with this one.
+class _ReadingColumn extends StatelessWidget {
+  const _ReadingColumn({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: MacMetrics.readingColumn),
+        child: child,
+      ),
     );
   }
 }

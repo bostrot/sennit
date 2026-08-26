@@ -189,7 +189,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
 
     final network = bridged.length == 1
         ? bridged.single
-        : await showModalBottomSheet<ChatNetwork>(
+        : await showWeftPanel<ChatNetwork>(
             context: context,
             showDragHandle: true,
             builder: (sheet) => SafeArea(

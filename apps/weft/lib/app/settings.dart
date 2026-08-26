@@ -39,6 +39,7 @@ class WeftAppearance {
     Brightness platformBrightness, {
     bool highContrast = false,
     bool reduceMotion = false,
+    WeftSurface surface = WeftSurface.touch,
   }) {
     final brightness = switch (mode) {
       WeftThemeMode.light => Brightness.light,
@@ -52,6 +53,7 @@ class WeftAppearance {
       densityScale: densityScale,
       highContrast: highContrast,
       reduceMotion: reduceMotion,
+      surface: surface,
     );
   }
 }

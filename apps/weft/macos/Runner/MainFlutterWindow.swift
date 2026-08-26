@@ -26,6 +26,62 @@ class MainFlutterWindow: NSWindow {
     WeftSnapshotChannel.register(
       with: flutterViewController.registrar(forPlugin: "WeftSnapshotChannel"))
 
+    configureWindowChrome(around: flutterViewController)
+
     super.awakeFromNib()
+  }
+
+  /// Turns the stock Flutter window into a Mac window.
+  ///
+  /// Three things, and the app looks wrong without any one of them:
+  ///
+  ///  * **Full-size content.** The title bar stops being a bar and becomes the
+  ///    top of the window, so the sidebar runs to the very top and the traffic
+  ///    lights float over it. Braid's toolbar reserves
+  ///    `MacMetrics.trafficLightInset` for them.
+  ///  * **Vibrancy behind everything.** An `NSVisualEffectView` under a
+  ///    transparent Flutter view is the only way to get the real material —
+  ///    the desktop, blurred and saturated by the compositor. A `BackdropFilter`
+  ///    in Dart can only blur what Flutter itself has drawn, so a sidebar built
+  ///    that way is glass over a wall. Braid's sidebar is deliberately drawn
+  ///    with a translucent tint and no opaque fill, which is what lets this
+  ///    show through; every other pane paints itself opaque.
+  ///  * **Drag by the background.** With no title bar there is nothing left to
+  ///    drag the window by, and the sidebar's empty space is what a Mac user
+  ///    reaches for.
+  private func configureWindowChrome(around controller: FlutterViewController) {
+    styleMask.insert(.fullSizeContentView)
+    titlebarAppearsTransparent = true
+    titleVisibility = .hidden
+    // Tahoe draws no line under the toolbar; the app's own scroll-edge effect
+    // is what marks the boundary, and only once something has scrolled under it.
+    titlebarSeparatorStyle = .none
+    isMovableByWindowBackground = true
+
+    // Below this the three panes stop being usable rather than merely cramped:
+    // 180 of sidebar, 240 of list and 300 of thread is the narrowest the layout
+    // is designed for, and the height is two toolbars plus a readable list.
+    minSize = NSSize(width: 720, height: 480)
+    setFrameAutosaveName("BraidMainWindow")
+
+    guard let contentView = contentView else { return }
+
+    let vibrancy = NSVisualEffectView(frame: contentView.bounds)
+    vibrancy.autoresizingMask = [.width, .height]
+    // `.sidebar` rather than `.windowBackground`: it is the material the system
+    // gives a source list, and it is what makes the wallpaper's colour reach
+    // the window instead of a flat grey.
+    vibrancy.material = .sidebar
+    vibrancy.blendingMode = .behindWindow
+    // Dims with the window, as every native sidebar does — a background app
+    // whose sidebar still glows reads as a window that has not noticed it lost
+    // focus.
+    vibrancy.state = .followsWindowActiveState
+
+    contentView.addSubview(vibrancy, positioned: .below, relativeTo: nil)
+
+    // Without this the Flutter view paints an opaque background over the
+    // material and none of the above is visible.
+    controller.backgroundColor = .clear
   }
 }

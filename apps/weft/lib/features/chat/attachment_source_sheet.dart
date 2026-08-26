@@ -55,7 +55,7 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
       ),
   ];
 
-  return showModalBottomSheet<AttachmentPickSource>(
+  return showWeftPanel<AttachmentPickSource>(
     context: context,
     showDragHandle: true,
     builder: (context) => SafeArea(

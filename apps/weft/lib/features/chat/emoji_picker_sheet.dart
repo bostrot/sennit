@@ -43,7 +43,7 @@ final reactionRecentsProvider = NotifierProvider<ReactionRecents, List<String>>(
 
 /// Picks a reaction. Returns null when the sheet is dismissed.
 Future<String?> showEmojiPickerSheet(BuildContext context) {
-  return showModalBottomSheet<String>(
+  return showWeftPanel<String>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

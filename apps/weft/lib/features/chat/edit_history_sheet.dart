@@ -21,7 +21,7 @@ Future<void> showEditHistorySheet(
   BuildContext context, {
   required WeftMessage message,
 }) {
-  return showModalBottomSheet<void>(
+  return showWeftPanel<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

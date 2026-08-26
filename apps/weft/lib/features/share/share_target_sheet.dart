@@ -36,7 +36,7 @@ import '../chat/send_network_chip.dart';
 /// pre-selected target lands on the confirmation rather than sending — and this
 /// is that same step, reached from the list as well as from a launcher face.
 Future<void> showShareTargetSheet(BuildContext context, SharedPayload payload) {
-  return showModalBottomSheet<void>(
+  return showWeftPanel<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

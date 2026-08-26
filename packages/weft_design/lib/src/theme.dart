@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'contrast.dart';
+import 'surface.dart';
 import 'tokens.dart';
 
 /// How dark Weft should be. Kept separate from [ThemeMode] because AMOLED is a
@@ -225,6 +226,12 @@ abstract final class WeftTheme {
   /// from `MediaQuery.disableAnimations` — both are read once, at the app root,
   /// so every widget below gets the answer through the theme rather than each
   /// checking for itself.
+  ///
+  /// [surface] is the same idea for the machine. It is the theme's job because
+  /// almost everything it changes is a theme value: a Mac's body text is 13pt
+  /// and a phone's is 15, a Mac's controls are 22pt tall and a phone's are 48,
+  /// a Mac has no ripple, and a Mac's corners are 7pt where a phone's are 14.
+  /// Widgets that need more than metrics read [WeftSurfaceContext.isMac].
   static ThemeData build({
     Color seed = defaultSeed,
     Brightness brightness = Brightness.dark,
@@ -232,6 +239,7 @@ abstract final class WeftTheme {
     double densityScale = 0,
     bool highContrast = false,
     bool reduceMotion = false,
+    WeftSurface surface = WeftSurface.touch,
   }) {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
@@ -274,14 +282,30 @@ abstract final class WeftTheme {
           : null,
     );
 
-    return ThemeData(
+    final mac = surface == WeftSurface.mac;
+    // Every control shrinks on the desktop. Material's own compact density is
+    // exactly the -2 the system's controls sit at against its touch defaults,
+    // so the user's density preference rides on top of it rather than
+    // replacing it.
+    final density = mac
+        ? VisualDensity(horizontal: -2 + densityScale, vertical: -2 + densityScale)
+        : VisualDensity(horizontal: densityScale, vertical: densityScale);
+
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: effectiveScheme,
       scaffoldBackgroundColor: effectiveScheme.surface,
-      visualDensity: VisualDensity(
-        horizontal: densityScale,
-        vertical: densityScale,
-      ),
+      // The system face, which on this platform is what "not a mobile app"
+      // most immediately means: Roboto in a Mac window is recognisable at a
+      // glance and wrong. Falls back to whatever the test runner has loaded,
+      // so a golden still renders real glyphs.
+      typography: mac
+          ? Typography.material2021(
+              platform: TargetPlatform.macOS,
+              colorScheme: effectiveScheme,
+            )
+          : null,
+      visualDensity: density,
       // The sparkle is a 400ms travelling highlight — the single most motion-y
       // thing in the app, and the first to go when the user has asked for none.
       splashFactory: reduceMotion
@@ -349,7 +373,193 @@ abstract final class WeftTheme {
       extensions: [
         palette,
         WeftMotionTokens(reduced: reduceMotion),
+        WeftSurfaceTokens(surface: surface),
       ],
+    );
+
+    return mac ? _macify(base, palette) : base;
+  }
+
+  /// Re-fits a built theme to the desktop.
+  ///
+  /// Applied on top of the shared theme rather than branched inside it,
+  /// because everything above this point is a decision about *Braid* — the
+  /// palette, the contrast corrections, the focus ring — and everything here
+  /// is a decision about *macOS*. Keeping the two apart is what stops the
+  /// colour work from having to be repeated per platform.
+  static ThemeData _macify(ThemeData base, WeftPalette palette) {
+    final scheme = base.colorScheme;
+    final text = _macTextTheme(base.textTheme);
+    const radius = MacMetrics.controlRadius;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+    );
+
+    return base.copyWith(
+      textTheme: text,
+      primaryTextTheme: text,
+      // macOS has no ripple. A travelling highlight under the pointer is the
+      // single loudest "this is an Android app" tell there is.
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: scheme.onSurface.withValues(alpha: 0.06),
+      appBarTheme: base.appBarTheme.copyWith(
+        toolbarHeight: MacMetrics.toolbarHeight,
+        titleTextStyle: text.titleSmall,
+      ),
+      dividerTheme: base.dividerTheme.copyWith(thickness: 0.5, space: 0.5),
+      cardTheme: base.cardTheme.copyWith(shape: shape),
+      // Hairline scrollbars that appear while scrolling, as the system's do.
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: const WidgetStatePropertyAll(7),
+        radius: const Radius.circular(4),
+        thumbVisibility: const WidgetStatePropertyAll(false),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => scheme.onSurface.withValues(
+            alpha: states.contains(WidgetState.hovered) ? 0.45 : 0.28,
+          ),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 900),
+        textStyle: text.labelSmall?.copyWith(color: scheme.onSurface),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: palette.border, width: 0.5),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerHigh,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MacMetrics.popoverRadius - 4),
+          side: BorderSide(color: palette.border, width: 0.5),
+        ),
+        textStyle: text.bodyMedium,
+        // A menu item is 22pt on this platform, not the 48 Material gives it.
+        menuPadding: const EdgeInsets.symmetric(vertical: 4),
+      ),
+      dialogTheme: base.dialogTheme.copyWith(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MacMetrics.popoverRadius),
+        ),
+        // A Mac alert is a narrow, centred column with the title above the
+        // body and the buttons at the trailing edge — not a wide sheet.
+        alignment: Alignment.center,
+        titleTextStyle: text.titleSmall,
+        contentTextStyle: text.bodyMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      bottomSheetTheme: base.bottomSheetTheme.copyWith(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MacMetrics.sheetRadius),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: base.filledButtonTheme.style?.copyWith(
+          shape: WidgetStatePropertyAll(shape),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: WeftSpace.md, vertical: 4),
+          ),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          textStyle: WidgetStatePropertyAll(text.labelLarge),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: (base.textButtonTheme.style ?? const ButtonStyle()).copyWith(
+          shape: WidgetStatePropertyAll(shape),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: WeftSpace.md, vertical: 4),
+          ),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          textStyle: WidgetStatePropertyAll(text.labelLarge),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: (base.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
+          shape: WidgetStatePropertyAll(shape),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          textStyle: WidgetStatePropertyAll(text.labelLarge),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        dense: true,
+        minVerticalPadding: 2,
+        horizontalTitleGap: WeftSpace.sm,
+        titleTextStyle: text.bodyMedium,
+        subtitleTextStyle: text.labelSmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+        shape: shape,
+      ),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: palette.focusRing, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.sm,
+          vertical: 6,
+        ),
+        isDense: true,
+      ),
+      switchTheme: SwitchThemeData(
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      checkboxTheme: CheckboxThemeData(
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+      ),
+      radioTheme: const RadioThemeData(
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  /// The system's type scale, mapped onto the slots the app already reads.
+  ///
+  /// macOS is an 11/13 platform: 13pt is body and every list row, 11pt is every
+  /// secondary line, and a window title is 13pt semibold rather than the 22pt
+  /// headline a phone screen puts at the top. Nothing in the app has to change
+  /// for this — the sizes travel through the slots the widgets already use,
+  /// which is the whole reason to express it as a text theme.
+  static TextTheme _macTextTheme(TextTheme base) {
+    TextStyle? at(TextStyle? style, double size, [FontWeight? weight]) =>
+        style?.copyWith(
+          fontSize: size,
+          fontWeight: weight,
+          // The system's own tracking at these sizes; Material's is looser
+          // because it is designed for a larger body size.
+          letterSpacing: 0,
+        );
+
+    return base.copyWith(
+      displayLarge: at(base.displayLarge, 34, FontWeight.w700),
+      displayMedium: at(base.displayMedium, 28, FontWeight.w700),
+      displaySmall: at(base.displaySmall, 26, FontWeight.w700),
+      headlineLarge: at(base.headlineLarge, 22, FontWeight.w700),
+      headlineMedium: at(base.headlineMedium, 20, FontWeight.w600),
+      headlineSmall: at(base.headlineSmall, 17, FontWeight.w600),
+      titleLarge: at(base.titleLarge, 15, FontWeight.w600),
+      titleMedium: at(base.titleMedium, 13, FontWeight.w600),
+      titleSmall: at(base.titleSmall, 13, FontWeight.w600),
+      bodyLarge: at(base.bodyLarge, 13, FontWeight.w400),
+      bodyMedium: at(base.bodyMedium, 13, FontWeight.w400),
+      bodySmall: at(base.bodySmall, 12, FontWeight.w400),
+      labelLarge: at(base.labelLarge, 13, FontWeight.w500),
+      labelMedium: at(base.labelMedium, 11, FontWeight.w500),
+      labelSmall: at(base.labelSmall, 11, FontWeight.w400),
     );
   }
 

@@ -14,7 +14,7 @@ import 'package:weft_design/weft_design.dart';
 ///
 /// Returns true when the user wants to be asked. The caller spends the prompt.
 Future<bool> showNotificationRationale(BuildContext context) async {
-  final wanted = await showModalBottomSheet<bool>(
+  final wanted = await showWeftPanel<bool>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

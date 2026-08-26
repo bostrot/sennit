@@ -4,6 +4,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../bidi.dart';
 import '../focus.dart';
 import '../semantics.dart';
+import '../surface.dart';
 import '../theme.dart';
 import '../tokens.dart';
 import 'network_glyph.dart';
@@ -15,6 +16,15 @@ import 'weft_avatar.dart';
 /// A merged chat is signalled three ways so it never depends on colour alone:
 /// the avatar's gradient ring, a row of network glyphs, and the "Merged" label
 /// in its accessibility description.
+///
+/// The row has two builds, chosen by [WeftSurface] and differing only in
+/// metrics and in how selection is drawn. A phone gets a 46pt avatar, a tinted
+/// selection and room for the merged strip on its own line; a Mac gets the
+/// system's list row — 32pt avatar, 13pt title, 11pt preview, and selection as
+/// a filled accent capsule with its ink flipped, which is the one thing that
+/// makes a list look like it belongs on the platform. Everything else — the
+/// semantics sentence, the preview vocabulary, the delivery glyphs — is shared,
+/// because none of it is a question about the machine.
 class ChatTile extends StatefulWidget {
   const ChatTile({
     super.key,
@@ -63,6 +73,20 @@ class _ChatTileState extends State<ChatTile> {
   Widget build(BuildContext context) {
     final chat = widget.chat;
     final colors = context.colors;
+    final mac = context.isMac;
+
+    // On a Mac a selected row is filled with the accent colour, so every piece
+    // of ink inside it has to move to `onPrimary` or become unreadable. Held
+    // as one flag rather than tested at each of the seven text sites.
+    final inverted = mac && widget.selected;
+    final ink = inverted ? colors.onPrimary : colors.onSurface;
+    final quiet = inverted
+        ? colors.onPrimary.withValues(alpha: 0.78)
+        : colors.onSurfaceVariant;
+
+    final radius = mac
+        ? BorderRadius.circular(MacMetrics.listRowRadius)
+        : WeftRadius.allLg;
 
     // Exclusive, and that is the whole fix for what a reader hears. The label
     // was right and the node was not a container, so the title, the pin, the
@@ -84,31 +108,37 @@ class _ChatTileState extends State<ChatTile> {
       onLongPress: widget.onLongPress,
       onLongPressHint: 'select',
       label: _semanticsLabel(),
-      borderRadius: WeftRadius.allLg,
+      borderRadius: radius,
       // Flush with the row's own box rather than 2dp outside it: the inbox
       // list clips its viewport, and a ring that overhangs is a ring with its
       // left and right edges shaved off.
       ringInset: 0,
       onHoverChanged: (value) => setState(() => _hovered = value),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: WeftSpace.sm,
-          vertical: 2,
-        ),
+        padding: mac
+            ? const EdgeInsets.symmetric(horizontal: WeftSpace.sm, vertical: 1)
+            : const EdgeInsets.symmetric(horizontal: WeftSpace.sm, vertical: 2),
         child: AnimatedContainer(
-          duration: context.motion.fast,
+          duration: mac ? context.motion.instant : context.motion.fast,
           curve: context.motion.standard,
-          padding: const EdgeInsets.symmetric(
-            horizontal: WeftSpace.md,
-            vertical: WeftSpace.md,
-          ),
+          padding: mac
+              ? const EdgeInsets.symmetric(
+                  horizontal: WeftSpace.sm,
+                  vertical: 6,
+                )
+              : const EdgeInsets.symmetric(
+                  horizontal: WeftSpace.md,
+                  vertical: WeftSpace.md,
+                ),
           decoration: BoxDecoration(
-            color: widget.selected
-                ? colors.primaryContainer
-                : _hovered
-                ? colors.surfaceContainerHigh
-                : Colors.transparent,
-            borderRadius: WeftRadius.allLg,
+            color: switch ((widget.selected, _hovered, mac)) {
+              (true, _, true) => colors.primary,
+              (true, _, false) => colors.primaryContainer,
+              (_, true, true) => colors.onSurface.withValues(alpha: 0.06),
+              (_, true, false) => colors.surfaceContainerHigh,
+              _ => Colors.transparent,
+            },
+            borderRadius: radius,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,12 +149,12 @@ class _ChatTileState extends State<ChatTile> {
                     imageUrl: chat.avatarUrl,
                     imageHeaders: widget.avatarHeaders,
                     networks: chat.networks,
-                    size: 46,
+                    size: mac ? 32 : 46,
                   ),
-              const SizedBox(width: WeftSpace.md),
-              Expanded(child: _body(context)),
+              SizedBox(width: mac ? WeftSpace.sm : WeftSpace.md),
+              Expanded(child: _body(context, ink: ink, quiet: quiet, mac: mac)),
               const SizedBox(width: WeftSpace.sm),
-              _trailing(context),
+              _trailing(context, quiet: quiet, mac: mac, inverted: inverted),
             ],
           ),
         ),
@@ -160,7 +190,12 @@ class _ChatTileState extends State<ChatTile> {
     ]);
   }
 
-  Widget _body(BuildContext context) {
+  Widget _body(
+    BuildContext context, {
+    required Color ink,
+    required Color quiet,
+    required bool mac,
+  }) {
     final chat = widget.chat;
     final unread = chat.unreadCount > 0;
     final last = chat.lastMessage;
@@ -181,9 +216,11 @@ class _ChatTileState extends State<ChatTile> {
                 // an English one in an Arabic inbox. Null for a title with no
                 // strong character in it — "🎉" — which then inherits the row's.
                 textDirection: textDirectionOf(chat.title),
-                style: context.text.titleSmall?.copyWith(
-                  fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
-                ),
+                style: (mac ? context.text.bodyMedium : context.text.titleSmall)
+                    ?.copyWith(
+                      color: ink,
+                      fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
+                    ),
               ),
             ),
             // Tooltips on the state glyphs, not labels: the row's own merged
@@ -194,11 +231,7 @@ class _ChatTileState extends State<ChatTile> {
               const SizedBox(width: WeftSpace.xs),
               Tooltip(
                 message: 'Pinned',
-                child: Icon(
-                  Icons.push_pin_rounded,
-                  size: 13,
-                  color: context.colors.onSurfaceVariant,
-                ),
+                child: Icon(Icons.push_pin_rounded, size: 13, color: quiet),
               ),
             ],
             if (chat.muted) ...[
@@ -208,13 +241,23 @@ class _ChatTileState extends State<ChatTile> {
                 child: Icon(
                   Icons.notifications_off_rounded,
                   size: 13,
-                  color: context.colors.onSurfaceVariant,
+                  color: quiet,
                 ),
+              ),
+            ],
+            // On a Mac the time belongs on the title's line, right-aligned —
+            // the trailing column is the unread count's alone, so a row with
+            // no unread does not leave a hole where a badge would have been.
+            if (mac && widget.timeLabel != null) ...[
+              const SizedBox(width: WeftSpace.sm),
+              Text(
+                widget.timeLabel!,
+                style: context.text.labelSmall?.copyWith(color: quiet),
               ),
             ],
           ],
         ),
-        const SizedBox(height: 3),
+        SizedBox(height: mac ? 1 : 3),
         Row(
           children: [
             // `read` and `delivered` are the same double tick and differ only
@@ -230,8 +273,10 @@ class _ChatTileState extends State<ChatTile> {
                   _deliveryIcon(last.deliveryState),
                   size: 14,
                   color: last.deliveryState == DeliveryState.read
-                      ? context.colors.primary
-                      : context.colors.onSurfaceVariant,
+                      ? (ink == context.colors.onPrimary
+                            ? ink
+                            : context.colors.primary)
+                      : quiet,
                 ),
               ),
               const SizedBox(width: WeftSpace.xs),
@@ -244,17 +289,26 @@ class _ChatTileState extends State<ChatTile> {
                 // Same rule as the title: the preview is somebody's words, and
                 // its direction is theirs rather than the reader's locale.
                 textDirection: textDirectionOf(_preview(last)),
-                style: context.text.bodySmall?.copyWith(
-                  color: unread
-                      ? context.colors.onSurface
-                      : context.colors.onSurfaceVariant,
-                  fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
-                ),
+                style: (mac ? context.text.labelSmall : context.text.bodySmall)
+                    ?.copyWith(
+                      color: unread ? ink : quiet,
+                      fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
+                    ),
               ),
             ),
+            // The merged marks ride the preview's line on a Mac. A third line
+            // would put the row at 60pt, which is a phone's row height in a
+            // window that has to show twenty of them.
+            if (mac && chat.isMerged) ...[
+              const SizedBox(width: WeftSpace.xs),
+              for (final n in chat.networks) ...[
+                NetworkGlyph(network: n, size: 11),
+                const SizedBox(width: 2),
+              ],
+            ],
           ],
         ),
-        if (chat.isMerged) ...[
+        if (!mac && chat.isMerged) ...[
           const SizedBox(height: WeftSpace.sm),
           _MergedStrip(networks: chat.networks),
         ],
@@ -262,9 +316,29 @@ class _ChatTileState extends State<ChatTile> {
     );
   }
 
-  Widget _trailing(BuildContext context) {
+  Widget _trailing(
+    BuildContext context, {
+    required Color quiet,
+    required bool mac,
+    required bool inverted,
+  }) {
     final chat = widget.chat;
     final palette = context.palette;
+
+    if (mac) {
+      if (chat.unreadCount == 0) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: WeftUnreadBadge(
+          count: chat.unreadCount,
+          // Inside a selected, accent-filled row the badge cannot also be the
+          // accent — it would vanish. It becomes the row's ink instead, with
+          // the fill's colour as its own text.
+          color: inverted ? context.colors.onPrimary : palette.unreadDot,
+          ink: inverted ? context.colors.primary : context.colors.onPrimary,
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -274,9 +348,7 @@ class _ChatTileState extends State<ChatTile> {
           Text(
             widget.timeLabel!,
             style: context.text.labelSmall?.copyWith(
-              color: chat.unreadCount > 0
-                  ? context.colors.primary
-                  : context.colors.onSurfaceVariant,
+              color: chat.unreadCount > 0 ? context.colors.primary : quiet,
               fontWeight: chat.unreadCount > 0
                   ? FontWeight.w700
                   : FontWeight.w400,

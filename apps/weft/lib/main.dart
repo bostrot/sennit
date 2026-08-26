@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import 'app/intents.dart';
 import 'app/localisation.dart';
+import 'app/menus.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
 import 'app/session_providers.dart';
@@ -462,6 +464,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         platformBrightness,
         highContrast: highContrast,
         reduceMotion: reduceMotion,
+        surface: weftSurface,
       ),
       // Both above the navigator, and for the same reason: a ringing call
       // appears over whatever route is open — a chat, the settings, a share
@@ -476,11 +479,14 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // what makes a timestamp in an Arabic UI Arabic. Idempotent — it
         // compares before it assigns — which is what makes it safe in a build.
         applyFormattingLocale(Localizations.localeOf(context));
-        return WeftShortcuts(
+        return WeftMenuBar(
           navigatorKey: _navigatorKey,
-          child: CallOverlay(
+          child: WeftShortcuts(
             navigatorKey: _navigatorKey,
-            child: child ?? const SizedBox.shrink(),
+            child: CallOverlay(
+              navigatorKey: _navigatorKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },

@@ -214,7 +214,7 @@ Future<void> showReactionSendersSheet(
   required ReactionTally tally,
   required String Function(String senderId) nameFor,
 }) {
-  return showModalBottomSheet<void>(
+  return showWeftPanel<void>(
     context: context,
     showDragHandle: true,
     builder: (context) => SafeArea(

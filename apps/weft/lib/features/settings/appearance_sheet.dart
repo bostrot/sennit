@@ -11,11 +11,21 @@ import '../../app/stores.dart';
 ///
 /// Everything applies instantly — picking a theme you then have to confirm is
 /// a needless step when the whole app is visible behind the sheet.
-Future<void> showAppearanceSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+///
+/// [anchorContext] is the control this was opened from, where there is one. On
+/// a Mac that turns the panel into a popover hanging off that button, which is
+/// what the system does for a short set of live controls — and it keeps the
+/// window visible behind it, which is the whole point of applying instantly.
+Future<void> showAppearanceSheet(
+  BuildContext context, {
+  BuildContext? anchorContext,
+}) {
+  return showWeftPanel<void>(
     context: context,
+    anchorContext: anchorContext,
     showDragHandle: true,
     isScrollControlled: true,
+    width: 340,
     builder: (_) => const _AppearanceSheet(),
   );
 }

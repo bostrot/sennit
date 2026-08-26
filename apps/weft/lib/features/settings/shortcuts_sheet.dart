@@ -15,7 +15,7 @@ import '../../app/shortcuts.dart';
 /// three the composer owns rather than the app, which are exactly the ones
 /// people go looking for ("how do I type a second line?").
 Future<void> showShortcutsSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showWeftPanel<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

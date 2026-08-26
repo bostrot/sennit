@@ -82,7 +82,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
     String title,
     List<NetworkHandle> handles,
   ) {
-    return showModalBottomSheet<NetworkHandle>(
+    return showWeftPanel<NetworkHandle>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

@@ -11,7 +11,7 @@ Future<String?> showLabelSheet(
   Set<String> chatIds,
 ) {
   final labels = ref.read(chatLabelsProvider.notifier).all;
-  return showModalBottomSheet<String>(
+  return showWeftPanel<String>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
