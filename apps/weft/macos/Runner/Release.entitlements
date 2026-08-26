@@ -29,6 +29,12 @@
 	<true/>
 	<key>com.apple.security.device.camera</key>
 	<true/>
+	<!-- The MCP server listens on loopback, and under the sandbox a listening
+	     socket needs this. It was on the debug profile and not here, which is
+	     the exact shape the comment above warns about: the switch worked while
+	     it was being built and did nothing at all in the build anyone runs. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
 </dict>

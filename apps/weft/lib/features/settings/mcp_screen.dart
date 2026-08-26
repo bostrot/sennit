@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,9 +30,39 @@ class _McpScreenState extends ConsumerState<McpScreen> {
       } else {
         await _service.stop();
       }
+    } on Object catch (error) {
+      // Said out loud, because the ways this fails are all invisible: a
+      // sandboxed build without `com.apple.security.network.server` cannot
+      // open a listening socket at all, and a port already in use is the same
+      // shape. The switch used to snap back with no explanation, which reads
+      // as a button that does nothing rather than as a refusal.
+      debugPrint('weft: MCP server ${on ? 'start' : 'stop'} failed: $error');
+      if (mounted) {
+        showWeftMessage(
+          context,
+          on
+              ? 'Could not start the MCP server: ${_reason(error)}'
+              : 'Could not stop the MCP server.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// The failure in a phrase, where the phrase is worth having.
+  ///
+  /// A `SocketException` stringifies to two lines of address and errno, which
+  /// is the wrong thing to put in a snack bar; the two cases anyone actually
+  /// hits are worth naming.
+  String _reason(Object error) {
+    if (error is! SocketException) return 'see the log for details.';
+    final code = error.osError?.errorCode;
+    return switch (code) {
+      1 => 'the sandbox refused the socket.',
+      48 || 98 => 'that port is already in use.',
+      _ => error.osError?.message ?? 'the socket could not be opened.',
+    };
   }
 
   Future<void> _createKey() async {
