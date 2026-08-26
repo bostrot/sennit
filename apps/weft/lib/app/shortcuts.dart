@@ -189,6 +189,16 @@ Map<ShortcutActivator, Intent> weftShortcutMap({bool? useMetaKey}) {
   };
 }
 
+/// Paste into the composer, whatever is on the clipboard.
+///
+/// A separate intent from the framework's `PasteTextIntent` because the
+/// question it answers is different: a clipboard holding a screenshot should
+/// attach a picture, and one holding text should paste text. The action decides
+/// which, and hands the second case straight back to the framework.
+class PasteIntoComposerIntent extends Intent {
+  const PasteIntoComposerIntent();
+}
+
 /// The composer's shortcuts, installed around the field itself.
 ///
 /// Around the field and not app-wide, and this is the whole reason KEY-04 was a
@@ -206,6 +216,13 @@ const Map<ShortcutActivator, Intent> composerShortcuts = {
       InsertComposerNewlineIntent(),
   SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
       InsertComposerNewlineIntent(),
+  // Both modifiers, unconditionally: ⌘V is paste on a Mac and Ctrl+V on
+  // Windows and Linux, and neither combination means anything else in a text
+  // field on the platform that does not use it.
+  SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+      PasteIntoComposerIntent(),
+  SingleActivator(LogicalKeyboardKey.keyV, control: true):
+      PasteIntoComposerIntent(),
 };
 
 /// Replaces the selection in [controller] with a line break.

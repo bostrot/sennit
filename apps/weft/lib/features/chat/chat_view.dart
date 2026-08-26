@@ -29,6 +29,7 @@ import '../../services/attachments/attachment_picker.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
+import '../../services/attachments/clipboard_images.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../settings/integrations_screen.dart';
 import 'paperless_picker_sheet.dart';
@@ -850,8 +851,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
   }
 
-  Future<void> _pickReaction(WeftMessage message) async {
-    final key = await showEmojiPickerSheet(context);
+  Future<void> _pickReaction(
+    WeftMessage message, {
+    BuildContext? anchor,
+  }) async {
+    final key = await showEmojiPickerSheet(context, anchorContext: anchor);
     if (key == null || !mounted) return;
     await _react(message, key);
   }
@@ -1140,12 +1144,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                 onQuickReply: () => _enterComposerContext(
                                   ComposerContext.reply(message),
                                 ),
-                                onQuickReact: () =>
-                                    unawaited(_pickReaction(message)),
+                                onQuickReact: (anchor) => unawaited(
+                                  _pickReaction(message, anchor: anchor),
+                                ),
                                 onJumpToReply: (eventId) => _jumpTo(eventId),
                                 onToggleReaction: (tally) =>
                                     _toggleReaction(message, tally),
-                                onAddReaction: () => _pickReaction(message),
+                                onAddReaction: (anchor) =>
+                                    _pickReaction(message, anchor: anchor),
                                 onShowReactionSenders: (tally) =>
                                     showReactionSendersSheet(
                                       context,
@@ -1231,6 +1237,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                         onCancelContext: _cancelComposerContext,
                         onSend: _send,
                         onAttach: () => _attach(chat),
+                        onPaste: () => unawaited(_paste(chat)),
                         onPickNetwork: _pickNetwork,
                         onRecordVoice: () => setState(() => _recording = true),
                         onSendLater: () => _sendLater(chat),
@@ -1600,6 +1607,40 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// leave anything behind: dismissing the source sheet picks nothing, cancelling
   /// the preview sends nothing, and removing every file from the preview is the
   /// same as cancelling it.
+  /// ⌘V, which on a desktop is as often a screenshot as a sentence.
+  ///
+  /// Images win when there are any: someone who has just copied a picture and
+  /// pressed paste in a chat wants the picture. Anything else falls straight
+  /// through to the framework's own paste — the key was intercepted to ask the
+  /// question, and text has to end up in the field exactly as it did before.
+  Future<void> _paste(Chat chat) async {
+    final images = await const ClipboardImages().read();
+    if (!mounted) return;
+
+    if (images.isEmpty) {
+      // Resolved from the caret rather than from here: the actions that
+      // implement a text paste are registered by `EditableText`, below this
+      // widget, and only a context inside it can reach them.
+      final caret = primaryFocus?.context;
+      if (caret != null && caret.mounted) {
+        Actions.maybeInvoke(
+          caret,
+          const PasteTextIntent(SelectionChangedCause.keyboard),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showAttachmentPreviewSheet(
+      context,
+      chat: chat,
+      sources: images,
+      onPickNetwork: _pickNetwork,
+    );
+    if (confirmed == null || confirmed.isEmpty || !mounted) return;
+    await _sendAttachments(confirmed);
+  }
+
   Future<void> _attach(Chat chat) async {
     final picker = ref.read(attachmentPickerProvider);
     final source = await showAttachmentSourceSheet(
@@ -2313,7 +2354,7 @@ class _BubbleHoverShell extends StatefulWidget {
   final bool own;
   final Widget child;
   final VoidCallback? onQuickReply;
-  final VoidCallback? onQuickReact;
+  final ValueChanged<BuildContext>? onQuickReact;
   final void Function(Offset globalPosition)? onActionsAt;
 
   @override
@@ -2366,12 +2407,14 @@ class _BubbleHoverShellState extends State<_BubbleHoverShell> {
                             onPressed: widget.onQuickReply,
                           ),
                         if (widget.onQuickReact != null)
-                          IconButton(
-                            tooltip: 'React',
-                            visualDensity: VisualDensity.compact,
-                            iconSize: 17,
-                            icon: const Icon(Icons.add_reaction_outlined),
-                            onPressed: widget.onQuickReact,
+                          Builder(
+                            builder: (anchor) => IconButton(
+                              tooltip: 'React',
+                              visualDensity: VisualDensity.compact,
+                              iconSize: 17,
+                              icon: const Icon(Icons.add_reaction_outlined),
+                              onPressed: () => widget.onQuickReact!(anchor),
+                            ),
                           ),
                         if (widget.onActionsAt != null)
                           Builder(
@@ -2494,14 +2537,14 @@ class _MessageBubble extends StatelessWidget {
 
   /// The hover cluster's one-click verbs.
   final VoidCallback? onQuickReply;
-  final VoidCallback? onQuickReact;
+  final ValueChanged<BuildContext>? onQuickReact;
 
   /// Reply-chip tap. Takes the target's event id rather than closing over it,
   /// so the bubble does not need to know how the list scrolls.
   final ValueChanged<String>? onJumpToReply;
 
   final ValueChanged<ReactionTally>? onToggleReaction;
-  final VoidCallback? onAddReaction;
+  final ValueChanged<BuildContext>? onAddReaction;
   final ValueChanged<ReactionTally>? onShowReactionSenders;
 
   final void Function(String url, String label)? onTapLink;
@@ -3166,6 +3209,7 @@ class _Composer extends StatelessWidget {
     required this.focusNode,
     required this.onSend,
     required this.onAttach,
+    required this.onPaste,
     required this.onPickNetwork,
     this.composing,
     this.onCancelContext,
@@ -3200,6 +3244,10 @@ class _Composer extends StatelessWidget {
 
   final VoidCallback onSend;
   final VoidCallback onAttach;
+
+  /// ⌘V / Ctrl+V, which may be an image rather than text.
+  final VoidCallback onPaste;
+
   final ValueChanged<ChatNetwork> onPickNetwork;
 
   /// What the next send will do, in one phrase.
@@ -3316,6 +3364,13 @@ class _Composer extends StatelessWidget {
                               CallbackAction<InsertComposerNewlineIntent>(
                                 onInvoke: (_) {
                                   insertComposerNewline(controller);
+                                  return null;
+                                },
+                              ),
+                          PasteIntoComposerIntent:
+                              CallbackAction<PasteIntoComposerIntent>(
+                                onInvoke: (_) {
+                                  onPaste();
                                   return null;
                                 },
                               ),

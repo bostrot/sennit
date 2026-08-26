@@ -26,6 +26,13 @@ class MainFlutterWindow: NSWindow {
     WeftSnapshotChannel.register(
       with: flutterViewController.registrar(forPlugin: "WeftSnapshotChannel"))
 
+    // Reading a picture off the pasteboard, which Flutter's own clipboard API
+    // cannot do — it takes a format and accepts only `text/plain`. On a
+    // desktop, pasting a screenshot into a chat is the ordinary way to send
+    // one.
+    WeftClipboardChannel.register(
+      with: flutterViewController.registrar(forPlugin: "WeftClipboardChannel"))
+
     configureWindowChrome(around: flutterViewController)
 
     super.awakeFromNib()

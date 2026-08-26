@@ -41,12 +41,23 @@ final reactionRecentsProvider = NotifierProvider<ReactionRecents, List<String>>(
   ReactionRecents.new,
 );
 
-/// Picks a reaction. Returns null when the sheet is dismissed.
-Future<String?> showEmojiPickerSheet(BuildContext context) {
+/// Picks a reaction. Returns null when the panel is dismissed.
+///
+/// [anchorContext] is the control it was opened from — the "+" on a message's
+/// reaction bar, or the row in its action menu. On a desktop that turns the
+/// panel into a popover beside *that message*, which is the whole of what a
+/// reaction picker is for; without it the picker drops from the top of the
+/// window and gives no clue which message it is about.
+Future<String?> showEmojiPickerSheet(
+  BuildContext context, {
+  BuildContext? anchorContext,
+}) {
   return showWeftPanel<String>(
     context: context,
+    anchorContext: anchorContext,
     showDragHandle: true,
     isScrollControlled: true,
+    width: 300,
     builder: (_) => const _EmojiPickerSheet(),
   );
 }
@@ -62,7 +73,11 @@ class _EmojiPickerSheet extends ConsumerWidget {
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+          // A popover is sized to itself, not to the window: 60% of a 1440pt
+          // display is a picker eight hundred points tall.
+          maxHeight: context.isDesktop
+              ? 360
+              : MediaQuery.sizeOf(context).height * 0.6,
         ),
         child: ListView(
           shrinkWrap: true,

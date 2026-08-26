@@ -36,7 +36,8 @@ class ReactionBar extends StatelessWidget {
 
   /// The trailing "+" that opens the picker. Null hides it — a bubble whose
   /// message cannot be reacted to at all.
-  final VoidCallback? onAdd;
+  /// Opens the picker, given the chip's own context to hang a popover on.
+  final ValueChanged<BuildContext>? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +163,9 @@ class ReactionChip extends StatelessWidget {
 class _AddReactionChip extends StatelessWidget {
   const _AddReactionChip({required this.onTap});
 
-  final VoidCallback onTap;
+  /// Given this chip's own context, so a popover opens *at the chip* rather
+  /// than at whatever ancestor happened to hold the callback.
+  final ValueChanged<BuildContext> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +175,7 @@ class _AddReactionChip extends StatelessWidget {
       button: true,
       label: 'Add reaction',
       excludeSemantics: true,
-      onTap: onTap,
+      onTap: () => onTap(context),
       child: WeftTapTarget(
         child: Tooltip(
           message: 'Add reaction',
@@ -182,7 +185,7 @@ class _AddReactionChip extends StatelessWidget {
             borderRadius: WeftRadius.pill,
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: onTap,
+              onTap: () => onTap(context),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: WeftSpace.sm,

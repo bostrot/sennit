@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import 'surface.dart';
+
 /// The smallest a control may be and still be reliably hittable.
 ///
 /// Android's guideline, which is the stricter of the two Weft ships against —
@@ -10,6 +12,16 @@ import 'package:flutter/rendering.dart';
 /// looser guideline fails the other, and a messenger's controls are the same
 /// controls on both platforms.
 const double kWeftMinTapTarget = 48;
+
+/// The same, for a machine driven by a pointer.
+///
+/// The 48 above is a *thumb* guideline, and it is the right number wherever a
+/// thumb is what arrives. A mouse lands within a pixel or two, and macOS,
+/// Windows and GNOME all size their dense controls around 28: a toolbar
+/// button, a sidebar row, a cell in a grid of emoji. Padding those to 48 on a
+/// desktop does not make them easier to hit, it makes a picker of six columns
+/// into a picker of four with holes between them.
+const double kWeftMinPointerTarget = 28;
 
 /// Guarantees [child] at least [minSize] of *interactive* box without changing
 /// what it paints.
@@ -36,25 +48,32 @@ const double kWeftMinTapTarget = 48;
 /// both what a screen reader's touch exploration uses and what
 /// [MinimumTapTargetGuideline] measures.
 class WeftTapTarget extends SingleChildRenderObjectWidget {
-  const WeftTapTarget({
-    super.key,
-    this.minSize = const Size.square(kWeftMinTapTarget),
-    required Widget super.child,
-  });
+  const WeftTapTarget({super.key, this.minSize, required Widget super.child});
 
   /// Both axes, because the guidelines are square. Give a control a smaller
   /// height only where the taller box would push a running line apart.
-  final Size minSize;
+  ///
+  /// Null — the usual case — resolves from the surface: [kWeftMinTapTarget]
+  /// where a thumb arrives, [kWeftMinPointerTarget] where a pointer does. A
+  /// call site that states a size is one with a layout reason of its own, and
+  /// keeps it on both.
+  final Size? minSize;
+
+  Size _resolve(BuildContext context) =>
+      minSize ??
+      Size.square(
+        context.isDesktop ? kWeftMinPointerTarget : kWeftMinTapTarget,
+      );
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderTapTarget(minSize);
+      _RenderTapTarget(_resolve(context));
 
   @override
   void updateRenderObject(BuildContext context, RenderObject renderObject) {
     // Declared against `RenderObject` rather than the private render class,
     // which would put a private type in a public signature.
-    (renderObject as _RenderTapTarget).minSize = minSize;
+    (renderObject as _RenderTapTarget).minSize = _resolve(context);
   }
 }
 

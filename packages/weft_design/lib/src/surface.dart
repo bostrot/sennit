@@ -127,4 +127,12 @@ extension WeftSurfaceContext on BuildContext {
 
   /// Whether this is the desktop layout. Read it rather than the platform.
   bool get isMac => surface == WeftSurface.mac;
+
+  /// Whether a pointer is what arrives, rather than a thumb.
+  ///
+  /// Separate from [isMac] because most of what the desktop changes is not
+  /// macOS-specific — a mouse lands within a pixel or two whichever system it
+  /// is plugged into — and this is the question Windows and Linux will answer
+  /// the same way.
+  bool get isDesktop => surface != WeftSurface.touch;
 }
