@@ -28,7 +28,7 @@ class ContactProfileScreen extends ConsumerWidget {
         .firstOrNull;
     if (chat == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: WeftAppBar(),
         body: const Center(child: Text('This conversation is gone.')),
       );
     }
@@ -50,158 +50,161 @@ class ContactProfileScreen extends ConsumerWidget {
     final labels = ref.watch(chatLabelsProvider.notifier).ofChat(chat.id);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Contact')),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: WeftSpace.xl),
-        children: [
-          const SizedBox(height: WeftSpace.lg),
-          Center(
-            child: Column(
-              children: [
-                WeftAvatar(
-                  label: chat.title,
-                  imageUrl: chat.avatarUrl,
-                  imageHeaders: ref.watch(mediaHeadersProvider),
-                  networks: chat.networks,
-                  size: 96,
-                ),
-                const SizedBox(height: WeftSpace.md),
-                Text(
-                  chat.title,
-                  style: context.text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+      appBar: WeftAppBar(title: const Text('Contact')),
+      body: WeftReadingPane(
+        maxWidth: 640,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: WeftSpace.xl),
+          children: [
+            const SizedBox(height: WeftSpace.lg),
+            Center(
+              child: Column(
+                children: [
+                  WeftAvatar(
+                    label: chat.title,
+                    imageUrl: chat.avatarUrl,
+                    imageHeaders: ref.watch(mediaHeadersProvider),
+                    networks: chat.networks,
+                    size: 96,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                if (chat.isMerged)
-                  Padding(
-                    padding: const EdgeInsets.only(top: WeftSpace.xs),
-                    child: Text(
-                      'Merged · ${chat.networks.map((n) => n.label).join(', ')}',
-                      style: context.text.labelMedium?.copyWith(
-                        color: context.palette.mergedAccent,
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: WeftSpace.md),
+                  Text(
+                    chat.title,
+                    style: context.text.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (chat.isMerged)
+                    Padding(
+                      padding: const EdgeInsets.only(top: WeftSpace.xs),
+                      child: Text(
+                        'Merged · ${chat.networks.map((n) => n.label).join(', ')}',
+                        style: context.text.labelMedium?.copyWith(
+                          color: context.palette.mergedAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(height: WeftSpace.lg),
+            if (phone != null)
+              ListTile(
+                leading: const Icon(Icons.phone_rounded),
+                title: Text(phone),
+                subtitle: const Text('Phone'),
+              ),
+            for (final id in matrixIds)
+              ListTile(
+                leading: const Icon(Icons.alternate_email_rounded),
+                title: Text(id),
+                subtitle: const Text('Matrix user'),
+              ),
+            if (handles.isNotEmpty) ...[
+              const _SectionHeader('On these networks'),
+              for (final handle in handles)
+                ListTile(
+                  leading: Icon(
+                    Icons.circle,
+                    size: 14,
+                    color: context.palette.networkColor(handle.network),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          if (phone != null)
-            ListTile(
-              leading: const Icon(Icons.phone_rounded),
-              title: Text(phone),
-              subtitle: const Text('Phone'),
-            ),
-          for (final id in matrixIds)
-            ListTile(
-              leading: const Icon(Icons.alternate_email_rounded),
-              title: Text(id),
-              subtitle: const Text('Matrix user'),
-            ),
-          if (handles.isNotEmpty) ...[
-            const _SectionHeader('On these networks'),
-            for (final handle in handles)
+                  title: Text(handle.displayName ?? handle.remoteId),
+                  subtitle: Text(
+                    handle.remoteId == (handle.displayName ?? '')
+                        ? handle.network.label
+                        : '${handle.network.label} · ${handle.remoteId}',
+                  ),
+                ),
+            ],
+            const _SectionHeader('Conversations in this chat'),
+            for (final source in chat.sources)
               ListTile(
                 leading: Icon(
-                  Icons.circle,
-                  size: 14,
-                  color: context.palette.networkColor(handle.network),
+                  Icons.forum_rounded,
+                  color: context.palette.networkColor(source.network),
                 ),
-                title: Text(handle.displayName ?? handle.remoteId),
+                title: Text(source.network.label),
                 subtitle: Text(
-                  handle.remoteId == (handle.displayName ?? '')
-                      ? handle.network.label
-                      : '${handle.network.label} · ${handle.remoteId}',
+                  source.roomId,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-          ],
-          const _SectionHeader('Conversations in this chat'),
-          for (final source in chat.sources)
-            ListTile(
-              leading: Icon(
-                Icons.forum_rounded,
-                color: context.palette.networkColor(source.network),
+            const _SectionHeader('For this contact'),
+            if (chat.networks.length > 1)
+              ListTile(
+                leading: const Icon(Icons.send_rounded),
+                title: const Text('Send new messages via'),
+                subtitle: Text(
+                  chat.hasExplicitSendNetwork
+                      ? (chat.sendNetwork?.label ?? '')
+                      : '${chat.sendNetwork?.label ?? ''} (automatic)',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  final network = await showWeftPanel<ChatNetwork>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (context) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final n in chat.networks)
+                            ListTile(
+                              leading: Icon(
+                                Icons.circle,
+                                size: 14,
+                                color: context.palette.networkColor(n),
+                              ),
+                              title: Text(n.label),
+                              selected: n == chat.sendNetwork,
+                              onTap: () => Navigator.of(context).pop(n),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (network != null) {
+                    await repository.setSendNetwork(chat.id, network);
+                  }
+                },
               ),
-              title: Text(source.network.label),
-              subtitle: Text(
-                source.roomId,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          const _SectionHeader('For this contact'),
-          if (chat.networks.length > 1)
             ListTile(
-              leading: const Icon(Icons.send_rounded),
-              title: const Text('Send new messages via'),
+              leading: const Icon(Icons.label_outline_rounded),
+              title: const Text('Labels'),
               subtitle: Text(
-                chat.hasExplicitSendNetwork
-                    ? (chat.sendNetwork?.label ?? '')
-                    : '${chat.sendNetwork?.label ?? ''} (automatic)',
+                labels.isEmpty ? 'None' : (labels.toList()..sort()).join(', '),
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () async {
-                final network = await showWeftPanel<ChatNetwork>(
-                  context: context,
-                  showDragHandle: true,
-                  builder: (context) => SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final n in chat.networks)
-                          ListTile(
-                            leading: Icon(
-                              Icons.circle,
-                              size: 14,
-                              color: context.palette.networkColor(n),
-                            ),
-                            title: Text(n.label),
-                            selected: n == chat.sendNetwork,
-                            onTap: () => Navigator.of(context).pop(n),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-                if (network != null) {
-                  await repository.setSendNetwork(chat.id, network);
-                }
-              },
+              onTap: () => showLabelSheet(context, ref, {chat.id}),
             ),
-          ListTile(
-            leading: const Icon(Icons.label_outline_rounded),
-            title: const Text('Labels'),
-            subtitle: Text(
-              labels.isEmpty ? 'None' : (labels.toList()..sort()).join(', '),
+            SwitchListTile.adaptive(
+              secondary: const Icon(Icons.notifications_off_outlined),
+              title: const Text('Mute'),
+              value: chat.muted,
+              onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => showLabelSheet(context, ref, {chat.id}),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.notifications_off_outlined),
-            title: const Text('Mute'),
-            value: chat.muted,
-            onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.archive_outlined),
-            title: const Text('Archive'),
-            value: chat.archived,
-            onChanged: (archived) =>
-                repository.setArchived(chat.id, archived: archived),
-          ),
-          ListTile(
-            leading: const Icon(Icons.merge_rounded),
-            title: const Text('Manage merges'),
-            subtitle: const Text('Combine or split this contact\'s chats'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const MergeScreen()),
+            SwitchListTile.adaptive(
+              secondary: const Icon(Icons.archive_outlined),
+              title: const Text('Archive'),
+              value: chat.archived,
+              onChanged: (archived) =>
+                  repository.setArchived(chat.id, archived: archived),
             ),
-          ),
-        ],
+            ListTile(
+              leading: const Icon(Icons.merge_rounded),
+              title: const Text('Manage merges'),
+              subtitle: const Text('Combine or split this contact\'s chats'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const MergeScreen()),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

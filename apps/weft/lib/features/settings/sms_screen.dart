@@ -47,7 +47,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
     final repository = ref.watch(smsRepositoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: const Text('SMS'),
         actions: [
           if (repository != null)
@@ -58,19 +58,21 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: repository == null
-            ? const [
-                SettingsMessage(
-                  message:
-                      'This device has no SMS. Braid carries SMS only on '
-                      'Android, where the system can hand one app the '
-                      'messaging role — everywhere else your conversations '
-                      'arrive over Matrix and its bridges.',
-                ),
-              ]
-            : _body(context, repository),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: repository == null
+              ? const [
+                  SettingsMessage(
+                    message:
+                        'This device has no SMS. Braid carries SMS only on '
+                        'Android, where the system can hand one app the '
+                        'messaging role — everywhere else your conversations '
+                        'arrive over Matrix and its bridges.',
+                  ),
+                ]
+              : _body(context, repository),
+        ),
       ),
     );
   }

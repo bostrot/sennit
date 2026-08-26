@@ -91,65 +91,68 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
     final headers = ref.watch(mediaHeadersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New chat')),
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-              WeftSpace.lg,
-              WeftSpace.sm,
-              WeftSpace.lg,
-              WeftSpace.sm,
-            ),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: 'Search people',
-                border: OutlineInputBorder(),
-                isDense: true,
+      appBar: WeftAppBar(title: const Text('New chat')),
+      body: WeftReadingPane(
+        maxWidth: 560,
+        child: ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                WeftSpace.lg,
+                WeftSpace.sm,
+                WeftSpace.lg,
+                WeftSpace.sm,
               ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.group_add_rounded),
-            title: const Text('New group'),
-            onTap: () => unawaited(_newGroup(context, ref)),
-          ),
-          if (chats.isNotEmpty) _header(context, 'Your conversations'),
-          for (final chat in chats)
-            ListTile(
-              leading: WeftAvatar(
-                label: chat.title,
-                imageUrl: chat.avatarUrl,
-                imageHeaders: headers,
-                networks: chat.networks,
-                size: 40,
-              ),
-              title: Text(chat.title),
-              onTap: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute<void>(
-                  builder: (_) => ChatView(chatId: chat.id),
+              child: TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded),
+                  hintText: 'Search people',
+                  border: OutlineInputBorder(),
+                  isDense: true,
                 ),
               ),
             ),
-          if (fromBook.isNotEmpty) _header(context, 'From your address book'),
-          for (final (name, phone) in fromBook)
             ListTile(
-              leading: WeftAvatar(label: name, size: 40),
-              title: Text(name),
-              onTap: () => unawaited(_startWithNumber(name, phone)),
+              leading: const Icon(Icons.group_add_rounded),
+              title: const Text('New group'),
+              onTap: () => unawaited(_newGroup(context, ref)),
             ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.alternate_email_rounded),
-            title: const Text('By ID or number'),
-            subtitle: const Text('A Matrix ID, or a number no list has'),
-            onTap: () => unawaited(_newDirectChat(context, ref)),
-          ),
-          const SizedBox(height: WeftSpace.xl),
-        ],
+            if (chats.isNotEmpty) _header(context, 'Your conversations'),
+            for (final chat in chats)
+              ListTile(
+                leading: WeftAvatar(
+                  label: chat.title,
+                  imageUrl: chat.avatarUrl,
+                  imageHeaders: headers,
+                  networks: chat.networks,
+                  size: 40,
+                ),
+                title: Text(chat.title),
+                onTap: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatView(chatId: chat.id),
+                  ),
+                ),
+              ),
+            if (fromBook.isNotEmpty) _header(context, 'From your address book'),
+            for (final (name, phone) in fromBook)
+              ListTile(
+                leading: WeftAvatar(label: name, size: 40),
+                title: Text(name),
+                onTap: () => unawaited(_startWithNumber(name, phone)),
+              ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.alternate_email_rounded),
+              title: const Text('By ID or number'),
+              subtitle: const Text('A Matrix ID, or a number no list has'),
+              onTap: () => unawaited(_newDirectChat(context, ref)),
+            ),
+            const SizedBox(height: WeftSpace.xl),
+          ],
+        ),
       ),
     );
   }

@@ -134,7 +134,7 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
     final messages = _messages;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Sign in to ${widget.network.label}')),
+      appBar: WeftAppBar(title: Text('Sign in to ${widget.network.label}')),
       body: error != null
           ? Center(
               child: Padding(

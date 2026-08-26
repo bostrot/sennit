@@ -191,7 +191,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
     final step = session?.currentStep;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: Text(_title),
         // Leaving mid-flow abandons the attempt rather than backgrounding it:
         // a half-finished login holds a slot on some bridges, and one left

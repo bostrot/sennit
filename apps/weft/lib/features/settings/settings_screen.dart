@@ -87,112 +87,114 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: WeftSpace.xxl),
-        children: [
-          header('Chats'),
-          tile(
-            icon: Icons.call_merge_rounded,
-            title: 'Merged chats',
-            subtitle: 'One person across several messengers, as one thread',
-            onTap: () => push(const MergeScreen()),
-          ),
-          tile(
-            icon: Icons.hub_outlined,
-            title: 'Bridges',
-            subtitle: 'The messenger bridges on your Matrix server',
-            onTap: () => push(const BridgesScreen()),
-          ),
-          if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
+      appBar: WeftAppBar(title: const Text('Settings')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: WeftSpace.xxl),
+          children: [
+            header('Chats'),
             tile(
-              icon: Icons.sms_outlined,
-              title: 'SMS',
-              subtitle: 'Text messages on this phone, in the inbox',
-              onTap: () => push(const SmsScreen()),
+              icon: Icons.call_merge_rounded,
+              title: 'Merged chats',
+              subtitle: 'One person across several messengers, as one thread',
+              onTap: () => push(const MergeScreen()),
+            ),
+            tile(
+              icon: Icons.hub_outlined,
+              title: 'Bridges',
+              subtitle: 'The messenger bridges on your Matrix server',
+              onTap: () => push(const BridgesScreen()),
+            ),
+            if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
+              tile(
+                icon: Icons.sms_outlined,
+                title: 'SMS',
+                subtitle: 'Text messages on this phone, in the inbox',
+                onTap: () => push(const SmsScreen()),
+              ),
+
+            const _StatusRingsToggle(),
+
+            header('Look & feel'),
+            tile(
+              icon: Icons.palette_outlined,
+              title: 'Appearance',
+              subtitle: 'Theme, colour and density',
+              onTap: () => showAppearanceSheet(context),
+            ),
+            tile(
+              icon: Icons.notifications_outlined,
+              title: 'Notifications',
+              subtitle: 'What may interrupt you, and how',
+              onTap: () => push(const NotificationsScreen()),
+            ),
+            if (_hasKeyboard)
+              tile(
+                icon: Icons.keyboard_outlined,
+                title: 'Keyboard shortcuts',
+                subtitle: 'Everything the keyboard can do here',
+                onTap: () => showShortcutsSheet(context),
+              ),
+
+            header('Search & intelligence'),
+            tile(
+              icon: Icons.manage_search_rounded,
+              title: 'Search & transcription',
+              subtitle: 'Semantic search and voice transcription endpoints',
+              onTap: () => push(const EndpointsScreen()),
+            ),
+            tile(
+              icon: Icons.download_for_offline_outlined,
+              title: 'Local models',
+              subtitle: 'Run search and transcription on this device',
+              onTap: () => push(const ModelsScreen()),
+            ),
+            const _AgendaToggle(),
+            const _HiddenNetworksSection(),
+
+            header('Privacy & security'),
+            const _ReadReceiptsToggle(),
+            const _ContactNamesToggle(),
+            tile(
+              icon: Icons.link_rounded,
+              title: 'Link previews',
+              subtitle: 'Whether links in messages may be previewed',
+              onTap: () => push(const LinkPreviewsScreen()),
+            ),
+            tile(
+              icon: Icons.devices_rounded,
+              title: 'Devices',
+              subtitle: 'Your other logins, and signing them out',
+              onTap: () => push(const DevicesScreen()),
+            ),
+            tile(
+              icon: Icons.lock_outline_rounded,
+              title: 'Encryption',
+              subtitle: 'Cross-signing, key backup and recovery',
+              onTap: () => push(const SecurityScreen()),
             ),
 
-          const _StatusRingsToggle(),
-
-          header('Look & feel'),
-          tile(
-            icon: Icons.palette_outlined,
-            title: 'Appearance',
-            subtitle: 'Theme, colour and density',
-            onTap: () => showAppearanceSheet(context),
-          ),
-          tile(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            subtitle: 'What may interrupt you, and how',
-            onTap: () => push(const NotificationsScreen()),
-          ),
-          if (_hasKeyboard)
+            header('Connections'),
             tile(
-              icon: Icons.keyboard_outlined,
-              title: 'Keyboard shortcuts',
-              subtitle: 'Everything the keyboard can do here',
-              onTap: () => showShortcutsSheet(context),
+              icon: Icons.widgets_outlined,
+              title: 'Widgets & watch',
+              subtitle: 'Home screen widgets and the watch companion',
+              onTap: () => push(const SurfacesScreen()),
             ),
-
-          header('Search & intelligence'),
-          tile(
-            icon: Icons.manage_search_rounded,
-            title: 'Search & transcription',
-            subtitle: 'Semantic search and voice transcription endpoints',
-            onTap: () => push(const EndpointsScreen()),
-          ),
-          tile(
-            icon: Icons.download_for_offline_outlined,
-            title: 'Local models',
-            subtitle: 'Run search and transcription on this device',
-            onTap: () => push(const ModelsScreen()),
-          ),
-          const _AgendaToggle(),
-          const _HiddenNetworksSection(),
-
-          header('Privacy & security'),
-          const _ReadReceiptsToggle(),
-          const _ContactNamesToggle(),
-          tile(
-            icon: Icons.link_rounded,
-            title: 'Link previews',
-            subtitle: 'Whether links in messages may be previewed',
-            onTap: () => push(const LinkPreviewsScreen()),
-          ),
-          tile(
-            icon: Icons.devices_rounded,
-            title: 'Devices',
-            subtitle: 'Your other logins, and signing them out',
-            onTap: () => push(const DevicesScreen()),
-          ),
-          tile(
-            icon: Icons.lock_outline_rounded,
-            title: 'Encryption',
-            subtitle: 'Cross-signing, key backup and recovery',
-            onTap: () => push(const SecurityScreen()),
-          ),
-
-          header('Connections'),
-          tile(
-            icon: Icons.widgets_outlined,
-            title: 'Widgets & watch',
-            subtitle: 'Home screen widgets and the watch companion',
-            onTap: () => push(const SurfacesScreen()),
-          ),
-          tile(
-            icon: Icons.home_outlined,
-            title: 'Integrations',
-            subtitle: 'Home Assistant and paperless-ngx, your own instances',
-            onTap: () => push(const IntegrationsScreen()),
-          ),
-          tile(
-            icon: Icons.terminal_rounded,
-            title: 'MCP server',
-            subtitle: 'Let your own agents read and send through Braid',
-            onTap: () => push(const McpScreen()),
-          ),
-        ],
+            tile(
+              icon: Icons.home_outlined,
+              title: 'Integrations',
+              subtitle: 'Home Assistant and paperless-ngx, your own instances',
+              onTap: () => push(const IntegrationsScreen()),
+            ),
+            tile(
+              icon: Icons.terminal_rounded,
+              title: 'MCP server',
+              subtitle: 'Let your own agents read and send through Braid',
+              onTap: () => push(const McpScreen()),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -216,7 +218,7 @@ class _ReadReceiptsToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       secondary: const Icon(Icons.done_all_rounded),
       title: const Text('Send read receipts'),
       subtitle: const Text(
@@ -266,7 +268,7 @@ class _HiddenNetworksSection extends ConsumerWidget {
       ),
       children: [
         for (final network in networks)
-          SwitchListTile(
+          SwitchListTile.adaptive(
             dense: true,
             title: Text('Show ${network.label} in All'),
             value: !hidden.contains(network),
@@ -296,7 +298,7 @@ class _ContactNamesToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       secondary: const Icon(Icons.person_pin_rounded),
       title: const Text('Use address book names'),
       subtitle: const Text(
@@ -349,7 +351,7 @@ class _AgendaToggle extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       secondary: const Icon(Icons.event_available_rounded),
       title: const Text('Detect appointments'),
       subtitle: const Text(

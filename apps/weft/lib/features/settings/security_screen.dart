@@ -258,7 +258,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: const Text('Encryption'),
         actions: [
           if (_stage == _Stage.status)

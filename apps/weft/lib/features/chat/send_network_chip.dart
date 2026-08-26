@@ -83,10 +83,16 @@ class SendNetworkChip extends StatelessWidget {
           child: AnimatedContainer(
             duration: WeftMotion.fast,
             curve: WeftMotion.standard,
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.sm,
-              vertical: WeftSpace.sm,
-            ),
+            // A phone's chip is 36 points tall and sits beside a 48-point
+            // field. On a desktop the field is 24, and the same chip towers
+            // over the composer — the tallest thing in the row, and the one
+            // that matters least.
+            padding: context.isDesktop
+                ? const EdgeInsets.symmetric(horizontal: 6, vertical: 3)
+                : const EdgeInsets.symmetric(
+                    horizontal: WeftSpace.sm,
+                    vertical: WeftSpace.sm,
+                  ),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.15),
               borderRadius: WeftRadius.pill,
@@ -97,9 +103,17 @@ class SendNetworkChip extends StatelessWidget {
               children: [
                 // The button's own label says the network; the glyph repeating it
                 // would announce "WhatsApp" twice in a row.
-                NetworkGlyph(network: current, size: 18, semanticsLabel: ''),
-                const SizedBox(width: WeftSpace.xs),
-                Icon(Icons.expand_more_rounded, size: 16, color: accent),
+                NetworkGlyph(
+                  network: current,
+                  size: context.isDesktop ? 15 : 18,
+                  semanticsLabel: '',
+                ),
+                SizedBox(width: context.isDesktop ? 2 : WeftSpace.xs),
+                Icon(
+                  Icons.expand_more_rounded,
+                  size: context.isDesktop ? 13 : 16,
+                  color: accent,
+                ),
               ],
             ),
           ),

@@ -516,6 +516,22 @@ abstract final class WeftTheme {
       ),
       switchTheme: SwitchThemeData(
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        // `Switch.adaptive` draws a `CupertinoSwitch` here, which is the right
+        // shape and the wrong colour: its "on" is the system green, and Braid's
+        // is whatever seed the user chose. Stated rather than inherited,
+        // because a green switch beside a purple everything reads as a control
+        // borrowed from another app.
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.primary
+              : scheme.surfaceContainerHighest,
+        ),
+        thumbColor: const WidgetStatePropertyAll(Colors.white),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.transparent
+              : palette.border,
+        ),
       ),
       checkboxTheme: CheckboxThemeData(
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

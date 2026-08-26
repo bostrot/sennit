@@ -25,7 +25,7 @@ Future<void> showAppearanceSheet(
     anchorContext: anchorContext,
     showDragHandle: true,
     isScrollControlled: true,
-    width: 340,
+    width: 460,
     builder: (_) => const _AppearanceSheet(),
   );
 }
@@ -41,9 +41,12 @@ class _AppearanceSheet extends ConsumerWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(
+        // A phone's bottom sheet has a drag handle above this and needs no top
+        // padding. A desktop panel has neither, and its heading was landing
+        // flush against — and above — the panel's own top edge.
+        padding: EdgeInsetsDirectional.fromSTEB(
           WeftSpace.xl,
-          0,
+          context.isDesktop ? WeftSpace.lg : 0,
           WeftSpace.xl,
           WeftSpace.xl,
         ),
@@ -57,33 +60,44 @@ class _AppearanceSheet extends ConsumerWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: WeftSpace.xl),
+            SizedBox(height: context.isDesktop ? WeftSpace.lg : WeftSpace.xl),
 
             _SheetHeading('Theme'),
             const SizedBox(height: WeftSpace.sm),
+            // Wrapped, and glyph-only where the labels do not fit. Four
+            // labelled segments need about 460 points; in a 420-point panel
+            // Flutter's answer is to break every label mid-word — "Au to",
+            // "Lig ht", "A M OL ED" — which is worse than no label at all,
+            // and each segment still carries its name as a tooltip.
             SegmentedButton<WeftThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: WeftThemeMode.system,
-                  icon: Icon(Icons.brightness_auto_rounded, size: 18),
-                  label: Text('Auto'),
-                ),
-                ButtonSegment(
-                  value: WeftThemeMode.light,
-                  icon: Icon(Icons.light_mode_rounded, size: 18),
-                  label: Text('Light'),
-                ),
-                ButtonSegment(
-                  value: WeftThemeMode.dark,
-                  icon: Icon(Icons.dark_mode_rounded, size: 18),
-                  label: Text('Dark'),
-                ),
-                ButtonSegment(
-                  value: WeftThemeMode.amoled,
-                  icon: Icon(Icons.contrast_rounded, size: 18),
-                  label: Text('AMOLED'),
-                ),
+              showSelectedIcon: false,
+              segments: [
+                for (final (mode, icon, label) in const [
+                  (
+                    WeftThemeMode.system,
+                    Icons.brightness_auto_rounded,
+                    'Auto',
+                  ),
+                  (WeftThemeMode.light, Icons.light_mode_rounded, 'Light'),
+                  (WeftThemeMode.dark, Icons.dark_mode_rounded, 'Dark'),
+                  (WeftThemeMode.amoled, Icons.contrast_rounded, 'AMOLED'),
+                ])
+                  ButtonSegment(
+                    value: mode,
+                    icon: Icon(icon, size: context.isDesktop ? 15 : 18),
+                    label: Text(label),
+                    tooltip: label,
+                  ),
               ],
+              style: context.isDesktop
+                  ? SegmentedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: WeftSpace.sm,
+                        vertical: 4,
+                      ),
+                      textStyle: context.text.labelMedium,
+                    )
+                  : null,
               selected: {appearance.mode},
               onSelectionChanged: (s) => notifier.setMode(s.first),
             ),
@@ -107,7 +121,7 @@ class _AppearanceSheet extends ConsumerWidget {
             ),
             const SizedBox(height: WeftSpace.xl),
 
-            SwitchListTile(
+            SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Select several networks at once'),
               subtitle: const Text('Off: the rail is one-network-at-a-time.'),
@@ -209,8 +223,10 @@ class _SwatchButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: context.motion.fast,
         curve: context.motion.spring,
-        width: kWeftMinTapTarget,
-        height: kWeftMinTapTarget,
+        // A thumb's target on a phone, a pointer's on a desktop — six
+        // swatches then fit on one row instead of five and an orphan.
+        width: context.isDesktop ? 30 : kWeftMinTapTarget,
+        height: context.isDesktop ? 30 : kWeftMinTapTarget,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,

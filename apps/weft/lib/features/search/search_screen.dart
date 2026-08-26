@@ -110,20 +110,59 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final backfill = ref.watch(embeddingBackfillProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         // The hint is the field's only name, and a hint disappears at the first
         // keystroke — so a reader who typed had nothing left telling them what
         // this field was. The label says it either way.
-        title: WeftLabelledField(
-          label: 'Search all conversations',
-          child: TextField(
-            controller: _controller,
-            autofocus: true,
-            onChanged: _onChanged,
-            decoration: const InputDecoration(
-              hintText: 'Search messages…',
-              border: InputBorder.none,
-              filled: false,
+        title: ConstrainedBox(
+          // Not the whole window. A search field that runs 1280 points across
+          // is a field with a caret at one end and nothing at the other.
+          constraints: BoxConstraints(
+            maxWidth: context.isDesktop ? 520 : double.infinity,
+          ),
+          child: DecoratedBox(
+            // A field needs to look like one. Stripping the theme's ring left
+            // a caret and a hint sitting on the window with nothing round
+            // them, flush against its edge — the fix for the clipping should
+            // not cost the control its own shape.
+            decoration: BoxDecoration(
+              color: context.isDesktop
+                  ? context.colors.onSurface.withValues(alpha: 0.07)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(MacMetrics.controlRadius),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.isDesktop ? WeftSpace.sm : 0,
+                vertical: context.isDesktop ? 5 : 0,
+              ),
+              child: WeftLabelledField(
+                label: 'Search all conversations',
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  onChanged: _onChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search messages…',
+                    // All three borders, not just `border` — and only on a
+                    // desktop. The theme gives every field a two-point focus
+                    // ring, and this one is autofocused inside a 52-point
+                    // toolbar, so the ring drew and was clipped along its top
+                    // edge: a field apparently hanging off the top of the
+                    // window. On a phone the bar is 56 points, the ring fits,
+                    // and it is the only thing marking where the caret is.
+                    border: context.isDesktop ? InputBorder.none : null,
+                    enabledBorder: context.isDesktop ? InputBorder.none : null,
+                    focusedBorder: context.isDesktop ? InputBorder.none : null,
+                    filled: false,
+                    // Dense on a desktop only. Unconditionally it took the
+                    // field to 24 points tall on a phone as well, which is
+                    // half the target a thumb is owed.
+                    isDense: context.isDesktop,
+                    contentPadding: context.isDesktop ? EdgeInsets.zero : null,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -142,70 +181,76 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.lg,
-              vertical: WeftSpace.sm,
-            ),
-            child: Wrap(
-              spacing: WeftSpace.sm,
-              children: [
-                for (final network in repository.availableNetworks)
-                  FilterChip(
-                    // The chip's own label is the network's name; a glyph that
-                    // says it again turns every filter into "WhatsApp,
-                    // WhatsApp, not selected".
-                    avatar: NetworkGlyph(
-                      network: network,
-                      size: 16,
-                      semanticsLabel: '',
+      body: WeftReadingPane(
+        // Wider than a settings page: this one holds result rows with a chat
+        // name, a snippet and a network mark, and squeezing those to 720
+        // truncates the snippet, which is the part being searched for.
+        maxWidth: 900,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: WeftSpace.lg,
+                vertical: WeftSpace.sm,
+              ),
+              child: Wrap(
+                spacing: WeftSpace.sm,
+                children: [
+                  for (final network in repository.availableNetworks)
+                    FilterChip(
+                      // The chip's own label is the network's name; a glyph that
+                      // says it again turns every filter into "WhatsApp,
+                      // WhatsApp, not selected".
+                      avatar: NetworkGlyph(
+                        network: network,
+                        size: 16,
+                        semanticsLabel: '',
+                      ),
+                      label: Text(network.label),
+                      selected: _networkFilter.contains(network),
+                      onSelected: (_) {
+                        setState(() {
+                          final next = {..._networkFilter};
+                          if (!next.remove(network)) next.add(network);
+                          _networkFilter = next;
+                        });
+                        _run();
+                      },
                     ),
-                    label: Text(network.label),
-                    selected: _networkFilter.contains(network),
-                    onSelected: (_) {
-                      setState(() {
-                        final next = {..._networkFilter};
-                        if (!next.remove(network)) next.add(network);
-                        _networkFilter = next;
-                      });
-                      _run();
-                    },
-                  ),
-              ],
-            ),
-          ),
-          if (!semanticAvailable)
-            _Notice(
-              icon: Icons.psychology_outlined,
-              text:
-                  'Keyword search only. To also search by meaning, download '
-                  'the search model under Settings → Endpoints → Local models '
-                  'and switch it on, or configure an embedding endpoint.',
-            )
-          else if (backfill != null && backfill.pending > 0)
-            _Notice(
-              icon: Icons.sync_rounded,
-              text:
-                  '${backfill.pending} messages still being embedded — '
-                  'semantic results may be incomplete.',
-              action: TextButton(
-                onPressed: () async {
-                  await backfill.drainAll(
-                    onProgress: (_) {
-                      if (mounted) setState(() {});
-                    },
-                  );
-                },
-                child: const Text('Backfill now'),
+                ],
               ),
             ),
-          if (_searchedOnce)
-            _ResultSummary(count: _results.length + _chatMatches().length),
-          Expanded(child: _body()),
-        ],
+            if (!semanticAvailable)
+              _Notice(
+                icon: Icons.psychology_outlined,
+                text:
+                    'Keyword search only. To also search by meaning, download '
+                    'the search model under Settings → Endpoints → Local models '
+                    'and switch it on, or configure an embedding endpoint.',
+              )
+            else if (backfill != null && backfill.pending > 0)
+              _Notice(
+                icon: Icons.sync_rounded,
+                text:
+                    '${backfill.pending} messages still being embedded — '
+                    'semantic results may be incomplete.',
+                action: TextButton(
+                  onPressed: () async {
+                    await backfill.drainAll(
+                      onProgress: (_) {
+                        if (mounted) setState(() {});
+                      },
+                    );
+                  },
+                  child: const Text('Backfill now'),
+                ),
+              ),
+            if (_searchedOnce)
+              _ResultSummary(count: _results.length + _chatMatches().length),
+            Expanded(child: _body()),
+          ],
+        ),
       ),
     );
   }

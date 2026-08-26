@@ -206,214 +206,217 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final quiet = policy.quietHours;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          const _BuiltInConnectionSection(),
-          const _UnifiedPushSection(),
-          SwitchListTile(
-            title: const Text('Notifications'),
-            subtitle: const Text(
-              'The master switch. Off means nothing is posted, on any device '
-              'this app is running on.',
-            ),
-            value: policy.enabled,
-            onChanged: (v) => _update((p) => p.copyWith(enabled: v)),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          if (policy.enabled) ...[
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Networks',
-              subtitle:
-                  'Muted still lets a mention through, if the setting below '
-                  'allows it. Off does not — off is off.',
-            ),
-            for (final network in networks)
-              _NetworkRow(
-                network: network,
-                mode: _modeFor(policy, network),
-                onChanged: (mode) => _setNetworkMode(network, mode),
+      appBar: WeftAppBar(title: const Text('Notifications')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            const _BuiltInConnectionSection(),
+            const _UnifiedPushSection(),
+            SwitchListTile.adaptive(
+              title: const Text('Notifications'),
+              subtitle: const Text(
+                'The master switch. Off means nothing is posted, on any device '
+                'this app is running on.',
               ),
-            if (networks.isEmpty)
-              Text(
-                'No bridges are configured yet, so there is nothing to switch '
-                'off. Networks appear here as they connect.',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
+              value: policy.enabled,
+              onChanged: (v) => _update((p) => p.copyWith(enabled: v)),
+              contentPadding: EdgeInsets.zero,
+            ),
+
+            if (policy.enabled) ...[
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Networks',
+                subtitle:
+                    'Muted still lets a mention through, if the setting below '
+                    'allows it. Off does not — off is off.',
+              ),
+              for (final network in networks)
+                _NetworkRow(
+                  network: network,
+                  mode: _modeFor(policy, network),
+                  onChanged: (mode) => _setNetworkMode(network, mode),
                 ),
-              ),
-
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'What gets through',
-              subtitle:
-                  'Applies everywhere. A single chat can disagree with this '
-                  'from its own screen.',
-            ),
-            SwitchListTile(
-              title: const Text('Only notify for mentions'),
-              subtitle: const Text(
-                'Matches your name, your Matrix id, the name each bridge gives '
-                'you, and @room.',
-              ),
-              value: policy.mentionsOnly,
-              onChanged: (v) => _update((p) => p.copyWith(mentionsOnly: v)),
-              contentPadding: EdgeInsets.zero,
-            ),
-            SwitchListTile(
-              title: const Text('Mentions break through a mute'),
-              subtitle: const Text(
-                'On: mute a busy group and still get paged in it. Off: a mute '
-                'is silence, which is what Matrix itself means by one.',
-              ),
-              value: policy.mentionsBypassMute,
-              onChanged: (v) =>
-                  _update((p) => p.copyWith(mentionsBypassMute: v)),
-              contentPadding: EdgeInsets.zero,
-            ),
-            SwitchListTile(
-              title: const Text('Show message text on the lock screen'),
-              subtitle: const Text(
-                'Off still notifies — it says "New message" instead of what was '
-                'said. The sender and the chat are still shown.',
-              ),
-              value: policy.showPreviews,
-              onChanged: (v) => _update((p) => p.copyWith(showPreviews: v)),
-              contentPadding: EdgeInsets.zero,
-            ),
-            const _SmartRepliesTile(),
-
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Quiet hours',
-              subtitle:
-                  'A time of day that recurs, stored with your UTC offset so a '
-                  'notification decided in the background agrees with one '
-                  'decided while the app is open.',
-            ),
-            SwitchListTile(
-              title: const Text('Quiet hours'),
-              value: quiet != null,
-              onChanged: (v) => _update(
-                (p) => p.copyWith(quietHours: v ? _defaultQuietHours() : null),
-              ),
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (quiet != null) ...[
-              // A time is a *value*, and "From 22:00" read as a label is a
-              // statement rather than something a reader knows they can change.
-              // The hint is what makes the row an editable setting instead of a
-              // fact about the screen.
-              _QuietHourTile(
-                icon: Icons.bedtime_outlined,
-                label: 'Quiet hours start',
-                value: _formatMinute(context, quiet.startMinute),
-                title: 'From',
-                onTap: () => _pickQuietHour(start: true),
-              ),
-              _QuietHourTile(
-                icon: Icons.wb_sunny_outlined,
-                label: 'Quiet hours end',
-                value: _formatMinute(context, quiet.endMinute),
-                title: 'Until',
-                onTap: () => _pickQuietHour(start: false),
-              ),
-              SwitchListTile(
-                title: const Text('Let mentions through'),
-                value: quiet.allowMentions,
-                onChanged: (v) => _update(
-                  (p) => p.copyWith(
-                    quietHours: (p.quietHours ?? quiet).copyWith(
-                      allowMentions: v,
-                    ),
+              if (networks.isEmpty)
+                Text(
+                  'No bridges are configured yet, so there is nothing to switch '
+                  'off. Networks appear here as they connect.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
                   ),
                 ),
-                contentPadding: EdgeInsets.zero,
+
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'What gets through',
+                subtitle:
+                    'Applies everywhere. A single chat can disagree with this '
+                    'from its own screen.',
               ),
-              SwitchListTile(
-                title: const Text('Deliver silently instead of hiding'),
+              SwitchListTile.adaptive(
+                title: const Text('Only notify for mentions'),
                 subtitle: const Text(
-                  'The notification is waiting in the shade in the morning, '
-                  'without having made a sound.',
+                  'Matches your name, your Matrix id, the name each bridge gives '
+                  'you, and @room.',
                 ),
-                value: quiet.deliverSilently,
+                value: policy.mentionsOnly,
+                onChanged: (v) => _update((p) => p.copyWith(mentionsOnly: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile.adaptive(
+                title: const Text('Mentions break through a mute'),
+                subtitle: const Text(
+                  'On: mute a busy group and still get paged in it. Off: a mute '
+                  'is silence, which is what Matrix itself means by one.',
+                ),
+                value: policy.mentionsBypassMute,
+                onChanged: (v) =>
+                    _update((p) => p.copyWith(mentionsBypassMute: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile.adaptive(
+                title: const Text('Show message text on the lock screen'),
+                subtitle: const Text(
+                  'Off still notifies — it says "New message" instead of what was '
+                  'said. The sender and the chat are still shown.',
+                ),
+                value: policy.showPreviews,
+                onChanged: (v) => _update((p) => p.copyWith(showPreviews: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const _SmartRepliesTile(),
+
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Quiet hours',
+                subtitle:
+                    'A time of day that recurs, stored with your UTC offset so a '
+                    'notification decided in the background agrees with one '
+                    'decided while the app is open.',
+              ),
+              SwitchListTile.adaptive(
+                title: const Text('Quiet hours'),
+                value: quiet != null,
                 onChanged: (v) => _update(
-                  (p) => p.copyWith(
-                    quietHours: (p.quietHours ?? quiet).copyWith(
-                      deliverSilently: v,
-                    ),
-                  ),
+                  (p) =>
+                      p.copyWith(quietHours: v ? _defaultQuietHours() : null),
                 ),
                 contentPadding: EdgeInsets.zero,
               ),
+              if (quiet != null) ...[
+                // A time is a *value*, and "From 22:00" read as a label is a
+                // statement rather than something a reader knows they can change.
+                // The hint is what makes the row an editable setting instead of a
+                // fact about the screen.
+                _QuietHourTile(
+                  icon: Icons.bedtime_outlined,
+                  label: 'Quiet hours start',
+                  value: _formatMinute(context, quiet.startMinute),
+                  title: 'From',
+                  onTap: () => _pickQuietHour(start: true),
+                ),
+                _QuietHourTile(
+                  icon: Icons.wb_sunny_outlined,
+                  label: 'Quiet hours end',
+                  value: _formatMinute(context, quiet.endMinute),
+                  title: 'Until',
+                  onTap: () => _pickQuietHour(start: false),
+                ),
+                SwitchListTile.adaptive(
+                  title: const Text('Let mentions through'),
+                  value: quiet.allowMentions,
+                  onChanged: (v) => _update(
+                    (p) => p.copyWith(
+                      quietHours: (p.quietHours ?? quiet).copyWith(
+                        allowMentions: v,
+                      ),
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                SwitchListTile.adaptive(
+                  title: const Text('Deliver silently instead of hiding'),
+                  subtitle: const Text(
+                    'The notification is waiting in the shade in the morning, '
+                    'without having made a sound.',
+                  ),
+                  value: quiet.deliverSilently,
+                  onChanged: (v) => _update(
+                    (p) => p.copyWith(
+                      quietHours: (p.quietHours ?? quiet).copyWith(
+                        deliverSilently: v,
+                      ),
+                    ),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Muted chats',
+                subtitle:
+                    'Everything currently silenced, whichever way it was muted. '
+                    'A timed mute is Braid\'s own — Matrix push rules cannot '
+                    'express an expiry.',
+              ),
+              _MutedChats(policy: policy, chats: chats),
             ],
 
             const Divider(height: WeftSpace.xl),
             const SettingsSectionHeader(
-              title: 'Muted chats',
+              title: 'Push',
               subtitle:
-                  'Everything currently silenced, whichever way it was muted. '
-                  'A timed mute is Braid\'s own — Matrix push rules cannot '
-                  'express an expiry.',
+                  'How this device is woken when Braid is not running. Braid hosts '
+                  'no gateway; point this at a sygnal instance you run, exactly '
+                  'as you do your homeserver. Left empty, notifications still '
+                  'arrive while the app is open.',
             ),
-            _MutedChats(policy: policy, chats: chats),
-          ],
-
-          const Divider(height: WeftSpace.xl),
-          const SettingsSectionHeader(
-            title: 'Push',
-            subtitle:
-                'How this device is woken when Braid is not running. Braid hosts '
-                'no gateway; point this at a sygnal instance you run, exactly '
-                'as you do your homeserver. Left empty, notifications still '
-                'arrive while the app is open.',
-          ),
-          const _PushStatus(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: WeftSpace.md),
-            child: TextField(
-              controller: _gateway,
-              autocorrect: false,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'Push gateway',
-                hintText: 'https://sygnal.example.org/_matrix/push/v1/notify',
+            const _PushStatus(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: WeftSpace.md),
+              child: TextField(
+                controller: _gateway,
+                autocorrect: false,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Push gateway',
+                  hintText: 'https://sygnal.example.org/_matrix/push/v1/notify',
+                ),
+                onSubmitted: (_) => _saveGateway(),
               ),
-              onSubmitted: (_) => _saveGateway(),
             ),
-          ),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: FilledButton.tonal(
-              onPressed: _saveGateway,
-              child: const Text('Save gateway'),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: FilledButton.tonal(
+                onPressed: _saveGateway,
+                child: const Text('Save gateway'),
+              ),
             ),
-          ),
 
-          const Divider(height: WeftSpace.xl),
-          const SettingsSectionHeader(
-            title: 'Check it works',
-            subtitle:
-                'Runs a message Braid made up through the same rules, the same '
-                'rendering and the same channel a real one takes. If nothing '
-                'appears, the reason is below.',
-          ),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FilledButton.icon(
-              onPressed: _testing ? null : () => unawaited(_sendTest()),
-              icon: const Icon(Icons.notifications_active_outlined, size: 18),
-              label: const Text('Send test notification'),
+            const Divider(height: WeftSpace.xl),
+            const SettingsSectionHeader(
+              title: 'Check it works',
+              subtitle:
+                  'Runs a message Braid made up through the same rules, the same '
+                  'rendering and the same channel a real one takes. If nothing '
+                  'appears, the reason is below.',
             ),
-          ),
-          if (_test case final result?) ...[
-            const SizedBox(height: WeftSpace.md),
-            _TestResult(decision: result.decision, network: result.network),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton.icon(
+                onPressed: _testing ? null : () => unawaited(_sendTest()),
+                icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                label: const Text('Send test notification'),
+              ),
+            ),
+            if (_test case final result?) ...[
+              const SizedBox(height: WeftSpace.md),
+              _TestResult(decision: result.decision, network: result.network),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -816,7 +819,7 @@ class _SmartRepliesTile extends ConsumerWidget {
         settings?.getBool(WeftSettings.notifySmartReplies, fallback: true) ??
         false;
 
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       title: const Text('AI reply suggestions'),
       subtitle: Text(
         configured
@@ -1003,7 +1006,7 @@ class _BuiltInConnectionSectionState
       margin: const EdgeInsets.only(bottom: WeftSpace.lg),
       child: Column(
         children: [
-          SwitchListTile(
+          SwitchListTile.adaptive(
             secondary: Icon(
               _enabled ? Icons.sync_rounded : Icons.sync_disabled_rounded,
               color: _enabled

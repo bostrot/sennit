@@ -103,75 +103,92 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Merged chats')),
       // Suggestions need a matching signal, and people rename themselves per
       // app — "Mum" on WhatsApp is "Petra" on Signal, and no scorer bridges
       // that. Manual merge is the user asserting what only they know.
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _manualMerge(repository),
-        icon: const Icon(Icons.call_merge_rounded),
-        label: const Text('Merge two chats'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          Text(
-            'When the same person reaches you on several networks, their '
-            'conversations can be woven into one thread. Braid suggests '
-            'matches; only you confirm them.',
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
+      appBar: WeftAppBar(
+        title: const Text('Merged chats'),
+        actions: [
+          // In the toolbar on a desktop, floating on a phone — see the note in
+          // `bridges_screen.dart`.
+          if (context.isDesktop)
+            TextButton.icon(
+              onPressed: () => _manualMerge(repository),
+              icon: const Icon(Icons.call_merge_rounded, size: 16),
+              label: const Text('Merge two chats'),
             ),
-          ),
-          const SizedBox(height: WeftSpace.xl),
-          _SectionTitle('Suggestions'),
-          const SizedBox(height: WeftSpace.sm),
-          if (suggestions.isEmpty)
-            Text(
-              'None right now. Suggestions appear as contacts with matching '
-              'phone numbers, names or avatars show up across networks.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
-            )
-          else
-            for (final candidate in suggestions)
-              _SuggestionCard(
-                candidate: candidate,
-                onMerge: () => _decide(
-                  () => repository.mergeHandles(candidate.a.id, candidate.b.id),
-                  'Merged ${handleLabel(candidate.a)} with '
-                  '${handleLabel(candidate.b)}. They are now one conversation.',
-                ),
-                onReject: () => _decide(
-                  () => repository.rejectSuggestion(
-                    candidate.a.id,
-                    candidate.b.id,
-                  ),
-                  '${handleLabel(candidate.a)} and ${handleLabel(candidate.b)} '
-                  'kept separate. This suggestion will not come back.',
-                ),
-              ),
-          const SizedBox(height: WeftSpace.xl),
-          _SectionTitle('Merged'),
-          const SizedBox(height: WeftSpace.sm),
-          if (merged.isEmpty)
-            Text(
-              'Nothing is merged yet.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
-            )
-          else
-            for (final contact in merged)
-              _MergedCard(
-                contact: contact,
-                onUnmerge: (handle) => _decide(
-                  () => repository.unmergeHandle(handle.id),
-                  '${handleLabel(handle)} is a separate conversation again.',
-                ),
-              ),
         ],
+      ),
+      floatingActionButton: context.isDesktop
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _manualMerge(repository),
+              icon: const Icon(Icons.call_merge_rounded),
+              label: const Text('Merge two chats'),
+            ),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            Text(
+              'When the same person reaches you on several networks, their '
+              'conversations can be woven into one thread. Braid suggests '
+              'matches; only you confirm them.',
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: WeftSpace.xl),
+            _SectionTitle('Suggestions'),
+            const SizedBox(height: WeftSpace.sm),
+            if (suggestions.isEmpty)
+              Text(
+                'None right now. Suggestions appear as contacts with matching '
+                'phone numbers, names or avatars show up across networks.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final candidate in suggestions)
+                _SuggestionCard(
+                  candidate: candidate,
+                  onMerge: () => _decide(
+                    () =>
+                        repository.mergeHandles(candidate.a.id, candidate.b.id),
+                    'Merged ${handleLabel(candidate.a)} with '
+                    '${handleLabel(candidate.b)}. They are now one conversation.',
+                  ),
+                  onReject: () => _decide(
+                    () => repository.rejectSuggestion(
+                      candidate.a.id,
+                      candidate.b.id,
+                    ),
+                    '${handleLabel(candidate.a)} and ${handleLabel(candidate.b)} '
+                    'kept separate. This suggestion will not come back.',
+                  ),
+                ),
+            const SizedBox(height: WeftSpace.xl),
+            _SectionTitle('Merged'),
+            const SizedBox(height: WeftSpace.sm),
+            if (merged.isEmpty)
+              Text(
+                'Nothing is merged yet.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final contact in merged)
+                _MergedCard(
+                  contact: contact,
+                  onUnmerge: (handle) => _decide(
+                    () => repository.unmergeHandle(handle.id),
+                    '${handleLabel(handle)} is a separate conversation again.',
+                  ),
+                ),
+          ],
+        ),
       ),
     );
   }

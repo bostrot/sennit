@@ -197,120 +197,122 @@ class _McpScreenState extends ConsumerState<McpScreen> {
     final keys = service.loadKeys().where((k) => !k.revoked).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('MCP server')),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          Text(
-            'Lets AI agents read and act on your messages over the Model '
-            'Context Protocol. Every call needs one of the API keys below, is '
-            'scope-checked, rate-limited and logged.',
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          SwitchListTile(
-            title: const Text('Run the MCP server'),
-            subtitle: Text(
-              running
-                  ? 'Listening on 127.0.0.1:${service.boundPort} (loopback only)'
-                  : 'Stopped',
-            ),
-            value: running,
-            onChanged: _busy ? null : _toggleServer,
-            contentPadding: EdgeInsets.zero,
-          ),
-          if (running) _TunnelTile(service: service),
-          const Divider(height: WeftSpace.xl),
-
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'API keys',
-                  style: context.text.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: _createKey,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('New key'),
-              ),
-            ],
-          ),
-          const SizedBox(height: WeftSpace.sm),
-          if (keys.isEmpty)
+      appBar: WeftAppBar(title: const Text('MCP server')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
             Text(
-              'No keys yet. The server refuses every request until one exists.',
+              'Lets AI agents read and act on your messages over the Model '
+              'Context Protocol. Every call needs one of the API keys below, is '
+              'scope-checked, rate-limited and logged.',
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
-            )
-          else
-            for (final key in keys)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.key_rounded),
-                title: Text(key.label),
-                subtitle: Text(
-                  '${key.id} · ${key.scopes.map((s) => s.name).join(", ")}',
+            ),
+            const SizedBox(height: WeftSpace.lg),
+            SwitchListTile.adaptive(
+              title: const Text('Run the MCP server'),
+              subtitle: Text(
+                running
+                    ? 'Listening on 127.0.0.1:${service.boundPort} (loopback only)'
+                    : 'Stopped',
+              ),
+              value: running,
+              onChanged: _busy ? null : _toggleServer,
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (running) _TunnelTile(service: service),
+            const Divider(height: WeftSpace.xl),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'API keys',
+                    style: context.text.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                trailing: NamedButton(
-                  label: 'Revoke the key named ${key.label}',
-                  onPressed: () {
-                    service.revokeKey(key.id);
-                    setState(() {});
-                  },
-                  child: TextButton(
+                FilledButton.tonalIcon(
+                  onPressed: _createKey,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('New key'),
+                ),
+              ],
+            ),
+            const SizedBox(height: WeftSpace.sm),
+            if (keys.isEmpty)
+              Text(
+                'No keys yet. The server refuses every request until one exists.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final key in keys)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.key_rounded),
+                  title: Text(key.label),
+                  subtitle: Text(
+                    '${key.id} · ${key.scopes.map((s) => s.name).join(", ")}',
+                  ),
+                  trailing: NamedButton(
+                    label: 'Revoke the key named ${key.label}',
                     onPressed: () {
                       service.revokeKey(key.id);
                       setState(() {});
                     },
-                    child: const Text('Revoke'),
+                    child: TextButton(
+                      onPressed: () {
+                        service.revokeKey(key.id);
+                        setState(() {});
+                      },
+                      child: const Text('Revoke'),
+                    ),
                   ),
                 ),
-              ),
-          const Divider(height: WeftSpace.xl),
+            const Divider(height: WeftSpace.xl),
 
-          Text(
-            'Recent activity',
-            style: context.text.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: WeftSpace.sm),
-          if (service.auditLog.entries.isEmpty)
             Text(
-              'Nothing yet.',
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
+              'Recent activity',
+              style: context.text.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-            )
-          else
-            for (final entry in service.auditLog.entries.reversed.take(30))
-              Padding(
-                padding: const EdgeInsets.only(bottom: WeftSpace.xs),
-                child: Text(
-                  '$entry',
-                  // Allowed and denied differ by colour and by nothing else, on
-                  // the log whose whole job is to show an agent being refused.
-                  // The word goes first because that is the one a reader
-                  // skimming thirty rows is listening for.
-                  semanticsLabel:
-                      '${entry.allowed ? 'Allowed' : 'Denied'}: $entry',
-                  style: context.text.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    color: entry.allowed
-                        ? context.colors.onSurfaceVariant
-                        : context.colors.error,
+            ),
+            const SizedBox(height: WeftSpace.sm),
+            if (service.auditLog.entries.isEmpty)
+              Text(
+                'Nothing yet.',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              )
+            else
+              for (final entry in service.auditLog.entries.reversed.take(30))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+                  child: Text(
+                    '$entry',
+                    // Allowed and denied differ by colour and by nothing else, on
+                    // the log whose whole job is to show an agent being refused.
+                    // The word goes first because that is the one a reader
+                    // skimming thirty rows is listening for.
+                    semanticsLabel:
+                        '${entry.allowed ? 'Allowed' : 'Denied'}: $entry',
+                    style: context.text.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: entry.allowed
+                          ? context.colors.onSurfaceVariant
+                          : context.colors.error,
+                    ),
                   ),
                 ),
-              ),
-        ],
+          ],
+        ),
       ),
     );
   }

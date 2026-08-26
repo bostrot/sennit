@@ -91,45 +91,47 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     ref.watch(settingsRevisionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Local models')),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          Text(
-            'Run search embeddings and voice transcription on this device '
-            'instead of an endpoint — nothing leaves the phone. Downloads are '
-            'large; they continue in the background with a notification, '
-            'resume if interrupted, and it is safe to leave the app.',
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
+      appBar: WeftAppBar(title: const Text('Local models')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            Text(
+              'Run search embeddings and voice transcription on this device '
+              'instead of an endpoint — nothing leaves the phone. Downloads are '
+              'large; they continue in the background with a notification, '
+              'resume if interrupted, and it is safe to leave the app.',
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
-          for (final spec in ModelCatalog.all)
-            _ModelCard(
-              spec: spec,
-              state: installer.stateOf(spec),
-              selectedForVoice: _selectedVoiceModel == spec.id,
-              selectedForSearch: _selectedSearchModel == spec.id,
-              onInstall: () => installer.install(spec),
-              onCancel: () => installer.cancel(spec),
-              onDelete: () async {
-                if (_selectedVoiceModel == spec.id) _useForVoice(null);
-                if (_selectedSearchModel == spec.id) _useForSearch(null);
-                await installer.delete(spec);
-              },
-              onUseForVoice: spec.capability == ModelCapability.speechToText
-                  ? () => _useForVoice(
-                      _selectedVoiceModel == spec.id ? null : spec.id,
-                    )
-                  : null,
-              onUseForSearch: spec.capability == ModelCapability.embedding
-                  ? () => _useForSearch(
-                      _selectedSearchModel == spec.id ? null : spec.id,
-                    )
-                  : null,
-            ),
-        ],
+            const SizedBox(height: WeftSpace.lg),
+            for (final spec in ModelCatalog.all)
+              _ModelCard(
+                spec: spec,
+                state: installer.stateOf(spec),
+                selectedForVoice: _selectedVoiceModel == spec.id,
+                selectedForSearch: _selectedSearchModel == spec.id,
+                onInstall: () => installer.install(spec),
+                onCancel: () => installer.cancel(spec),
+                onDelete: () async {
+                  if (_selectedVoiceModel == spec.id) _useForVoice(null);
+                  if (_selectedSearchModel == spec.id) _useForSearch(null);
+                  await installer.delete(spec);
+                },
+                onUseForVoice: spec.capability == ModelCapability.speechToText
+                    ? () => _useForVoice(
+                        _selectedVoiceModel == spec.id ? null : spec.id,
+                      )
+                    : null,
+                onUseForSearch: spec.capability == ModelCapability.embedding
+                    ? () => _useForSearch(
+                        _selectedSearchModel == spec.id ? null : spec.id,
+                      )
+                    : null,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -282,7 +284,7 @@ class _ModelCard extends StatelessWidget {
                     ],
                   ),
                   if (onUseForVoice != null)
-                    SwitchListTile(
+                    SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('Use for voice messages'),
@@ -293,7 +295,7 @@ class _ModelCard extends StatelessWidget {
                       onChanged: (_) => onUseForVoice!(),
                     ),
                   if (onUseForSearch != null)
-                    SwitchListTile(
+                    SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('Use for search'),

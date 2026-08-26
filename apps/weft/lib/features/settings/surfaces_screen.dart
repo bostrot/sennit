@@ -37,141 +37,143 @@ class SurfacesScreen extends ConsumerWidget {
     final networks = ref.watch(chatRepositoryProvider).availableNetworks;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Widgets & watch')),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          const PrivacyNotice(
-            message:
-                'A widget and a watch cannot decrypt your messages, so Braid has '
-                'to write what they show into a file outside the encrypted '
-                'store. That file sits on this device where the system, and any '
-                'backup of this device, can read it — and a home screen is '
-                'read by whoever is standing next to you. Nothing is written '
-                'until you switch a surface on below, and you choose how much '
-                'of a conversation goes into it.',
-          ),
-          const SizedBox(height: WeftSpace.lg),
+      appBar: WeftAppBar(title: const Text('Widgets & watch')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            const PrivacyNotice(
+              message:
+                  'A widget and a watch cannot decrypt your messages, so Braid has '
+                  'to write what they show into a file outside the encrypted '
+                  'store. That file sits on this device where the system, and any '
+                  'backup of this device, can read it — and a home screen is '
+                  'read by whoever is standing next to you. Nothing is written '
+                  'until you switch a surface on below, and you choose how much '
+                  'of a conversation goes into it.',
+            ),
+            const SizedBox(height: WeftSpace.lg),
 
-          SwitchListTile(
-            title: const PrivacyGatedTitle(
-              title: 'Home screen widgets',
-              warning:
-                  'Turning this on writes your recent conversations to a file '
-                  'outside the encrypted store, which backups can read.',
-            ),
-            subtitle: const Text(
-              'Adds an unread-count tile and a recent-conversations list you '
-              'can place on your home screen.',
-            ),
-            value: settings.widgets,
-            onChanged: (v) => _write(ref, settings.copyWith(widgets: v)),
-            contentPadding: EdgeInsets.zero,
-          ),
-          SwitchListTile(
-            title: const PrivacyGatedTitle(
-              title: 'Watch',
-              warning:
-                  'Turning this on writes your recent conversations to a file '
-                  'outside the encrypted store, which backups can read.',
-            ),
-            subtitle: const Text(
-              'Sends the same list to a paired watch. Replies you dictate are '
-              'handed back to this phone to send — the watch never holds your '
-              'account.',
-            ),
-            value: settings.watch,
-            onChanged: (v) => _write(ref, settings.copyWith(watch: v)),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          if (settings.anySurface) ...[
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'What a row shows',
-              subtitle:
-                  'Both are off to begin with. With both off, a surface is told '
-                  'how many unread messages you have and nothing else — no '
-                  'names, no words, no faces.',
-            ),
-            SwitchListTile(
+            SwitchListTile.adaptive(
               title: const PrivacyGatedTitle(
-                title: 'Message previews',
+                title: 'Home screen widgets',
                 warning:
-                    'Turning this on puts the text of your most recent messages '
-                    'on your home screen.',
+                    'Turning this on writes your recent conversations to a file '
+                    'outside the encrypted store, which backups can read.',
               ),
               subtitle: const Text(
-                'The first line of the newest message in each conversation.',
+                'Adds an unread-count tile and a recent-conversations list you '
+                'can place on your home screen.',
               ),
-              value: settings.includePreviews,
-              onChanged: (v) =>
-                  _write(ref, settings.copyWith(includePreviews: v)),
+              value: settings.widgets,
+              onChanged: (v) => _write(ref, settings.copyWith(widgets: v)),
               contentPadding: EdgeInsets.zero,
             ),
-            SwitchListTile(
+            SwitchListTile.adaptive(
               title: const PrivacyGatedTitle(
-                title: 'Names and faces',
+                title: 'Watch',
                 warning:
-                    'Turning this on puts the names and profile pictures of the '
-                    'people you talk to on your home screen.',
+                    'Turning this on writes your recent conversations to a file '
+                    'outside the encrypted store, which backups can read.',
               ),
               subtitle: const Text(
-                'Who each conversation is with, who sent the last message, and '
-                'their picture. Off, every row is labelled '
-                '“$kRedactedRowTitle”.',
+                'Sends the same list to a paired watch. Replies you dictate are '
+                'handed back to this phone to send — the watch never holds your '
+                'account.',
               ),
-              value: settings.includeSenderNames,
-              onChanged: (v) =>
-                  _write(ref, settings.copyWith(includeSenderNames: v)),
+              value: settings.watch,
+              onChanged: (v) => _write(ref, settings.copyWith(watch: v)),
               contentPadding: EdgeInsets.zero,
             ),
 
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Networks',
-              subtitle:
-                  'An excluded network never reaches a widget or a watch, '
-                  'whatever the switches above say. A conversation that carries '
-                  'an excluded network is left out whole — there is no half of '
-                  'a merged row to show.',
-            ),
-            for (final network in networks)
-              NetworkToggleRow(
-                network: network,
-                allowed: !settings.excludedNetworks.contains(network.id),
-                onChanged: (allowed) => _write(
-                  ref,
-                  settings.copyWith(
-                    excludedNetworks: {
-                      ...settings.excludedNetworks.where(
-                        (id) => id != network.id,
-                      ),
-                      if (!allowed) network.id,
-                    },
+            if (settings.anySurface) ...[
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'What a row shows',
+                subtitle:
+                    'Both are off to begin with. With both off, a surface is told '
+                    'how many unread messages you have and nothing else — no '
+                    'names, no words, no faces.',
+              ),
+              SwitchListTile.adaptive(
+                title: const PrivacyGatedTitle(
+                  title: 'Message previews',
+                  warning:
+                      'Turning this on puts the text of your most recent messages '
+                      'on your home screen.',
+                ),
+                subtitle: const Text(
+                  'The first line of the newest message in each conversation.',
+                ),
+                value: settings.includePreviews,
+                onChanged: (v) =>
+                    _write(ref, settings.copyWith(includePreviews: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile.adaptive(
+                title: const PrivacyGatedTitle(
+                  title: 'Names and faces',
+                  warning:
+                      'Turning this on puts the names and profile pictures of the '
+                      'people you talk to on your home screen.',
+                ),
+                subtitle: const Text(
+                  'Who each conversation is with, who sent the last message, and '
+                  'their picture. Off, every row is labelled '
+                  '“$kRedactedRowTitle”.',
+                ),
+                value: settings.includeSenderNames,
+                onChanged: (v) =>
+                    _write(ref, settings.copyWith(includeSenderNames: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Networks',
+                subtitle:
+                    'An excluded network never reaches a widget or a watch, '
+                    'whatever the switches above say. A conversation that carries '
+                    'an excluded network is left out whole — there is no half of '
+                    'a merged row to show.',
+              ),
+              for (final network in networks)
+                NetworkToggleRow(
+                  network: network,
+                  allowed: !settings.excludedNetworks.contains(network.id),
+                  onChanged: (allowed) => _write(
+                    ref,
+                    settings.copyWith(
+                      excludedNetworks: {
+                        ...settings.excludedNetworks.where(
+                          (id) => id != network.id,
+                        ),
+                        if (!allowed) network.id,
+                      },
+                    ),
                   ),
                 ),
-              ),
-            if (networks.isEmpty)
-              Text(
-                'No bridges are configured yet, so there is nothing to '
-                'exclude. Networks appear here as they connect.',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
+              if (networks.isEmpty)
+                Text(
+                  'No bridges are configured yet, so there is nothing to '
+                  'exclude. Networks appear here as they connect.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
                 ),
-              ),
 
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'What leaves the encrypted store',
-              subtitle:
-                  'Your own top conversation, drawn the way a widget row draws '
-                  'it, with the switches above applied. This is the whole of '
-                  'what a surface is given.',
-            ),
-            _SnapshotRowPreview(settings: settings),
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'What leaves the encrypted store',
+                subtitle:
+                    'Your own top conversation, drawn the way a widget row draws '
+                    'it, with the switches above applied. This is the whole of '
+                    'what a surface is given.',
+              ),
+              _SnapshotRowPreview(settings: settings),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

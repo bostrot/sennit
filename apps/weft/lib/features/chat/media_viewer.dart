@@ -237,7 +237,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
+      appBar: WeftAppBar(
         backgroundColor: Colors.black.withValues(alpha: 0.35),
         elevation: 0,
         foregroundColor: Colors.white,

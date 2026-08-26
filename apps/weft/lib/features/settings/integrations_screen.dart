@@ -125,7 +125,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: const Text('Integrations'),
         actions: [
           TextButton(
@@ -135,55 +135,61 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
           const SizedBox(width: WeftSpace.sm),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          SettingsSectionHeader(
-            title: 'Home Assistant',
-            subtitle:
-                'Every message action "Send to Home Assistant" fires a '
-                'weft_message event on your instance — automate anything '
-                'against it. For the other direction, point a rest_command at '
-                'Braid\'s MCP server and call its send_message tool.',
-          ),
-          _field(_haUrl, 'Base URL', hint: 'http://homeassistant.local:8123'),
-          _field(
-            _haToken,
-            'Long-lived access token (stored in the keychain)',
-            secret: true,
-            hint: 'leave blank to keep the current token',
-          ),
-          if (_haStatus != null) _status(_haStatus!),
-          const SizedBox(height: WeftSpace.xl),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            SettingsSectionHeader(
+              title: 'Home Assistant',
+              subtitle:
+                  'Every message action "Send to Home Assistant" fires a '
+                  'weft_message event on your instance — automate anything '
+                  'against it. For the other direction, point a rest_command at '
+                  'Braid\'s MCP server and call its send_message tool.',
+            ),
+            _field(_haUrl, 'Base URL', hint: 'http://homeassistant.local:8123'),
+            _field(
+              _haToken,
+              'Long-lived access token (stored in the keychain)',
+              secret: true,
+              hint: 'leave blank to keep the current token',
+            ),
+            if (_haStatus != null) _status(_haStatus!),
+            const SizedBox(height: WeftSpace.xl),
 
-          SettingsSectionHeader(
-            title: 'paperless-ngx',
-            subtitle:
-                'With this set, "Attach → Paperless document" lets you pick a '
-                'document from your archive and share it into any chat.',
-          ),
-          _field(_paperlessUrl, 'Base URL', hint: 'https://paperless.example'),
-          _field(
-            _paperlessToken,
-            'API token (stored in the keychain)',
-            secret: true,
-            hint: 'leave blank to keep the current token',
-          ),
-          if (_paperlessStatus != null) _status(_paperlessStatus!),
-          const SizedBox(height: WeftSpace.xl),
+            SettingsSectionHeader(
+              title: 'paperless-ngx',
+              subtitle:
+                  'With this set, "Attach → Paperless document" lets you pick a '
+                  'document from your archive and share it into any chat.',
+            ),
+            _field(
+              _paperlessUrl,
+              'Base URL',
+              hint: 'https://paperless.example',
+            ),
+            _field(
+              _paperlessToken,
+              'API token (stored in the keychain)',
+              secret: true,
+              hint: 'leave blank to keep the current token',
+            ),
+            if (_paperlessStatus != null) _status(_paperlessStatus!),
+            const SizedBox(height: WeftSpace.xl),
 
-          FilledButton.tonalIcon(
-            onPressed: _busy ? null : _test,
-            icon: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.network_check_rounded, size: 18),
-            label: const Text('Save & test connections'),
-          ),
-        ],
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : _test,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.network_check_rounded, size: 18),
+              label: const Text('Save & test connections'),
+            ),
+          ],
+        ),
       ),
     );
   }

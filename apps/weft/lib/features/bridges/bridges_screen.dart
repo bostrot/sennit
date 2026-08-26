@@ -320,9 +320,18 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: const Text('Bridges'),
         actions: [
+          // A desktop has a toolbar, so the page's primary action belongs in
+          // it. A floating button hovering over the bottom-right corner of a
+          // window is the single most recognisable phone idiom there is.
+          if (context.isDesktop)
+            TextButton.icon(
+              onPressed: _addBridge,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add bridge'),
+            ),
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded),
@@ -330,22 +339,27 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addBridge,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add bridge'),
-      ),
+      floatingActionButton: context.isDesktop
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _addBridge,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add bridge'),
+            ),
       body: _bridges.isEmpty && _detected.isEmpty
           ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(WeftSpace.xl),
-                child: Text(
-                  'No bridges yet.\n\nWeft connects to bridges you run on your '
-                  'own server — mautrix-whatsapp, -signal, -telegram and '
-                  'friends. Add one by its provisioning URL.',
-                  textAlign: TextAlign.center,
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.colors.onSurfaceVariant,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.all(WeftSpace.xl),
+                  child: Text(
+                    'No bridges yet.\n\nBraid connects to bridges you run on '
+                    'your own server — mautrix-whatsapp, -signal, -telegram '
+                    'and friends. Add one by its provisioning URL.',
+                    textAlign: TextAlign.center,
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),

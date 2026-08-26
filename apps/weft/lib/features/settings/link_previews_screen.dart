@@ -24,91 +24,93 @@ class LinkPreviewsScreen extends ConsumerWidget {
     final networks = ref.watch(chatRepositoryProvider).availableNetworks;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Link previews')),
-      body: ListView(
-        padding: const EdgeInsets.all(WeftSpace.lg),
-        children: [
-          const PrivacyNotice(
-            message:
-                'A preview is fetched by your homeserver, not by this device, '
-                'so the site is never told your IP address or when you read '
-                'the message. The cost is on the other side: your homeserver '
-                'learns every link you are sent and when, including links '
-                'inside end-to-end encrypted chats it can otherwise never '
-                'read. Leave this off unless you run the homeserver yourself '
-                'or trust whoever does.',
-          ),
-          const SizedBox(height: WeftSpace.lg),
+      appBar: WeftAppBar(title: const Text('Link previews')),
+      body: WeftReadingPane(
+        child: ListView(
+          padding: const EdgeInsets.all(WeftSpace.lg),
+          children: [
+            const PrivacyNotice(
+              message:
+                  'A preview is fetched by your homeserver, not by this device, '
+                  'so the site is never told your IP address or when you read '
+                  'the message. The cost is on the other side: your homeserver '
+                  'learns every link you are sent and when, including links '
+                  'inside end-to-end encrypted chats it can otherwise never '
+                  'read. Leave this off unless you run the homeserver yourself '
+                  'or trust whoever does.',
+            ),
+            const SizedBox(height: WeftSpace.lg),
 
-          SwitchListTile(
-            title: const PrivacyGatedTitle(
-              title: 'Show link previews',
-              warning:
-                  'Turning this on tells your homeserver every link you are '
-                  'sent, including links inside encrypted chats.',
+            SwitchListTile.adaptive(
+              title: const PrivacyGatedTitle(
+                title: 'Show link previews',
+                warning:
+                    'Turning this on tells your homeserver every link you are '
+                    'sent, including links inside encrypted chats.',
+              ),
+              subtitle: const Text(
+                'Off means no link in any message is ever looked up. Nothing is '
+                'requested until you switch this on.',
+              ),
+              value: settings.enabled,
+              onChanged: (v) =>
+                  _write(ref, settings.copyWith(enabled: v), clearCache: !v),
+              contentPadding: EdgeInsets.zero,
             ),
-            subtitle: const Text(
-              'Off means no link in any message is ever looked up. Nothing is '
-              'requested until you switch this on.',
-            ),
-            value: settings.enabled,
-            onChanged: (v) =>
-                _write(ref, settings.copyWith(enabled: v), clearCache: !v),
-            contentPadding: EdgeInsets.zero,
-          ),
 
-          if (settings.enabled) ...[
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Networks',
-              subtitle:
-                  'Excluded networks are never previewed, whatever the switch '
-                  'above says. Use this for the conversations that must leave '
-                  'nothing on the homeserver beyond their ciphertext.',
-            ),
-            for (final network in networks)
-              NetworkToggleRow(
-                network: network,
-                allowed: !settings.excludedNetworks.contains(network.id),
-                onChanged: (allowed) => _write(
-                  ref,
-                  settings.copyWith(
-                    excludedNetworks: {
-                      ...settings.excludedNetworks.where(
-                        (id) => id != network.id,
-                      ),
-                      if (!allowed) network.id,
-                    },
+            if (settings.enabled) ...[
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Networks',
+                subtitle:
+                    'Excluded networks are never previewed, whatever the switch '
+                    'above says. Use this for the conversations that must leave '
+                    'nothing on the homeserver beyond their ciphertext.',
+              ),
+              for (final network in networks)
+                NetworkToggleRow(
+                  network: network,
+                  allowed: !settings.excludedNetworks.contains(network.id),
+                  onChanged: (allowed) => _write(
+                    ref,
+                    settings.copyWith(
+                      excludedNetworks: {
+                        ...settings.excludedNetworks.where(
+                          (id) => id != network.id,
+                        ),
+                        if (!allowed) network.id,
+                      },
+                    ),
                   ),
                 ),
+              if (networks.isEmpty)
+                Text(
+                  'No bridges are configured yet, so there is nothing to '
+                  'exclude. Networks appear here as they connect.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+
+              const Divider(height: WeftSpace.xl),
+              const SettingsSectionHeader(
+                title: 'Cached previews',
+                subtitle:
+                    'Answers already given are kept so the same link is not '
+                    'asked about twice. Clearing them costs a fresh request the '
+                    'next time one of those links is on screen.',
               ),
-            if (networks.isEmpty)
-              Text(
-                'No bridges are configured yet, so there is nothing to '
-                'exclude. Networks appear here as they connect.',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Clear cached previews'),
+                  onPressed: () => _clearCache(context, ref),
                 ),
               ),
-
-            const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Cached previews',
-              subtitle:
-                  'Answers already given are kept so the same link is not '
-                  'asked about twice. Clearing them costs a fresh request the '
-                  'next time one of those links is on screen.',
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('Clear cached previews'),
-                onPressed: () => _clearCache(context, ref),
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

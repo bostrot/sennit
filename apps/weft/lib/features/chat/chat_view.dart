@@ -3271,8 +3271,8 @@ class _Composer extends StatelessWidget {
       padding: mac
           ? const EdgeInsetsDirectional.fromSTEB(
               WeftSpace.sm,
-              WeftSpace.xs,
               WeftSpace.sm,
+              WeftSpace.md,
               WeftSpace.sm,
             )
           : const EdgeInsetsDirectional.fromSTEB(
@@ -3312,7 +3312,13 @@ class _Composer extends StatelessWidget {
                     SmsComposerBar(body: value.text),
               ),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              // Centred on a desktop, where the field is one line tall and
+              // every control beside it is 24 points: aligning to the bottom
+              // there leaves each of them sitting on a different line. A phone's
+              // field grows to five lines, and the buttons belong at its foot.
+              crossAxisAlignment: mac
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.end,
               children: [
                 if (chat.isMerged && sendNetwork != null) ...[
                   SendNetworkChip(
@@ -3324,9 +3330,15 @@ class _Composer extends StatelessWidget {
                 ],
                 IconButton(
                   icon: const Icon(Icons.add_rounded),
-                  iconSize: mac ? 16 : null,
+                  iconSize: mac ? 17 : null,
                   visualDensity: mac ? VisualDensity.compact : null,
-                  constraints: mac ? _macButton : null,
+                  // Wider than the round send button on purpose. Squeezed to
+                  // 24 with no padding it stopped reading as a control at all
+                  // — a stray plus sign between the network chip and the
+                  // field, with nothing to hover.
+                  constraints: mac
+                      ? const BoxConstraints.tightFor(width: 28, height: 28)
+                      : null,
                   padding: mac ? EdgeInsets.zero : null,
                   tooltip: 'Attach',
                   // An edit replaces one event's text. There is no such thing

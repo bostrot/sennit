@@ -247,7 +247,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: WeftAppBar(
         title: const Text('Devices'),
         actions: [
           IconButton(
