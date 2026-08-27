@@ -55,6 +55,27 @@ ChatNetwork networkFromBridgeBotId(String userId) {
   return ChatNetwork.fromBridgeProtocol(localpart);
 }
 
+/// The bridge bot in [room], and the network it bridges, if one is a member.
+///
+/// A bridge bot's localpart names its network and ends in `bot`. Both halves
+/// are required: `@signalbot:hs` is a bridge, while a person who happens to be
+/// called `@signal:hs` is not, and one relay bot must not be able to rename
+/// somebody's account.
+({ChatNetwork network, String userId})? bridgeBotIn(sdk.Room room) {
+  for (final participant in room.getParticipants()) {
+    var localpart = participant.id.split(':').first;
+    if (localpart.startsWith('@')) localpart = localpart.substring(1);
+    if (!localpart.endsWith('bot')) continue;
+
+    final network = networkFromBridgeBotId(participant.id);
+    if (network == ChatNetwork.unknown || network == ChatNetwork.matrix) {
+      continue;
+    }
+    return (network: network, userId: participant.id);
+  }
+  return null;
+}
+
 /// Infers the network from a user id.
 ///
 /// Bridge ghosts are namespaced by the bridge — `@whatsapp_4915112345678:hs`,

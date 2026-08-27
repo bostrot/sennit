@@ -62,12 +62,16 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   final Map<String, String> _errors = {};
   List<DetectedBridge> _detected = const [];
 
+  /// Bridges whose bot exists on the homeserver but shares no room yet.
+  List<DetectedBridge> _probed = const [];
+
   @override
   void initState() {
     super.initState();
     _bridges = _loadBridges(ref.read(storesProvider).settings);
     _detect();
     _probeAll();
+    _probeBots();
     // Detection walks the *local* room list, and right after a cold start
     // that list is still loading. One early call used to be the only call —
     // open Bridges in the first seconds of a fresh install and every bridge
@@ -90,7 +94,50 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   }
 
   /// What the server already runs, from m.bridge state in joined rooms.
-  void _detect() => _detected = ref.read(detectedBridgesProvider);
+  void _detect() {
+    final fromRooms = ref.read(detectedBridgesProvider);
+    // The room scan is authoritative — it knows the room counts — so anything
+    // it found keeps its entry and the probe's guess for that network is
+    // dropped.
+    final known = fromRooms.map((bridge) => bridge.network).toSet();
+    _detected = [
+      ...fromRooms,
+      ..._probed.where((bridge) => !known.contains(bridge.network)),
+    ];
+  }
+
+  /// Asks the homeserver about the bridge bots no room mentioned.
+  ///
+  /// Once, on open: the answer is about which accounts exist on the server, and
+  /// that does not change while the screen is up. Failures are silent — a
+  /// server that will not answer profile lookups for strangers is not an error
+  /// to report, it just means this screen knows what the rooms told it.
+  Future<void> _probeBots() async {
+    if (kDemoMode) return;
+    final List<DetectedBridge> probed;
+    try {
+      final session = ref.read(matrixSessionProvider);
+      if (!session.isInitialized) return;
+      final client = session.client;
+      final homeserver = client.homeserver;
+      final ownUserId = client.userID;
+      if (homeserver == null || ownUserId == null) return;
+      probed = await probeBridgeBots(
+        homeserver: homeserver,
+        ownUserId: ownUserId,
+        httpClient: client.httpClient,
+        accessToken: client.accessToken,
+        skip: _detected.map((bridge) => bridge.network).toSet(),
+      );
+    } on Object {
+      return;
+    }
+    if (!mounted || probed.isEmpty) return;
+    setState(() {
+      _probed = probed;
+      _detect();
+    });
+  }
 
   BridgeProvisioningClient _clientFor(_StoredBridge bridge) {
     final session = ref.read(matrixSessionProvider);
@@ -435,8 +482,9 @@ final detectedBridgesProvider = Provider<List<DetectedBridge>>((ref) {
 
 /// What a homeserver with bridges on it looks like, for the demo build.
 ///
-/// Five, because that is the case worth drawing: one is a row and five is a
-/// list with rhythm to get wrong.
+/// Several, because that is the case worth drawing: one is a row and a handful
+/// is a list with rhythm to get wrong. The three states a row can be in are all
+/// present — busy, found-but-unused, and no bot to sign in through.
 const List<DetectedBridge> _demoDetected = [
   DetectedBridge(
     network: ChatNetwork.whatsapp,
@@ -458,8 +506,15 @@ const List<DetectedBridge> _demoDetected = [
     botUserId: '@instagrambot:example.org',
     roomCount: 12,
   ),
+  // Not signed into yet: found by its bot alone, with no portal rooms behind
+  // it. This is what every bridge looks like before its first login, and the
+  // shape that used to be missing from the screen entirely.
+  DetectedBridge(
+    network: ChatNetwork.discord,
+    botUserId: '@discordbot:example.org',
+  ),
   // No bot id: the case that offers a provisioning URL instead of a sign-in.
-  DetectedBridge(network: ChatNetwork.discord, roomCount: 7),
+  DetectedBridge(network: ChatNetwork.slack, roomCount: 7),
 ];
 
 /// The detected bridges as one grouped list.
@@ -546,6 +601,20 @@ class _DetectedBridgeCard extends StatelessWidget {
   final VoidCallback? onOpenChat;
   final VoidCallback onAddUrl;
 
+  /// What was actually found, in words.
+  ///
+  /// A bridge is listed on the strength of its bot alone, which is how one you
+  /// have not signed into yet gets here — and for that one the count is zero.
+  /// "0 bridged chat(s)" reads as a broken bridge rather than an unused one.
+  String get _subtitle {
+    final chats = switch (found.roomCount) {
+      0 => 'No chats bridged yet',
+      1 => '1 bridged chat',
+      final count => '$count bridged chats',
+    };
+    return found.botUserId == null ? chats : '$chats · ${found.botUserId}';
+  }
+
   @override
   Widget build(BuildContext context) {
     // Sign-in first: the guided flow talks to the bot's management room, which
@@ -579,8 +648,7 @@ class _DetectedBridgeCard extends StatelessWidget {
         Text(found.network.label, style: context.text.titleSmall),
         const SizedBox(height: 2),
         Text(
-          '${found.roomCount} bridged chat(s)'
-          '${found.botUserId == null ? '' : ' · ${found.botUserId}'}',
+          _subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: context.text.labelSmall?.copyWith(
