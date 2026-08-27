@@ -148,6 +148,14 @@ abstract interface class SmsGateway {
   /// not an error.
   Future<bool> requestRole();
 
+  /// Opens Android's default-apps settings, resolving to whether it opened.
+  ///
+  /// The way *out* of the role, which no API provides: `RoleManager` can be
+  /// asked for a role and cannot be told to give one up. Without this the role
+  /// is a one-way door, and it is a door with a cost — the phone's RCS — so
+  /// the way back belongs in the same screen as the way in.
+  Future<bool> openDefaultAppSettings();
+
   Future<List<SmsThread>> threads({int limit});
 
   Future<List<SmsMessage>> messages(String threadId, {int limit});
@@ -220,6 +228,10 @@ class SmsPlatform implements SmsGateway {
   @override
   Future<bool> requestRole() async =>
       await _invoke<bool>('requestRole') ?? false;
+
+  @override
+  Future<bool> openDefaultAppSettings() async =>
+      await _invoke<bool>('openDefaultAppSettings') ?? false;
 
   @override
   Future<List<SmsThread>> threads({int limit = kSmsReadLimit}) async {

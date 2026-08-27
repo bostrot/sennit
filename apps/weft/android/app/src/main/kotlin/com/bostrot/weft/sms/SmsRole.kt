@@ -6,7 +6,9 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.provider.Telephony
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -114,5 +116,39 @@ object SmsRole {
             Log.w(TAG, "could not show the default-SMS-app dialog", e)
             false
         }
+    }
+
+    /// Opens Android's own default-apps settings, so the role can be handed on.
+    ///
+    /// There is no API for giving the role up: `RoleManager` can request a role
+    /// and cannot release one, and the system dialog only ever asks about the
+    /// app that raised it. Which left Weft as a one-way door — take the role and
+    /// the way back is a settings screen the user has to go and find. That
+    /// matters more than it sounds, because the role costs the phone its RCS,
+    /// and somebody who wants it back should not have to hunt for the switch.
+    fun openDefaultAppSettings(context: Context): Boolean {
+        val candidates = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            }
+            // Pre-Q, and as the fallback for a ROM whose default-apps screen is
+            // somewhere else entirely: app settings is always reachable and the
+            // choice is one level in from there.
+            add(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", context.packageName, null),
+                ),
+            )
+        }
+        for (intent in candidates) {
+            try {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return true
+            } catch (e: Exception) {
+                Log.w(TAG, "could not open ${intent.action}", e)
+            }
+        }
+        return false
     }
 }

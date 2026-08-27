@@ -252,6 +252,13 @@ class SmsChatRepository {
     return granted;
   }
 
+  /// Opens Android's default-apps settings, for handing the role back.
+  ///
+  /// No refresh follows, deliberately: the user is leaving for another app and
+  /// the answer arrives when they return, through the same resume path that
+  /// already catches a role changed behind Braid's back.
+  Future<bool> openDefaultAppSettings() => _gateway.openDefaultAppSettings();
+
   /// Re-reads the role without ever subscribing twice.
   ///
   /// The role can change while Braid is running and without Braid asking: the

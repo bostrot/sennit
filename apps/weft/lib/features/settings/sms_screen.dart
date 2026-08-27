@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft_sms/weft_sms.dart';
+
 import '../../app/providers.dart';
 import '../../data/sms_chat_repository.dart';
 import '../../services/sms/sms_platform.dart';
+import '../bridges/bridges_screen.dart';
 import 'settings_section.dart';
 
 /// The one place Weft asks for Android's default-SMS-app role.
@@ -112,6 +115,9 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
         ),
       ],
 
+      const SizedBox(height: WeftSpace.lg),
+      ..._rcs(context, status),
+
       if (status.canRequestRole) ...[
         const SizedBox(height: WeftSpace.lg),
         const SettingsSectionHeader(
@@ -149,14 +155,108 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
     ];
   }
 
+  /// Whether a Google Messages bridge is relaying this phone into the inbox.
+  ///
+  /// It matters here because that bridge relays *through the app*, and an app
+  /// that is not the default receives nothing to relay. Taking the role
+  /// therefore costs the user their RCS twice over: once on the phone, and
+  /// once in the inbox they were reading it in.
+  bool get _hasGoogleMessagesBridge {
+    try {
+      return ref
+          .read(detectedBridgesProvider)
+          .any((bridge) => bridge.network == ChatNetwork.gmessages);
+    } on Object {
+      return false;
+    }
+  }
+
+  /// Where RCS stands on this phone, which the role decides and cannot move.
+  ///
+  /// The section that was missing. Everything else here described the role
+  /// honestly — every incoming message, sole write access to the store — and
+  /// left out the consequence a user cannot undo by reading: taking the role
+  /// ends RCS for the whole phone. Android has no RCS API for a third-party
+  /// app, so this is not a feature Braid has yet to build; it is one it cannot
+  /// have, and saying so is the only useful thing to do about it.
+  List<Widget> _rcs(BuildContext context, SmsPlatformStatus status) {
+    final standing = rcsStanding(
+      supported: status.availability != SmsAvailability.unsupported,
+      braidIsDefault: status.isReady,
+      defaultPackage: status.defaultPackage,
+    );
+    if (standing == RcsStanding.unavailable) return const [];
+
+    final holder = messagingAppName(status.defaultPackage) ?? 'Another app';
+
+    return [
+      SettingsSectionHeader(
+        title: 'RCS',
+        subtitle: switch (standing) {
+          RcsStanding.withGoogleMessages =>
+            'Google Messages holds the messaging role, so this phone has RCS. '
+                'Braid cannot take that over: Android has no RCS API for a '
+                'third-party app — RCS is Google Messages talking to Google\'s '
+                'network, and only while it is the default. Making Braid your '
+                'SMS app would turn RCS off for the whole phone and drop those '
+                'conversations back to SMS and MMS.',
+          RcsStanding.offForBraid =>
+            'This phone sends SMS and MMS, and no RCS. That is not a setting '
+                'waiting to be found: Android has no RCS API for a third-party '
+                'app, and RCS works only in Google Messages while it holds the '
+                'messaging role. To have RCS again, hand the role back.',
+          RcsStanding.offForOther =>
+            'RCS is already off on this phone. $holder holds the messaging '
+                'role and RCS on Android works only in Google Messages, so '
+                'making Braid your SMS app costs you no chat features.',
+          RcsStanding.unavailable => '',
+        },
+      ),
+
+      if (standing != RcsStanding.offForOther) ...[
+        const SizedBox(height: WeftSpace.sm),
+        Text(
+          _hasGoogleMessagesBridge
+              ? 'The way to have both is the one you are already running: '
+                    'leave Google Messages as the default and let your Google '
+                    'Messages bridge carry it. RCS and SMS both arrive in this '
+                    'inbox that way, and a number that also has a WhatsApp or '
+                    'Signal chat can still be merged with them.'
+              : 'The way to have both is a bridge rather than the role: '
+                    'mautrix-gmessages pairs with Google Messages on this '
+                    'phone and puts those conversations — RCS included — in '
+                    'this inbox, while Google Messages stays the default app.',
+          style: context.text.bodySmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+
+      if (status.isReady) ...[
+        const SizedBox(height: WeftSpace.sm),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: const Text('Choose a different SMS app'),
+            onPressed: _busy ? null : _handBack,
+          ),
+        ),
+      ],
+    ];
+  }
+
   /// The sentence under the section header, which is the state in words.
   String _explain(SmsPlatformStatus status) => switch (status.availability) {
     SmsAvailability.ready =>
       'Braid is your default messaging app. Texts arrive in the same inbox as '
           'every bridged network, and a number that also has a WhatsApp or '
           'Signal chat can be merged with it.',
+    // Named rather than spelled as a package id where the id is one anybody
+    // ships: "Google Messages" is the app the user chose in a settings screen,
+    // and `com.google.android.apps.messaging` is not.
     SmsAvailability.notDefault when status.defaultPackage != null =>
-      'Another app holds the role: ${status.defaultPackage}. Until that '
+      '${messagingAppName(status.defaultPackage)} holds the role. Until that '
           'changes, Braid cannot read or send texts and the SMS network is '
           'absent from your inbox.',
     SmsAvailability.notDefault =>
@@ -167,7 +267,72 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
           'or the system does not offer the role at all.',
   };
 
+  /// Sends the user to Android's default-apps settings to give the role up.
+  Future<void> _handBack() async {
+    final repository = ref.read(smsRepositoryProvider);
+    if (repository == null) return;
+    setState(() => _busy = true);
+    try {
+      final opened = await repository.openDefaultAppSettings();
+      if (!mounted || opened) return;
+      // A ROM with neither screen. Rare, and worth saying out loud rather than
+      // leaving a button that does nothing.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This device has no default-apps screen to open. The setting is in '
+            'Android settings, under default apps.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// The one warning worth a dialog: the role is about to end the phone's RCS.
+  ///
+  /// Only raised when RCS is plausibly on — Google Messages holds the role
+  /// right now. Warning when the role is coming from another SMS app would be
+  /// warning about nothing, and teaches the user to click through the warning
+  /// that matters.
+  Future<bool> _confirmLosingRcs(SmsPlatformStatus status) async {
+    if (!takingRoleEndsRcs(status.defaultPackage)) return true;
+
+    final bridged = _hasGoogleMessagesBridge;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('This turns RCS off'),
+        content: Text(
+          'Google Messages is your SMS app, so this phone has RCS: typing '
+          'indicators, read receipts, full-size photos, group chats that work. '
+          'Braid cannot carry any of it — Android has no RCS API for a '
+          'third-party app.\n\n'
+          'Taking the role turns RCS off for the whole phone. Those '
+          'conversations drop back to SMS and MMS'
+          '${bridged ? ', and your Google Messages bridge relays through the '
+                    'app on this phone, so it stops receiving too' : ''}'
+          '.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep RCS'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Turn RCS off and continue'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _request(SmsChatRepository repository) async {
+    if (!await _confirmLosingRcs(repository.status)) return;
+    if (!mounted) return;
     setState(() {
       _busy = true;
       _declined = false;

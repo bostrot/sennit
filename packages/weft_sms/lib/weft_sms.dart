@@ -16,5 +16,6 @@ library;
 export 'src/identity.dart';
 export 'src/mms.dart';
 export 'src/phone.dart';
+export 'src/rcs.dart';
 export 'src/segment.dart';
 export 'src/thread.dart';

@@ -145,6 +145,9 @@ object SmsBridge {
                 }
             }
 
+            "openDefaultAppSettings" ->
+                result.success(SmsRole.openDefaultAppSettings(activity ?: context))
+
             "getThreads" -> result.success(
                 SmsProvider.threads(context, args.int("limit") ?: SmsProvider.DEFAULT_LIMIT),
             )

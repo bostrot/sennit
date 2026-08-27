@@ -7,6 +7,7 @@ import 'package:weft/features/settings/settings_section.dart';
 import 'package:weft/features/settings/sms_screen.dart';
 import 'package:weft/services/sms/sms_platform.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_sms/weft_sms.dart';
 
 import 'support/sms_fixtures.dart';
 
@@ -55,6 +56,23 @@ void main() {
     'defaultPackage': 'com.bostrot.weft',
   };
 
+  /// Taps a control the RCS section may have pushed below the fold.
+  ///
+  /// Scrolled to rather than tapped where it sits: with the RCS explanation on
+  /// screen the button is past the list's cache extent, so it is not merely off
+  /// screen — it has not been built, and `ensureVisible` has nothing to reach.
+  Future<void> tap(WidgetTester tester, String label) async {
+    final target = find.text(label);
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(target, 200);
+    } else {
+      await tester.ensureVisible(target);
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> pump(WidgetTester tester, {bool present = true}) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -86,9 +104,10 @@ void main() {
     await repository.start();
     await pump(tester);
 
-    // "Weft is not your SMS app" leaves the user hunting. The package is what
-    // they can act on.
-    expect(find.textContaining('com.android.messaging'), findsOneWidget);
+    // "Weft is not your SMS app" leaves the user hunting. The app in the way is
+    // what they can act on — under the name it has in Android's own settings,
+    // not the package id the phone reports it by.
+    expect(find.textContaining('Messaging holds the role'), findsOneWidget);
     expect(find.text('Off'), findsOneWidget);
   });
 
@@ -100,8 +119,7 @@ void main() {
     await repository.start();
     await pump(tester);
 
-    await tester.tap(find.text('Make Braid the SMS app'));
-    await tester.pumpAndSettle();
+    await tap(tester, 'Make Braid the SMS app');
 
     expect(channel.calls, contains('requestRole'));
     expect(find.textContaining('Nothing changed'), findsOneWidget);
@@ -126,8 +144,7 @@ void main() {
     channel.roleGranted = true;
     channel.status = isDefault;
     channel.threads = [smsThreadRow()];
-    await tester.tap(find.text('Make Braid the SMS app'));
-    await tester.pumpAndSettle();
+    await tap(tester, 'Make Braid the SMS app');
 
     expect(find.text('On'), findsOneWidget);
     // The offer is gone rather than disabled: there is no dialog left to raise.
@@ -179,6 +196,127 @@ void main() {
 
     expect(find.text('Not available'), findsOneWidget);
     expect(find.text('Make Braid the SMS app'), findsNothing);
+  });
+
+  /// The RCS consequence, which is the one cost of the role that the user
+  /// cannot undo by reading.
+  ///
+  /// Android has no RCS API for a third-party app: RCS is Google Messages
+  /// talking to Google's network, and only while it holds the messaging role.
+  /// So taking the role does not move RCS to Braid, it ends it for the whole
+  /// phone — and the screen used to describe everything the role costs except
+  /// that. A user who found out afterwards had lost their group chats to green
+  /// SMS with no warning at all.
+  group('RCS', () {
+    /// Google Messages holding the role: the only state where RCS is on.
+    Map<String, Object?> withGoogleMessages() =>
+        notDefault(holder: kGoogleMessagesPackage);
+
+    testWidgets('says RCS will be turned off before the offer', (tester) async {
+      channel.status = withGoogleMessages();
+      await repository.start();
+      await pump(tester);
+
+      expect(find.textContaining('turn RCS off for the whole phone'), findsOne);
+    });
+
+    testWidgets('taking the role asks first, and a no changes nothing', (
+      tester,
+    ) async {
+      channel.status = withGoogleMessages();
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+      expect(find.text('This turns RCS off'), findsOne);
+
+      await tester.tap(find.text('Keep RCS'));
+      await tester.pumpAndSettle();
+      expect(
+        channel.calls,
+        isNot(contains('requestRole')),
+        reason: 'the system dialog must not appear behind a declined warning',
+      );
+    });
+
+    testWidgets('the warning can be accepted, and then it proceeds', (
+      tester,
+    ) async {
+      channel.status = withGoogleMessages();
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+      await tester.tap(find.text('Turn RCS off and continue'));
+      await tester.pumpAndSettle();
+
+      expect(channel.calls, contains('requestRole'));
+    });
+
+    testWidgets('taking it from an app with no RCS raises no warning', (
+      tester,
+    ) async {
+      // Warning here too would be warning about nothing, and teaches the user
+      // to click through the warning that matters.
+      channel.status = notDefault(holder: 'com.textra');
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+
+      expect(find.text('This turns RCS off'), findsNothing);
+      expect(channel.calls, contains('requestRole'));
+      expect(find.textContaining('RCS is already off'), findsOne);
+    });
+
+    testWidgets('holding the role says the phone has no RCS, and why', (
+      tester,
+    ) async {
+      channel.status = isDefault;
+      await repository.start();
+      await pump(tester);
+
+      expect(find.textContaining('no RCS'), findsOne);
+      expect(
+        find.textContaining('no RCS API for a third-party'),
+        findsOne,
+        reason: 'a missing feature and an impossible one read differently',
+      );
+    });
+
+    testWidgets('the way back out is offered, and opens Android settings', (
+      tester,
+    ) async {
+      // No API gives a role up, so without this the role is a one-way door —
+      // and it is a door with a cost.
+      channel.status = isDefault;
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Choose a different SMS app');
+
+      expect(channel.calls, contains('openDefaultAppSettings'));
+    });
+
+    testWidgets('there is no way back to offer before the role is held', (
+      tester,
+    ) async {
+      channel.status = withGoogleMessages();
+      await repository.start();
+      await pump(tester);
+
+      expect(find.text('Choose a different SMS app'), findsNothing);
+    });
+
+    testWidgets('a device with no telephony says nothing about RCS', (
+      tester,
+    ) async {
+      channel.status = {'supported': false};
+      await repository.start();
+      await pump(tester);
+
+      expect(find.text('RCS'), findsNothing);
+    });
   });
 
   testWidgets('a platform with no SMS at all explains itself', (tester) async {

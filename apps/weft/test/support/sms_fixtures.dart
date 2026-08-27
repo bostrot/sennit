@@ -56,6 +56,9 @@ class FakeSmsChannel {
   /// The user's answer to the role dialog.
   bool roleGranted = false;
 
+  /// Whether Android had a default-apps screen to open.
+  bool settingsOpen = true;
+
   /// Methods that fail, and the code they fail with — a role handed away
   /// mid-call, a permission revoked in Settings.
   Map<String, String> failures = const {};
@@ -84,6 +87,8 @@ class FakeSmsChannel {
         return status;
       case 'requestRole':
         return roleGranted;
+      case 'openDefaultAppSettings':
+        return settingsOpen;
       case 'getThreads':
         return threads;
       case 'getMessages':
