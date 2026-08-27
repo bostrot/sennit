@@ -97,11 +97,14 @@ void main() {
     expect(taps, 1);
   });
 
-  testWidgets('somebody else\'s device is reported without a button', (
+  testWidgets('somebody else\'s device is stated, not alarmed about', (
     tester,
   ) async {
     // There is nothing this side can do about another person's new phone, and
-    // a button that could not fix it would be a button that lies.
+    // a button that could not fix it would be a button that lies. The same
+    // reasoning applies to the colour: an unclearable red bar over every chat
+    // with anyone who has not been verified is how a warning stops being read,
+    // including the one that can be acted on.
     await pump(
       tester,
       const RoomTrust(
@@ -112,8 +115,48 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('Someone in this chat'), findsOneWidget);
+    expect(find.textContaining('has not been verified'), findsOneWidget);
     expect(find.text('Verify'), findsNothing);
+
+    // `.first`: the strip's own Material, not the button's inside it.
+    final material = tester.widget<Material>(
+      find
+          .descendant(
+            of: find.byType(UnverifiedDevicesBanner),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    final colors = WeftTheme.build().colorScheme;
+    expect(
+      material.color,
+      isNot(colors.errorContainer),
+      reason: 'a fact about someone else is not an error of yours',
+    );
+  });
+
+  testWidgets('own devices keep the red, and the button', (tester) async {
+    await pump(
+      tester,
+      const RoomTrust(
+        encrypted: true,
+        unverifiedDevices: 1,
+        unverifiedUsers: 1,
+        includesOwnDevice: true,
+      ),
+    );
+
+    // `.first`: the strip's own Material, not the button's inside it.
+    final material = tester.widget<Material>(
+      find
+          .descendant(
+            of: find.byType(UnverifiedDevicesBanner),
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    expect(material.color, WeftTheme.build().colorScheme.errorContainer);
+    expect(find.text('Verify'), findsOneWidget);
   });
 
   testWidgets('several devices are counted, and so are the people', (
@@ -129,7 +172,22 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('3 unverified devices'), findsOneWidget);
+    expect(find.textContaining('3 devices'), findsOneWidget);
     expect(find.textContaining('2 people'), findsOneWidget);
+  });
+
+  testWidgets('one person is a person, not "1 people"', (tester) async {
+    await pump(
+      tester,
+      const RoomTrust(
+        encrypted: true,
+        unverifiedDevices: 8,
+        unverifiedUsers: 1,
+        includesOwnDevice: false,
+      ),
+    );
+
+    expect(find.textContaining('someone here'), findsOneWidget);
+    expect(find.textContaining('1 people'), findsNothing);
   });
 }

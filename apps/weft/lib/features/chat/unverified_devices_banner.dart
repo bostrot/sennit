@@ -32,15 +32,27 @@ class UnverifiedDevicesBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!trust.hasWarning) return const SizedBox.shrink();
 
+    // Two different facts wearing one coat of paint, until now.
+    //
+    // An unverified device *of your own* is a problem you can fix in two taps,
+    // and it means Braid cannot promise your messages are only reaching you.
+    // Someone else's unverified device is neither: it is the ordinary state of
+    // every Matrix contact you have not personally verified, there is no
+    // action in this app that resolves it, and their phone count is theirs to
+    // change. Painting the second one red and unclearable — eight devices,
+    // permanently, with no button — is how a warning stops being read at all,
+    // including the one that matters.
+    final own = trust.includesOwnDevice;
     final devices = trust.unverifiedDevices;
-    final message = trust.includesOwnDevice
+    final people = trust.unverifiedUsers;
+    final message = own
         ? 'One of your own devices is not verified, so Braid cannot promise the '
               'messages here are only reaching you.'
         : devices == 1
-        ? 'Someone in this chat is using a device nobody has verified. It can '
-              'read what you send from now on.'
-        : '$devices unverified devices across ${trust.unverifiedUsers} people '
-              'can read what you send here.';
+        ? 'One device here has not been verified.'
+        : '$devices devices belonging to '
+              '${people == 1 ? 'someone here' : '$people people here'} '
+              'have not been verified.';
 
     // A live region, because the strip *appearing* is the event. It arrives in
     // response to a trust change — someone in the room signed in on a new
@@ -56,7 +68,11 @@ class UnverifiedDevicesBanner extends StatelessWidget {
       explicitChildNodes: true,
       label: message,
       child: Material(
-        color: context.colors.errorContainer,
+        // Error red for the one case with something to do about it; the
+        // surface's own quiet container for the statement of fact.
+        color: own
+            ? context.colors.errorContainer
+            : context.colors.surfaceContainerHigh,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: WeftSpace.lg,
@@ -66,9 +82,11 @@ class UnverifiedDevicesBanner extends StatelessWidget {
             children: [
               ExcludeSemantics(
                 child: Icon(
-                  Icons.gpp_maybe_rounded,
-                  size: 20,
-                  color: context.colors.onErrorContainer,
+                  own ? Icons.gpp_maybe_rounded : Icons.lock_outline_rounded,
+                  size: own ? 20 : 16,
+                  color: own
+                      ? context.colors.onErrorContainer
+                      : context.colors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: WeftSpace.md),
@@ -76,13 +94,17 @@ class UnverifiedDevicesBanner extends StatelessWidget {
                 child: ExcludeSemantics(
                   child: Text(
                     message,
-                    style: context.text.bodySmall?.copyWith(
-                      color: context.colors.onErrorContainer,
-                    ),
+                    style:
+                        (own ? context.text.bodySmall : context.text.labelSmall)
+                            ?.copyWith(
+                              color: own
+                                  ? context.colors.onErrorContainer
+                                  : context.colors.onSurfaceVariant,
+                            ),
                   ),
                 ),
               ),
-              if (trust.includesOwnDevice) ...[
+              if (own) ...[
                 const SizedBox(width: WeftSpace.sm),
                 // "Verify" alone is a verb with no object once it is read out
                 // of the strip it sits in.
