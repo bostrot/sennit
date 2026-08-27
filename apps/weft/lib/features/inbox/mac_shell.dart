@@ -400,6 +400,10 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
         child: ChatTile(
           chat: chat,
           avatarHeaders: mediaHeaders,
+          typing: ref.read(chatRepositoryProvider).typingIn(chat.id).isNotEmpty,
+          online:
+              ref.read(chatRepositoryProvider).presenceFor(chat.id)?.online ??
+              false,
           selected: picked || chat.id == selectedChatId,
           checked: selection.isEmpty ? null : picked,
           leading: selection.isEmpty

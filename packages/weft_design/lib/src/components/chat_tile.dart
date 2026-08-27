@@ -36,7 +36,20 @@ class ChatTile extends StatefulWidget {
     this.avatarHeaders,
     this.leading,
     this.checked,
+    this.typing = false,
+    this.online = false,
   });
+
+  /// Someone in this conversation is writing.
+  ///
+  /// Replaces the preview while it lasts, which is what makes it worth having:
+  /// the preview is what the reader's eye is already on, and a note tucked
+  /// anywhere else is one nobody sees in the second it is true for.
+  final bool typing;
+
+  /// The other person is online. Only meaningful for a one-to-one chat, and
+  /// only where the homeserver serves presence at all.
+  final bool online;
 
   /// The tick state while the inbox is in selection mode, or null when it is
   /// not selecting.
@@ -149,6 +162,7 @@ class _ChatTileState extends State<ChatTile> {
                     imageUrl: chat.avatarUrl,
                     imageHeaders: widget.avatarHeaders,
                     networks: chat.networks,
+                    online: widget.online,
                     size: mac ? 32 : 46,
                   ),
               SizedBox(width: mac ? WeftSpace.sm : WeftSpace.md),
@@ -183,7 +197,8 @@ class _ChatTileState extends State<ChatTile> {
       if (chat.pinned) 'pinned',
       if (chat.muted) 'muted',
       if (last != null && last.isOwn) deliveryStateLabel(last.deliveryState),
-      _preview(last),
+      if (widget.typing) 'typing' else _preview(last),
+      if (widget.online) 'online',
       widget.timeLabel,
       if (chat.unreadCount > 0)
         chat.unreadCount == 1 ? '1 unread' : '${chat.unreadCount} unread',
@@ -266,35 +281,64 @@ class _ChatTileState extends State<ChatTile> {
             // node is what names it for a screen reader. A shape that told the
             // two apart on sight would be a change to the mark itself, and
             // that belongs to whoever owns the design, not to a semantics pass.
-            if (last != null && last.isOwn) ...[
+            if (last != null && last.isOwn && !widget.typing) ...[
               Tooltip(
                 message: deliveryStateLabel(last.deliveryState),
                 child: Icon(
                   _deliveryIcon(last.deliveryState),
                   size: 14,
-                  color: last.deliveryState == DeliveryState.read
-                      ? (ink == context.colors.onPrimary
-                            ? ink
-                            : context.colors.primary)
-                      : quiet,
+                  color: switch (last.deliveryState) {
+                    // Inside a selected, accent-filled row the blue would sit
+                    // on a purple fill; the row's own ink is what stays
+                    // readable there.
+                    DeliveryState.read
+                        when ink == context.colors.onPrimary =>
+                      ink,
+                    DeliveryState.read => context.palette.readReceipt,
+                    _ => quiet,
+                  },
                 ),
               ),
               const SizedBox(width: WeftSpace.xs),
             ],
             Expanded(
-              child: Text(
-                _preview(last),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                // Same rule as the title: the preview is somebody's words, and
-                // its direction is theirs rather than the reader's locale.
-                textDirection: textDirectionOf(_preview(last)),
-                style: (mac ? context.text.labelSmall : context.text.bodySmall)
-                    ?.copyWith(
-                      color: unread ? ink : quiet,
-                      fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
+              child: widget.typing
+                  ? Text(
+                      'typing…',
+                      maxLines: 1,
+                      style:
+                          (mac
+                                  ? context.text.labelSmall
+                                  : context.text.bodySmall)
+                              ?.copyWith(
+                                // Inside a selected, accent-filled row the
+                                // accent is the background; the row's ink is
+                                // what stays legible.
+                                color: ink == context.colors.onPrimary
+                                    ? ink
+                                    : context.colors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                    )
+                  : Text(
+                      _preview(last),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      // Same rule as the title: the preview is somebody's
+                      // words, and its direction is theirs rather than the
+                      // reader's locale.
+                      textDirection: textDirectionOf(_preview(last)),
+                      style:
+                          (mac
+                                  ? context.text.labelSmall
+                                  : context.text.bodySmall)
+                              ?.copyWith(
+                                color: unread ? ink : quiet,
+                                fontWeight: unread
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
+                              ),
                     ),
-              ),
             ),
             // The merged marks ride the preview's line on a Mac. A third line
             // would put the row at 60pt, which is a phone's row height in a
@@ -383,11 +427,11 @@ class _ChatTileState extends State<ChatTile> {
     };
   }
 
+  /// One tick sent, two ticks arrived, two blue ticks read.
   static IconData _deliveryIcon(DeliveryState? state) => switch (state) {
     DeliveryState.sending => Icons.schedule_rounded,
     DeliveryState.failed => Icons.error_outline_rounded,
-    DeliveryState.read => Icons.done_all_rounded,
-    DeliveryState.delivered => Icons.done_all_rounded,
+    DeliveryState.read || DeliveryState.delivered => Icons.done_all_rounded,
     _ => Icons.done_rounded,
   };
 }

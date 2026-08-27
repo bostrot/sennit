@@ -262,6 +262,7 @@ Future<void> pumpWeft(
   DeviceManager? deviceManager,
   KeyBackup? keyBackup,
   List<DetectedBridge>? detectedBridges,
+  bool settle = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -339,7 +340,16 @@ Future<void> pumpWeft(
 
   // Settle the entry animations rather than capturing them mid-flight, which
   // would make every golden non-deterministic.
-  await tester.pumpAndSettle(const Duration(milliseconds: 50));
+  //
+  // Some screens never settle, and correctly so: a typing indicator and a QR
+  // code's expiry clock both animate for as long as they are true. Those pump
+  // a fixed number of frames instead.
+  if (settle) {
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 /// Points `intl` at [locale] for the duration of one test.

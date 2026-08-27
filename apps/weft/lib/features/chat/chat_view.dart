@@ -771,6 +771,40 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// When the other side read [message] — set only on the newest own message,
   /// which is the one place a "Seen" line carries information rather than
   /// noise down the whole column.
+  /// What the ticks under [message] should say.
+  ///
+  /// Matrix has no delivery receipts, only read ones, so the mapper can never
+  /// produce [DeliveryState.read] — it stops at `delivered` the moment the
+  /// server echoes the event. The receipts are right here though, and without
+  /// folding them in the two ticks meant "not failed" and nothing else, which
+  /// is not what anyone looks at them for.
+  DeliveryState? _effectiveDelivery(WeftMessage message) {
+    if (!message.isOwn) return message.deliveryState;
+    if (message.deliveryState != DeliveryState.delivered) {
+      return message.deliveryState;
+    }
+    return _readByPeer(message) ? DeliveryState.read : message.deliveryState;
+  }
+
+  /// Whether any peer's read receipt covers [message].
+  bool _readByPeer(WeftMessage message) {
+    for (final marker
+        in ref.read(chatRepositoryProvider).peerReadUpTo(_chatId)) {
+      if (marker.roomId != message.roomId) continue;
+      if (marker.eventId == message.eventId) return true;
+      final receipted = _view.messages
+          .where(
+            (m) => m.eventId == marker.eventId && m.roomId == marker.roomId,
+          )
+          .firstOrNull;
+      if (receipted != null &&
+          !receipted.timestamp.isBefore(message.timestamp)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   DateTime? _seenAt(WeftMessage message) {
     if (!message.isOwn) return null;
     final newestOwn = _view.messages.where((m) => m.isOwn).firstOrNull;
@@ -1095,8 +1129,24 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           horizontal: WeftSpace.lg,
                           vertical: WeftSpace.md,
                         ),
-                        itemCount: uploads.length + _view.messages.length + 1,
+                        itemCount:
+                            (_typing.isEmpty ? 0 : 1) +
+                            uploads.length +
+                            _view.messages.length +
+                            1,
                         itemBuilder: (context, index) {
+                          // The list is reversed, so index 0 is the bottom of
+                          // the screen — which is where someone typing belongs,
+                          // under the last thing they said.
+                          if (_typing.isNotEmpty) {
+                            if (index == 0) {
+                              return _TypingBubble(
+                                names: _typing,
+                                isGroup: chat.isGroup,
+                              );
+                            }
+                            index -= 1;
+                          }
                           if (index < uploads.length) {
                             // Reversed: index 0 is the newest, and the newest upload is
                             // the last one enqueued.
@@ -1139,6 +1189,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                 ),
                                 child: _MessageBubble(
                                   message: message,
+                                  delivery: _effectiveDelivery(message),
                                   replyPreview: _replyPreviewFor(message),
                                   highlighted:
                                       message.eventId == _highlightEventId,
@@ -2020,6 +2071,11 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                         imageUrl: chat.avatarUrl,
                         imageHeaders: ref.watch(mediaHeadersProvider),
                         networks: chat.networks,
+                        // The dot, not only the word. "· online" in 11pt under
+                        // a name is true and unreadable; the mark on the face
+                        // is the one every messenger uses and the one anyone
+                        // actually notices.
+                        online: online,
                         size: 38,
                         // The lines beside it already say all of this.
                         semanticsLabel: '',
@@ -2235,6 +2291,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     imageUrl: chat.avatarUrl,
                     imageHeaders: ref.watch(mediaHeadersProvider),
                     networks: chat.networks,
+                    online: online,
                     size: 26,
                     semanticsLabel: '',
                   ),
@@ -2542,6 +2599,7 @@ Color _senderColor(BuildContext context, String senderId) {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
+    this.delivery,
     required this.showNetwork,
     this.showSender = false,
     required this.groupedWithPrevious,
@@ -2628,6 +2686,11 @@ class _MessageBubble extends StatelessWidget {
 
   final WeftMessage message;
 
+  /// The ticks to draw, which is not always what the message carries: a read
+  /// receipt is the only thing that can turn `delivered` into `read`, and it
+  /// arrives separately from the event that is being ticked.
+  final DeliveryState? delivery;
+
   /// Set for an untranscribed voice message when an endpoint is configured.
   final VoidCallback? onTranscribe;
 
@@ -2657,7 +2720,9 @@ class _MessageBubble extends StatelessWidget {
   /// unlabelled 13dp tick.
   String get _metaLabel => semanticsSentence([
     'Sent ${DateFormat.Hm().format(message.timestamp)}',
-    if (message.isOwn) deliveryStateLabel(message.deliveryState),
+    // The effective state, so a reader is told "Read" exactly when the ticks
+    // are blue. Two answers to the same question is worse than either.
+    if (message.isOwn) deliveryStateLabel(delivery ?? message.deliveryState),
   ]);
 
   @override
@@ -2953,30 +3018,38 @@ class _MessageBubble extends StatelessWidget {
                                     if (own) ...[
                                       const SizedBox(width: 3),
                                       Tooltip(
-                                        message: deliveryStateLabel(
-                                          message.deliveryState,
-                                        ),
+                                        message: deliveryStateLabel(delivery),
                                         excludeFromSemantics: true,
                                         child: Icon(
-                                          // An upload still on the wire, and one
-                                          // that failed, must not wear the same
-                                          // double tick a delivered message does.
-                                          switch (message.deliveryState) {
+                                          // The vocabulary everyone already
+                                          // knows: one tick sent, two ticks
+                                          // arrived, two blue ticks read. Every
+                                          // state past sending used to draw the
+                                          // same double tick in the same
+                                          // colour, so the mark said only "not
+                                          // failed" — and the one thing it is
+                                          // looked at for is whether the other
+                                          // side has seen it.
+                                          switch (delivery) {
                                             DeliveryState.sending =>
                                               Icons.schedule_rounded,
                                             DeliveryState.failed =>
                                               Icons.error_outline_rounded,
+                                            DeliveryState.sent =>
+                                              Icons.done_rounded,
                                             _ => Icons.done_all_rounded,
                                           },
                                           size: 13,
-                                          color:
-                                              message.deliveryState ==
-                                                  DeliveryState.failed
-                                              ? context.colors.error
-                                              : palette.mutedOnBubble(
-                                                  true,
-                                                  alpha: 0.7,
-                                                ),
+                                          color: switch (delivery) {
+                                            DeliveryState.failed =>
+                                              context.colors.error,
+                                            DeliveryState.read =>
+                                              palette.readReceipt,
+                                            _ => palette.mutedOnBubble(
+                                              true,
+                                              alpha: 0.7,
+                                            ),
+                                          },
                                         ),
                                       ),
                                     ],
@@ -4229,4 +4302,151 @@ class _ReadingColumn extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Someone on the other side is writing.
+///
+/// In the thread rather than only in the header, which is where the app used to
+/// put it: a line of small print above a conversation is not where anyone is
+/// looking while they wait for a reply, and it is the one piece of state whose
+/// whole value is being noticed. A bubble in the place the reply itself will
+/// appear is what every messenger does, and it is the same shape the reply will
+/// take, so nothing jumps when the words arrive.
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble({required this.names, required this.isGroup});
+
+  final List<String> names;
+  final bool isGroup;
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Not merely drawn static under reduced motion — not *running*. A
+    // repeating controller schedules a frame forever, which costs a phone
+    // battery and costs a widget test its `pumpAndSettle`.
+    final still = MediaQuery.disableAnimationsOf(context);
+    if (still && _controller.isAnimating) {
+      _controller.stop();
+    } else if (!still && !_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Who, in a group. A one-to-one chat needs no name — there is only one
+  /// person it can be, and saying it is noise on every message.
+  String? get _who {
+    if (!widget.isGroup || widget.names.isEmpty) return null;
+    return switch (widget.names.length) {
+      1 => widget.names.single,
+      2 => '${widget.names[0]} and ${widget.names[1]}',
+      _ => '${widget.names[0]} and ${widget.names.length - 1} others',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final who = _who;
+
+    // One live node: a screen reader is told someone is writing, and told once
+    // — the dots themselves are decoration and would otherwise announce three
+    // times a second.
+    return Semantics(
+      liveRegion: true,
+      label: who == null ? 'Typing' : '$who is typing',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(top: WeftSpace.sm),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: WeftSpace.md,
+                vertical: WeftSpace.sm + 2,
+              ),
+              decoration: BoxDecoration(
+                color: palette.peerBubble,
+                borderRadius: WeftRadius.allLg,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (who != null) ...[
+                    Text(
+                      who,
+                      style: context.text.labelSmall?.copyWith(
+                        color: palette.mutedOnBubble(false),
+                      ),
+                    ),
+                    const SizedBox(width: WeftSpace.sm),
+                  ],
+                  for (var i = 0; i < 3; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    _TypingDot(controller: _controller, index: i),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One dot of the three, lifting and fading a third of a cycle after the last.
+class _TypingDot extends StatelessWidget {
+  const _TypingDot({required this.controller, required this.index});
+
+  final AnimationController controller;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = context.palette.mutedOnBubble(false, alpha: 0.75);
+    // Reduced motion means no motion: three dots pulsing forever is exactly
+    // the kind of small perpetual movement the setting exists to stop.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return _dot(colour, 1);
+    }
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final phase = (controller.value + index / 3) % 1;
+        // A short rise and a long rest, so the row reads as a wave rather than
+        // as three lights blinking.
+        final lift = phase < 0.5 ? Curves.easeInOut.transform(phase * 2) : 0.0;
+        return Transform.translate(
+          offset: Offset(0, -2 * lift),
+          child: _dot(colour, 0.45 + 0.55 * lift),
+        );
+      },
+    );
+  }
+
+  Widget _dot(Color colour, double opacity) => Container(
+    width: 6,
+    height: 6,
+    decoration: BoxDecoration(
+      color: colour.withValues(alpha: colour.a * opacity),
+      shape: BoxShape.circle,
+    ),
+  );
 }

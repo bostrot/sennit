@@ -370,6 +370,16 @@ class _InboxPane extends ConsumerWidget {
                             child: ChatTile(
                               chat: chat,
                               avatarHeaders: mediaHeaders,
+                              typing: ref
+                                  .read(chatRepositoryProvider)
+                                  .typingIn(chat.id)
+                                  .isNotEmpty,
+                              online:
+                                  ref
+                                      .read(chatRepositoryProvider)
+                                      .presenceFor(chat.id)
+                                      ?.online ??
+                                  false,
                               selected:
                                   picked || (wide && chat.id == selectedChatId),
                               // The tick's state has to reach the row's merged

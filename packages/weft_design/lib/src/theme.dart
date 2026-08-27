@@ -26,6 +26,7 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
     required this.unreadDot,
     required this.mergedAccent,
     required this.online,
+    required this.readReceipt,
     required this.callAccept,
     required this.callDecline,
     required this.onCallAccept,
@@ -59,6 +60,15 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
   /// surface and is 1.9:1 on a light one, which is a fail for a label and for a
   /// meaningful dot alike.
   final Color online;
+
+  /// The two ticks, once the other side has read it.
+  ///
+  /// Blue, because that is the one piece of messenger iconography everybody
+  /// already knows — a decade of WhatsApp taught it — and a read marker that
+  /// used the app's own accent would be indistinguishable from the delivered
+  /// one on a purple bubble. Corrected against the *own bubble* as well as the
+  /// page, since that is where it is nearly always read.
+  final Color readReceipt;
 
   /// Answer and hang up.
   ///
@@ -152,6 +162,7 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
     Color? unreadDot,
     Color? mergedAccent,
     Color? online,
+    Color? readReceipt,
     Color? callAccept,
     Color? callDecline,
     Color? onCallAccept,
@@ -174,6 +185,7 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
       unreadDot: unreadDot ?? this.unreadDot,
       mergedAccent: mergedAccent ?? this.mergedAccent,
       online: online ?? this.online,
+      readReceipt: readReceipt ?? this.readReceipt,
       callAccept: callAccept ?? this.callAccept,
       callDecline: callDecline ?? this.callDecline,
       onCallAccept: onCallAccept ?? this.onCallAccept,
@@ -201,6 +213,7 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
       unreadDot: Color.lerp(unreadDot, other.unreadDot, t)!,
       mergedAccent: Color.lerp(mergedAccent, other.mergedAccent, t)!,
       online: Color.lerp(online, other.online, t)!,
+      readReceipt: Color.lerp(readReceipt, other.readReceipt, t)!,
       callAccept: Color.lerp(callAccept, other.callAccept, t)!,
       callDecline: Color.lerp(callDecline, other.callDecline, t)!,
       onCallAccept: Color.lerp(onCallAccept, other.onCallAccept, t)!,
@@ -606,6 +619,9 @@ abstract final class WeftTheme {
     // and the call fills stay put with corrected ink instead.
     const brandGreen = Color(0xFF2ECC71);
     const brandRed = Color(0xFFE5484D);
+    // WhatsApp's tick blue, which is the point of it: this mark means the same
+    // thing in every messenger anyone has used.
+    const brandBlue = Color(0xFF34B7F1);
 
     // The "Merged" pill tints its own background with the accent at 16% and
     // then puts the same accent on top, so one of the backgrounds this has to
@@ -666,6 +682,14 @@ abstract final class WeftTheme {
       unreadDot: scheme.primary,
       mergedAccent: mergedAccent,
       online: _ensureOn(brandGreen, (_) => backgrounds, WeftContrast.bodyText),
+      // Read against the own bubble far more often than against the page, so
+      // the own bubble's fill is one of the backgrounds it has to clear. A
+      // 13dp tick is a graphic that carries meaning, not body text.
+      readReceipt: _ensureOn(
+        brandBlue,
+        (_) => [...backgrounds, scheme.primary],
+        WeftContrast.uiComponent,
+      ),
       callAccept: brandGreen,
       callDecline: brandRed,
       // White is the glyph these buttons were designed with; it survives on the

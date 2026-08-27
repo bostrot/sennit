@@ -187,6 +187,7 @@ WeftMessage seededMessage({
   List<ReactionTally> reactions = const [],
   DateTime? editedAt,
   List<EditRecord> editHistory = const [],
+  DeliveryState? deliveryState,
 }) {
   return WeftMessage(
     eventId: eventId,
@@ -205,6 +206,11 @@ WeftMessage seededMessage({
     reactions: reactions,
     editedAt: editedAt,
     editHistory: editHistory,
-    deliveryState: isOwn ? DeliveryState.read : DeliveryState.sent,
+    // `delivered` is as far as the mapper can take an own message — Matrix has
+    // no delivery receipts — so that is the honest default for one, and what a
+    // test varies when it is asking about ticks.
+    deliveryState:
+        deliveryState ??
+        (isOwn ? DeliveryState.delivered : DeliveryState.sent),
   );
 }

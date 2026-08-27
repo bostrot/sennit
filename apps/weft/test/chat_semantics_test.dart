@@ -116,6 +116,11 @@ void main() {
           body: 'on my way',
           isOwn: true,
           timestamp: DateTime(2026, 8, 18, 14, 32),
+          // Stated, because the default is now what the Matrix mapper can
+          // actually produce — `delivered`, since the protocol has no delivery
+          // receipts. Only a read receipt lifts a message past that, and this
+          // test is about the sentence, not about where the state came from.
+          deliveryState: DeliveryState.read,
         ),
       ]);
 
