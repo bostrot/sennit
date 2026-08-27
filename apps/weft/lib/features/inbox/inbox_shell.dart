@@ -292,7 +292,7 @@ class _InboxPane extends ConsumerWidget {
     final wide = MediaQuery.sizeOf(context).width >= kTwoPaneBreakpoint;
 
     final selection = ref.watch(chatSelectionProvider);
-    final selecting = selection.isNotEmpty;
+    final selecting = ref.read(chatSelectionProvider.notifier).isActive;
 
     // The rail handles its own insets and should keep painting behind the
     // status bar; only the inbox column must start below it — and the edge the
@@ -385,9 +385,19 @@ class _InboxPane extends ConsumerWidget {
                                           .toggle(chat.id),
                                     )
                                   : null,
-                              onLongPress: () => ref
-                                  .read(chatSelectionProvider.notifier)
-                                  .toggle(chat.id),
+                              // Hold to look, not to select. Reading a chat
+                              // marks it read, and holding was the only
+                              // gesture free to answer "who was that?"
+                              // without spending the unread marker; picking
+                              // several conversations is a rarer thing and now
+                              // has a button of its own in the inbox menu.
+                              onLongPress: selecting
+                                  ? () => ref
+                                        .read(chatSelectionProvider.notifier)
+                                        .toggle(chat.id)
+                                  : () => unawaited(
+                                      showChatPreview(context, chat.id),
+                                    ),
                               timeLabel: formatInboxTime(
                                 chat.lastMessage?.timestamp,
                                 now: ref.watch(clockProvider)(),
@@ -662,6 +672,8 @@ class _InboxHeader extends ConsumerWidget {
                 onSelected: (choice) {
                   final navigator = Navigator.of(context);
                   switch (choice) {
+                    case 'select':
+                      ref.read(chatSelectionProvider.notifier).begin();
                     case 'read_all':
                       final repository = ref.read(chatRepositoryProvider);
                       final unread = ref
@@ -698,6 +710,10 @@ class _InboxHeader extends ConsumerWidget {
                 // "Keyboard shortcuts" — configuration now has a screen of
                 // its own with room to be grouped and explained.
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'select',
+                    child: Text('Select conversations'),
+                  ),
                   const PopupMenuItem(
                     value: 'read_all',
                     child: Text('Mark all as read'),

@@ -150,6 +150,7 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => push(const ModelsScreen()),
             ),
             const _AgendaToggle(),
+            const _SendOnEnterToggle(),
             const _HiddenNetworksSection(),
 
             header('Privacy & security'),
@@ -334,6 +335,44 @@ class _ContactNamesToggle extends ConsumerWidget {
 
 /// The appointment-detection switch.
 ///
+/// What the Return key does in the composer.
+///
+/// Off by default, which is the opposite of most messengers and deliberate:
+/// this composer grows to five lines and people write paragraphs in it, so a
+/// Return that sends turns every attempt at a second line into a message
+/// nobody meant to send — and there is no unsending one that has already left
+/// for another network.
+class _SendOnEnterToggle extends ConsumerWidget {
+  const _SendOnEnterToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on StateError {
+      return const SizedBox.shrink();
+    }
+
+    final on = stores.settings.getBool(WeftSettings.sendOnEnter);
+    return SwitchListTile(
+      secondary: const Icon(Icons.keyboard_return_rounded),
+      title: const Text('Return sends the message'),
+      subtitle: Text(
+        on
+            ? 'Shift+Return starts a new line.'
+            : 'Return starts a new line. Cmd or Ctrl + Return sends.',
+      ),
+      value: on,
+      onChanged: (value) {
+        stores.settings.setBool(WeftSettings.sendOnEnter, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
+    );
+  }
+}
+
 /// Its own widget because it is the one row on this screen with state. Fully
 /// on-device — rules plus, when installed, the local embedding model — which
 /// is why it defaults on where the remote-endpoint gates default off.

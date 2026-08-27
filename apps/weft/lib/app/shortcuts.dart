@@ -209,6 +209,8 @@ class PasteIntoComposerIntent extends Intent {
 /// forwards it, which is what lets Shift+Enter mean something different from
 /// Enter. A soft keyboard sends no key events at all and still goes through
 /// `onSubmitted`, so a phone is unaffected either way.
+/// [composerShortcutsFor] with Return bound to sending, which is what it was
+/// before the behaviour became a setting.
 const Map<ShortcutActivator, Intent> composerShortcuts = {
   SingleActivator(LogicalKeyboardKey.enter): SendComposerIntent(),
   SingleActivator(LogicalKeyboardKey.numpadEnter): SendComposerIntent(),
@@ -223,6 +225,49 @@ const Map<ShortcutActivator, Intent> composerShortcuts = {
       PasteIntoComposerIntent(),
   SingleActivator(LogicalKeyboardKey.keyV, control: true):
       PasteIntoComposerIntent(),
+};
+
+/// The composer's keys, given what Return is set to do.
+///
+/// Both arrangements bind the same two intents; which key carries which is the
+/// whole of the setting. The modifier chord sends in both, because a person who
+/// has turned Return into a newline still needs a way to send that does not
+/// involve reaching for the mouse — and Cmd+Return is what every editor with
+/// this setting uses.
+Map<ShortcutActivator, Intent> composerShortcutsFor({
+  required bool sendOnEnter,
+}) => {
+  const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+      const SendComposerIntent(),
+  const SingleActivator(LogicalKeyboardKey.enter, control: true):
+      const SendComposerIntent(),
+  const SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true):
+      const SendComposerIntent(),
+  const SingleActivator(LogicalKeyboardKey.numpadEnter, control: true):
+      const SendComposerIntent(),
+  if (sendOnEnter) ...{
+    const SingleActivator(LogicalKeyboardKey.enter):
+        const SendComposerIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter):
+        const SendComposerIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter, shift: true):
+        const InsertComposerNewlineIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
+        const InsertComposerNewlineIntent(),
+  } else ...{
+    const SingleActivator(LogicalKeyboardKey.enter):
+        const InsertComposerNewlineIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter):
+        const InsertComposerNewlineIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter, shift: true):
+        const InsertComposerNewlineIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true):
+        const InsertComposerNewlineIntent(),
+  },
+  const SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+      const PasteIntoComposerIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+      const PasteIntoComposerIntent(),
 };
 
 /// Replaces the selection in [controller] with a line break.

@@ -179,6 +179,28 @@ final attachmentFileReaderProvider = Provider<AttachmentBytesLoader>(
   (ref) => readAttachmentFile,
 );
 
+/// Whether Return sends the message, or breaks the line.
+///
+/// Off by default. Braid's composer grows to five lines and people write
+/// paragraphs in it; a Return that sends turns every attempt at a second line
+/// into a message nobody meant to send, and there is no unsending it on a
+/// network the message has already left.
+final sendOnEnterProvider = Provider<bool>((ref) {
+  ref.watch(settingsRevisionProvider);
+  try {
+    return ref
+        .read(storesProvider)
+        .settings
+        .getBool(WeftSettings.sendOnEnter);
+  } on Object {
+    // `Object`, not `StateError`: reading a provider that threw during its own
+    // creation rethrows a `ProviderException` wrapping the cause, so catching
+    // the cause catches nothing — and the composer's setting took the whole
+    // chat view down with it before the stores had finished bootstrapping.
+    return false;
+  }
+});
+
 /// What time it is.
 ///
 /// A provider because two things need to disagree about it: the app, which
@@ -247,6 +269,25 @@ class ChatSelectionNotifier extends Notifier<Set<String>> {
   @override
   Set<String> build() => const {};
 
+  /// Whether the inbox is in selection mode with nothing picked yet.
+  ///
+  /// Selection used to be entered by long-pressing a row, which made the mode
+  /// and its first member the same act — fine until holding a row came to mean
+  /// something else. Now the mode is entered deliberately and starts empty, so
+  /// it needs a state of its own: an empty set no longer means "not
+  /// selecting".
+  bool _active = false;
+  bool get isActive => _active || state.isNotEmpty;
+
+  /// Enters selection mode with nothing selected.
+  void begin() {
+    _active = true;
+    // The set is what listeners watch, so the mode change has to reach them
+    // through it. A fresh instance is not `==` to the old one, which is what
+    // makes an empty-to-empty transition notify at all.
+    state = <String>{...state};
+  }
+
   void toggle(String chatId) {
     final next = {...state};
     if (!next.remove(chatId)) next.add(chatId);
@@ -255,7 +296,10 @@ class ChatSelectionNotifier extends Notifier<Set<String>> {
 
   void selectAll(Iterable<String> chatIds) => state = chatIds.toSet();
 
-  void clear() => state = const {};
+  void clear() {
+    _active = false;
+    state = const {};
+  }
 }
 
 final chatSelectionProvider =

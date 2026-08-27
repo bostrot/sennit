@@ -26,6 +26,7 @@ class SeededChatRepository extends RecordingChatRepository {
     required this.messages,
     this.chatId = 'seeded:chat',
     this.title = 'Test Chat',
+    this.isGroup = false,
   });
 
   /// The history, in any order — the sources sort it.
@@ -33,6 +34,11 @@ class SeededChatRepository extends RecordingChatRepository {
 
   final String chatId;
   final String title;
+
+  /// Whether the thread names its senders. A one-to-one chat does not — you
+  /// know who the other person is — so anything about how a group attributes
+  /// its messages has to say so.
+  final bool isGroup;
 
   /// One source per distinct room, in the order the messages first name them.
   Chat get chat {
@@ -47,6 +53,7 @@ class SeededChatRepository extends RecordingChatRepository {
       id: chatId,
       title: title,
       sources: sources,
+      isGroup: isGroup,
       lastMessage: newest.firstOrNull,
     );
   }

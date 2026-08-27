@@ -362,21 +362,36 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   /// encrypted photo does not lay out as a squat grey box and then reflow the
   /// whole timeline under the reader's thumb when it decodes.
   Widget _placeholder(BuildContext context, {required bool broken}) {
+    // A video whose event carried no thumbnail has nothing to show and nothing
+    // wrong with it: the sender's client simply did not make one, which is
+    // ordinary on several bridges. A broken-image glyph says the opposite —
+    // that something failed — so a poster says what is actually true. The
+    // play control is drawn over this by the caller either way.
+    final isVideo = widget.message.kind == MessageKind.video;
+    final missingByDesign = broken && isVideo;
+
     return Container(
       width: _boxWidth,
       height: _boxHeight,
-      color: context.colors.surfaceContainerHighest,
+      color: missingByDesign
+          ? context.colors.surfaceContainerHigh
+          : context.colors.surfaceContainerHighest,
       alignment: Alignment.center,
-      child: broken
-          ? Icon(
-              Icons.broken_image_outlined,
-              color: context.colors.onSurfaceVariant,
-            )
-          : const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+      child: switch ((broken, missingByDesign)) {
+        // Nothing at all: the caller draws a play control over this, dead
+        // centre, and a film glyph behind it is two symbols stacked on the
+        // same pixels saying the same thing.
+        (_, true) => const SizedBox.shrink(),
+        (true, _) => Icon(
+          Icons.broken_image_outlined,
+          color: context.colors.onSurfaceVariant,
+        ),
+        _ => const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      },
     );
   }
 }

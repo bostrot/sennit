@@ -287,6 +287,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     final selectedChatId = ref.watch(selectedChatProvider);
     final mediaHeaders = ref.watch(mediaHeadersProvider);
     final selection = ref.watch(chatSelectionProvider);
+    final selecting = ref.read(chatSelectionProvider.notifier).isActive;
     final quick = ref.watch(inboxQuickFilterProvider);
     final archived = ref.watch(showArchivedProvider);
     final networks = ref.watch(networkFilterProvider);
@@ -314,13 +315,12 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
         // separator is the previous decade's window.
         child: MacScrollEdge(
           barHeight:
-              MacMetrics.toolbarHeight +
-              (selection.isEmpty ? 0 : _selectionBarHeight),
+              MacMetrics.toolbarHeight + (selecting ? _selectionBarHeight : 0),
           bar: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _listToolbar(title),
-              if (selection.isNotEmpty)
+              if (selecting)
                 SizedBox(
                   height: _selectionBarHeight,
                   child: InboxSelectionBar(selected: selection, visible: chats),

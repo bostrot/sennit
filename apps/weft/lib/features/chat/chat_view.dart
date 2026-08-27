@@ -1229,8 +1229,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                       : null,
                                   showNetwork: chat.isMerged,
                                   showSender: chat.isGroup,
+                                  // Same *person*, not merely the same side
+                                  // of the thread. Without the sender check a
+                                  // group ran two people's messages together
+                                  // whenever they landed within five minutes,
+                                  // and the second one lost its name — so a
+                                  // reply from someone else read as a second
+                                  // line from whoever spoke first, which is
+                                  // the one thing a group chat must never get
+                                  // wrong.
                                   groupedWithPrevious:
                                       older != null &&
+                                      older.senderId == message.senderId &&
                                       older.isOwn == message.isOwn &&
                                       older.network == message.network &&
                                       message.timestamp
@@ -1284,6 +1294,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           onSend: _send,
                           onAttach: () => _attach(chat),
                           onPaste: () => unawaited(_paste(chat)),
+                          sendOnEnter: ref.watch(sendOnEnterProvider),
                           onPickNetwork: _pickNetwork,
                           onRecordVoice: () =>
                               setState(() => _recording = true),
@@ -2677,6 +2688,36 @@ class _MessageBubble extends StatelessWidget {
                 : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // Who said it, as a face. A group named its senders in text and
+              // showed no picture at all, which leaves a wall of identical
+              // bubbles to be told apart by reading — and the name only
+              // appears on the first message of a run, so most of them said
+              // nothing. The gutter is held even on grouped messages, so a run
+              // stays aligned under its own avatar.
+              if (showSender && !own) ...[
+                SizedBox(
+                  width: 26,
+                  child: groupedWithPrevious
+                      ? null
+                      : Consumer(
+                          builder: (context, ref, _) => WeftAvatar(
+                            label: message.senderName,
+                            imageUrl: ref
+                                .read(chatRepositoryProvider)
+                                .avatarUrlFor(
+                                  message.senderId,
+                                  roomId: message.roomId,
+                                ),
+                            imageHeaders: ref.watch(mediaHeadersProvider),
+                            size: 24,
+                            // The bubble's own node already opens with the
+                            // sender's name; a second one would say it twice.
+                            semanticsLabel: '',
+                          ),
+                        ),
+                ),
+                const SizedBox(width: WeftSpace.xs),
+              ],
               Flexible(
                 child: _BubbleHoverShell(
                   own: own,
@@ -3264,6 +3305,7 @@ class _Composer extends StatelessWidget {
     required this.onAttach,
     required this.onPaste,
     required this.onPickNetwork,
+    required this.sendOnEnter,
     this.composing,
     this.onCancelContext,
     this.onRecordVoice,
@@ -3300,6 +3342,9 @@ class _Composer extends StatelessWidget {
 
   /// ⌘V / Ctrl+V, which may be an image rather than text.
   final VoidCallback onPaste;
+
+  /// Whether Return sends. Off, it breaks the line and ⌘/Ctrl+Return sends.
+  final bool sendOnEnter;
 
   final ValueChanged<ChatNetwork> onPickNetwork;
 

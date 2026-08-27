@@ -1044,6 +1044,19 @@ class MatrixChatRepository implements ChatRepository {
     try {
       final event = await room.getEventById(eventId);
       if (event == null) return null;
+
+      // A thumbnail request for an event that has no thumbnail falls back, in
+      // the SDK, to the attachment itself. For an image that is a sensible
+      // preview; for a video it means downloading the whole film to hand to
+      // `Image.memory`, which cannot decode an MP4 — so the timeline spent
+      // megabytes to arrive at a broken-image glyph. Nothing is a better
+      // answer than the file: the caller draws a poster instead.
+      if (thumbnail &&
+          !event.hasThumbnail &&
+          event.messageType != sdk.MessageTypes.Image) {
+        return null;
+      }
+
       final file = await event.downloadAndDecryptAttachment(
         getThumbnail: thumbnail,
       );

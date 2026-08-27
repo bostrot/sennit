@@ -106,6 +106,15 @@ abstract final class WeftSettings {
   /// When false (the default), the network rail is single-select: tapping a
   /// network shows only it, tapping again returns to All.
   static const String railMultiSelect = 'rail.multi_select';
+
+  /// Whether Return sends the message.
+  ///
+  /// False by default, which is the opposite of most messengers and is the
+  /// right default for this one: Braid's composer grows to five lines, people
+  /// write paragraphs in it, and a Return that sends turns every attempt at a
+  /// second line into a message nobody meant to send. Off, Return breaks the
+  /// line and the platform's send chord — Cmd+Return, Ctrl+Return — sends.
+  static const String sendOnEnter = 'composer.send_on_enter';
   static const String seedColor = 'appearance.seed_color';
   static const String density = 'appearance.density';
 
