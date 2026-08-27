@@ -59,6 +59,13 @@ dependencies:
   go_router: ^17.5.0
   http: ^1.6.0
   image_picker: ^1.2.3
+  # Directly, only so the Android photo picker can be switched on: the
+  # flag lives on the platform implementation and defaults to off. See
+  # `attachment_picker.dart`.
+  image_picker_android: ^0.8.13
+  # And the interface, for the one type needed to reach that flag: the
+  # implementation is looked up through `ImagePickerPlatform.instance`.
+  image_picker_platform_interface: ^2.10.0
   # Voice-note playback. ExoPlayer on Android and AVPlayer on iOS/macOS decode
   # the ogg/opus that Matrix voice messages actually are on Android; Apple
   # platforms may refuse the container, which surfaces as a readable error

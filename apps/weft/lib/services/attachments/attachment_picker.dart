@@ -4,6 +4,10 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart' as picker;
+import 'package:image_picker_android/image_picker_android.dart'
+    show ImagePickerAndroid;
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart'
+    show ImagePickerPlatform;
 import 'package:weft_attachments/weft_attachments.dart';
 
 /// Bytes read from the front of a picked file to fill [AttachmentSource.header].
@@ -102,6 +106,25 @@ class PlatformAttachmentPicker implements AttachmentPicker {
     ),
   ];
 
+  /// Switches Android to the system photo picker, once.
+  ///
+  /// `image_picker` asks for the *photo library*, and on Android it got there
+  /// through `ACTION_GET_CONTENT` — which resolves to the documents browser,
+  /// so "send a photo" opened a file manager at Downloads and the phone's
+  /// actual gallery was several taps away. The plugin has spoken
+  /// `ACTION_PICK_IMAGES` since Android 13 (backported further by Play
+  /// services) behind a flag that defaults to off, and this is that flag.
+  ///
+  /// Set here rather than in `main` so the knowledge stays with the thing that
+  /// picks, and guarded by the instance's own type so it is a no-op on every
+  /// other platform.
+  static void _useSystemPhotoPicker() {
+    final implementation = ImagePickerPlatform.instance;
+    if (implementation is ImagePickerAndroid) {
+      implementation.useAndroidPhotoPicker = true;
+    }
+  }
+
   bool get _isMobile =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
@@ -118,6 +141,7 @@ class PlatformAttachmentPicker implements AttachmentPicker {
 
   @override
   Future<List<AttachmentSource>> pick(AttachmentPickSource source) async {
+    _useSystemPhotoPicker();
     final files = switch (source) {
       AttachmentPickSource.media when _isMobile =>
         await picker.ImagePicker().pickMultipleMedia(),
