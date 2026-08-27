@@ -20,10 +20,9 @@ import 'support/seeded_repository.dart';
 /// nothing turned that into `read`.
 class _ReadRepository extends SeededChatRepository {
   _ReadRepository(
-    DemoChatRepository super.inner, {
+    super.inner, {
     required super.messages,
     required this.readUpTo,
-    super.isGroup,
   });
 
   /// The event id the other side's receipt names, or null for no receipt.
@@ -245,7 +244,7 @@ void main() {
 
 class _TypingRepository extends SeededChatRepository {
   _TypingRepository(
-    DemoChatRepository super.inner, {
+    super.inner, {
     required super.messages,
     required this.typing,
     super.isGroup,

@@ -12,12 +12,22 @@ class ChatSource {
     required this.network,
     this.handleId,
     this.muted = false,
+    this.unread = 0,
   });
 
   final String roomId;
   final ChatNetwork network;
   final String? handleId;
   final bool muted;
+
+  /// Unread messages on *this* leg.
+  ///
+  /// A merged conversation sums its legs into one badge, which is what the
+  /// inbox row shows and the right answer there. The rail asks a different
+  /// question — which networks have something waiting — and answering it from
+  /// the sum lit up every network a merged contact spans, so one WhatsApp
+  /// message marked Signal, Telegram and Instagram unread as well.
+  final int unread;
 
   @override
   bool operator ==(Object other) =>

@@ -423,9 +423,30 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   });
 });
 
-/// Unread totals per network, for the rail badges. Computed from the unfiltered
-/// list so filtering never makes a badge disappear.
+/// Unread totals per network, for the rail badges.
+///
+/// Deliberately *not* narrowed by the rail's own filter or the quick filters —
+/// a badge that disappeared when you filtered somewhere else would be useless.
+/// It is narrowed by the things the inbox will never show at all, which is a
+/// different question and was the bug: the count came off the raw list, so a
+/// WhatsApp status broadcast and the bridge bots' service rooms each put a
+/// badge on a network whose inbox contains nothing unread. Tapping it showed
+/// an empty result and no way to clear the mark.
 final unreadByNetworkProvider = Provider<Map<ChatNetwork, int>>((ref) {
   final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
-  return unreadByNetwork(chats);
+  final service = ref.watch(chatRepositoryProvider).serviceChatIds;
+  // The broadcast group is a conversation only in `group` mode; in the other
+  // two its content is a story row or nothing, and neither is something a
+  // rail badge can send anyone to.
+  final statusChatId = ref.watch(statusModeProvider) == StatusMode.group
+      ? null
+      : ref.watch(statusChatProvider)?.id;
+
+  return unreadByNetwork([
+    for (final chat in chats)
+      if (!chat.archived &&
+          !service.contains(chat.id) &&
+          chat.id != statusChatId)
+        chat,
+  ]);
 });

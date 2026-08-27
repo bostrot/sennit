@@ -1820,6 +1820,17 @@ class MatrixChatRepository implements ChatRepository {
     return mapped;
   }
 
+  /// How many messages are waiting in [room].
+  ///
+  /// Lifted out so a room's own leg and the chat built from it cannot disagree
+  /// — the rail reads the first and the inbox row the second.
+  int _unreadCountFor(sdk.Room room, sdk.Event? lastEvent) {
+    if (room.markedUnread) {
+      return room.notificationCount > 0 ? room.notificationCount : 1;
+    }
+    return _isReadLocally(room, lastEvent) ? 0 : room.notificationCount;
+  }
+
   /// Whether the user has read [room] up to (at least) [lastEvent].
   ///
   /// Four witnesses, any of which settles it: the newest event being one the
@@ -1862,6 +1873,10 @@ class MatrixChatRepository implements ChatRepository {
         ChatSource(
           roomId: room.id,
           network: network,
+          // The same number the chat carries, on the leg it came from. A
+          // one-legged chat is the trivial case; a merged one is folded from
+          // these, and the rail needs to know which leg is waiting.
+          unread: _unreadCountFor(room, lastEvent),
           // Per leg, and it is not the same fact as [Chat.muted]: a merged
           // chat is muted only when *every* leg is, so a contact muted on
           // WhatsApp and live on Signal reads as unmuted at chat level. This
@@ -1879,11 +1894,7 @@ class MatrixChatRepository implements ChatRepository {
       // receipt, or the *persisted* one the SDK synced back, both beat the
       // server's cached count, which goes stale the moment the app is killed
       // before the next sync and resurrected every chat as unread.
-      unreadCount: room.markedUnread
-          ? (room.notificationCount > 0 ? room.notificationCount : 1)
-          : _isReadLocally(room, lastEvent)
-          ? 0
-          : room.notificationCount,
+      unreadCount: _unreadCountFor(room, lastEvent),
       // A resolved peer means "conversation with a person", whatever the
       // member count says: a bridged DM carries the bot as a third member and
       // is usually missing from m.direct, and calling it a group is what put

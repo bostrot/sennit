@@ -510,16 +510,36 @@ List<Chat> filterChats(List<Chat> chats, Set<ChatNetwork> networks) {
       .toList(growable: false);
 }
 
-/// Unread totals per network, for the rail badges. A merged chat contributes
-/// its unread count to every network it spans, since the user cannot tell which
-/// leg the unread messages arrived on until they open it.
+/// Unread totals per network, for the rail badges.
+///
+/// Counted per *leg*, which is the whole correction: a merged chat used to
+/// contribute its total to every network it spans, on the theory that the user
+/// could not tell which leg the messages arrived on. They can — the legs carry
+/// their own counts — and the old answer meant one WhatsApp message lit up
+/// Signal, Telegram and Instagram too, so the rail said "something is waiting
+/// here" about three networks where nothing was.
+///
+/// A chat whose legs report nothing while the chat itself reports unread is
+/// still counted, against the network of its newest message: some repositories
+/// build chats directly rather than folding them from rooms, and dropping
+/// their badge would be a worse answer than attributing it.
 Map<ChatNetwork, int> unreadByNetwork(List<Chat> chats) {
   final out = <ChatNetwork, int>{};
   for (final chat in chats) {
     if (chat.unreadCount == 0) continue;
-    for (final n in chat.networks) {
-      out[n] = (out[n] ?? 0) + chat.unreadCount;
+
+    final perLeg = chat.sources.fold(0, (sum, s) => sum + s.unread);
+    if (perLeg > 0) {
+      for (final source in chat.sources) {
+        if (source.unread == 0) continue;
+        out[source.network] = (out[source.network] ?? 0) + source.unread;
+      }
+      continue;
     }
+
+    final network = chat.lastMessage?.network ?? chat.networks.firstOrNull;
+    if (network == null) continue;
+    out[network] = (out[network] ?? 0) + chat.unreadCount;
   }
   return out;
 }
