@@ -458,13 +458,17 @@ abstract final class WeftTheme {
           borderRadius: BorderRadius.circular(MacMetrics.sheetRadius),
         ),
       ),
+      // 32 rather than 24, and that is not a typo: `visualDensity.compact`
+      // subtracts eight points from a button's minimum size, so asking for 24
+      // produced a 16-point button with its label touching the border. The
+      // system's push button is 24 tall, which is what this arrives at.
       filledButtonTheme: FilledButtonThemeData(
         style: base.filledButtonTheme.style?.copyWith(
           shape: WidgetStatePropertyAll(shape),
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: WeftSpace.md, vertical: 4),
+            EdgeInsets.symmetric(horizontal: WeftSpace.md),
           ),
-          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
           textStyle: WidgetStatePropertyAll(text.labelLarge),
         ),
       ),
@@ -472,17 +476,23 @@ abstract final class WeftTheme {
         style: (base.textButtonTheme.style ?? const ButtonStyle()).copyWith(
           shape: WidgetStatePropertyAll(shape),
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: WeftSpace.md, vertical: 4),
+            EdgeInsets.symmetric(horizontal: WeftSpace.md),
           ),
-          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
           textStyle: WidgetStatePropertyAll(text.labelLarge),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: (base.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
           shape: WidgetStatePropertyAll(shape),
-          minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: WeftSpace.md),
+          ),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
           textStyle: WidgetStatePropertyAll(text.labelLarge),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: palette.border, width: 0.5),
+          ),
         ),
       ),
       listTileTheme: ListTileThemeData(

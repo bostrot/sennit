@@ -368,25 +368,25 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                         ),
                       ),
                     ),
-                    for (final found in _detected)
-                      if (!_bridges.any((b) => b.networkId == found.network.id))
-                        _DetectedBridgeCard(
-                          found: found,
-                          onSignIn: found.botUserId == null
-                              ? null
-                              : () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => BridgeBotLoginScreen(
-                                      botUserId: found.botUserId!,
-                                      network: found.network,
-                                    ),
-                                  ),
-                                ),
-                          onOpenChat: found.botUserId == null
-                              ? null
-                              : () => _openBotChat(found.botUserId!),
-                          onAddUrl: _addBridge,
+                    _DetectedGroup(
+                      found: [
+                        for (final found in _detected)
+                          if (!_bridges.any(
+                            (b) => b.networkId == found.network.id,
+                          ))
+                            found,
+                      ],
+                      onSignIn: (found) => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => BridgeBotLoginScreen(
+                            botUserId: found.botUserId!,
+                            network: found.network,
+                          ),
                         ),
+                      ),
+                      onOpenChat: (found) => _openBotChat(found.botUserId!),
+                      onAddUrl: _addBridge,
+                    ),
                     // Only when something follows it. A divider under the last
                     // detected bridge with no configured ones after it is a rule
                     // separating a list from nothing.
@@ -462,6 +462,67 @@ const List<DetectedBridge> _demoDetected = [
   DetectedBridge(network: ChatNetwork.discord, roomCount: 7),
 ];
 
+/// The detected bridges as one grouped list.
+///
+/// A box with hairlines between its rows rather than five separate cards with
+/// gaps: that is how every desktop draws a list of like things — macOS System
+/// Settings, GNOME's boxed lists, Windows' settings cards — and five floating
+/// panels for five rows of the same shape reads as five unrelated objects.
+class _DetectedGroup extends StatelessWidget {
+  const _DetectedGroup({
+    required this.found,
+    required this.onSignIn,
+    required this.onOpenChat,
+    required this.onAddUrl,
+  });
+
+  final List<DetectedBridge> found;
+  final ValueChanged<DetectedBridge> onSignIn;
+  final ValueChanged<DetectedBridge> onOpenChat;
+  final VoidCallback onAddUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    if (found.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: WeftSpace.sm),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(
+          context.isDesktop ? 10 : WeftRadius.md.x,
+        ),
+        border: Border.all(color: context.palette.border, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          for (final (index, bridge) in found.indexed) ...[
+            if (index > 0)
+              Divider(
+                height: 0.5,
+                thickness: 0.5,
+                // Indented past the glyph, so the rule separates the text
+                // rather than cutting the row in half.
+                indent: 52,
+                color: context.palette.divider,
+              ),
+            _DetectedBridgeCard(
+              found: bridge,
+              onSignIn: bridge.botUserId == null
+                  ? null
+                  : () => onSignIn(bridge),
+              onOpenChat: bridge.botUserId == null
+                  ? null
+                  : () => onOpenChat(bridge),
+              onAddUrl: onAddUrl,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// A bridge found on the homeserver that Braid is not configured for yet.
 ///
 /// Was a `ListTile` with two buttons inside its `subtitle`, which is a slot for
@@ -529,53 +590,53 @@ class _DetectedBridgeCard extends StatelessWidget {
       ],
     );
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: WeftSpace.sm),
-      child: Padding(
-        padding: const EdgeInsets.all(WeftSpace.md),
-        // Trailing on a desktop, where the row is wide enough to hold them;
-        // under the name on a phone, since two buttons and a bot id do not
-        // share four hundred points.
-        child: context.isDesktop
-            ? Row(
-                children: [
-                  NetworkGlyph(
-                    network: found.network,
-                    size: 28,
-                    semanticsLabel: '',
-                  ),
-                  const SizedBox(width: WeftSpace.md),
-                  Expanded(child: name),
-                  const SizedBox(width: WeftSpace.md),
-                  Row(mainAxisSize: MainAxisSize.min, children: actions),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      NetworkGlyph(
-                        network: found.network,
-                        size: 30,
-                        semanticsLabel: '',
-                      ),
-                      const SizedBox(width: WeftSpace.md),
-                      Expanded(child: name),
-                    ],
-                  ),
-                  const SizedBox(height: WeftSpace.sm),
-                  Wrap(
-                    spacing: WeftSpace.sm,
-                    runSpacing: WeftSpace.sm,
-                    children: actions
-                        .where((w) => w is! SizedBox)
-                        .toList(growable: false),
-                  ),
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: WeftSpace.md,
+        vertical: WeftSpace.sm,
       ),
+      // Trailing on a desktop, where the row is wide enough to hold them;
+      // under the name on a phone, since two buttons and a bot id do not
+      // share four hundred points.
+      child: context.isDesktop
+          ? Row(
+              children: [
+                NetworkGlyph(
+                  network: found.network,
+                  size: 28,
+                  semanticsLabel: '',
+                ),
+                const SizedBox(width: WeftSpace.md),
+                Expanded(child: name),
+                const SizedBox(width: WeftSpace.md),
+                Row(mainAxisSize: MainAxisSize.min, children: actions),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    NetworkGlyph(
+                      network: found.network,
+                      size: 30,
+                      semanticsLabel: '',
+                    ),
+                    const SizedBox(width: WeftSpace.md),
+                    Expanded(child: name),
+                  ],
+                ),
+                const SizedBox(height: WeftSpace.sm),
+                Wrap(
+                  spacing: WeftSpace.sm,
+                  runSpacing: WeftSpace.sm,
+                  children: actions
+                      .where((w) => w is! SizedBox)
+                      .toList(growable: false),
+                ),
+              ],
+            ),
     );
   }
 }
