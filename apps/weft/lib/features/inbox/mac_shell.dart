@@ -12,6 +12,7 @@ import '../../app/providers.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../bridges/bridges_screen.dart';
+import '../chat/chat_preview.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../search/search_screen.dart';
@@ -57,6 +58,13 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Shows [chatId] without reading it, and opens it properly if asked.
+  Future<void> _peek(String chatId) async {
+    final open = await showChatPreview(context, chatId);
+    if (open != true || !mounted) return;
+    ref.read(selectedChatProvider.notifier).select(chatId);
   }
 
   void _openSearch([String? query]) {
@@ -405,6 +413,10 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             chat.lastMessage?.timestamp,
             now: ref.watch(clockProvider)(),
           ),
+          // Hold to look without spending the unread marker. The phone's
+          // long-press enters selection, which is a thumb's idiom; a pointer
+          // has a right-click menu for that and nothing else bound to holding.
+          onLongPress: () => unawaited(_peek(chat.id)),
           onTap: () {
             if (selection.isNotEmpty) {
               ref.read(chatSelectionProvider.notifier).toggle(chat.id);

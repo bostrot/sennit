@@ -13,6 +13,7 @@ import '../../services/schedule/scheduled_actions.dart';
 import '../../app/providers.dart';
 import '../../app/shortcuts.dart';
 import '../bridges/bridges_screen.dart';
+import '../chat/chat_preview.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
 import '../status/status_bar.dart';
@@ -72,6 +73,10 @@ Future<void> showChatContextMenu(
       Offset.zero & overlay.size,
     ),
     items: [
+      // First, because it is the one verb here that changes nothing — and the
+      // reason it exists is that every other way of looking at a conversation
+      // marks it read.
+      item('peek', Icons.visibility_outlined, 'Peek'),
       if (chat.unreadCount > 0)
         item('read', Icons.mark_email_read_outlined, 'Mark read')
       else
@@ -97,6 +102,8 @@ Future<void> showChatContextMenu(
   if (choice == null || !context.mounted) return;
 
   switch (choice) {
+    case 'peek':
+      await showChatPreview(context, chat.id);
     case 'read':
       await repository.markRead(chat.id);
     case 'unread':
@@ -421,7 +428,6 @@ class _InboxPane extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 /// Bulk actions for the selected chats.

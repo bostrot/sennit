@@ -121,6 +121,26 @@ void main() {
     });
   }
 
+  // The preview's own card. The composed overlay cannot be captured here — a
+  // route draws above the repaint boundary this harness photographs — so what
+  // is checked is the thing inside it: a conversation with no composer.
+  testWidgets('16_chat_preview', (tester) async {
+    await shot(
+      tester,
+      '16_chat_preview',
+      Center(
+        child: SizedBox(
+          width: 720,
+          height: 520,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: const ChatView(chatId: 'merged:anna', preview: true),
+          ),
+        ),
+      ),
+    );
+  });
+
   testWidgets('01_inbox_light', (tester) async {
     await shot(tester, '01_inbox_light', const InboxShell(),
         mode: WeftThemeMode.light);

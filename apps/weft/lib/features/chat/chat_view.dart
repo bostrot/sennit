@@ -62,9 +62,25 @@ import 'unverified_devices_banner.dart';
 /// The timeline is driven by [MergedTimeline], so a merged chat and a plain one
 /// take exactly the same code path; a plain chat is simply a merge of one.
 class ChatView extends ConsumerStatefulWidget {
-  const ChatView({super.key, required this.chatId, this.initialEventId});
+  const ChatView({
+    super.key,
+    required this.chatId,
+    this.initialEventId,
+    this.preview = false,
+  });
 
   final String chatId;
+
+  /// A look at the conversation that does not count as having read it.
+  ///
+  /// Opening a chat marks it read and clears its notification, which is right
+  /// — and is exactly what someone checking "who was that?" does not want,
+  /// because the unread marker is the only record of what they still owe an
+  /// answer to. A preview reads the same timeline through the same widget and
+  /// changes nothing: no read receipt, no notification dismissed, no composer,
+  /// and no action on any message.
+
+  final bool preview;
 
   /// When set — a search result, a link — history loads until this event is
   /// present, the list jumps to it, and the bubble pulses. Landing at the
@@ -300,7 +316,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
         _unavailable = null;
         _view = timeline.view();
       });
-      _readConversation(chatId);
+      // The one thing a preview must not do. Everything else about this
+      // screen is the same in both modes, which is the point of the flag.
+      if (!widget.preview) _readConversation(chatId);
       await _loadOlder();
       if (widget.initialEventId != null) await _jumpTo(widget.initialEventId!);
     } on ArgumentError {
@@ -1025,6 +1043,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
         mac: context.isMac,
         typing: _typing,
         online: _peerOnline,
+        preview: widget.preview,
       ),
       body: _escapeCancels(
         // Ordered rather than reading order: the timeline comes before the
@@ -1070,179 +1089,207 @@ class _ChatViewState extends ConsumerState<ChatView> {
                     child: _ReadingColumn(
                       enabled: context.isMac,
                       child: ListView.builder(
-                      controller: _scroll,
-                      reverse: true,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: WeftSpace.lg,
-                        vertical: WeftSpace.md,
-                      ),
-                      itemCount: uploads.length + _view.messages.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index < uploads.length) {
-                          // Reversed: index 0 is the newest, and the newest upload is
-                          // the last one enqueued.
-                          return _uploadBubble(
-                            chat,
-                            uploads[uploads.length - 1 - index],
-                          );
-                        }
-                        final i = index - uploads.length;
-                        if (i == _view.messages.length) return _historyFooter();
-                        var message = _view.messages[i];
-                        // Transcripts arrive after the event was mapped; overlay the
-                        // session cache so a finished transcription shows in place.
-                        final cachedTranscript = ref
-                            .watch(transcriptionServiceProvider)
-                            .cached(message.eventId, roomId: message.roomId);
-                        if (cachedTranscript != null &&
-                            message.transcript == null) {
-                          message = message.copyWith(
-                            transcript: cachedTranscript.text,
-                          );
-                        }
-                        final older = i + 1 < _view.messages.length
-                            ? _view.messages[i + 1]
-                            : null;
-                        return Column(
-                          key: _messageKeys.putIfAbsent(
-                            message.eventId,
-                            GlobalKey.new,
-                          ),
-                          children: [
-                            if (_needsDayDivider(message, older))
-                              _DayDivider(date: message.timestamp),
-                            _SwipeToReply(
-                              enabled: !message.redacted,
-                              onReply: () => _enterComposerContext(
-                                ComposerContext.reply(message),
-                              ),
-                              child: _MessageBubble(
-                                message: message,
-                                replyPreview: _replyPreviewFor(message),
-                                highlighted:
-                                    message.eventId == _highlightEventId,
-                                transcribing: _transcribing.contains(
-                                  message.eventId,
-                                ),
-                                onOpen: rendersAsAttachment(message)
-                                    ? () => _openMedia(message)
-                                    : null,
-                                onTranscribe:
-                                    message.canTranscribe &&
-                                        message.transcript == null
-                                    ? () => _transcribe(message)
-                                    : null,
-                                onRetranscribe:
-                                    message.canTranscribe &&
-                                        message.transcript != null
-                                    ? () => _retranscribe(message)
-                                    : null,
-                                onActions: () => _openActions(message),
-                                onActionsAt: (position) => unawaited(
-                                  _openActions(message, at: position),
-                                ),
-                                onQuickReply: () => _enterComposerContext(
+                        controller: _scroll,
+                        reverse: true,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: WeftSpace.lg,
+                          vertical: WeftSpace.md,
+                        ),
+                        itemCount: uploads.length + _view.messages.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index < uploads.length) {
+                            // Reversed: index 0 is the newest, and the newest upload is
+                            // the last one enqueued.
+                            return _uploadBubble(
+                              chat,
+                              uploads[uploads.length - 1 - index],
+                            );
+                          }
+                          final i = index - uploads.length;
+                          if (i == _view.messages.length) {
+                            return _historyFooter();
+                          }
+                          var message = _view.messages[i];
+                          // Transcripts arrive after the event was mapped; overlay the
+                          // session cache so a finished transcription shows in place.
+                          final cachedTranscript = ref
+                              .watch(transcriptionServiceProvider)
+                              .cached(message.eventId, roomId: message.roomId);
+                          if (cachedTranscript != null &&
+                              message.transcript == null) {
+                            message = message.copyWith(
+                              transcript: cachedTranscript.text,
+                            );
+                          }
+                          final older = i + 1 < _view.messages.length
+                              ? _view.messages[i + 1]
+                              : null;
+                          return Column(
+                            key: _messageKeys.putIfAbsent(
+                              message.eventId,
+                              GlobalKey.new,
+                            ),
+                            children: [
+                              if (_needsDayDivider(message, older))
+                                _DayDivider(date: message.timestamp),
+                              _SwipeToReply(
+                                enabled: !widget.preview && !message.redacted,
+                                onReply: () => _enterComposerContext(
                                   ComposerContext.reply(message),
                                 ),
-                                onQuickReact: (anchor) => unawaited(
-                                  _pickReaction(message, anchor: anchor),
-                                ),
-                                onJumpToReply: (eventId) => _jumpTo(eventId),
-                                onToggleReaction: (tally) =>
-                                    _toggleReaction(message, tally),
-                                onAddReaction: (anchor) =>
-                                    _pickReaction(message, anchor: anchor),
-                                onShowReactionSenders: (tally) =>
-                                    showReactionSendersSheet(
-                                      context,
-                                      tally: tally,
-                                      nameFor: _nameFor,
-                                    ),
-                                onTapLink: _openLink,
-                                onTapMention: _openMention,
-                                onRespondInvite: message.calendarInvite == null
-                                    ? null
-                                    : (reply, proposedStart) => _respondInvite(
-                                        message,
-                                        reply,
-                                        proposedStart,
+                                child: _MessageBubble(
+                                  message: message,
+                                  replyPreview: _replyPreviewFor(message),
+                                  highlighted:
+                                      message.eventId == _highlightEventId,
+                                  transcribing: _transcribing.contains(
+                                    message.eventId,
+                                  ),
+                                  onOpen:
+                                      !widget.preview &&
+                                          rendersAsAttachment(message)
+                                      ? () => _openMedia(message)
+                                      : null,
+                                  onTranscribe:
+                                      message.canTranscribe &&
+                                          message.transcript == null
+                                      ? () => _transcribe(message)
+                                      : null,
+                                  onRetranscribe:
+                                      message.canTranscribe &&
+                                          message.transcript != null
+                                      ? () => _retranscribe(message)
+                                      : null,
+                                  onActions: widget.preview
+                                      ? null
+                                      : () => _openActions(message),
+                                  onActionsAt: widget.preview
+                                      ? null
+                                      : (position) => unawaited(
+                                          _openActions(message, at: position),
+                                        ),
+                                  onQuickReply: widget.preview
+                                      ? null
+                                      : () => _enterComposerContext(
+                                          ComposerContext.reply(message),
+                                        ),
+                                  onQuickReact: widget.preview
+                                      ? null
+                                      : (anchor) => unawaited(
+                                          _pickReaction(
+                                            message,
+                                            anchor: anchor,
+                                          ),
+                                        ),
+                                  onJumpToReply: (eventId) => _jumpTo(eventId),
+                                  onToggleReaction: widget.preview
+                                      ? null
+                                      : (tally) =>
+                                            _toggleReaction(message, tally),
+                                  onAddReaction: widget.preview
+                                      ? null
+                                      : (anchor) => _pickReaction(
+                                          message,
+                                          anchor: anchor,
+                                        ),
+                                  onShowReactionSenders: (tally) =>
+                                      showReactionSendersSheet(
+                                        context,
+                                        tally: tally,
+                                        nameFor: _nameFor,
                                       ),
-                                onAddInviteToCalendar:
-                                    message.calendarInvite == null
-                                    ? null
-                                    : () => _addInviteToCalendar(message),
-                                onEditInvite: message.calendarInvite == null
-                                    ? null
-                                    : () => _editInvite(message),
-                                onVote: message.kind == MessageKind.poll
-                                    ? (optionId) => _run(
-                                        () => ref
-                                            .read(chatRepositoryProvider)
-                                            .votePoll(
-                                              message.roomId,
-                                              message.eventId,
-                                              {optionId},
+                                  onTapLink: _openLink,
+                                  onTapMention: _openMention,
+                                  onRespondInvite:
+                                      message.calendarInvite == null
+                                      ? null
+                                      : (reply, proposedStart) =>
+                                            _respondInvite(
+                                              message,
+                                              reply,
+                                              proposedStart,
                                             ),
-                                      )
-                                    : null,
-                                showNetwork: chat.isMerged,
-                                showSender: chat.isGroup,
-                                groupedWithPrevious:
-                                    older != null &&
-                                    older.isOwn == message.isOwn &&
-                                    older.network == message.network &&
-                                    message.timestamp
-                                            .difference(older.timestamp)
-                                            .inMinutes <
-                                        5,
-                              ),
-                            ),
-                            if (_seenAt(message) case final DateTime seen)
-                              Padding(
-                                padding: const EdgeInsetsDirectional.only(
-                                  top: 2,
-                                  end: WeftSpace.xs,
+                                  onAddInviteToCalendar:
+                                      message.calendarInvite == null
+                                      ? null
+                                      : () => _addInviteToCalendar(message),
+                                  onEditInvite: message.calendarInvite == null
+                                      ? null
+                                      : () => _editInvite(message),
+                                  onVote: message.kind == MessageKind.poll
+                                      ? (optionId) => _run(
+                                          () => ref
+                                              .read(chatRepositoryProvider)
+                                              .votePoll(
+                                                message.roomId,
+                                                message.eventId,
+                                                {optionId},
+                                              ),
+                                        )
+                                      : null,
+                                  showNetwork: chat.isMerged,
+                                  showSender: chat.isGroup,
+                                  groupedWithPrevious:
+                                      older != null &&
+                                      older.isOwn == message.isOwn &&
+                                      older.network == message.network &&
+                                      message.timestamp
+                                              .difference(older.timestamp)
+                                              .inMinutes <
+                                          5,
                                 ),
-                                child: Align(
-                                  alignment: AlignmentDirectional.centerEnd,
-                                  child: Text(
-                                    _seenLabel(seen),
-                                    style: context.text.labelSmall?.copyWith(
-                                      color: context.colors.onSurfaceVariant,
+                              ),
+                              if (_seenAt(message) case final DateTime seen)
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                    top: 2,
+                                    end: WeftSpace.xs,
+                                  ),
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: Text(
+                                      _seenLabel(seen),
+                                      style: context.text.labelSmall?.copyWith(
+                                        color: context.colors.onSurfaceVariant,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
               ),
-              _ScheduledSendsBar(chatId: _chatId),
-              FocusTraversalOrder(
-                order: const NumericFocusOrder(2),
-                child: _recording
-                    ? VoiceRecordingBar(
-                        onCancel: () => setState(() => _recording = false),
-                        onSend: (recording) => _sendVoiceNote(chat, recording),
-                      )
-                    : _Composer(
-                        chat: chat,
-                        controller: _composer,
-                        focusNode: _composerFocus,
-                        composing: _composerContext,
-                        onCancelContext: _cancelComposerContext,
-                        onSend: _send,
-                        onAttach: () => _attach(chat),
-                        onPaste: () => unawaited(_paste(chat)),
-                        onPickNetwork: _pickNetwork,
-                        onRecordVoice: () => setState(() => _recording = true),
-                        onSendLater: () => _sendLater(chat),
-                      ),
-              ),
+              // A preview is a look, not a place to answer from: no composer,
+              // and none of the state that hangs off one.
+              if (!widget.preview) _ScheduledSendsBar(chatId: _chatId),
+              if (!widget.preview)
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(2),
+                  child: _recording
+                      ? VoiceRecordingBar(
+                          onCancel: () => setState(() => _recording = false),
+                          onSend: (recording) =>
+                              _sendVoiceNote(chat, recording),
+                        )
+                      : _Composer(
+                          chat: chat,
+                          controller: _composer,
+                          focusNode: _composerFocus,
+                          composing: _composerContext,
+                          onCancelContext: _cancelComposerContext,
+                          onSend: _send,
+                          onAttach: () => _attach(chat),
+                          onPaste: () => unawaited(_paste(chat)),
+                          onPickNetwork: _pickNetwork,
+                          onRecordVoice: () =>
+                              setState(() => _recording = true),
+                          onSendLater: () => _sendLater(chat),
+                        ),
+                ),
             ],
           ),
         ),
@@ -1889,7 +1936,12 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.mac,
     this.typing = const [],
     this.online = false,
+    this.preview = false,
   });
+
+  /// A preview's bar names the conversation and offers nothing: a peek that
+  /// can start a call is not a peek.
+  final bool preview;
 
   final Chat chat;
 
@@ -1918,11 +1970,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required VoidCallback? onPressed,
   }) => mac
       ? MacToolbarButton(icon: icon, tooltip: tooltip, onPressed: onPressed)
-      : IconButton(
-          tooltip: tooltip,
-          icon: Icon(icon),
-          onPressed: onPressed,
-        );
+      : IconButton(tooltip: tooltip, icon: Icon(icon), onPressed: onPressed);
 
   @override
   Widget build(BuildContext context) {
@@ -2038,88 +2086,90 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// The conversation's verbs. Shared by both bars — a call is a call, and the
   /// only thing the surface changes is which button shape draws it.
-  List<Widget> _actions(BuildContext context) => [
-        // Disabled rather than hidden, with the reason in its tooltip: a
-        // conversation with no Matrix-native leg cannot carry a call, and a
-        // button that quietly disappeared for bridged chats would read as Braid
-        // having lost the feature.
-        Consumer(
-          builder: (context, ref, _) {
-            final availability = ref.watch(callAvailabilityProvider(chat.id));
-            final target = availability.target;
-            if (target != null) {
-              return _action(
-                tooltip: availability.message,
-                icon: Icons.call_rounded,
-                onPressed: () => startCall(context, ref, target),
-              );
-            }
-            // No Matrix leg to call over — the call lives in the network's
-            // own app, so the button opens the conversation there (or the
-            // dialler, when all Weft knows is a number) instead of sitting
-            // greyed out under a tooltip explaining itself. Only for the
-            // *bridged* refusal: a group is refused as a group whatever apps
-            // its members are on.
-            if (availability is! CallBlocked ||
-                availability.reason != CallBlocker.bridged) {
-              return _action(
-                tooltip: availability.message,
-                icon: Icons.call_rounded,
-                onPressed: null,
-              );
-            }
-            final contact = chat.contactId == null
-                ? null
-                : ref
-                      .read(chatRepositoryProvider)
-                      .identityGraph
-                      .contacts()
-                      .where((c) => c.id == chat.contactId)
-                      .firstOrNull;
-            final external = externalCallRouteFor(chat, contact);
-            if (external == null) {
-              return _action(
-                tooltip: availability.message,
-                icon: Icons.call_rounded,
-                onPressed: null,
-              );
-            }
-            return _action(
-              tooltip: external.label,
-              icon: Icons.phone_forwarded_rounded,
-              onPressed: () async {
-                final opened = await launchUrl(
-                  external.uri,
-                  mode: LaunchMode.externalApplication,
+  List<Widget> _actions(BuildContext context) => preview
+      ? const []
+      : [
+          // Disabled rather than hidden, with the reason in its tooltip: a
+          // conversation with no Matrix-native leg cannot carry a call, and a
+          // button that quietly disappeared for bridged chats would read as Braid
+          // having lost the feature.
+          Consumer(
+            builder: (context, ref, _) {
+              final availability = ref.watch(callAvailabilityProvider(chat.id));
+              final target = availability.target;
+              if (target != null) {
+                return _action(
+                  tooltip: availability.message,
+                  icon: Icons.call_rounded,
+                  onPressed: () => startCall(context, ref, target),
                 );
-                if (!opened && context.mounted) {
-                  showWeftMessage(
-                    context,
-                    'Nothing on this device could open that call.',
+              }
+              // No Matrix leg to call over — the call lives in the network's
+              // own app, so the button opens the conversation there (or the
+              // dialler, when all Weft knows is a number) instead of sitting
+              // greyed out under a tooltip explaining itself. Only for the
+              // *bridged* refusal: a group is refused as a group whatever apps
+              // its members are on.
+              if (availability is! CallBlocked ||
+                  availability.reason != CallBlocker.bridged) {
+                return _action(
+                  tooltip: availability.message,
+                  icon: Icons.call_rounded,
+                  onPressed: null,
+                );
+              }
+              final contact = chat.contactId == null
+                  ? null
+                  : ref
+                        .read(chatRepositoryProvider)
+                        .identityGraph
+                        .contacts()
+                        .where((c) => c.id == chat.contactId)
+                        .firstOrNull;
+              final external = externalCallRouteFor(chat, contact);
+              if (external == null) {
+                return _action(
+                  tooltip: availability.message,
+                  icon: Icons.call_rounded,
+                  onPressed: null,
+                );
+              }
+              return _action(
+                tooltip: external.label,
+                icon: Icons.phone_forwarded_rounded,
+                onPressed: () async {
+                  final opened = await launchUrl(
+                    external.uri,
+                    mode: LaunchMode.externalApplication,
                   );
-                }
-              },
-            );
-          },
-        ),
-        _action(
-          tooltip: chat.isMerged ? 'Manage merge' : 'Merge with…',
-          icon: Icons.merge_rounded,
-          onPressed: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute<void>(builder: (_) => const MergeScreen())),
-        ),
-        // Disabled rather than inert. `onPressed: () {}` is a button that
-        // announces itself as enabled, takes a tap and does nothing — which a
-        // reader has no way to distinguish from a tap that failed. There is no
-        // in-conversation search yet; the tooltip says so and the button says
-        // so by being unavailable. Search across every chat is on the inbox.
-        _action(
-          tooltip: 'Search in conversation — not available yet',
-          icon: Icons.search_rounded,
-          onPressed: null,
-        ),
-      ];
+                  if (!opened && context.mounted) {
+                    showWeftMessage(
+                      context,
+                      'Nothing on this device could open that call.',
+                    );
+                  }
+                },
+              );
+            },
+          ),
+          _action(
+            tooltip: chat.isMerged ? 'Manage merge' : 'Merge with…',
+            icon: Icons.merge_rounded,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MergeScreen()),
+            ),
+          ),
+          // Disabled rather than inert. `onPressed: () {}` is a button that
+          // announces itself as enabled, takes a tap and does nothing — which a
+          // reader has no way to distinguish from a tap that failed. There is no
+          // in-conversation search yet; the tooltip says so and the button says
+          // so by being unavailable. Search across every chat is on the inbox.
+          _action(
+            tooltip: 'Search in conversation — not available yet',
+            icon: Icons.search_rounded,
+            onPressed: null,
+          ),
+        ];
 
   /// The thread's slice of the window's toolbar.
   ///
@@ -2129,10 +2179,11 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// conversation's name at 13pt and gets on with showing the conversation.
   Widget _macBar(BuildContext context) {
     final subtitle = switch ((typing.isNotEmpty, chat.isMerged)) {
-      (true, _) => chat.isGroup
-          ? '${typing.join(', ')} '
-                '${typing.length == 1 ? 'is' : 'are'} typing…'
-          : 'typing…',
+      (true, _) =>
+        chat.isGroup
+            ? '${typing.join(', ')} '
+                  '${typing.length == 1 ? 'is' : 'are'} typing…'
+            : 'typing…',
       (_, true) =>
         'Merged · ${chat.networks.map((n) => n.label).join(', ')}'
             '${online ? ' · online' : ''}',
@@ -2160,11 +2211,13 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: MouseRegion(
               cursor: SystemMouseCursors.basic,
               child: GestureDetector(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ContactProfileScreen(chatId: chat.id),
-                  ),
-                ),
+                onTap: preview
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ContactProfileScreen(chatId: chat.id),
+                        ),
+                      ),
                 child: ExcludeSemantics(
                   child: WeftAvatar(
                     label: chat.title,
@@ -3295,187 +3348,189 @@ class _Composer extends StatelessWidget {
           // that starts where the bubbles stop looks like a bar bolted on.
           enabled: mac,
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (composing != null)
-              _ComposerContextBar(
-                composing: composing!,
-                onCancel: onCancelContext,
-              ),
-            // Rebuilt per keystroke rather than with the whole view: the
-            // segment count is a live number, and the encryption warning has to
-            // be on screen before the first character is typed, not after.
-            if (sendNetwork == ChatNetwork.sms)
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) =>
-                    SmsComposerBar(body: value.text),
-              ),
-            Row(
-              // Centred on a desktop, where the field is one line tall and
-              // every control beside it is 24 points: aligning to the bottom
-              // there leaves each of them sitting on a different line. A phone's
-              // field grows to five lines, and the buttons belong at its foot.
-              crossAxisAlignment: mac
-                  ? CrossAxisAlignment.center
-                  : CrossAxisAlignment.end,
-              children: [
-                if (chat.isMerged && sendNetwork != null) ...[
-                  SendNetworkChip(
-                    chat: chat,
-                    current: sendNetwork,
-                    onPick: onPickNetwork,
-                  ),
-                  const SizedBox(width: WeftSpace.sm),
-                ],
-                IconButton(
-                  icon: const Icon(Icons.add_rounded),
-                  iconSize: mac ? 17 : null,
-                  visualDensity: mac ? VisualDensity.compact : null,
-                  // Wider than the round send button on purpose. Squeezed to
-                  // 24 with no padding it stopped reading as a control at all
-                  // — a stray plus sign between the network chip and the
-                  // field, with nothing to hover.
-                  constraints: mac
-                      ? const BoxConstraints.tightFor(width: 28, height: 28)
-                      : null,
-                  padding: mac ? EdgeInsets.zero : null,
-                  tooltip: 'Attach',
-                  // An edit replaces one event's text. There is no such thing
-                  // as editing a message into a photo, so the picker is closed
-                  // rather than left to fail somewhere further down.
-                  onPressed: editing ? null : onAttach,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (composing != null)
+                _ComposerContextBar(
+                  composing: composing!,
+                  onCancel: onCancelContext,
                 ),
-                Expanded(
-                  // The hint is the *only* place the composer's mode is stated
-                  // in words, and a hint disappears the moment a character is
-                  // typed — so a reader who started replying and then typed had
-                  // no way left to find out that the next send is a reply. The
-                  // label says it whether the field is empty or not.
-                  child: WeftLabelledField(
-                    label: _fieldLabel(sendNetwork),
-                    // Around the field, so the key is resolved from the focused
-                    // node outward and marked handled before the platform's
-                    // text input ever sees it. That is what makes Shift+Enter
-                    // able to mean something other than Enter: with
-                    // `TextInputAction.send` alone the embedder called
-                    // `performAction` for both, so a five-line composer had no
-                    // reachable line two.
-                    child: Shortcuts(
-                      shortcuts: composerShortcuts,
-                      child: Actions(
-                        actions: <Type, Action<Intent>>{
-                          SendComposerIntent:
-                              CallbackAction<SendComposerIntent>(
-                                onInvoke: (_) {
-                                  onSend();
-                                  return null;
-                                },
+              // Rebuilt per keystroke rather than with the whole view: the
+              // segment count is a live number, and the encryption warning has to
+              // be on screen before the first character is typed, not after.
+              if (sendNetwork == ChatNetwork.sms)
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) =>
+                      SmsComposerBar(body: value.text),
+                ),
+              Row(
+                // Centred on a desktop, where the field is one line tall and
+                // every control beside it is 24 points: aligning to the bottom
+                // there leaves each of them sitting on a different line. A phone's
+                // field grows to five lines, and the buttons belong at its foot.
+                crossAxisAlignment: mac
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.end,
+                children: [
+                  if (chat.isMerged && sendNetwork != null) ...[
+                    SendNetworkChip(
+                      chat: chat,
+                      current: sendNetwork,
+                      onPick: onPickNetwork,
+                    ),
+                    const SizedBox(width: WeftSpace.sm),
+                  ],
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    iconSize: mac ? 17 : null,
+                    visualDensity: mac ? VisualDensity.compact : null,
+                    // Wider than the round send button on purpose. Squeezed to
+                    // 24 with no padding it stopped reading as a control at all
+                    // — a stray plus sign between the network chip and the
+                    // field, with nothing to hover.
+                    constraints: mac
+                        ? const BoxConstraints.tightFor(width: 28, height: 28)
+                        : null,
+                    padding: mac ? EdgeInsets.zero : null,
+                    tooltip: 'Attach',
+                    // An edit replaces one event's text. There is no such thing
+                    // as editing a message into a photo, so the picker is closed
+                    // rather than left to fail somewhere further down.
+                    onPressed: editing ? null : onAttach,
+                  ),
+                  Expanded(
+                    // The hint is the *only* place the composer's mode is stated
+                    // in words, and a hint disappears the moment a character is
+                    // typed — so a reader who started replying and then typed had
+                    // no way left to find out that the next send is a reply. The
+                    // label says it whether the field is empty or not.
+                    child: WeftLabelledField(
+                      label: _fieldLabel(sendNetwork),
+                      // Around the field, so the key is resolved from the focused
+                      // node outward and marked handled before the platform's
+                      // text input ever sees it. That is what makes Shift+Enter
+                      // able to mean something other than Enter: with
+                      // `TextInputAction.send` alone the embedder called
+                      // `performAction` for both, so a five-line composer had no
+                      // reachable line two.
+                      child: Shortcuts(
+                        shortcuts: composerShortcuts,
+                        child: Actions(
+                          actions: <Type, Action<Intent>>{
+                            SendComposerIntent:
+                                CallbackAction<SendComposerIntent>(
+                                  onInvoke: (_) {
+                                    onSend();
+                                    return null;
+                                  },
+                                ),
+                            InsertComposerNewlineIntent:
+                                CallbackAction<InsertComposerNewlineIntent>(
+                                  onInvoke: (_) {
+                                    insertComposerNewline(controller);
+                                    return null;
+                                  },
+                                ),
+                            PasteIntoComposerIntent:
+                                CallbackAction<PasteIntoComposerIntent>(
+                                  onInvoke: (_) {
+                                    onPaste();
+                                    return null;
+                                  },
+                                ),
+                          },
+                          // Rebuilt per keystroke for one reason: the field's
+                          // base direction follows what is being typed, the same
+                          // way a sent message's follows what was typed. Someone
+                          // answering a Hebrew message in an English UI gets a
+                          // caret that starts on the right and punctuation that
+                          // lands where they meant it, without having to change
+                          // the app's language to write one sentence. The SMS bar
+                          // above listens to the same controller for the same
+                          // reason.
+                          child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: controller,
+                            builder: (context, value, _) => TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              minLines: 1,
+                              maxLines: 5,
+                              textDirection: textDirectionOf(value.text),
+                              // Kept for a soft keyboard, which sends no key
+                              // events at all: on a phone this is still what puts
+                              // a send glyph on the return key and what fires
+                              // `onSend`.
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => onSend(),
+                              decoration: InputDecoration(
+                                hintText: _fieldLabel(sendNetwork),
+                                isDense: true,
                               ),
-                          InsertComposerNewlineIntent:
-                              CallbackAction<InsertComposerNewlineIntent>(
-                                onInvoke: (_) {
-                                  insertComposerNewline(controller);
-                                  return null;
-                                },
-                              ),
-                          PasteIntoComposerIntent:
-                              CallbackAction<PasteIntoComposerIntent>(
-                                onInvoke: (_) {
-                                  onPaste();
-                                  return null;
-                                },
-                              ),
-                        },
-                        // Rebuilt per keystroke for one reason: the field's
-                        // base direction follows what is being typed, the same
-                        // way a sent message's follows what was typed. Someone
-                        // answering a Hebrew message in an English UI gets a
-                        // caret that starts on the right and punctuation that
-                        // lands where they meant it, without having to change
-                        // the app's language to write one sentence. The SMS bar
-                        // above listens to the same controller for the same
-                        // reason.
-                        child: ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: controller,
-                          builder: (context, value, _) => TextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            minLines: 1,
-                            maxLines: 5,
-                            textDirection: textDirectionOf(value.text),
-                            // Kept for a soft keyboard, which sends no key
-                            // events at all: on a phone this is still what puts
-                            // a send glyph on the return key and what fires
-                            // `onSend`.
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => onSend(),
-                            decoration: InputDecoration(
-                              hintText: _fieldLabel(sendNetwork),
-                              isDense: true,
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: WeftSpace.sm),
-                // WhatsApp's swap: an empty field sends nothing, so its button
-                // is the microphone; the first typed character turns it into
-                // send. Listening to the controller keeps the swap in step
-                // with typing without rebuilding the whole composer.
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: controller,
-                  builder: (context, value, _) {
-                    final showMic =
-                        !editing &&
-                        onRecordVoice != null &&
-                        value.text.trim().isEmpty;
-                    if (showMic) {
+                  const SizedBox(width: WeftSpace.sm),
+                  // WhatsApp's swap: an empty field sends nothing, so its button
+                  // is the microphone; the first typed character turns it into
+                  // send. Listening to the controller keeps the swap in step
+                  // with typing without rebuilding the whole composer.
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final showMic =
+                          !editing &&
+                          onRecordVoice != null &&
+                          value.text.trim().isEmpty;
+                      if (showMic) {
                         return IconButton.filled(
-                        onPressed: onRecordVoice,
-                        iconSize: mac ? 13 : 18,
-                        visualDensity: mac ? VisualDensity.compact : null,
-                        constraints: mac ? _macButton : null,
-                        padding: mac ? EdgeInsets.zero : null,
-                        icon: const Icon(Icons.mic_rounded),
-                        tooltip: 'Record voice message',
-                      );
-                    }
-                    return GestureDetector(
-                      // Long-press for "send later" — the same spot WhatsApp
-                      // and Telegram hide it, and harmless to discover: a
-                      // long-press that does nothing was doing nothing anyway.
-                      onLongPress: editing ? null : onSendLater,
-                      child: Tooltip(
-                        message: editing
-                            ? 'Save edit'
-                            : 'Send — hold to schedule',
-                        // Hover still shows it; touch no longer does. A
-                        // `Tooltip` claims long presses by default, and as the
-                        // deeper widget it won the gesture arena against the
-                        // handler above — holding Send showed the tip that
-                        // says to hold Send, and scheduled nothing.
-                        triggerMode: TooltipTriggerMode.manual,
-                        child: IconButton.filled(
-                          onPressed: onSend,
+                          onPressed: onRecordVoice,
                           iconSize: mac ? 13 : 18,
                           visualDensity: mac ? VisualDensity.compact : null,
                           constraints: mac ? _macButton : null,
                           padding: mac ? EdgeInsets.zero : null,
-                          icon: Icon(
-                            editing ? Icons.check_rounded : Icons.send_rounded,
+                          icon: const Icon(Icons.mic_rounded),
+                          tooltip: 'Record voice message',
+                        );
+                      }
+                      return GestureDetector(
+                        // Long-press for "send later" — the same spot WhatsApp
+                        // and Telegram hide it, and harmless to discover: a
+                        // long-press that does nothing was doing nothing anyway.
+                        onLongPress: editing ? null : onSendLater,
+                        child: Tooltip(
+                          message: editing
+                              ? 'Save edit'
+                              : 'Send — hold to schedule',
+                          // Hover still shows it; touch no longer does. A
+                          // `Tooltip` claims long presses by default, and as the
+                          // deeper widget it won the gesture arena against the
+                          // handler above — holding Send showed the tip that
+                          // says to hold Send, and scheduled nothing.
+                          triggerMode: TooltipTriggerMode.manual,
+                          child: IconButton.filled(
+                            onPressed: onSend,
+                            iconSize: mac ? 13 : 18,
+                            visualDensity: mac ? VisualDensity.compact : null,
+                            constraints: mac ? _macButton : null,
+                            padding: mac ? EdgeInsets.zero : null,
+                            icon: Icon(
+                              editing
+                                  ? Icons.check_rounded
+                                  : Icons.send_rounded,
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
