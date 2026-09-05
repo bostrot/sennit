@@ -450,6 +450,11 @@
   "@inboxDeleteManyBody": {
     "description": "Body of the bulk-delete dialog. Three sentences: what happens, that it cannot be undone, and the gentler alternative. May wrap to four lines."
   },
+  "inboxCatchingUp": "Updating\u2026",
+  "@inboxCatchingUp": {
+    "description": "Small line under the inbox title while the first sync of this app start is still fetching news from the server. The chats on screen are from the last run until it finishes. Keep short, like a phone status line.",
+    "maxLength": 24
+  },
   "inboxTitleConversations": "Conversations",
   "@inboxTitleConversations": {
     "description": "Headline at the top of the inbox when no network filter is active. Replaced by the network names when one is. Keep under ~20 chars.",

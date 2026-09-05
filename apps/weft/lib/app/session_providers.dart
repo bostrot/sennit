@@ -25,6 +25,42 @@ final sessionBootstrapProvider = FutureProvider<WeftSessionState>((ref) async {
   return ref.watch(matrixSessionProvider).initialize();
 });
 
+/// True while this run's first sync is still on its way.
+///
+/// The inbox draws from the local database the moment the session restores,
+/// which bought the startup its speed at the price of a silence: for the first
+/// seconds the screen is last run's state, with nothing saying newer news is
+/// coming. This is the sentence that fills the silence, and it ends itself —
+/// once the first sync lands, updates stream in live and there is nothing left
+/// to announce.
+///
+/// Yields nothing until the bootstrap resolves, so a build with no session —
+/// tests, demo mode — settles on false without ever showing the label.
+final catchingUpProvider = StreamProvider<bool>((ref) async* {
+  if (!kDemoMode) {
+    try {
+      await ref.watch(sessionBootstrapProvider.future);
+      final client = ref.read(matrixSessionProvider).client;
+      final firstSync = client.firstSyncReceived;
+      if (firstSync != null) {
+        yield true;
+        try {
+          await firstSync;
+        } on Object {
+          // The first round failed — offline, or a server mid-restart. The
+          // SDK's loop retries on its own; the label comes down with whichever
+          // sync eventually lands, because "Updating…" over an inbox that is
+          // not updating is worse than no label at all.
+          await client.onSync.stream.first;
+        }
+      }
+    } on Object {
+      // No session to catch up: logged out, or a build without one.
+    }
+  }
+  yield false;
+});
+
 /// This account's other logins, for the devices screen.
 ///
 /// Built lazily, and deliberately not guarded against an uninitialised session:

@@ -11,6 +11,7 @@ import '../../app/localisation.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../../app/providers.dart';
+import '../../app/session_providers.dart';
 import '../../app/shortcuts.dart';
 import '../bridges/bridges_screen.dart';
 import '../chat/chat_preview.dart';
@@ -683,6 +684,19 @@ class _InboxHeader extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              // The inbox draws from the local database the moment the app
+              // opens; until the first sync of this run lands, what it shows
+              // is last run's state. This is the only thing that says so.
+              if (ref.watch(catchingUpProvider).value ?? false)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: WeftSpace.sm),
+                  child: Text(
+                    context.l10n.inboxCatchingUp,
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               IconButton(
                 tooltip: context.l10n.commonAppearance,
                 icon: const Icon(Icons.palette_outlined),

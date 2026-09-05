@@ -98,6 +98,7 @@
   "inboxLeaveAndDelete": "Verlassen und löschen",
   "inboxDeleteManyTitle": "{count, plural, =1{1 Unterhaltung löschen?} other{{count} Unterhaltungen löschen?}}",
   "inboxDeleteManyBody": "Dabei werden die Räume verlassen und vergessen. Der Verlauf ist für dieses Konto weg und lässt sich hier nicht wiederherstellen. Archivieren blendet einen Chat aus, ohne etwas zu verlieren.",
+  "inboxCatchingUp": "Wird aktualisiert\u2026",
   "inboxTitleConversations": "Unterhaltungen",
   "inboxMenuSelect": "Unterhaltungen auswählen",
   "inboxMenuMarkAllRead": "Alle als gelesen markieren",

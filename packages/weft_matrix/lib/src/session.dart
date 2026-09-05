@@ -109,7 +109,29 @@ class WeftMatrixSession {
     client.onLoginStateChanged.stream.listen(_onLoginStateChanged);
 
     _emit(WeftSessionState.connecting);
-    await client.init();
+    // Not `waitForFirstSync`: with it, init() holds until the homeserver
+    // answers a full /sync round-trip and the client has processed it — on an
+    // account with hundreds of bridged rooms that is tens of seconds, all of
+    // them spent behind the splash. Everything the inbox needs to draw is
+    // already in the local database from the last run; the sync keeps running
+    // in the background and its news streams in through `onSync` exactly as it
+    // would have a minute later.
+    await client.init(waitForFirstSync: false);
+
+    // The one start with nothing cached to show: a device that has never
+    // completed a sync (`prevBatch` is only ever written by one). Declaring
+    // the session ready there renders an empty inbox that reads as an empty
+    // *account*, so this start — and only this one — keeps the splash until
+    // the first sync lands.
+    if (client.isLogged() && client.prevBatch == null) {
+      try {
+        await client.firstSyncReceived;
+      } on Object {
+        // Offline, or a server mid-restart. The SDK's sync loop retries on
+        // its own; an inbox that fills in when the network returns beats a
+        // spinner that never ends.
+      }
+    }
 
     _emit(_deriveState());
     return _state;

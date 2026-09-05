@@ -99,6 +99,7 @@
   "inboxLeaveAndDelete": "退出并删除",
   "inboxDeleteManyTitle": "{count, plural, other{删除 {count} 个对话？}}",
   "inboxDeleteManyBody": "此操作会退出并遗忘这些房间。历史记录将从此账号中消失，且无法在此恢复。归档可以隐藏聊天而不丢失任何内容。",
+  "inboxCatchingUp": "\u6b63\u5728\u66f4\u65b0\u2026",
   "inboxTitleConversations": "对话",
   "inboxMenuSelect": "选择对话",
   "inboxMenuMarkAllRead": "全部标记为已读",

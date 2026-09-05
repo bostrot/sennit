@@ -98,6 +98,7 @@
   "inboxLeaveAndDelete": "Quitter et supprimer",
   "inboxDeleteManyTitle": "{count, plural, =1{Supprimer 1 conversation ?} other{Supprimer {count} conversations ?}}",
   "inboxDeleteManyBody": "Cette action quitte et oublie les salons. L’historique disparaît de ce compte et ne peut pas être récupéré ici. L’archivage masque une discussion sans rien perdre.",
+  "inboxCatchingUp": "Mise \u00e0 jour\u2026",
   "inboxTitleConversations": "Conversations",
   "inboxMenuSelect": "Sélectionner des conversations",
   "inboxMenuMarkAllRead": "Tout marquer comme lu",

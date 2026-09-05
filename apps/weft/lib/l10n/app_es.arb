@@ -98,6 +98,7 @@
   "inboxLeaveAndDelete": "Salir y eliminar",
   "inboxDeleteManyTitle": "{count, plural, =1{¿Eliminar 1 conversación?} other{¿Eliminar {count} conversaciones?}}",
   "inboxDeleteManyBody": "Esto sale de las salas y las olvida. El historial desaparece de esta cuenta y no se puede recuperar aquí. Archivar oculta un chat sin perder nada.",
+  "inboxCatchingUp": "Actualizando\u2026",
   "inboxTitleConversations": "Conversaciones",
   "inboxMenuSelect": "Seleccionar conversaciones",
   "inboxMenuMarkAllRead": "Marcar todo como leído",

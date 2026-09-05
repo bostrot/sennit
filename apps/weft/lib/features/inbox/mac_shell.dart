@@ -10,6 +10,7 @@ import '../../app/labels.dart';
 import '../../app/localisation.dart';
 import '../../app/menus.dart';
 import '../../app/providers.dart';
+import '../../app/session_providers.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../bridges/bridges_screen.dart';
@@ -422,11 +423,18 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     ),
     titleWidget: Align(
       alignment: AlignmentDirectional.centerStart,
-      child: Text(
-        title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: context.text.titleSmall,
+      child: Consumer(
+        builder: (context, ref, _) {
+          // Same sentence as the phone header: until this run's first sync
+          // lands, the list is last run's state, and nothing else says so.
+          final catchingUp = ref.watch(catchingUpProvider).value ?? false;
+          return Text(
+            catchingUp ? context.l10n.inboxCatchingUp : title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.titleSmall,
+          );
+        },
       ),
     ),
     actions: [

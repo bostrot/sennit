@@ -287,6 +287,12 @@ Future<void> pumpWeft(
   /// Null leaves the real provider in place, which reads the settings store and
   /// defaults to on.
   bool? readReceipts,
+
+  /// Whether the scene is still waiting on its first sync of the run.
+  ///
+  /// Overridden even when false: the real provider waits on the session
+  /// bootstrap, and a scene has no session to boot.
+  bool catchingUp = false,
   bool settle = true,
 }) async {
   tester.view.physicalSize = size;
@@ -308,6 +314,7 @@ Future<void> pumpWeft(
         // clock here would label the inbox "16:40" today and "8/15/2026" next
         // week — a golden that fails on a Tuesday.
         clockProvider.overrideWithValue(() => DemoChatRepository.fixtureNow),
+        catchingUpProvider.overrideWith((ref) => Stream.value(catchingUp)),
         if (fileReader != null)
           attachmentFileReaderProvider.overrideWithValue(fileReader),
         // Both faces of the same store. `storesProvider` is the synchronous one

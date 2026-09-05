@@ -99,6 +99,7 @@
   "inboxLeaveAndDelete": "Sair e excluir",
   "inboxDeleteManyTitle": "{count, plural, =1{Excluir 1 conversa?} other{Excluir {count} conversas?}}",
   "inboxDeleteManyBody": "Isto sai das salas e as esquece. O histórico desaparece desta conta e não pode ser recuperado aqui. Arquivar oculta uma conversa sem perder nada.",
+  "inboxCatchingUp": "Atualizando\u2026",
   "inboxTitleConversations": "Conversas",
   "inboxMenuSelect": "Selecionar conversas",
   "inboxMenuMarkAllRead": "Marcar tudo como lido",
