@@ -10,6 +10,8 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
     show ImagePickerPlatform;
 import 'package:weft_attachments/weft_attachments.dart';
 
+import '../../app/localisation.dart';
+
 /// Bytes read from the front of a picked file to fill [AttachmentSource.header].
 ///
 /// Everything `weft_attachments` decides — the sniffed mime type, the msgtype,
@@ -84,9 +86,9 @@ class PlatformAttachmentPicker implements AttachmentPicker {
   ///
   /// Extensions rather than mime types: `file_selector` maps them per platform,
   /// and a bare `image/*` is not expressible in a Windows file dialog filter.
-  static const List<XTypeGroup> _mediaTypes = [
+  static List<XTypeGroup> get _mediaTypes => [
     XTypeGroup(
-      label: 'Photos and videos',
+      label: weftPlatformL10n().attachPhotosAndVideos,
       extensions: [
         'jpg',
         'jpeg',

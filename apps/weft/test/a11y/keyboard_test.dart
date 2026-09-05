@@ -17,6 +17,7 @@ import 'package:weft/features/settings/shortcuts_sheet.dart';
 
 import '../support/recording_repository.dart';
 import '../support/semantics_probe.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Weft from a keyboard alone.
 ///
@@ -28,6 +29,7 @@ import '../support/semantics_probe.dart';
 /// so the suite says the same thing on a machine where Cmd is the modifier as
 /// on one where Ctrl is.
 void main() {
+  final en = lookupAppL10n(const Locale('en'));
   late DemoChatRepository demo;
   late RecordingChatRepository repository;
   late WeftStores stores;
@@ -71,6 +73,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           debugShowCheckedModeBanner: false,
           navigatorKey: navigatorKey,
           theme: WeftTheme.build(),
@@ -108,10 +111,11 @@ void main() {
   }
 
   /// The binding called [description], or a failure naming it.
-  WeftKeyBinding bindingFor(String description) => weftKeyBindings().firstWhere(
-    (b) => b.description == description,
-    orElse: () => fail('No binding called "$description"'),
-  );
+  WeftKeyBinding bindingFor(String description) =>
+      weftKeyBindings(en).firstWhere(
+        (b) => b.description == description,
+        orElse: () => fail('No binding called "$description"'),
+      );
 
   /// Presses the first key combination bound to [description].
   ///
@@ -337,10 +341,9 @@ void main() {
 
   group('every shortcut fires its action', () {
     test('the expectations below cover every app-wide binding', () {
-      final bound = weftKeyBindings()
-          .where((b) => b.intent != null)
-          .map((b) => b.description)
-          .toSet();
+      final bound = weftKeyBindings(
+        en,
+      ).where((b) => b.intent != null).map((b) => b.description).toSet();
       // Both directions. A missing expectation is an untested command; a stale
       // one is an expectation about a key nobody can press any more.
       expect(effects.keys.toSet(), bound);

@@ -17,6 +17,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/share_fixtures.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The share sheet as a *picker*, which is what Phase 04 task 7 turned it into.
 ///
@@ -79,6 +80,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: Builder(
             builder: (context) => Scaffold(
@@ -997,9 +999,13 @@ class _RecordingRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   }) async {
     if (failing.contains(chatId)) throw StateError('no route to $chatId');
-    sent.add('$chatId/${via?.id ?? 'default'}: file ${source.basename}');
+    sent.add(
+      '$chatId/${via?.id ?? 'default'}: file ${source.basename}'
+      '${caption == null ? '' : ' [$caption]'}',
+    );
   }
 
   /// Everything else throws: a picker that starts loading timelines or watching

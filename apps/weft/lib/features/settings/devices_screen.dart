@@ -6,6 +6,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
 import '../auth/verification_screen.dart';
 import 'settings_section.dart';
@@ -87,7 +88,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     showWeftMessage(context, message);
   }
 
-  static String _sentence(Object error) {
+  String _sentence(Object error) {
     final raw = error.toString();
     // The SDK reports an unreachable or erroring homeserver as a bare
     // "http error response" (a 502 from a restarting reverse proxy, most
@@ -96,8 +97,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         raw.contains('SocketException') ||
         raw.contains('Connection closed') ||
         raw.contains('has not connection')) {
-      return 'Your homeserver could not be reached — it may be restarting. '
-          'Try again in a moment.';
+      return context.l10n.devicesUnreachableHomeserver;
     }
     return switch (error) {
       DeviceActionException(:final message) => message,
@@ -114,28 +114,25 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   Future<String?> _askPassword() {
     return showDialog<String>(
       context: context,
-      builder: (_) => const TextPromptDialog(
-        title: 'Confirm it is you',
-        message:
-            'Your homeserver asks for your account password before it will '
-            'sign a session out.',
-        fieldLabel: 'Password',
-        confirmLabel: 'Confirm',
+      builder: (_) => TextPromptDialog(
+        title: context.l10n.devicesConfirmItIsYouTitle,
+        message: context.l10n.devicesConfirmItIsYouMessage,
+        fieldLabel: context.l10n.devicesPasswordField,
+        confirmLabel: context.l10n.commonConfirm,
         obscure: true,
       ),
     );
   }
 
   Future<void> _rename(WeftDevice device) async {
+    final renamed = context.l10n.devicesRenamed;
     final name = await showDialog<String>(
       context: context,
       builder: (_) => TextPromptDialog(
-        title: 'Rename device',
-        message:
-            'The name is visible to anyone you share an encrypted room with, '
-            'so it is worth being recognisable without being personal.',
-        fieldLabel: 'Name',
-        confirmLabel: 'Save',
+        title: context.l10n.devicesRenameTitle,
+        message: context.l10n.devicesRenameMessage,
+        fieldLabel: context.l10n.devicesNameField,
+        confirmLabel: context.l10n.commonSave,
         initialValue: device.displayName ?? '',
       ),
     );
@@ -144,22 +141,18 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     await _run(
       () =>
           ref.read(deviceManagerProvider).rename(device.deviceId, name.trim()),
-      success: 'Renamed.',
+      success: renamed,
     );
   }
 
   Future<void> _signOut(WeftDevice device) async {
+    final l10n = context.l10n;
     final confirmed = await _confirm(
-      title: 'Sign out ${device.label}?',
+      title: l10n.devicesSignOutTitle(device.label),
       message: device.isCurrent
-          ? 'This is the device you are using. Signing it out logs you out of '
-                'Braid here, and any messages only this device can decrypt stay '
-                'unreadable unless you have a key backup.'
-          : 'That session loses access immediately. If you did not recognise '
-                'it, change your account password afterwards as well — a '
-                'sign-out does not stop whoever has your password logging in '
-                'again.',
-      confirmLabel: 'Sign out',
+          ? l10n.devicesSignOutCurrentMessage
+          : l10n.devicesSignOutOtherMessage,
+      confirmLabel: l10n.devicesSignOut,
     );
     if (!confirmed || !mounted) return;
 
@@ -167,20 +160,16 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       () => ref.read(deviceManagerProvider).signOut([
         device.deviceId,
       ], reauth: _askPassword),
-      success: 'Signed out ${device.label}.',
+      success: l10n.devicesSignedOutOne(device.label),
     );
   }
 
   Future<void> _signOutOthers(List<WeftDevice> others) async {
+    final l10n = context.l10n;
     final confirmed = await _confirm(
-      title: others.length == 1
-          ? 'Sign out 1 other device?'
-          : 'Sign out ${others.length} other devices?',
-      message:
-          'Everything except this device is signed out. Those sessions can no '
-          'longer read new messages, and each will have to verify again when '
-          'it signs back in.',
-      confirmLabel: 'Sign out others',
+      title: l10n.devicesSignOutOthersTitle(others.length),
+      message: l10n.devicesSignOutOthersMessage,
+      confirmLabel: l10n.devicesSignOutOthersConfirm,
     );
     if (!confirmed || !mounted) return;
 
@@ -188,7 +177,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       () => ref.read(deviceManagerProvider).signOut([
         for (final device in others) device.deviceId,
       ], reauth: _askPassword),
-      success: 'Signed out ${others.length} other devices.',
+      success: l10n.devicesSignedOutOthers(others.length),
     );
   }
 
@@ -205,7 +194,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -248,10 +237,10 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
 
     return Scaffold(
       appBar: WeftAppBar(
-        title: const Text('Devices'),
+        title: Text(context.l10n.devicesTitle),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: context.l10n.commonRefresh,
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _busy ? null : _load,
           ),
@@ -276,12 +265,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     return ListView(
       padding: const EdgeInsets.all(WeftSpace.lg),
       children: [
-        const SettingsSectionHeader(
-          title: 'Where you are signed in',
-          subtitle:
-              'Each of these holds a key to your account. Sign out anything '
-              'you do not recognise, and verify the ones you keep so your '
-              'encrypted chats trust them.',
+        SettingsSectionHeader(
+          title: context.l10n.devicesSectionTitle,
+          subtitle: context.l10n.devicesSectionSubtitle,
         ),
         const SizedBox(height: WeftSpace.sm),
         for (final device in devices)
@@ -300,7 +286,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
             alignment: AlignmentDirectional.centerStart,
             child: OutlinedButton.icon(
               icon: const WeftMirroredIcon(Icons.logout_rounded, size: 18),
-              label: const Text('Sign out other devices'),
+              label: Text(context.l10n.devicesSignOutOthersButton),
               style: OutlinedButton.styleFrom(
                 foregroundColor: context.colors.error,
               ),
@@ -333,7 +319,7 @@ class _DeviceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final detail = [
       device.deviceId,
-      describeLastSeen(device.lastSeenAt, now: clock.now()),
+      describeLastSeen(context.l10n, device.lastSeenAt, now: clock.now()),
       ?device.lastSeenIp,
     ].join(' · ');
 
@@ -346,8 +332,8 @@ class _DeviceTile extends StatelessWidget {
       container: true,
       label: semanticsSentence([
         device.label,
-        if (device.isCurrent) 'this device',
-        trustLabel(device.trust),
+        if (device.isCurrent) context.l10n.devicesThisDeviceClause,
+        trustLabel(context.l10n, device.trust),
         detail,
       ]),
       // A group rather than an exclusion: everything *shown* is excluded
@@ -378,7 +364,10 @@ class _DeviceTile extends StatelessWidget {
               ),
               if (device.isCurrent) ...[
                 const SizedBox(width: WeftSpace.sm),
-                _Chip(label: 'This device', color: context.palette.online),
+                _Chip(
+                  label: context.l10n.devicesThisDevice,
+                  color: context.palette.online,
+                ),
               ],
             ],
           ),
@@ -388,7 +377,7 @@ class _DeviceTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                trustLabel(device.trust),
+                trustLabel(context.l10n, device.trust),
                 style: context.text.labelMedium?.copyWith(
                   color: _color(context, device.trust),
                   fontWeight: FontWeight.w600,
@@ -409,7 +398,7 @@ class _DeviceTile extends StatelessWidget {
         trailing: PopupMenuButton<String>(
           // Named, because a list of six sessions is six buttons reading
           // "Device actions" over a menu whose last item signs one out.
-          tooltip: 'Actions for ${device.label}',
+          tooltip: context.l10n.devicesActionsFor(device.label),
           enabled: enabled,
           onSelected: (choice) {
             switch (choice) {
@@ -422,10 +411,19 @@ class _DeviceTile extends StatelessWidget {
             }
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'rename', child: Text('Rename')),
+            PopupMenuItem(
+              value: 'rename',
+              child: Text(context.l10n.devicesRename),
+            ),
             if (onVerify != null)
-              const PopupMenuItem(value: 'verify', child: Text('Verify')),
-            const PopupMenuItem(value: 'signout', child: Text('Sign out')),
+              PopupMenuItem(
+                value: 'verify',
+                child: Text(context.l10n.commonVerify),
+              ),
+            PopupMenuItem(
+              value: 'signout',
+              child: Text(context.l10n.devicesSignOut),
+            ),
           ],
         ),
       ),
@@ -451,11 +449,11 @@ class _DeviceTile extends StatelessWidget {
 ///
 /// Public so the verification banner and the devices list cannot drift into
 /// calling the same state two different things.
-String trustLabel(DeviceTrust trust) => switch (trust) {
-  DeviceTrust.verified => 'Verified',
-  DeviceTrust.unverified => 'Not verified',
-  DeviceTrust.blocked => 'Blocked',
-  DeviceTrust.noKeys => 'No encryption keys',
+String trustLabel(AppL10n l10n, DeviceTrust trust) => switch (trust) {
+  DeviceTrust.verified => l10n.deviceTrustVerified,
+  DeviceTrust.unverified => l10n.deviceTrustUnverified,
+  DeviceTrust.blocked => l10n.deviceTrustBlocked,
+  DeviceTrust.noKeys => l10n.deviceTrustNoKeys,
 };
 
 /// When the homeserver last saw a device, in the words a person would use.
@@ -463,17 +461,17 @@ String trustLabel(DeviceTrust trust) => switch (trust) {
 /// Coarse on purpose past the first day: the server's own timestamp is allowed
 /// to be minutes stale, so a to-the-minute rendering of it would be precision
 /// the number does not have.
-String describeLastSeen(DateTime? at, {required DateTime now}) {
-  if (at == null) return 'Last seen unknown';
+String describeLastSeen(AppL10n l10n, DateTime? at, {required DateTime now}) {
+  if (at == null) return l10n.devicesLastSeenUnknown;
 
   final delta = now.difference(at);
-  if (delta.isNegative || delta.inMinutes < 5) return 'Active now';
-  if (delta.inMinutes < 60) return '${delta.inMinutes} minutes ago';
-  if (delta.inHours < 24) {
-    return delta.inHours == 1 ? '1 hour ago' : '${delta.inHours} hours ago';
-  }
+  if (delta.isNegative || delta.inMinutes < 5) return l10n.devicesActiveNow;
+  if (delta.inMinutes < 60) return l10n.devicesMinutesAgo(delta.inMinutes);
+  if (delta.inHours < 24) return l10n.devicesHoursAgo(delta.inHours);
   if (delta.inDays < 7) {
-    return delta.inDays == 1 ? 'Yesterday' : '${delta.inDays} days ago';
+    return delta.inDays == 1
+        ? l10n.devicesYesterday
+        : l10n.devicesDaysAgo(delta.inDays);
   }
   return DateFormat.yMMMd().format(at);
 }

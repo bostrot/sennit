@@ -13,6 +13,7 @@ import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 
 import 'support/semantics_probe.dart';
 import 'support/seeded_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// What the conversation says to a screen reader.
 ///
@@ -46,6 +47,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: ChatView(chatId: repository.chatId),
         ),
@@ -413,6 +415,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(repository)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: repository.chatId),
           ),
@@ -454,6 +457,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(repository)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: repository.chatId),
           ),
@@ -480,6 +484,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: Scaffold(
             body: UnverifiedDevicesBanner(

@@ -4,6 +4,7 @@ import 'package:weft_call/weft_call.dart';
 
 import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
+import '../../app/localisation.dart';
 import 'call_labels.dart';
 
 /// Places a call and says so if it could not be placed.
@@ -30,9 +31,13 @@ Future<void> startCall(
   // happened to be watching the bottom of the screen for four seconds.
   void say(String message) => showWeftMessage(context, message);
 
+  // Read before the awaited `placeCall`: the microphone prompt it may raise
+  // can outlive this route, and a `context` looked up afterwards may be gone.
+  final l10n = context.l10n;
+
   final service = ref.read(callServiceProvider);
   if (service == null) {
-    say('Calling needs a signed-in Matrix account.');
+    say(l10n.callNeedsAccount);
     return;
   }
 
@@ -41,5 +46,5 @@ Future<void> startCall(
     peer: target.peer,
     video: video,
   );
-  if (failure != null) say(callStartFailureLabel(failure));
+  if (failure != null) say(callStartFailureLabel(l10n, failure));
 }

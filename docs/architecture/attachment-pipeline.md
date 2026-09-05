@@ -157,6 +157,53 @@ there is no URI to put in it — `toEventContent` injects one afterwards. That
 ordering also makes it structurally impossible to emit key material on a
 plain-room event.
 
+### Captions ride on the attachment, per MSC2530
+
+A caption is **not** a second message. `body` carries the user's words and
+`filename` carries the name, and the two keys are what make the reading
+unambiguous:
+
+```json
+{ "msgtype": "m.image", "body": "at the beach", "filename": "IMG_4021.jpg",
+  "info": { "…": "…" }, "url": "mxc://…" }
+```
+
+Without `filename`, `body` **is** the name — which is what every client that
+predates the MSC writes, and what `toEventContent` still emits for an
+uncaptioned attachment. That is the whole ambiguity: with one key doing both
+jobs, nothing in the event says which it is doing, and `attachmentCaption` has to
+guess from the shape of the string. The guess is wrong in both directions —
+`final.report` typed under a photo is a caption read as a name, and `at the
+beach` is a perfectly legal filename read as a caption and printed under the
+picture. `WeftMessage.attachmentName` is that ambiguity resolved: non-null means
+exactly "the body is a caption", and the heuristic is skipped entirely.
+
+Three rules hold it together:
+
+- **The caption lives on `UploadPlan`**, set once by `planUpload`, not passed to
+  `toEventContent` at dispatch time. The plan is what `UploadQueue` keeps for the
+  life of a task — through hashing, three attempts, sixteen seconds of backoff,
+  a failure retried an hour later — and the event is written from it at the far
+  end. A caption threaded alongside the plan by every layer in between would be
+  dropped silently by the first layer that forgot: the photo still arrives, so
+  nothing looks broken.
+- **Blank is normalised to null, once, at the door.** `planUpload` trims and
+  drops an empty result, so a composer that submitted an untouched field cannot
+  produce `body: "   "` with the name pushed aside — a message that renders as a
+  blank line on every client, having hidden the name that should have been there.
+- **`filename` equal to `body` is read as absent.** Several bridges write the
+  name into both keys for an uncaptioned photo; taken at face value that says
+  "the body is a caption", and the caption is `IMG_4021.jpg`.
+
+One caption goes on the **first** attachment of a batch. One field above a strip
+of eight photos is one sentence about the batch: repeated on each it is the same
+words shouted eight times, and put on the last it lands on whichever picture
+happened to finish first.
+
+The share sheet is deliberately different. It sends its caption as a text event
+*before* the files, because a share can target several conversations at once and
+the text may be the whole of what was shared — see [[Share-Surfaces]].
+
 ### Round-tripping through `weft_matrix`
 
 The write side must produce exactly what the read side already parses.

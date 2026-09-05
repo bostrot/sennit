@@ -135,11 +135,18 @@ class WeftDesktopTokens extends ThemeExtension<WeftDesktopTokens> {
         readingColumn: double.infinity,
       );
 
+  /// The tokens for the surface this build actually runs on.
+  ///
+  /// Two arms, not four. [WeftSurface] has only `mac` and `touch` — Windows and
+  /// Linux deliberately run the touch layout, for the reason stated where the
+  /// enum is declared — so there is nothing here that could be handed a
+  /// `windows` or a `linux`. The token sets for those two are written and
+  /// waiting above; what does not exist yet is a surface to select them with,
+  /// and inventing one here to keep a switch exhaustive would be building the
+  /// selection before the layout it selects.
   factory WeftDesktopTokens.forSurface(WeftSurface surface) =>
       switch (surface) {
         WeftSurface.mac => const WeftDesktopTokens.mac(),
-        WeftSurface.windows => const WeftDesktopTokens.windows(),
-        WeftSurface.linux => const WeftDesktopTokens.linux(),
         WeftSurface.touch => const WeftDesktopTokens.touch(),
       };
 

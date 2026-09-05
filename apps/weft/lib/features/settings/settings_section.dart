@@ -12,6 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/localisation.dart';
+
 /// The red box at the top of a screen that can send something off the device.
 ///
 /// Deliberately not a tooltip, an info icon or an expandable: the whole point
@@ -30,7 +32,7 @@ class PrivacyNotice extends StatelessWidget {
       // shield glyph are the entire signal that this is not more explanatory
       // copy, and both are invisible to a reader — who otherwise hears four
       // sentences of prose indistinguishable from the section blurbs below it.
-      label: 'Privacy warning. $message',
+      label: context.l10n.settingsPrivacyWarningSemantics(message),
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(WeftSpace.md),
@@ -117,7 +119,7 @@ class SettingsSectionHeader extends StatelessWidget {
     return Semantics(
       header: true,
       container: true,
-      label: '$title. $subtitle',
+      label: context.l10n.settingsSectionHeaderSemantics(title, subtitle),
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.only(bottom: WeftSpace.sm),
@@ -198,7 +200,10 @@ class SettingsMessage extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: WeftSpace.lg),
-            OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.settingsTryAgain),
+            ),
           ],
         ),
       ),
@@ -280,7 +285,7 @@ class _TextPromptDialogState extends State<TextPromptDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),

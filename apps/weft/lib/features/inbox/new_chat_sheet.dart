@@ -6,6 +6,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/stores.dart';
 import '../../services/contacts/device_contacts.dart';
@@ -42,6 +43,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final repository = ref.watch(chatRepositoryProvider);
     final query = _search.text.trim().toLowerCase();
 
@@ -91,7 +93,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
     final headers = ref.watch(mediaHeadersProvider);
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('New chat')),
+      appBar: WeftAppBar(title: Text(l10n.newChatTitle)),
       body: WeftReadingPane(
         maxWidth: 560,
         child: ListView(
@@ -106,20 +108,21 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
               child: TextField(
                 controller: _search,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Search people',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: l10n.newChatSearchHint,
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
             ),
             ListTile(
               leading: const Icon(Icons.group_add_rounded),
-              title: const Text('New group'),
+              title: Text(l10n.newChatNewGroup),
               onTap: () => unawaited(_newGroup(context, ref)),
             ),
-            if (chats.isNotEmpty) _header(context, 'Your conversations'),
+            if (chats.isNotEmpty)
+              _header(context, l10n.newChatYourConversations),
             for (final chat in chats)
               ListTile(
                 leading: WeftAvatar(
@@ -136,7 +139,8 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                   ),
                 ),
               ),
-            if (fromBook.isNotEmpty) _header(context, 'From your address book'),
+            if (fromBook.isNotEmpty)
+              _header(context, l10n.newChatFromAddressBook),
             for (final (name, phone) in fromBook)
               ListTile(
                 leading: WeftAvatar(label: name, size: 40),
@@ -146,8 +150,8 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.alternate_email_rounded),
-              title: const Text('By ID or number'),
-              subtitle: const Text('A Matrix ID, or a number no list has'),
+              title: Text(l10n.newChatByIdTitle),
+              subtitle: Text(l10n.newChatByIdSubtitle),
               onTap: () => unawaited(_newDirectChat(context, ref)),
             ),
             const SizedBox(height: WeftSpace.xl),
@@ -186,7 +190,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
         )
         .toList();
     if (bridged.isEmpty) {
-      showWeftMessage(context, 'No bridge is connected to reach $name over.');
+      showWeftMessage(context, context.l10n.newChatNoBridgeForPerson(name));
       return;
     }
 
@@ -202,7 +206,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                   Padding(
                     padding: const EdgeInsets.all(WeftSpace.md),
                     child: Text(
-                      'Reach $name over…',
+                      context.l10n.newChatReachOver(name),
                       style: context.text.titleSmall,
                     ),
                   ),
@@ -227,9 +231,8 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
     showWeftMessage(
       context,
       sent
-          ? 'Asked the ${network.label} bridge to open a chat with $name — '
-                'it will appear in the inbox in a moment.'
-          : 'No ${network.label} bridge is connected.',
+          ? context.l10n.newChatBridgeAsked(network.label, name)
+          : context.l10n.newChatNoBridgeConnected(network.label),
     );
   }
 }
@@ -254,7 +257,7 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
         final text = input.text.trim();
         final isMatrixId = text.startsWith('@') && text.contains(':');
         return AlertDialog(
-          title: const Text('New chat'),
+          title: Text(dialog.l10n.newChatTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,15 +267,15 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
                 autofocus: true,
                 autocorrect: false,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: '@user:server or phone number',
-                  hintText: '@anna:matrix.org · +49151…',
+                decoration: InputDecoration(
+                  labelText: dialog.l10n.newChatIdentifierLabel,
+                  hintText: dialog.l10n.newChatIdentifierHint,
                 ),
               ),
               if (!isMatrixId && bridged.isNotEmpty) ...[
                 const SizedBox(height: WeftSpace.md),
                 Text(
-                  'A phone number is opened through the bridge:',
+                  dialog.l10n.newChatBridgeChoicePrompt,
                   style: Theme.of(dialog).textTheme.bodySmall,
                 ),
                 const SizedBox(height: WeftSpace.xs),
@@ -293,7 +296,7 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialog).pop(),
-              child: const Text('Cancel'),
+              child: Text(dialog.l10n.commonCancel),
             ),
             FilledButton(
               onPressed: text.isEmpty
@@ -301,7 +304,7 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
                   : () => Navigator.of(
                       dialog,
                     ).pop((text, isMatrixId ? null : network)),
-              child: const Text('Start'),
+              child: Text(dialog.l10n.commonStart),
             ),
           ],
         );
@@ -324,7 +327,7 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
       );
     } on Object catch (error) {
       if (context.mounted) {
-        showWeftMessage(context, 'That chat could not be started: $error');
+        showWeftMessage(context, context.l10n.newChatFailed('$error'));
       }
     }
     return;
@@ -336,9 +339,8 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
   showWeftMessage(
     context,
     sent
-        ? 'Asked the ${via.label} bridge to open a chat with $identifier — '
-              'it will appear in the inbox in a moment.'
-        : 'No ${via.label} bridge is connected.',
+        ? context.l10n.newChatBridgeAsked(via.label, identifier)
+        : context.l10n.newChatNoBridgeConnected(via.label),
   );
 }
 
@@ -358,7 +360,7 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
     context: context,
     builder: (dialog) => StatefulBuilder(
       builder: (dialog, setState) => AlertDialog(
-        title: const Text('New group'),
+        title: Text(dialog.l10n.newChatNewGroup),
         content: SizedBox(
           width: 360,
           child: SingleChildScrollView(
@@ -370,11 +372,16 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
                   controller: name,
                   autofocus: true,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(labelText: 'Group name'),
+                  decoration: InputDecoration(
+                    labelText: dialog.l10n.newGroupNameLabel,
+                  ),
                 ),
                 const SizedBox(height: WeftSpace.md),
                 if (candidates.isNotEmpty) ...[
-                  Text('Invite:', style: Theme.of(dialog).textTheme.bodySmall),
+                  Text(
+                    dialog.l10n.newGroupInvite,
+                    style: Theme.of(dialog).textTheme.bodySmall,
+                  ),
                   for (final handle in candidates)
                     CheckboxListTile(
                       dense: true,
@@ -397,9 +404,9 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
                 TextField(
                   controller: manual,
                   autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'More Matrix IDs (comma-separated)',
-                    hintText: '@anna:matrix.org, @ben:example.org',
+                  decoration: InputDecoration(
+                    labelText: dialog.l10n.newGroupMoreIdsLabel,
+                    hintText: dialog.l10n.newGroupMoreIdsHint,
                   ),
                 ),
               ],
@@ -409,7 +416,7 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialog).pop(),
-            child: const Text('Cancel'),
+            child: Text(dialog.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: name.text.trim().isEmpty
@@ -426,7 +433,7 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
                           ),
                     ],
                   )),
-            child: const Text('Create'),
+            child: Text(dialog.l10n.commonCreate),
           ),
         ],
       ),
@@ -448,7 +455,7 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
     );
   } on Object catch (error) {
     if (context.mounted) {
-      showWeftMessage(context, 'The group could not be created: $error');
+      showWeftMessage(context, context.l10n.newGroupFailed('$error'));
     }
   }
 }

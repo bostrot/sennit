@@ -4,6 +4,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/labels.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
@@ -29,7 +30,7 @@ class ContactProfileScreen extends ConsumerWidget {
     if (chat == null) {
       return Scaffold(
         appBar: WeftAppBar(),
-        body: const Center(child: Text('This conversation is gone.')),
+        body: Center(child: Text(context.l10n.contactGone)),
       );
     }
 
@@ -50,7 +51,7 @@ class ContactProfileScreen extends ConsumerWidget {
     final labels = ref.watch(chatLabelsProvider.notifier).ofChat(chat.id);
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Contact')),
+      appBar: WeftAppBar(title: Text(context.l10n.contactTitle)),
       body: WeftReadingPane(
         maxWidth: 640,
         child: ListView(
@@ -79,7 +80,9 @@ class ContactProfileScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: WeftSpace.xs),
                       child: Text(
-                        'Merged · ${chat.networks.map((n) => n.label).join(', ')}',
+                        context.l10n.chatMergedNetworks(
+                          chat.networks.map((n) => n.label).join(', '),
+                        ),
                         style: context.text.labelMedium?.copyWith(
                           color: context.palette.mergedAccent,
                           fontWeight: FontWeight.w600,
@@ -94,16 +97,16 @@ class ContactProfileScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.phone_rounded),
                 title: Text(phone),
-                subtitle: const Text('Phone'),
+                subtitle: Text(context.l10n.contactPhone),
               ),
             for (final id in matrixIds)
               ListTile(
                 leading: const Icon(Icons.alternate_email_rounded),
                 title: Text(id),
-                subtitle: const Text('Matrix user'),
+                subtitle: Text(context.l10n.contactMatrixUser),
               ),
             if (handles.isNotEmpty) ...[
-              const _SectionHeader('On these networks'),
+              _SectionHeader(context.l10n.contactOnTheseNetworks),
               for (final handle in handles)
                 ListTile(
                   leading: Icon(
@@ -115,11 +118,14 @@ class ContactProfileScreen extends ConsumerWidget {
                   subtitle: Text(
                     handle.remoteId == (handle.displayName ?? '')
                         ? handle.network.label
-                        : '${handle.network.label} · ${handle.remoteId}',
+                        : context.l10n.handleOnNetwork(
+                            handle.network.label,
+                            handle.remoteId,
+                          ),
                   ),
                 ),
             ],
-            const _SectionHeader('Conversations in this chat'),
+            _SectionHeader(context.l10n.contactConversationsIn),
             for (final source in chat.sources)
               ListTile(
                 leading: Icon(
@@ -133,15 +139,17 @@ class ContactProfileScreen extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            const _SectionHeader('For this contact'),
+            _SectionHeader(context.l10n.contactForThisContact),
             if (chat.networks.length > 1)
               ListTile(
                 leading: const Icon(Icons.send_rounded),
-                title: const Text('Send new messages via'),
+                title: Text(context.l10n.contactSendVia),
                 subtitle: Text(
                   chat.hasExplicitSendNetwork
                       ? (chat.sendNetwork?.label ?? '')
-                      : '${chat.sendNetwork?.label ?? ''} (automatic)',
+                      : context.l10n.contactSendViaAutomatic(
+                          chat.sendNetwork?.label ?? '',
+                        ),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
@@ -174,30 +182,32 @@ class ContactProfileScreen extends ConsumerWidget {
               ),
             ListTile(
               leading: const Icon(Icons.label_outline_rounded),
-              title: const Text('Labels'),
+              title: Text(context.l10n.contactLabels),
               subtitle: Text(
-                labels.isEmpty ? 'None' : (labels.toList()..sort()).join(', '),
+                labels.isEmpty
+                    ? context.l10n.contactNoLabels
+                    : (labels.toList()..sort()).join(', '),
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => showLabelSheet(context, ref, {chat.id}),
             ),
             SwitchListTile(
               secondary: const Icon(Icons.notifications_off_outlined),
-              title: const Text('Mute'),
+              title: Text(context.l10n.commonMute),
               value: chat.muted,
               onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
             ),
             SwitchListTile(
               secondary: const Icon(Icons.archive_outlined),
-              title: const Text('Archive'),
+              title: Text(context.l10n.inboxArchive),
               value: chat.archived,
               onChanged: (archived) =>
                   repository.setArchived(chat.id, archived: archived),
             ),
             ListTile(
               leading: const Icon(Icons.merge_rounded),
-              title: const Text('Manage merges'),
-              subtitle: const Text('Combine or split this contact\'s chats'),
+              title: Text(context.l10n.contactManageMerges),
+              subtitle: Text(context.l10n.contactManageMergesSubtitle),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const MergeScreen()),

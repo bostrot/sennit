@@ -10,6 +10,7 @@ import 'package:weft_call/weft_call.dart';
 import 'package:weft_design/weft_design.dart';
 
 import 'support/call_fixtures.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Which conversations offer a call, as the app resolves it.
 ///
@@ -59,19 +60,19 @@ void main() {
     });
 
     testWidgets('is disabled for a group, as a group', (tester) async {
-      // "Weft calls one person at a time" stays true however the room got
+      // "Braid calls one person at a time" stays true however the room got
       // there, so it outranks the bridging answer.
       await pumpChat(
         tester,
         availability: const CallBlocked(
           CallBlocker.group,
-          'Weft calls one person at a time.',
+          'Braid calls one person at a time.',
         ),
       );
 
       final button = callButton(tester);
       expect(button.onPressed, isNull);
-      expect(button.tooltip, 'Weft calls one person at a time.');
+      expect(button.tooltip, 'Braid calls one person at a time.');
     });
 
     testWidgets('says so when there is no account behind it', (tester) async {
@@ -256,6 +257,7 @@ Future<void> pumpChat(
           ).overrideWithValue(availability),
       ],
       child: MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: const ChatView(chatId: 'merged:anna'),
       ),

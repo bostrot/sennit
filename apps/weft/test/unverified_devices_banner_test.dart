@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/features/chat/unverified_devices_banner.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The warning that sits above a conversation when something in it is unchecked.
 ///
@@ -14,6 +15,7 @@ void main() {
     var verifyTaps = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(
           body: UnverifiedDevicesBanner(
@@ -78,6 +80,7 @@ void main() {
     var taps = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(
           body: UnverifiedDevicesBanner(

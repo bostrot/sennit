@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 
+import '../../app/localisation.dart';
 import '../../services/attachments/attachment_picker.dart';
 
 /// Asks where the attachment is coming from.
@@ -16,42 +17,43 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
   AttachmentPicker picker, {
   bool paperless = false,
 }) {
+  final l10n = context.l10n;
   final rows = [
     (
       source: AttachmentPickSource.media,
       icon: Icons.photo_library_rounded,
-      label: 'Photo or video',
+      label: l10n.attachSourceMedia,
     ),
     (
       source: AttachmentPickSource.files,
       icon: Icons.attach_file_rounded,
-      label: 'File',
+      label: l10n.attachSourceFiles,
     ),
     (
       source: AttachmentPickSource.camera,
       icon: Icons.photo_camera_rounded,
-      label: 'Camera',
+      label: l10n.attachSourceCamera,
     ),
     (
       source: AttachmentPickSource.location,
       icon: Icons.location_on_outlined,
-      label: 'Location',
+      label: l10n.attachSourceLocation,
     ),
     (
       source: AttachmentPickSource.poll,
       icon: Icons.poll_outlined,
-      label: 'Poll',
+      label: l10n.attachSourcePoll,
     ),
     (
       source: AttachmentPickSource.calendar,
       icon: Icons.event_outlined,
-      label: 'Calendar entry',
+      label: l10n.attachSourceCalendar,
     ),
     if (paperless)
       (
         source: AttachmentPickSource.paperless,
         icon: Icons.description_outlined,
-        label: 'Paperless document',
+        label: l10n.attachSourcePaperless,
       ),
   ];
 
@@ -74,7 +76,7 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
               child: Semantics(
                 header: true,
                 child: Text(
-                  'Attach',
+                  l10n.attachSheetTitle,
                   style: context.text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),

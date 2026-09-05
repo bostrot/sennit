@@ -1,0 +1,23 @@
+name: weft_autoreply
+description: >-
+  The auto-reply decision layer: which conversations a user-authored prompt
+  applies to, when it may fire, and the guards that stop two auto-responders
+  talking to each other for ever. Pure Dart with the clock, the conversation
+  state and the reply ledger injected, so every rule and every refusal is
+  unit-testable without a device, a homeserver, or a language model.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  collection: ^1.19.0
+  meta: ^1.17.0
+  weft_domain: ^0.1.0
+
+dev_dependencies:
+  clock: ^1.1.2
+  lints: ^6.0.0
+  test: ^1.31.0

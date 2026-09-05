@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/session_providers.dart';
 import 'package:weft/features/settings/security_screen.dart';
 import 'package:weft/features/settings/settings_section.dart';
@@ -15,6 +16,7 @@ import 'support/session_fakes.dart';
 /// stops at a cancelled prompt, the replace that waits for a confirmation, the
 /// wrong key that leaves the user exactly where they were.
 void main() {
+  final en = lookupAppL10n(const Locale('en'));
   final thisDevice = const WeftDevice(
     deviceId: 'THISONE',
     displayName: 'Weft on Pixel',
@@ -45,6 +47,8 @@ void main() {
           deviceManagerProvider.overrideWithValue(fakeDevices),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: const SecurityScreen(),
         ),
@@ -60,7 +64,7 @@ void main() {
     ) async {
       await pump(tester);
 
-      expect(find.text(backupLabel(KeyBackupState.absent)), findsOneWidget);
+      expect(find.text(backupLabel(en, KeyBackupState.absent)), findsOneWidget);
       expect(
         find.textContaining('every encrypted message you have is gone'),
         findsOneWidget,
@@ -96,7 +100,10 @@ void main() {
           ),
         );
 
-        expect(find.text(backupLabel(KeyBackupState.upToDate)), findsOneWidget);
+        expect(
+          find.text(backupLabel(en, KeyBackupState.upToDate)),
+          findsOneWidget,
+        );
         expect(find.textContaining('412 keys'), findsOneWidget);
         expect(find.textContaining('version 3'), findsOneWidget);
         expect(find.textContaining('cross-signing on'), findsOneWidget);
@@ -188,7 +195,10 @@ void main() {
       await tester.tap(find.text('Confirm'));
       await tester.pumpAndSettle();
 
-      expect(find.text(backupLabel(KeyBackupState.upToDate)), findsOneWidget);
+      expect(
+        find.text(backupLabel(en, KeyBackupState.upToDate)),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the passphrase typed is the passphrase used', (tester) async {
@@ -342,7 +352,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fakes.backup.restores, ['EsAABBCCDDEEFFGG']);
-      expect(find.text(backupLabel(KeyBackupState.upToDate)), findsOneWidget);
+      expect(
+        find.text(backupLabel(en, KeyBackupState.upToDate)),
+        findsOneWidget,
+      );
     });
 
     testWidgets('cancelling goes back without restoring', (tester) async {
@@ -354,24 +367,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fakes.backup.restores, isEmpty);
-      expect(find.text(backupLabel(KeyBackupState.locked)), findsOneWidget);
+      expect(find.text(backupLabel(en, KeyBackupState.locked)), findsOneWidget);
     });
   });
 
   group('the labels', () {
     test('every state has a name and a sentence, and they are distinct', () {
-      final labels = KeyBackupState.values.map(backupLabel).toSet();
+      final labels = KeyBackupState.values
+          .map((s) => backupLabel(en, s))
+          .toSet();
       expect(labels.length, KeyBackupState.values.length);
 
       for (final state in KeyBackupState.values) {
-        expect(backupExplanation(state), isNotEmpty);
+        expect(backupExplanation(en, state), isNotEmpty);
       }
     });
 
     test('only a real risk has something to say', () {
-      expect(riskMessage(RecoveryRisk.none), isNull);
-      expect(riskMessage(RecoveryRisk.otherDevicesOnly), isNotNull);
-      expect(riskMessage(RecoveryRisk.unrecoverable), isNotNull);
+      expect(riskMessage(en, RecoveryRisk.none), isNull);
+      expect(riskMessage(en, RecoveryRisk.otherDevicesOnly), isNotNull);
+      expect(riskMessage(en, RecoveryRisk.unrecoverable), isNotNull);
     });
   });
 }

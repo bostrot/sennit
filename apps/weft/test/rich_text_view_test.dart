@@ -12,6 +12,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
 import 'support/seeded_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The renderer half of rich content: what a formatted body turns into on
 /// screen, and — the part that matters most — what a hostile one does not.
@@ -31,6 +32,7 @@ void main() {
   }) {
     return tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(
           body: Builder(
@@ -712,6 +714,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(repository)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: repository.chatId),
           ),

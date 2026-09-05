@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.bostrot.weft.R
 
 /// The incoming-call notification, and the actions on it.
 ///
@@ -58,7 +59,7 @@ object CallNotifications {
     fun showIncoming(context: Context, callId: String, callerName: String, video: Boolean) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
-        ensureChannel(manager)
+        ensureChannel(context, manager)
 
         val full = launchIntent(context, callId)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -76,7 +77,11 @@ object CallNotifications {
             // stays independent of the generated resource class.
             .setSmallIcon(context.applicationInfo.icon)
             .setContentTitle(callerName)
-            .setContentText(if (video) "Incoming video call" else "Incoming call")
+            .setContentText(
+                context.getString(
+                    if (video) R.string.call_incoming_video else R.string.call_incoming,
+                ),
+            )
             .setContentIntent(full)
             .setFullScreenIntent(full, true)
             // Ongoing and non-dismissible: a swipe that removed this would leave
@@ -116,11 +121,15 @@ object CallNotifications {
 
     /// Creates `weft.calls` when it does not exist yet. See the class comment
     /// for why the importance is written out.
-    fun ensureChannel(manager: NotificationManager) {
+    fun ensureChannel(context: Context, manager: NotificationManager) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(CHANNEL_ID, "Calls", IMPORTANCE_MAX).apply {
-            description = "Incoming calls."
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            context.getString(R.string.call_channel_name),
+            IMPORTANCE_MAX,
+        ).apply {
+            description = context.getString(R.string.call_channel_description)
             setShowBadge(true)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }

@@ -5,6 +5,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
 import 'settings_section.dart';
 
@@ -86,7 +87,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     }
   }
 
-  static String _sentence(Object error) {
+  String _sentence(Object error) {
     final raw = error.toString();
     // The SDK reports an unreachable or erroring homeserver as a bare
     // "http error response" (a 502 from a restarting reverse proxy, most
@@ -95,8 +96,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         raw.contains('SocketException') ||
         raw.contains('Connection closed') ||
         raw.contains('has not connection')) {
-      return 'Your homeserver could not be reached — it may be restarting. '
-          'Try again in a moment.';
+      return context.l10n.devicesUnreachableHomeserver;
     }
     return switch (error) {
       KeyBackupException(:final message) => message,
@@ -133,17 +133,15 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       if (!confirmed || !mounted) return;
     }
 
+    final l10n = context.l10n;
     final passphrase = await showDialog<String>(
       context: context,
-      builder: (_) => const TextPromptDialog(
-        title: 'Add a passphrase?',
-        message:
-            'A passphrase is a second way in, for the times the key itself is '
-            'not to hand. It never leaves this device, and it does not replace '
-            'the key.',
-        fieldLabel: 'Passphrase (optional)',
-        confirmLabel: 'Continue',
-        helperText: 'Leave this empty to use the recovery key alone.',
+      builder: (_) => TextPromptDialog(
+        title: l10n.securityPassphraseTitle,
+        message: l10n.securityPassphraseMessage,
+        fieldLabel: l10n.securityPassphraseField,
+        confirmLabel: l10n.commonContinue,
+        helperText: l10n.securityPassphraseHelper,
       ),
     );
     // Backing out of the passphrase prompt cancels the whole setup: it is the
@@ -162,7 +160,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       if (!mounted) return;
       _goTo(
         _Stage.showKey,
-        'Your recovery key. Write it down now — it cannot be shown again.',
+        l10n.securityAnnounceShowKey,
         also: () {
           _newKey = key;
           _stepError = null;
@@ -180,16 +178,12 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     final answer = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Replace the recovery key?'),
-        content: const Text(
-          'The old key stops working, the backup is made again from scratch, '
-          'and your other devices have to be verified again. Do this if the '
-          'old key is lost or somebody else has seen it — not to tidy up.',
-        ),
+        title: Text(context.l10n.securityReplaceTitle),
+        content: Text(context.l10n.securityReplaceMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -197,7 +191,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
               foregroundColor: context.colors.onError,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Replace'),
+            child: Text(context.l10n.securityReplace),
           ),
         ],
       ),
@@ -210,11 +204,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     if (expected == null) return;
 
     if (!recoveryKeyMatches(_entry.text, expected)) {
-      setState(
-        () => _stepError =
-            'That is not the key that was just shown. Go back and copy it '
-            'again — a single wrong character makes it useless.',
-      );
+      setState(() => _stepError = context.l10n.securityWrongKey);
       return;
     }
 
@@ -224,14 +214,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       _stage = _Stage.status;
       _entry.clear();
     });
-    _say('Recovery key saved. Your messages can be restored from it.');
+    _say(context.l10n.securityKeySaved);
     await _load();
   }
 
   Future<void> _restore() async {
     final input = _entry.text.trim();
     if (input.isEmpty) {
-      setState(() => _stepError = 'Enter your recovery key or passphrase.');
+      setState(() => _stepError = context.l10n.securityEnterKeyOrPassphrase);
       return;
     }
 
@@ -246,7 +236,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         _stage = _Stage.status;
         _entry.clear();
       });
-      _say('Restored. Older messages will decrypt as they load.');
+      _say(context.l10n.securityRestored);
       await _load();
     } catch (error) {
       if (mounted) setState(() => _stepError = _sentence(error));
@@ -259,11 +249,11 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WeftAppBar(
-        title: const Text('Encryption'),
+        title: Text(context.l10n.securityTitle),
         actions: [
           if (_stage == _Stage.status)
             IconButton(
-              tooltip: 'Refresh',
+              tooltip: context.l10n.commonRefresh,
               icon: const Icon(Icons.refresh_rounded),
               onPressed: _busy ? null : _load,
             ),
@@ -295,16 +285,13 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     return ListView(
       padding: const EdgeInsets.all(WeftSpace.lg),
       children: [
-        const SettingsSectionHeader(
-          title: 'Message recovery',
-          subtitle:
-              'Your homeserver stores your messages encrypted and cannot read '
-              'them. The keys that can are on your devices — and, if you set '
-              'one up, in a backup only your recovery key opens.',
+        SettingsSectionHeader(
+          title: context.l10n.securityRecoveryTitle,
+          subtitle: context.l10n.securityRecoverySubtitle,
         ),
         const SizedBox(height: WeftSpace.md),
         _StatusCard(status: status),
-        if (riskMessage(risk) case final message?) ...[
+        if (riskMessage(context.l10n, risk) case final message?) ...[
           const SizedBox(height: WeftSpace.lg),
           if (risk == RecoveryRisk.unrecoverable)
             PrivacyNotice(message: message)
@@ -316,7 +303,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           FilledButton.icon(
             onPressed: _busy ? null : () => _setUp(replaceExisting: false),
             icon: const Icon(Icons.key_rounded, size: 18),
-            label: const Text('Set up a recovery key'),
+            label: Text(context.l10n.securitySetUpKey),
           ),
         if (status.state == KeyBackupState.locked) ...[
           FilledButton.icon(
@@ -324,14 +311,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                 ? null
                 : () => _goTo(
                     _Stage.restore,
-                    'Enter your recovery key or passphrase.',
+                    context.l10n.securityEnterKeyOrPassphrase,
                     also: () {
                       _stepError = null;
                       _entry.clear();
                     },
                   ),
             icon: const Icon(Icons.lock_open_rounded, size: 18),
-            label: const Text('Enter your recovery key'),
+            label: Text(context.l10n.securityEnterKey),
           ),
           const SizedBox(height: WeftSpace.sm),
         ],
@@ -342,7 +329,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             ),
             onPressed: _busy ? null : () => _setUp(replaceExisting: true),
             icon: const Icon(Icons.autorenew_rounded, size: 18),
-            label: const Text('Replace the recovery key'),
+            label: Text(context.l10n.securityReplaceKeyButton),
           ),
       ],
     );
@@ -355,12 +342,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     return ListView(
       padding: const EdgeInsets.all(WeftSpace.lg),
       children: [
-        const SettingsSectionHeader(
-          title: 'Your recovery key',
-          subtitle:
-              'Write it down or put it in a password manager now. Braid cannot '
-              'show it again, and nobody — not your homeserver, not us — can '
-              'reissue it.',
+        SettingsSectionHeader(
+          title: context.l10n.securityYourKeyTitle,
+          subtitle: context.l10n.securityYourKeySubtitle,
         ),
         const SizedBox(height: WeftSpace.lg),
         Container(
@@ -376,9 +360,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           // down" the screen a blind user cannot complete. `letterSpacing` is
           // the sighted half of the same intent.
           child: Semantics(
-            label:
-                'Recovery key. Copy it with the button below, or write it '
-                'down: ${spelledOut(formatRecoveryKey(key))}',
+            label: context.l10n.securityKeySpelledOut(
+              spelledOut(formatRecoveryKey(key)),
+            ),
             excludeSemantics: true,
             child: SelectableText(
               formatRecoveryKey(key),
@@ -395,24 +379,25 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             onPressed: () async {
+              final copied = context.l10n.securityKeyCopied;
               await Clipboard.setData(ClipboardData(text: key));
-              if (mounted) _say('Recovery key copied.');
+              if (mounted) _say(copied);
             },
             icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy'),
+            label: Text(context.l10n.commonCopy),
           ),
         ),
         const SizedBox(height: WeftSpace.lg),
         FilledButton(
           onPressed: () => _goTo(
             _Stage.confirmKey,
-            'Type the recovery key back in to confirm you have it.',
+            context.l10n.securityAnnounceConfirmKey,
             also: () {
               _stepError = null;
               _entry.clear();
             },
           ),
-          child: const Text('I have saved it'),
+          child: Text(context.l10n.securityIHaveSavedIt),
         ),
       ],
     );
@@ -422,11 +407,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     return ListView(
       padding: const EdgeInsets.all(WeftSpace.lg),
       children: [
-        const SettingsSectionHeader(
-          title: 'Check you have it',
-          subtitle:
-              'Paste the key back in. This is the only chance to find out that '
-              'what you saved is not what Braid generated.',
+        SettingsSectionHeader(
+          title: context.l10n.securityCheckTitle,
+          subtitle: context.l10n.securityCheckSubtitle,
         ),
         const SizedBox(height: WeftSpace.lg),
         TextField(
@@ -434,9 +417,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           autofocus: true,
           maxLines: 2,
           minLines: 1,
-          decoration: const InputDecoration(
-            labelText: 'Recovery key',
-            helperText: 'Spacing does not matter.',
+          decoration: InputDecoration(
+            labelText: context.l10n.securityKeyField,
+            helperText: context.l10n.securitySpacingHelper,
           ),
         ),
         if (_stepError case final message?) ...[
@@ -444,15 +427,18 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           _ErrorBox(message: message),
         ],
         const SizedBox(height: WeftSpace.lg),
-        FilledButton(onPressed: _confirmSaved, child: const Text('Confirm')),
+        FilledButton(
+          onPressed: _confirmSaved,
+          child: Text(context.l10n.commonConfirm),
+        ),
         const SizedBox(height: WeftSpace.sm),
         TextButton(
           onPressed: () => _goTo(
             _Stage.showKey,
-            'Your recovery key, shown again.',
+            context.l10n.securityAnnounceShowAgain,
             also: () => _stepError = null,
           ),
-          child: const Text('Show it again'),
+          child: Text(context.l10n.securityShowAgain),
         ),
       ],
     );
@@ -462,12 +448,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     return ListView(
       padding: const EdgeInsets.all(WeftSpace.lg),
       children: [
-        const SettingsSectionHeader(
-          title: 'Restore from your backup',
-          subtitle:
-              'Enter the recovery key you saved, or the passphrase you set '
-              'with it. This device then decrypts the history it has been '
-              'missing.',
+        SettingsSectionHeader(
+          title: context.l10n.securityRestoreTitle,
+          subtitle: context.l10n.securityRestoreSubtitle,
         ),
         const SizedBox(height: WeftSpace.lg),
         TextField(
@@ -476,8 +459,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           maxLines: 2,
           minLines: 1,
           enabled: !_busy,
-          decoration: const InputDecoration(
-            labelText: 'Recovery key or passphrase',
+          decoration: InputDecoration(
+            labelText: context.l10n.securityKeyOrPassphraseField,
           ),
         ),
         if (_stepError case final message?) ...[
@@ -487,7 +470,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         const SizedBox(height: WeftSpace.lg),
         FilledButton(
           onPressed: _busy ? null : _restore,
-          child: const Text('Restore'),
+          child: Text(context.l10n.securityRestore),
         ),
         const SizedBox(height: WeftSpace.sm),
         TextButton(
@@ -495,13 +478,13 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
               ? null
               : () => _goTo(
                   _Stage.status,
-                  'Cancelled. Back to your encryption settings.',
+                  context.l10n.securityAnnounceCancelled,
                   also: () {
                     _stepError = null;
                     _entry.clear();
                   },
                 ),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
       ],
     );
@@ -513,41 +496,26 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
 /// Public for the same reason `trustLabel` is: the security screen, a future
 /// status row and any golden that pins them must not invent three names for
 /// "there is no backup".
-String backupLabel(KeyBackupState state) => switch (state) {
-  KeyBackupState.absent => 'No backup',
-  KeyBackupState.locked => 'Backup locked',
-  KeyBackupState.outOfDate => 'Backup out of date',
-  KeyBackupState.upToDate => 'Backed up',
+String backupLabel(AppL10n l10n, KeyBackupState state) => switch (state) {
+  KeyBackupState.absent => l10n.backupStateAbsent,
+  KeyBackupState.locked => l10n.backupStateLocked,
+  KeyBackupState.outOfDate => l10n.backupStateOutOfDate,
+  KeyBackupState.upToDate => l10n.backupStateUpToDate,
 };
 
 /// What the state means, in the words the reader would use.
-String backupExplanation(KeyBackupState state) => switch (state) {
-  KeyBackupState.absent =>
-    'Nothing is stored on the server. Messages you can read today stay '
-        'readable only on the devices that received them.',
-  KeyBackupState.locked =>
-    'A backup exists, but this device cannot open it. Enter your recovery '
-        'key to unlock the history it holds.',
-  KeyBackupState.outOfDate =>
-    'This device is holding keys the backup does not have yet. They upload '
-        'on their own; leave Braid open for a minute.',
-  KeyBackupState.upToDate =>
-    'Everything this device knows how to decrypt is in the backup, and your '
-        'recovery key opens it on any new device.',
+String backupExplanation(AppL10n l10n, KeyBackupState state) => switch (state) {
+  KeyBackupState.absent => l10n.backupExplainAbsent,
+  KeyBackupState.locked => l10n.backupExplainLocked,
+  KeyBackupState.outOfDate => l10n.backupExplainOutOfDate,
+  KeyBackupState.upToDate => l10n.backupExplainUpToDate,
 };
 
 /// The sentence for a [RecoveryRisk], or null when there is nothing to say.
-String? riskMessage(RecoveryRisk risk) => switch (risk) {
+String? riskMessage(AppL10n l10n, RecoveryRisk risk) => switch (risk) {
   RecoveryRisk.none => null,
-  RecoveryRisk.otherDevicesOnly =>
-    'There is no backup, but another device is signed in. It can verify a '
-        'replacement and pass your keys to it — as long as you still have it. '
-        'A recovery key is the version of that which survives losing them all.',
-  RecoveryRisk.unrecoverable =>
-    'No backup, and this is the only device signed in. If you lose it or sign '
-        'out, every encrypted message you have is gone: your homeserver still '
-        'has them, but nothing anywhere can decrypt them again. Nobody can '
-        'undo this for you afterwards.',
+  RecoveryRisk.otherDevicesOnly => l10n.backupRiskOtherDevices,
+  RecoveryRisk.unrecoverable => l10n.backupRiskUnrecoverable,
 };
 
 /// The backup at a glance: what it is, and what it means.
@@ -585,7 +553,7 @@ class _StatusCard extends StatelessWidget {
               const SizedBox(width: WeftSpace.md),
               Expanded(
                 child: Text(
-                  backupLabel(status.state),
+                  backupLabel(context.l10n, status.state),
                   style: context.text.titleSmall?.copyWith(
                     color: colour,
                     fontWeight: FontWeight.w700,
@@ -596,7 +564,7 @@ class _StatusCard extends StatelessWidget {
           ),
           const SizedBox(height: WeftSpace.sm),
           Text(
-            backupExplanation(status.state),
+            backupExplanation(context.l10n, status.state),
             style: context.text.bodySmall?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),
@@ -604,13 +572,15 @@ class _StatusCard extends StatelessWidget {
           if (status.state.exists) ...[
             const SizedBox(height: WeftSpace.sm),
             Text(
-              [
-                '${status.keyCount} keys',
-                if (status.version case final version?) 'version $version',
-                status.crossSigningEnabled
-                    ? 'cross-signing on'
-                    : 'cross-signing off',
-              ].join(' · '),
+              context.l10n.securityBackupDetail(
+                context.l10n.securityKeyCount(status.keyCount),
+                switch (status.version) {
+                  final version? =>
+                    ' · ${context.l10n.securityBackupVersion(version)}',
+                  null => '',
+                },
+                ' · ${status.crossSigningEnabled ? context.l10n.securityCrossSigningOn : context.l10n.securityCrossSigningOff}',
+              ),
               style: context.text.labelSmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
@@ -654,7 +624,7 @@ class _Note extends StatelessWidget {
               // Named as advice rather than left as prose: the grey box and the
               // info glyph are the whole signal that this is a suggestion, and
               // both are invisible to a reader.
-              label: 'Suggestion. $message',
+              label: context.l10n.securitySuggestionSemantics(message),
               excludeSemantics: true,
               child: Text(
                 message,

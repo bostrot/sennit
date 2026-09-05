@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../data/chat_repository.dart';
 
@@ -33,7 +34,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
     } on Object catch (error) {
       debugPrint('weft: merge decision failed: $error');
       if (mounted) {
-        showWeftMessage(context, 'That did not go through. $error');
+        showWeftMessage(context, context.l10n.mergeFailed('$error'));
       }
       return;
     }
@@ -55,7 +56,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
             ).toLowerCase().compareTo(handleLabel(b).toLowerCase()),
           );
     if (handles.length < 2) {
-      showWeftMessage(context, 'There is nothing to merge yet.');
+      showWeftMessage(context, context.l10n.mergeNothingToMerge);
       return;
     }
 
@@ -107,7 +108,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
       // app — "Mum" on WhatsApp is "Petra" on Signal, and no scorer bridges
       // that. Manual merge is the user asserting what only they know.
       appBar: WeftAppBar(
-        title: const Text('Merged chats'),
+        title: Text(context.l10n.commonMergedChats),
         actions: [
           // In the toolbar on a desktop, floating on a phone — see the note in
           // `bridges_screen.dart`.
@@ -115,7 +116,7 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
             TextButton.icon(
               onPressed: () => _manualMerge(repository),
               icon: const Icon(Icons.call_merge_rounded, size: 16),
-              label: const Text('Merge two chats'),
+              label: Text(context.l10n.mergeTwoChats),
             ),
         ],
       ),
@@ -124,27 +125,32 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
           : FloatingActionButton.extended(
               onPressed: () => _manualMerge(repository),
               icon: const Icon(Icons.call_merge_rounded),
-              label: const Text('Merge two chats'),
+              label: Text(context.l10n.mergeTwoChats),
             ),
       body: WeftReadingPane(
         child: ListView(
-          padding: const EdgeInsets.all(WeftSpace.lg),
+          // Bottom is the clearance rather than [WeftSpace.lg] like the other
+          // three sides: the extended FAB below floats over this list, and at
+          // 16 it covered the last merged contact's *Unmerge* button outright.
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            WeftSpace.lg,
+            WeftSpace.lg,
+            WeftSpace.lg,
+            WeftSpace.fabClearance,
+          ),
           children: [
             Text(
-              'When the same person reaches you on several networks, their '
-              'conversations can be woven into one thread. Braid suggests '
-              'matches; only you confirm them.',
+              context.l10n.mergeIntro,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: WeftSpace.xl),
-            _SectionTitle('Suggestions'),
+            _SectionTitle(context.l10n.mergeSuggestions),
             const SizedBox(height: WeftSpace.sm),
             if (suggestions.isEmpty)
               Text(
-                'None right now. Suggestions appear as contacts with matching '
-                'phone numbers, names or avatars show up across networks.',
+                context.l10n.mergeNoSuggestions,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -169,11 +175,11 @@ class _MergeScreenState extends ConsumerState<MergeScreen> {
                   ),
                 ),
             const SizedBox(height: WeftSpace.xl),
-            _SectionTitle('Merged'),
+            _SectionTitle(context.l10n.mergeMergedSection),
             const SizedBox(height: WeftSpace.sm),
             if (merged.isEmpty)
               Text(
-                'Nothing is merged yet.',
+                context.l10n.mergeNothingMerged,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -243,7 +249,9 @@ class _SuggestionCard extends StatelessWidget {
                       _HandleChip(handle: candidate.b),
                       const Spacer(),
                       Text(
-                        '${(candidate.score * 100).round()}%',
+                        context.l10n.mergeScore(
+                          (candidate.score * 100).round(),
+                        ),
                         style: context.text.labelSmall?.copyWith(
                           color: context.colors.onSurfaceVariant,
                         ),
@@ -270,36 +278,54 @@ class _SuggestionCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: WeftSpace.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // Both buttons name whom they act on and what happens. On a
-                // screen with four suggestions, four buttons reading "Merge"
-                // are four ways to merge the wrong two people.
-                NamedButton(
-                  label:
-                      'Not the same person: keep '
-                      '${handleLabel(candidate.a)} and '
-                      '${handleLabel(candidate.b)} separate',
-                  onPressed: onReject,
-                  child: TextButton(
+            // `Wrap`, not `Row` — the same 2.0× finding as the message request
+            // card's action row, and the same shape of consequence: *Merge* was
+            // the button that went off the edge, so a suggestion could be
+            // rejected at large text but not accepted.
+            // `double.infinity` is load-bearing, not defensive. A `Wrap` sizes
+            // to its widest run, and `WrapAlignment.end` distributes *free*
+            // space — so a shrink-wrapped `Wrap` has none to distribute and the
+            // buttons stop at the widest run's edge instead of the card's. The
+            // `Row` this replaced filled the card for free, and dropping the
+            // width is how swapping one for the other silently moves a button
+            // 85 points in from the trailing margin at 1.0×. Caught in the
+            // re-walk, not in review.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: WeftSpace.sm,
+                runSpacing: WeftSpace.xs,
+                children: [
+                  // Both buttons name whom they act on and what happens. On a
+                  // screen with four suggestions, four buttons reading "Merge"
+                  // are four ways to merge the wrong two people.
+                  NamedButton(
+                    label: context.l10n.mergeRejectSemantics(
+                      handleLabel(candidate.a),
+                      handleLabel(candidate.b),
+                    ),
                     onPressed: onReject,
-                    child: const Text('Not the same person'),
+                    child: TextButton(
+                      onPressed: onReject,
+                      child: Text(context.l10n.mergeNotSamePerson),
+                    ),
                   ),
-                ),
-                const SizedBox(width: WeftSpace.sm),
-                NamedButton(
-                  label:
-                      'Merge ${handleLabel(candidate.a)} with '
-                      '${handleLabel(candidate.b)} into one conversation',
-                  onPressed: onMerge,
-                  child: FilledButton.icon(
+                  NamedButton(
+                    label: context.l10n.mergeAcceptSemantics(
+                      handleLabel(candidate.a),
+                      handleLabel(candidate.b),
+                    ),
                     onPressed: onMerge,
-                    icon: const Icon(Icons.merge_rounded, size: 18),
-                    label: const Text('Merge'),
+                    child: FilledButton.icon(
+                      onPressed: onMerge,
+                      icon: const Icon(Icons.merge_rounded, size: 18),
+                      label: Text(context.l10n.mergeAccept),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -360,13 +386,14 @@ class _MergedCard extends StatelessWidget {
                   // Same problem as Merge, one row down: a contact with three
                   // legs has three buttons reading "Unmerge".
                   NamedButton(
-                    label:
-                        'Unmerge ${handleLabel(handle)} from '
-                        '${contact.displayName}',
+                    label: context.l10n.mergeUnmergeSemantics(
+                      handleLabel(handle),
+                      contact.displayName,
+                    ),
                     onPressed: () => onUnmerge(handle),
                     child: TextButton(
                       onPressed: () => onUnmerge(handle),
-                      child: const Text('Unmerge'),
+                      child: Text(context.l10n.mergeUnmerge),
                     ),
                   ),
                 ],
@@ -493,14 +520,14 @@ class _HandlePickerSheetState extends State<_HandlePickerSheet> {
                 ),
                 const SizedBox(height: WeftSpace.sm),
                 WeftLabelledField(
-                  label: 'Search conversations',
+                  label: context.l10n.mergeSearchLabel,
                   child: TextField(
                     controller: _query,
                     autofocus: true,
                     onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name or number',
-                      prefixIcon: Icon(Icons.search_rounded, size: 20),
+                    decoration: InputDecoration(
+                      hintText: context.l10n.mergeSearchHint,
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
                       isDense: true,
                     ),
                   ),
@@ -523,7 +550,10 @@ class _HandlePickerSheetState extends State<_HandlePickerSheet> {
                   ),
                   title: Text(handleLabel(handle)),
                   subtitle: Text(
-                    '${handle.network.label} · ${handle.remoteId}',
+                    context.l10n.handleOnNetwork(
+                      handle.network.label,
+                      handle.remoteId,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

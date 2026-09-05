@@ -27,7 +27,7 @@ class WeftUnreadBadge extends StatelessWidget {
     required this.ink,
     this.extent = 20,
     this.fontSize = 11,
-    this.horizontalPadding = 6,
+    this.horizontalPadding = WeftSpace.dense,
     this.borderColor,
   });
 

@@ -360,7 +360,7 @@ class _UnreadBadge extends StatelessWidget {
         ink: context.colors.onError,
         extent: 18,
         fontSize: 10,
-        horizontalPadding: 5,
+        horizontalPadding: WeftSpace.xs,
         // The badge overlaps the icon it counts for; without the ring a red
         // pill over a red brand glyph has no edge.
         borderColor: context.palette.railBackground,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_store/weft_store.dart';
+import '../../app/localisation.dart';
 
 import '../../app/settings.dart';
 import '../../app/stores.dart';
@@ -55,7 +56,7 @@ class _AppearanceSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Appearance',
+              context.l10n.commonAppearance,
               style: context.text.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -73,11 +74,7 @@ class _AppearanceSheet extends ConsumerWidget {
               showSelectedIcon: false,
               segments: [
                 for (final (mode, icon, label) in const [
-                  (
-                    WeftThemeMode.system,
-                    Icons.brightness_auto_rounded,
-                    'Auto',
-                  ),
+                  (WeftThemeMode.system, Icons.brightness_auto_rounded, 'Auto'),
                   (WeftThemeMode.light, Icons.light_mode_rounded, 'Light'),
                   (WeftThemeMode.dark, Icons.dark_mode_rounded, 'Dark'),
                   (WeftThemeMode.amoled, Icons.contrast_rounded, 'AMOLED'),
@@ -123,8 +120,8 @@ class _AppearanceSheet extends ConsumerWidget {
 
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Select several networks at once'),
-              subtitle: const Text('Off: the rail is one-network-at-a-time.'),
+              title: Text(context.l10n.appearanceRailMultiSelectTitle),
+              subtitle: Text(context.l10n.appearanceRailMultiSelectSubtitle),
               value: _railMultiSelect(ref),
               onChanged: (value) {
                 ref
@@ -211,7 +208,7 @@ class _SwatchButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return WeftFocusable(
       selected: selected,
-      label: '$name accent',
+      label: context.l10n.appearanceAccentSwatch(name),
       onTap: onTap,
       // Round, so no corner radius describes it — and the ring goes outside
       // the swatch rather than over it, because a ring drawn on top of a

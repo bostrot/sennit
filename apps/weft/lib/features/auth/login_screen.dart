@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show TextInput;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import '../../app/localisation.dart';
 
 import '../../app/session_providers.dart';
 
@@ -124,13 +125,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const _Wordmark(),
                 const SizedBox(height: WeftSpace.huge),
 
-                Text('Server', style: context.text.labelLarge),
+                Text(
+                  context.l10n.loginServerHeading,
+                  style: context.text.labelLarge,
+                ),
                 const SizedBox(height: WeftSpace.sm),
                 // The hint is the field's whole name, and a hint is gone at the
                 // first keystroke — so on a form of three fields, a reader who
                 // typed into all three had three fields left called nothing.
                 WeftLabelledField(
-                  label: 'Server address',
+                  label: context.l10n.loginServerField,
                   child: TextField(
                     controller: _homeserver,
                     enabled: !_busy && !_serverResolved,
@@ -142,7 +146,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: const Icon(Icons.dns_outlined, size: 20),
                       suffixIcon: _serverResolved
                           ? IconButton(
-                              tooltip: 'Change server',
+                              tooltip: context.l10n.loginChangeServer,
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               onPressed: () => setState(() {
                                 _discovery = null;
@@ -171,7 +175,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         WeftLabelledField(
-                          label: 'Username',
+                          label: context.l10n.loginUsernameField,
                           child: TextField(
                             controller: _username,
                             enabled: !_busy,
@@ -179,24 +183,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             autofocus: true,
                             autofillHints: const [AutofillHints.username],
                             keyboardType: TextInputType.name,
-                            decoration: const InputDecoration(
-                              hintText: 'Username',
-                              prefixIcon: Icon(Icons.person_outline, size: 20),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.loginUsernameField,
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(height: WeftSpace.sm),
                         WeftLabelledField(
-                          label: 'Password',
+                          label: context.l10n.loginPasswordField,
                           child: TextField(
                             controller: _password,
                             enabled: !_busy,
                             obscureText: true,
                             autofillHints: const [AutofillHints.password],
                             onSubmitted: (_) => _signIn(),
-                            decoration: const InputDecoration(
-                              hintText: 'Password',
-                              prefixIcon: Icon(Icons.lock_outline, size: 20),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.loginPasswordField,
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),
@@ -217,10 +227,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // "button". The label outlives the text it is made of.
                 Semantics(
                   label: _busy
-                      ? 'Working'
+                      ? context.l10n.loginWorking
                       : _serverResolved
-                      ? 'Sign in'
-                      : 'Continue',
+                      ? context.l10n.loginSignIn
+                      : context.l10n.commonContinue,
                   excludeSemantics: true,
                   button: true,
                   child: FilledButton(
@@ -235,7 +245,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_serverResolved ? 'Sign in' : 'Continue'),
+                        : Text(
+                            _serverResolved
+                                ? context.l10n.loginSignIn
+                                : context.l10n.commonContinue,
+                          ),
                   ),
                 ),
 
@@ -247,15 +261,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // be worse than saying so.
                     onPressed: null,
                     icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                    label: const Text('Single sign-on (M8)'),
+                    label: Text(context.l10n.loginSso),
                   ),
                 ],
 
                 const SizedBox(height: WeftSpace.xl),
                 Text(
-                  'Braid connects to your own Matrix server. It never '
-                  'proxies '
-                  'your messages through anyone else.',
+                  context.l10n.loginFooter,
                   textAlign: TextAlign.center,
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
@@ -280,6 +292,7 @@ class _Wordmark extends StatelessWidget {
         const BrandMark(size: 76),
         const SizedBox(height: WeftSpace.lg),
         Text(
+          // l10n-ignore: the app's own name, never translated.
           'Braid',
           style: context.text.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
@@ -288,7 +301,7 @@ class _Wordmark extends StatelessWidget {
         ),
         const SizedBox(height: WeftSpace.xs),
         Text(
-          'Every conversation, one thread.',
+          context.l10n.brandTagline,
           style: context.text.bodyMedium?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
@@ -324,8 +337,8 @@ class _ServerSummary extends StatelessWidget {
           Expanded(
             child: Text(
               discovery.viaWellKnown
-                  ? 'Delegated to ${discovery.baseUrl.host}'
-                  : 'Connected to ${discovery.baseUrl.host}',
+                  ? context.l10n.loginDelegatedTo(discovery.baseUrl.host)
+                  : context.l10n.loginConnectedTo(discovery.baseUrl.host),
               style: context.text.bodySmall,
             ),
           ),
@@ -349,7 +362,7 @@ class _ErrorBanner extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: 'Sign-in failed. $message',
+      label: context.l10n.loginFailed(message),
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(WeftSpace.md),

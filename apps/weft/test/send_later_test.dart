@@ -8,6 +8,7 @@ import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft_design/weft_design.dart';
 
 import 'support/recording_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Holding Send opens the scheduler.
 ///
@@ -35,6 +36,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: const ChatView(chatId: mergedChat),
         ),

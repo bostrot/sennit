@@ -1,0 +1,14 @@
+/* Brazilian Portuguese, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+   The permission prompts iOS and macOS draw before Braid has run a line of
+   Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
+   out of the bundle, keyed by the `Info.plist` key each one overrides.
+
+   Keep them keyed against the English in `Info.plist` — a key here that is not
+   there is dead, and a key there that is missing here falls back to English,
+   which is a permission prompt in the wrong language on a screen the user
+   cannot get past. `l10n_test.dart` checks both directions. */
+
+"NSLocationUsageDescription" = "O Weft compartilha sua localização apenas quando você toca em \"compartilhar localização\" em uma conversa.";
+"NSMicrophoneUsageDescription" = "O Weft precisa do microfone para você poder falar em uma chamada de voz ou de vídeo.";
+"NSCameraUsageDescription" = "O Weft precisa da câmera para você poder ser visto em uma videochamada.";

@@ -1,8 +1,6 @@
 import 'package:meta/meta.dart';
 import 'package:weft_domain/weft_domain.dart';
 
-import 'fallback.dart';
-
 /// A single `m.annotation`, as it arrived off one source room's timeline.
 ///
 /// Reactions never pass through the message mapper — `mapEvent` filters to
@@ -420,6 +418,197 @@ String replyPreviewText(
   final runes = collapsed.runes.toList(growable: false);
   if (runes.length <= maxLength) return collapsed;
   return '${String.fromCharCodes(runes.take(maxLength)).trimRight()}…';
+}
+
+/// Longest a thread title taken from a root message's body may be.
+///
+/// The indicator is one line under a bubble that already carries the same words
+/// in full, so this only has to be enough to tell forty topics apart.
+const int kThreadTitleLength = 48;
+
+/// Splits [messages] into the room-level timeline and the threads hanging off it.
+///
+/// [messages] is in whatever order the timeline hands over — newest first, for
+/// a `MergedTimelineView` — and that order is preserved in
+/// [ThreadGrouping.messages]. Nothing here sorts: re-sorting would silently
+/// disagree with the merge's own watermark ordering, which is the only ordering
+/// that is safe across sources.
+///
+/// **A reply whose root is not loaded stays in the flat timeline.** This is the
+/// case that decides whether the feature loses messages or not. Scrolling back
+/// through a forum group reaches thread replies long before it reaches the
+/// topic roots they hang off, and taking those replies out of the flat list on
+/// the strength of a relation to an event nobody can see would hide them behind
+/// an indicator that does not exist. They are shown where they are until their
+/// root arrives, at which point the next grouping folds them in.
+///
+/// [readUpTo] is the timestamp of the last message the user has read in this
+/// room, and everything newer than it counts as unread. Null means "no read
+/// marker yet", which is treated as *nothing* unread rather than everything: a
+/// freshly-opened chat whose receipt has not synced would otherwise light up
+/// every topic at once, which is indistinguishable from noise.
+///
+/// [titleFor] overrides how a thread is named. The default is
+/// [threadTitleFromRoot] with the bridge's announced name preferred over it —
+/// see [ThreadSummary.title] — and takes the replies as well as the root,
+/// because the bridges disagree about which event carries a Telegram forum
+/// topic's name.
+ThreadGrouping groupThreads({
+  required Iterable<WeftMessage> messages,
+  DateTime? readUpTo,
+  String? Function(WeftMessage root, List<WeftMessage> replies)? titleFor,
+  bool Function(WeftMessage message)? isOwn,
+}) {
+  final flat = <WeftMessage>[];
+  final repliesByRoot = <String, List<WeftMessage>>{};
+
+  for (final message in messages) {
+    final root = message.threadRootId;
+    if (root == null || root.isEmpty) {
+      flat.add(message);
+    } else {
+      repliesByRoot.putIfAbsent(root, () => []).add(message);
+    }
+  }
+
+  if (repliesByRoot.isEmpty) return ThreadGrouping.flatten(flat);
+
+  final roots = <String, WeftMessage>{
+    for (final message in flat) message.eventId: message,
+  };
+
+  final summaries = <String, ThreadSummary>{};
+  for (final entry in repliesByRoot.entries) {
+    final root = roots[entry.key];
+    if (root == null) continue;
+
+    final replies = entry.value;
+    WeftMessage? latest;
+    var unread = 0;
+    for (final reply in replies) {
+      if (latest == null ||
+          _compareRelation(
+                latest.timestamp,
+                latest.eventId,
+                reply.timestamp,
+                reply.eventId,
+              ) <
+              0) {
+        latest = reply;
+      }
+      // The user's own reply is never unread to them, whichever device it was
+      // sent from — and in a thread the user is participating in, that is most
+      // of the traffic.
+      final own = isOwn?.call(reply) ?? reply.isOwn;
+      if (!own && readUpTo != null && reply.timestamp.isAfter(readUpTo)) {
+        unread++;
+      }
+    }
+
+    summaries[root.eventId] = ThreadSummary(
+      rootEventId: root.eventId,
+      roomId: root.roomId,
+      title: (titleFor ?? threadTitle)(root, replies),
+      replyCount: replies.length,
+      latestReply: latest,
+      unreadCount: unread,
+    );
+  }
+
+  // Replies whose root never turned up go back where they were, in the position
+  // the timeline gave them. Rebuilt by a second walk rather than by inserting
+  // into `flat` as we go, because "is this root loaded?" is not answerable until
+  // the whole list has been seen.
+  final orphaned = <WeftMessage>[
+    for (final entry in repliesByRoot.entries)
+      if (!summaries.containsKey(entry.key)) ...entry.value,
+  ];
+  if (orphaned.isEmpty) {
+    return ThreadGrouping(
+      messages: List.unmodifiable(flat),
+      threads: Map.unmodifiable(summaries),
+    );
+  }
+
+  final orphanedIds = {for (final message in orphaned) message.eventId};
+  final restored = <WeftMessage>[
+    for (final message in messages)
+      if (message.threadRootId == null ||
+          message.threadRootId!.isEmpty ||
+          orphanedIds.contains(message.eventId))
+        message,
+  ];
+  return ThreadGrouping(
+    messages: List.unmodifiable(restored),
+    threads: Map.unmodifiable(summaries),
+  );
+}
+
+/// Every message belonging to one thread, root first, oldest to newest.
+///
+/// Read order rather than the timeline's newest-first, because a thread view is
+/// read top to bottom from the message that started it — which is also why the
+/// root is included: a thread opened without the thing it is about is a set of
+/// answers to a missing question.
+List<WeftMessage> threadMessages({
+  required Iterable<WeftMessage> messages,
+  required String rootEventId,
+}) {
+  final belonging = <WeftMessage>[
+    for (final message in messages)
+      if (message.eventId == rootEventId || message.threadRootId == rootEventId)
+        message,
+  ];
+  belonging.sort(
+    (a, b) => _compareRelation(a.timestamp, a.eventId, b.timestamp, b.eventId),
+  );
+  // The root leads whatever its timestamp says. A bridge that backfills a forum
+  // topic can stamp the first reply at or before the root's own origin time,
+  // and a thread that opens on an answer reads as though the question is
+  // missing.
+  final rootIndex = belonging.indexWhere((m) => m.eventId == rootEventId);
+  if (rootIndex > 0) {
+    final root = belonging.removeAt(rootIndex);
+    belonging.insert(0, root);
+  }
+  return List.unmodifiable(belonging);
+}
+
+/// What to call a thread: the bridge's name for it, or the root's own words.
+///
+/// The announced name wins wherever it turns up, root or reply, because the
+/// bridges disagree about which event carries it and a Telegram forum topic
+/// called "Bugs" must not be labelled with the first thing anyone said in it.
+/// Falls through to [threadTitleFromRoot] for a plain Matrix thread, which has
+/// no name at all.
+String? threadTitle(WeftMessage root, List<WeftMessage> replies) {
+  var announced = root.threadName;
+  if (announced == null) {
+    for (final reply in replies) {
+      if (reply.threadName != null) {
+        announced = reply.threadName;
+        break;
+      }
+    }
+  }
+  if (announced != null && announced.trim().isNotEmpty) {
+    return announced.trim();
+  }
+  return threadTitleFromRoot(root);
+}
+
+/// A thread's name taken from the message it hangs off.
+///
+/// What a Matrix thread has instead of a name. Collapsed to one line and
+/// truncated by runes, the same way a reply chip is, and empty for a root that
+/// is all attachment — the indicator says "4 replies" on its own rather than
+/// showing a blank title, which reads as a bug.
+String? threadTitleFromRoot(
+  WeftMessage root, {
+  int maxLength = kThreadTitleLength,
+}) {
+  final text = replyPreviewText(root, maxLength: maxLength);
+  return text.isEmpty ? null : text;
 }
 
 /// Total order for relation events: origin timestamp, then event id.

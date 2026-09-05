@@ -242,14 +242,31 @@ class SmsChatRepository {
     await _gateway.drainPending();
   }
 
-  /// Shows the system's default-app dialog, then reloads if it was granted.
+  /// Shows the system's default-app dialog, then re-reads the role.
   ///
   /// A decline is an answer rather than an error: [chats] stays empty and every
   /// other network in the inbox is untouched.
-  Future<bool> requestRole() async {
-    final granted = await _gateway.requestRole();
-    if (granted) await start();
-    return granted;
+  ///
+  /// The refresh happens on **every** outcome, not only on a grant. The old
+  /// code reloaded when the dialog said yes and otherwise left [status]
+  /// untouched, so any answer the dialog got wrong — and it gets one wrong
+  /// whenever the activity is recreated underneath it — left the whole screen
+  /// rendering state from before the dialog. The dialog is a hint about what to
+  /// say; the platform is the source of truth about what happened.
+  Future<SmsRoleOutcome> requestRole() async {
+    final outcome = await _gateway.requestRole();
+    // Nothing was asked and nothing can have changed, so there is nothing to
+    // re-read — and re-reading would cost a channel round trip on every tap on
+    // a device that has no role to give.
+    if (outcome == SmsRoleOutcome.unavailable) return outcome;
+
+    final before = _status.isReady;
+    await refreshStatus();
+    // A grant that reached us as anything else. `refreshStatus` has already
+    // subscribed and loaded through `start`, so the correction costs nothing
+    // beyond telling the truth about which outcome this was.
+    if (!before && _status.isReady) return SmsRoleOutcome.granted;
+    return outcome;
   }
 
   /// Opens Android's default-apps settings, for handing the role back.

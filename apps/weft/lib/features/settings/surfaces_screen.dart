@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_snapshot/weft_snapshot.dart';
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../app/snapshot_providers.dart';
@@ -37,50 +39,30 @@ class SurfacesScreen extends ConsumerWidget {
     final networks = ref.watch(chatRepositoryProvider).availableNetworks;
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Widgets & watch')),
+      appBar: WeftAppBar(title: Text(context.l10n.surfacesTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
-            const PrivacyNotice(
-              message:
-                  'A widget and a watch cannot decrypt your messages, so Braid has '
-                  'to write what they show into a file outside the encrypted '
-                  'store. That file sits on this device where the system, and any '
-                  'backup of this device, can read it — and a home screen is '
-                  'read by whoever is standing next to you. Nothing is written '
-                  'until you switch a surface on below, and you choose how much '
-                  'of a conversation goes into it.',
-            ),
+            PrivacyNotice(message: context.l10n.surfacesNotice),
             const SizedBox(height: WeftSpace.lg),
 
             SwitchListTile(
-              title: const PrivacyGatedTitle(
-                title: 'Home screen widgets',
-                warning:
-                    'Turning this on writes your recent conversations to a file '
-                    'outside the encrypted store, which backups can read.',
+              title: PrivacyGatedTitle(
+                title: context.l10n.surfacesWidgetsTitle,
+                warning: context.l10n.surfacesWriteWarning,
               ),
-              subtitle: const Text(
-                'Adds an unread-count tile and a recent-conversations list you '
-                'can place on your home screen.',
-              ),
+              subtitle: Text(context.l10n.surfacesWidgetsSubtitle),
               value: settings.widgets,
               onChanged: (v) => _write(ref, settings.copyWith(widgets: v)),
               contentPadding: EdgeInsets.zero,
             ),
             SwitchListTile(
-              title: const PrivacyGatedTitle(
-                title: 'Watch',
-                warning:
-                    'Turning this on writes your recent conversations to a file '
-                    'outside the encrypted store, which backups can read.',
+              title: PrivacyGatedTitle(
+                title: context.l10n.surfacesWatchTitle,
+                warning: context.l10n.surfacesWriteWarning,
               ),
-              subtitle: const Text(
-                'Sends the same list to a paired watch. Replies you dictate are '
-                'handed back to this phone to send — the watch never holds your '
-                'account.',
-              ),
+              subtitle: Text(context.l10n.surfacesWatchSubtitle),
               value: settings.watch,
               onChanged: (v) => _write(ref, settings.copyWith(watch: v)),
               contentPadding: EdgeInsets.zero,
@@ -88,39 +70,30 @@ class SurfacesScreen extends ConsumerWidget {
 
             if (settings.anySurface) ...[
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'What a row shows',
-                subtitle:
-                    'Both are off to begin with. With both off, a surface is told '
-                    'how many unread messages you have and nothing else — no '
-                    'names, no words, no faces.',
+              SettingsSectionHeader(
+                title: context.l10n.surfacesRowShowsTitle,
+                subtitle: context.l10n.surfacesRowShowsSubtitle,
               ),
               SwitchListTile(
-                title: const PrivacyGatedTitle(
-                  title: 'Message previews',
-                  warning:
-                      'Turning this on puts the text of your most recent messages '
-                      'on your home screen.',
+                title: PrivacyGatedTitle(
+                  title: context.l10n.surfacesPreviewsTitle,
+                  warning: context.l10n.surfacesPreviewsWarning,
                 ),
-                subtitle: const Text(
-                  'The first line of the newest message in each conversation.',
-                ),
+                subtitle: Text(context.l10n.surfacesPreviewsSubtitle),
                 value: settings.includePreviews,
                 onChanged: (v) =>
                     _write(ref, settings.copyWith(includePreviews: v)),
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
-                title: const PrivacyGatedTitle(
-                  title: 'Names and faces',
-                  warning:
-                      'Turning this on puts the names and profile pictures of the '
-                      'people you talk to on your home screen.',
+                title: PrivacyGatedTitle(
+                  title: context.l10n.surfacesNamesTitle,
+                  warning: context.l10n.surfacesNamesWarning,
                 ),
-                subtitle: const Text(
-                  'Who each conversation is with, who sent the last message, and '
-                  'their picture. Off, every row is labelled '
-                  '“$kRedactedRowTitle”.',
+                subtitle: Text(
+                  context.l10n.surfacesNamesSubtitle(
+                    context.l10n.snapshotRedactedRowTitle,
+                  ),
                 ),
                 value: settings.includeSenderNames,
                 onChanged: (v) =>
@@ -129,13 +102,9 @@ class SurfacesScreen extends ConsumerWidget {
               ),
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Networks',
-                subtitle:
-                    'An excluded network never reaches a widget or a watch, '
-                    'whatever the switches above say. A conversation that carries '
-                    'an excluded network is left out whole — there is no half of '
-                    'a merged row to show.',
+              SettingsSectionHeader(
+                title: context.l10n.settingsNetworksSectionTitle,
+                subtitle: context.l10n.surfacesNetworksSubtitle,
               ),
               for (final network in networks)
                 NetworkToggleRow(
@@ -155,20 +124,16 @@ class SurfacesScreen extends ConsumerWidget {
                 ),
               if (networks.isEmpty)
                 Text(
-                  'No bridges are configured yet, so there is nothing to '
-                  'exclude. Networks appear here as they connect.',
+                  context.l10n.settingsNoBridgesToExclude,
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
                   ),
                 ),
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'What leaves the encrypted store',
-                subtitle:
-                    'Your own top conversation, drawn the way a widget row draws '
-                    'it, with the switches above applied. This is the whole of '
-                    'what a surface is given.',
+              SettingsSectionHeader(
+                title: context.l10n.surfacesLeavesStoreTitle,
+                subtitle: context.l10n.surfacesLeavesStoreSubtitle,
               ),
               _SnapshotRowPreview(settings: settings),
             ],
@@ -211,12 +176,19 @@ class _SnapshotRowPreview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
     final policy = settings.policy;
+    final placeholder = _placeholderChat(context.l10n);
     final subject = chats.firstWhere(
       (chat) => chat.networks.every(policy.allows),
-      orElse: () => _placeholderChat,
+      orElse: () => placeholder,
     );
-    final isPlaceholder = identical(subject, _placeholderChat);
-    final row = buildSnapshotRow(subject, policy);
+    final isPlaceholder = identical(subject, placeholder);
+    final row = buildSnapshotRow(
+      subject,
+      policy,
+      words: weftNotifyStringsFrom(context.l10n),
+      redactedTitle: context.l10n.snapshotRedactedRowTitle,
+      deletedPreview: context.l10n.chatMessageDeleted,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,11 +197,8 @@ class _SnapshotRowPreview extends ConsumerWidget {
         const SizedBox(height: WeftSpace.sm),
         Text(
           isPlaceholder
-              ? 'An example — no conversation here is allowed onto a surface '
-                    'yet, either because there are none or because every one of '
-                    'them is on an excluded network.'
-              : 'Your most recent conversation that a surface is allowed to '
-                    'show.',
+              ? context.l10n.surfacesPreviewPlaceholder
+              : context.l10n.surfacesPreviewReal,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
@@ -255,7 +224,7 @@ class _WidgetRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final hasName = row.title != kRedactedRowTitle;
+    final hasName = row.title != context.l10n.snapshotRedactedRowTitle;
 
     return Semantics(
       container: true,
@@ -264,11 +233,13 @@ class _WidgetRowCard extends StatelessWidget {
       // three separate labels would have no way to tell it from the settings
       // around it.
       label: [
-        'Example widget row.',
+        context.l10n.surfacesExampleRowSemantics,
         row.title,
         if (row.preview != null) row.preview,
-        if (row.senderName != null) 'from ${row.senderName}',
-        if (row.unreadCount > 0) '${row.unreadLabel} unread',
+        if (row.senderName case final sender?)
+          context.l10n.surfacesFromSender(sender),
+        if (row.unreadCount > 0)
+          context.l10n.surfacesUnreadCount(row.unreadLabel),
         for (final network in row.networks) network.label,
       ].join('. '),
       excludeSemantics: true,
@@ -374,9 +345,9 @@ class _WidgetRowCard extends StatelessWidget {
 /// A group chat rather than a DM, and named as an example rather than as a
 /// person, so that a screenshot of this screen never shows a plausible contact
 /// name that someone might take for real data.
-final Chat _placeholderChat = Chat(
+Chat _placeholderChat(AppL10n l10n) => Chat(
   id: '!example:weft.invalid',
-  title: 'Weekend plans',
+  title: l10n.surfacesExampleChatTitle,
   sources: const [
     ChatSource(roomId: '!example:weft.invalid', network: ChatNetwork.matrix),
   ],
@@ -387,13 +358,13 @@ final Chat _placeholderChat = Chat(
     roomId: '!example:weft.invalid',
     network: ChatNetwork.matrix,
     senderId: '@example:weft.invalid',
-    senderName: 'Sam',
+    senderName: l10n.surfacesExampleSender,
     // Fixed rather than `DateTime.now()`: the row does not draw a timestamp, and
     // a value that moved every rebuild would make this widget rebuild-unstable
     // for no visible gain — including in a golden.
     timestamp: DateTime.utc(2026),
     kind: MessageKind.text,
     isOwn: false,
-    body: 'Still on for Saturday?',
+    body: l10n.surfacesExampleBody,
   ),
 );

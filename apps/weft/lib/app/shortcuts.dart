@@ -35,6 +35,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/search/search_screen.dart';
 import '../features/settings/shortcuts_sheet.dart';
+import 'localisation.dart';
 import 'providers.dart';
 
 /// Width at which the inbox and the open conversation sit side by side.
@@ -119,7 +120,7 @@ class WeftKeyBinding {
 /// wrong on macOS, where Ctrl+F moves the caret forward a character inside a
 /// text field — a shortcut that stole it would break editing in the composer to
 /// save one branch here.
-List<WeftKeyBinding> weftKeyBindings({bool? useMetaKey}) {
+List<WeftKeyBinding> weftKeyBindings(AppL10n l10n, {bool? useMetaKey}) {
   final meta = useMetaKey ?? _platformUsesMetaKey;
   SingleActivator primary(
     LogicalKeyboardKey key, {
@@ -130,7 +131,7 @@ List<WeftKeyBinding> weftKeyBindings({bool? useMetaKey}) {
 
   return [
     WeftKeyBinding(
-      description: 'Next conversation',
+      description: l10n.shortcutNextChat,
       activators: [
         const SingleActivator(LogicalKeyboardKey.arrowDown, alt: true),
         primary(LogicalKeyboardKey.pageDown),
@@ -138,7 +139,7 @@ List<WeftKeyBinding> weftKeyBindings({bool? useMetaKey}) {
       intent: const NextChatIntent(),
     ),
     WeftKeyBinding(
-      description: 'Previous conversation',
+      description: l10n.shortcutPreviousChat,
       activators: [
         const SingleActivator(LogicalKeyboardKey.arrowUp, alt: true),
         primary(LogicalKeyboardKey.pageUp),
@@ -146,7 +147,7 @@ List<WeftKeyBinding> weftKeyBindings({bool? useMetaKey}) {
       intent: const PreviousChatIntent(),
     ),
     WeftKeyBinding(
-      description: 'Search all conversations',
+      description: l10n.inboxSearchAll,
       activators: [
         primary(LogicalKeyboardKey.keyF),
         primary(LogicalKeyboardKey.keyK),
@@ -154,36 +155,47 @@ List<WeftKeyBinding> weftKeyBindings({bool? useMetaKey}) {
       intent: const FocusSearchIntent(),
     ),
     WeftKeyBinding(
-      description: 'Write a message',
+      description: l10n.shortcutWriteMessage,
       activators: [primary(LogicalKeyboardKey.keyM, shift: true)],
       intent: const FocusComposerIntent(),
     ),
     WeftKeyBinding(
-      description: 'Keyboard shortcuts',
+      description: l10n.shortcutsTitle,
       activators: [primary(LogicalKeyboardKey.slash)],
       intent: const ShowShortcutsIntent(),
     ),
     // The composer's three. Documented here, bound there — see the library
     // comment above for why they are not in the app-wide map.
-    const WeftKeyBinding(
-      description: 'Send',
-      activators: [SingleActivator(LogicalKeyboardKey.enter)],
+    WeftKeyBinding(
+      description: l10n.shortcutSend,
+      activators: const [SingleActivator(LogicalKeyboardKey.enter)],
     ),
-    const WeftKeyBinding(
-      description: 'New line',
-      activators: [SingleActivator(LogicalKeyboardKey.enter, shift: true)],
+    WeftKeyBinding(
+      description: l10n.shortcutNewLine,
+      activators: const [
+        SingleActivator(LogicalKeyboardKey.enter, shift: true),
+      ],
     ),
-    const WeftKeyBinding(
-      description: 'Cancel reply or edit',
-      activators: [SingleActivator(LogicalKeyboardKey.escape)],
+    WeftKeyBinding(
+      description: l10n.shortcutCancelReply,
+      activators: const [SingleActivator(LogicalKeyboardKey.escape)],
     ),
   ];
 }
 
 /// The app-wide map: every binding in [weftKeyBindings] that carries an intent.
+///
+/// Built from the same list rather than a second table of its own, which is
+/// what stops a shortcut being documented in the sheet and bound to nothing.
+/// The locale is [weftPlatformL10n] rather than the app's resolved one because
+/// this map reads only activators and intents — the descriptions it walks past
+/// never reach a screen, so which language they were built in cannot matter.
 Map<ShortcutActivator, Intent> weftShortcutMap({bool? useMetaKey}) {
   return {
-    for (final binding in weftKeyBindings(useMetaKey: useMetaKey))
+    for (final binding in weftKeyBindings(
+      weftPlatformL10n(),
+      useMetaKey: useMetaKey,
+    ))
       if (binding.intent case final intent?)
         for (final activator in binding.activators) activator: intent,
   };
@@ -198,6 +210,35 @@ Map<ShortcutActivator, Intent> weftShortcutMap({bool? useMetaKey}) {
 class PasteIntoComposerIntent extends Intent {
   const PasteIntoComposerIntent();
 }
+
+/// Copy what the reader is pointing at in a conversation.
+///
+/// One intent for two things, because to the person pressing the key they are
+/// one thing. With text selected across the thread it copies the selection;
+/// with nothing selected and a bubble focused it copies that message — the
+/// behaviour "Copy" in the actions sheet has always had.
+///
+/// A separate intent from the framework's [CopySelectionTextIntent] rather than
+/// an override of it, and this is the whole reason: a message bubble is not an
+/// `EditableText`, `SelectableRegion`'s copy action knows only about the
+/// selection, and neither can answer "copy the message under the caret". The
+/// chat registers this one and decides; everything above it — the Mac menu bar,
+/// the Ctrl+C binding on Windows and Linux — just sends it.
+class CopyMessageIntent extends Intent {
+  const CopyMessageIntent();
+}
+
+/// Copy, in a conversation, on a platform with no menu bar to claim it.
+///
+/// macOS never gets here: `PlatformMenuBar` hands ⌘C to AppKit, which invokes
+/// the Edit menu item directly and the key event never reaches the focus tree.
+/// Windows and Linux have no menu bar, so the binding has to live in the
+/// widget tree — installed *around the message list only*, so a composer with
+/// the caret in it keeps the framework's own copy.
+const Map<ShortcutActivator, Intent> messageCopyShortcuts = {
+  SingleActivator(LogicalKeyboardKey.keyC, meta: true): CopyMessageIntent(),
+  SingleActivator(LogicalKeyboardKey.keyC, control: true): CopyMessageIntent(),
+};
 
 /// The composer's shortcuts, installed around the field itself.
 ///
@@ -246,8 +287,7 @@ Map<ShortcutActivator, Intent> composerShortcutsFor({
   const SingleActivator(LogicalKeyboardKey.numpadEnter, control: true):
       const SendComposerIntent(),
   if (sendOnEnter) ...{
-    const SingleActivator(LogicalKeyboardKey.enter):
-        const SendComposerIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter): const SendComposerIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter):
         const SendComposerIntent(),
     const SingleActivator(LogicalKeyboardKey.enter, shift: true):

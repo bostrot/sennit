@@ -234,13 +234,26 @@ enum UploadRejectionReason {
 /// A file that will not be sent, with a reason fit to show the user.
 @immutable
 final class UploadRejection extends UploadDecision {
-  const UploadRejection({required this.reason, required this.message});
+  const UploadRejection({
+    required this.reason,
+    required this.message,
+    this.sizeBytes,
+    this.limitBytes,
+  });
 
   final UploadRejectionReason reason;
 
-  /// Plain language, already user-facing. No error codes, no byte counts the
-  /// user has no way to act on — the caller shows this string as-is.
+  /// An English sentence, kept for logs and for a caller with no translations
+  /// of its own. The app words [reason] instead, using [sizeBytes] and
+  /// [limitBytes] where it needs the numbers — see
+  /// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
   final String message;
+
+  /// The file's size, for the sentence the app writes about it.
+  final int? sizeBytes;
+
+  /// What the server would have accepted, for the same sentence.
+  final int? limitBytes;
 
   @override
   String toString() => 'UploadRejection(${reason.name}: $message)';
@@ -263,6 +276,7 @@ final class UploadPlan extends UploadDecision {
     required this.encrypted,
     this.dimensions,
     this.durationMs,
+    this.caption,
   });
 
   /// The file this plan is about.
@@ -292,6 +306,22 @@ final class UploadPlan extends UploadDecision {
   /// nothing downstream has to ask the room again.
   final bool encrypted;
 
+  /// What the user typed under the picture before sending it, or null when they
+  /// typed nothing — which is the overwhelming majority of attachments.
+  ///
+  /// Held on the plan rather than passed to [toEventContent] at dispatch time
+  /// because of where the two moments are. The plan is what `UploadQueue` keeps
+  /// for the whole life of a task — through `hashing`, through three attempts
+  /// and sixteen seconds of backoff, through a failure the user retries an hour
+  /// later — and the event is written from it at the far end. A caption passed
+  /// in at the end would have to be carried alongside the plan by every layer
+  /// in between, and the one that forgot would drop the user's words silently:
+  /// the photo still arrives, so nothing looks broken.
+  ///
+  /// Empty and whitespace-only strings are normalised to null by [planUpload],
+  /// so `caption != null` means there is really something to say.
+  final String? caption;
+
   /// Size of the original file in bytes.
   int get sizeBytes => source.sizeBytes;
 
@@ -320,13 +350,14 @@ final class UploadPlan extends UploadDecision {
   /// [ArgumentError] instead of degrading — an event that carries both a plain
   /// `url` and a `file` block is ambiguous to every receiving client.
   ///
-  /// [caption] replaces `body` with the user's text and moves the filename to
+  /// A [caption] replaces `body` with the user's text and moves the filename to
   /// `filename`, per MSC2530. Without one, `body` is the filename, which is what
-  /// clients that predate captions expect.
+  /// clients that predate captions expect — and which is why the two keys are
+  /// never both the name: a receiving client that falls back to `body` would
+  /// then print `IMG_4021.jpg` under the photo instead of the caption.
   Map<String, Object?> toEventContent({
     required String uri,
     EncryptedFileInfo? file,
-    String? caption,
     String? thumbnailUri,
     EncryptedFileInfo? thumbnailFile,
     int? thumbnailSizeBytes,
@@ -431,6 +462,12 @@ final class UploadPlan extends UploadDecision {
 /// [messageKindFor] ignores it for everything else. [durationMs] likewise comes
 /// from the caller: no playback length is readable from a header slice.
 ///
+/// [caption] is the user's own words, trimmed here and normalised to null when
+/// nothing is left. Doing it once, at the only door into the pipeline, is what
+/// stops a composer that submitted a field holding two spaces from producing an
+/// event whose `body` is `"  "` and whose `filename` is the name the body should
+/// have carried — a message that renders as a blank line on every client.
+///
 /// Total — every input produces a decision, never an exception.
 UploadDecision planUpload(
   AttachmentSource source, {
@@ -438,6 +475,7 @@ UploadDecision planUpload(
   required int maxUploadBytes,
   bool isVoiceNote = false,
   int? durationMs,
+  String? caption,
 }) {
   if (source.isEmpty) {
     return const UploadRejection(
@@ -451,6 +489,8 @@ UploadDecision planUpload(
       message:
           'This file is ${_megabytes(source.sizeBytes)} MB, and the server '
           'accepts at most ${_megabytes(maxUploadBytes)} MB.',
+      sizeBytes: source.sizeBytes,
+      limitBytes: maxUploadBytes,
     );
   }
 
@@ -472,6 +512,8 @@ UploadDecision planUpload(
     _ => null,
   };
 
+  final trimmed = caption?.trim();
+
   return UploadPlan(
     source: source,
     mimeType: mimeType,
@@ -479,6 +521,7 @@ UploadDecision planUpload(
     msgtype: _msgtypeFor(kind),
     dimensions: dimensions,
     durationMs: durationMs,
+    caption: trimmed == null || trimmed.isEmpty ? null : trimmed,
     thumbnail: ThumbnailSpec.forSource(
       kind: kind,
       sizeBytes: source.sizeBytes,

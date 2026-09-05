@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/labels.dart';
+import '../../app/localisation.dart';
 
 /// Picks (or creates) a label for the selected chats. Pops the label, or null.
 Future<String?> showLabelSheet(
@@ -40,6 +41,7 @@ class _LabelSheetState extends ConsumerState<_LabelSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final labelsByChat = ref.watch(chatLabelsProvider);
     // Checked when every selected chat already carries the label, so the
     // sheet reads as state, not just as a list of names.
@@ -58,15 +60,14 @@ class _LabelSheetState extends ConsumerState<_LabelSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Label ${widget.chatIds.length} '
-            'conversation${widget.chatIds.length == 1 ? '' : 's'}',
+            l10n.inboxLabelHeading(widget.chatIds.length),
             style: context.text.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: WeftSpace.sm),
           Text(
-            'A label already on every selected chat is removed instead.',
+            l10n.inboxLabelRemoveHint,
             style: context.text.bodySmall?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),
@@ -91,14 +92,14 @@ class _LabelSheetState extends ConsumerState<_LabelSheet> {
             children: [
               Expanded(
                 child: WeftLabelledField(
-                  label: 'New label',
+                  label: l10n.inboxLabelNewField,
                   child: TextField(
                     controller: _newLabel,
                     autofocus: widget.existing.isEmpty,
                     textCapitalization: TextCapitalization.sentences,
                     onSubmitted: (value) => Navigator.of(context).pop(value),
-                    decoration: const InputDecoration(
-                      hintText: 'New label — e.g. Work',
+                    decoration: InputDecoration(
+                      hintText: l10n.inboxLabelNewHint,
                       isDense: true,
                     ),
                   ),
@@ -107,7 +108,7 @@ class _LabelSheetState extends ConsumerState<_LabelSheet> {
               const SizedBox(width: WeftSpace.sm),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(_newLabel.text),
-                child: const Text('Apply'),
+                child: Text(l10n.commonApply),
               ),
             ],
           ),

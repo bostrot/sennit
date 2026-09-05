@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../data/demo_account.dart';
+
 /// Runs the app on in-memory fixtures instead of a homeserver.
 ///
 ///     flutter run --dart-define=WEFT_DEMO=true
@@ -29,18 +31,28 @@ final sessionBootstrapProvider = FutureProvider<WeftSessionState>((ref) async {
 /// reading it before login is a programming error, and the screen that reads it
 /// reports the failure it gets rather than rendering an empty list that would
 /// read as "you have no other devices".
-final deviceManagerProvider = Provider<DeviceManager>(
-  (ref) => MatrixDeviceManager(ref.watch(matrixSessionProvider).client),
-);
+///
+/// [kDemoMode] is not that case and is why the branch is here. Demo mode never
+/// calls `initialize()`, so `session.client` throws — and the screen's honest
+/// report of that was a red `ProviderException` where Settings ▸ Devices should
+/// be. Every other seam in demo mode is already a fixture; this one is now too.
+/// The unguarded real path is unchanged.
+final deviceManagerProvider = Provider<DeviceManager>((ref) {
+  if (kDemoMode) return DemoDeviceManager();
+  return MatrixDeviceManager(ref.watch(matrixSessionProvider).client);
+});
 
 /// Cross-signing, the online key backup and the recovery key behind them.
 ///
 /// Same shape and same reasoning as [deviceManagerProvider]: an interface so
-/// the security screen can be built against a fake, and unguarded so reading it
-/// before login fails loudly instead of reporting a healthy empty account.
-final keyBackupProvider = Provider<KeyBackup>(
-  (ref) => MatrixKeyBackup(ref.watch(matrixSessionProvider).client),
-);
+/// the security screen can be built against a fake, unguarded so reading it
+/// before login fails loudly instead of reporting a healthy empty account, and
+/// a fixture in demo mode so Settings ▸ Encryption is a screen rather than a
+/// stack trace.
+final keyBackupProvider = Provider<KeyBackup>((ref) {
+  if (kDemoMode) return DemoKeyBackup();
+  return MatrixKeyBackup(ref.watch(matrixSessionProvider).client);
+});
 
 /// Live session state. Seeded from the bootstrap result so there is no gap
 /// between "restored" and "first state event".

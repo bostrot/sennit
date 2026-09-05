@@ -223,7 +223,12 @@ class McpService {
     final bound = await _server.start(port: port);
     _settings.setInt(WeftSettings.mcpPort, bound);
 
-    if (_settings.getBool(WeftSettings.mcpTunnelEnabled)) {
+    // The setting can be on for a device that cannot honour it — settings are
+    // per-install, but a user who turned it on once carries the habit. Starting
+    // it anyway would put a failed tunnel on the screen of a phone that never
+    // asked for one; the row says why instead.
+    if (_settings.getBool(WeftSettings.mcpTunnelEnabled) &&
+        _tunnel.isSupportedPlatform) {
       final token = await _ref
           .read(storesProvider)
           .secrets

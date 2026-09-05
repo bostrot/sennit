@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simplified Chinese, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml`, which carries the reasoning behind
+     each string; this one only the words. `app_name`, `tile_name` and
+     `complication_name` are the product's own name and stay as they are. -->
+<resources>
+    <string name="app_name">Weft</string>
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">你的未读消息和最近的对话。</string>
+    <string name="complication_name">Weft unread</string>
+    <string name="inbox_heading">最近</string>
+    <string name="signed_out_title">登录 Weft</string>
+    <string name="signed_out_body">在手机上打开 Weft 并登录。</string>
+    <string name="disabled_title">手表已关闭</string>
+    <string name="disabled_body">在手机上打开 Weft，在「小组件与手表」中启用手表。</string>
+    <string name="stale_title">请在手机上打开 Weft</string>
+    <string name="stale_body">内容已过期。打开 Weft 即可刷新。</string>
+    <string name="empty_title">没有对话</string>
+    <string name="empty_body">暂时没有可显示的内容。被排除网络上的对话永远不会在此显示。</string>
+    <string name="merged">合并的对话</string>
+    <string name="unread_label">未读</string>
+    <string name="reply_heading">回复</string>
+    <string name="reply_dictate">语音输入</string>
+    <string name="reply_dictate_hint">回复 %1$s</string>
+    <string name="reply_sending">正在发送…</string>
+    <string name="reply_sent">已发送</string>
+    <string name="reply_sent_via">已通过 %1$s 发送</string>
+    <string name="reply_failed">未发送</string>
+    <string name="reply_failed_unknown_chat">该对话已不在 Weft 中。</string>
+    <string name="reply_failed_not_signed_in">未发送。你的手机上没有登录账号。</string>
+    <string name="reply_failed_send_failed">未发送。请在手机上打开 Weft 重试。</string>
+    <string name="reply_failed_timed_out">未发送。你的手机没有响应。</string>
+    <string name="reply_failed_overflowed">未发送。同时回复过多。</string>
+    <string name="reply_failed_app_not_running">未发送。请在手机上打开 Weft。</string>
+    <string name="canned_yes">好</string>
+    <string name="canned_no">不用</string>
+    <string name="canned_on_my_way">我在路上了</string>
+    <string name="canned_thanks">谢谢！</string>
+    <string name="canned_call_later">我稍后打给你可以吗？</string>
+    <string name="canned_cant_talk">现在不方便说话</string>
+
+    <plurals name="unread_count">
+        <item quantity="one">%1$d 条未读消息</item>
+        <item quantity="other">%1$d 条未读消息</item>
+    </plurals>
+</resources>

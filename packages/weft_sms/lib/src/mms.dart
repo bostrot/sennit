@@ -72,14 +72,28 @@ sealed class MmsDecision {
 /// An attachment that will not be sent, with a reason fit to show the user.
 @immutable
 final class MmsRejection extends MmsDecision {
-  const MmsRejection({required this.reason, required this.message});
+  const MmsRejection({
+    required this.reason,
+    required this.message,
+    this.mimeType,
+    this.sizeBytes,
+    this.budgetBytes,
+  });
 
   final MmsRejectionReason reason;
 
-  /// Plain language, already user-facing, and specific about SMS being the
-  /// constraint — the reader is about to wonder why the same photo sent fine an
-  /// hour ago on a different network.
+  /// An English sentence, kept for logs and for a caller with no translations
+  /// of its own. The app words [reason] instead, using [mimeType],
+  /// [sizeBytes] and [budgetBytes] where it needs the facts — see
+  /// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
   final String message;
+
+  /// What the file turned out to be, for the sentence the app writes.
+  final String? mimeType;
+
+  /// The file's size, and what a text message could have carried.
+  final int? sizeBytes;
+  final int? budgetBytes;
 
   @override
   String toString() => 'MmsRejection(${reason.name}: $message)';
@@ -153,6 +167,7 @@ MmsDecision planMmsPart(
           'Text messaging cannot carry a $mimeType file — only pictures, '
           'video, audio and contact cards travel over MMS. Sending this on '
           'another network in this conversation will work.',
+      mimeType: mimeType,
     );
   }
 
@@ -164,6 +179,8 @@ MmsDecision planMmsPart(
           'This file is ${_kilobytes(source.sizeBytes)} KB, and a text message '
           'can carry about ${_kilobytes(budget < 0 ? 0 : budget)} KB. Carriers '
           'drop anything larger without telling either of you.',
+      sizeBytes: source.sizeBytes,
+      budgetBytes: budget < 0 ? 0 : budget,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/search_providers.dart';
 import 'package:weft/app/stores.dart';
@@ -35,6 +36,8 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(repository)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
             theme: WeftTheme.build(),
             home: const MergeScreen(),
           ),
@@ -159,6 +162,8 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
             theme: WeftTheme.build(),
             home: SearchScreen(initialQuery: query),
           ),
@@ -240,6 +245,8 @@ void main() {
     Future<void> pump(WidgetTester tester, Widget child) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: Scaffold(body: child),
         ),
@@ -329,6 +336,8 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: const Scaffold(
             body: Center(child: QrCard.data('https://example.org/pair')),
@@ -349,6 +358,8 @@ void main() {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: const Scaffold(
             body: Center(

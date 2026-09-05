@@ -13,3 +13,6 @@ export 'src/message.dart';
 export 'src/network.dart';
 export 'src/poll.dart';
 export 'src/relations.dart';
+export 'src/reply_fallback.dart';
+export 'src/request.dart';
+export 'src/thread.dart';

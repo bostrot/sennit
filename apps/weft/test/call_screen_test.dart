@@ -11,6 +11,7 @@ import 'package:weft_call/weft_call.dart';
 
 import 'support/call_fixtures.dart';
 import 'support/semantics_probe.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The call screen, in each state a call can put it in.
 ///
@@ -25,6 +26,7 @@ import 'support/semantics_probe.dart';
 /// button drives**, because a mute button wired to the speaker looks perfect in
 /// an image.
 void main() {
+  final en = lookupAppL10n(const Locale('en'));
   group('what each state says', () {
     testWidgets('an outgoing call is calling, and cannot add video yet', (
       tester,
@@ -542,6 +544,7 @@ void main() {
     test('each call state has its own', () {
       expect(
         callStatusLabel(
+          en,
           serviceState(callSession(state: CallState.outgoingRinging)),
           now: t0,
         ),
@@ -549,27 +552,32 @@ void main() {
       );
       expect(
         callStatusLabel(
+          en,
           serviceState(callSession(state: CallState.connecting)),
           now: t0,
         ),
         'Connecting…',
       );
       expect(
-        callStatusLabel(serviceState(ringingSession()), now: t0),
+        callStatusLabel(en, serviceState(ringingSession()), now: t0),
         'Incoming call',
       );
       expect(
-        callStatusLabel(serviceState(ringingSession(video: true)), now: t0),
+        callStatusLabel(en, serviceState(ringingSession(video: true)), now: t0),
         'Incoming video call',
       );
       expect(
         callStatusLabel(
+          en,
           serviceState(callSession(state: CallState.ending)),
           now: t0,
         ),
         'Ending…',
       );
-      expect(callStatusLabel(const CallServiceState(), now: t0), 'Call ended');
+      expect(
+        callStatusLabel(en, const CallServiceState(), now: t0),
+        'Call ended',
+      );
     });
 
     test(
@@ -577,6 +585,7 @@ void main() {
       () {
         expect(
           callStatusLabel(
+            en,
             serviceState(
               callSession(
                 state: CallState.connected,
@@ -591,6 +600,7 @@ void main() {
         // timer counting the ringing.
         expect(
           callStatusLabel(
+            en,
             serviceState(callSession(state: CallState.connecting)),
             now: t0,
           ),
@@ -603,42 +613,42 @@ void main() {
       // Every one of these is `user_hangup` or a reject on the wire. The
       // sentences are the only place the difference survives.
       expect(
-        callEndLabel(CallEndReason.remoteReject, isOutgoing: true),
+        callEndLabel(en, CallEndReason.remoteReject, isOutgoing: true),
         'They declined',
       );
       expect(
-        callEndLabel(CallEndReason.remoteReject, isOutgoing: false),
+        callEndLabel(en, CallEndReason.remoteReject, isOutgoing: false),
         'Call declined',
       );
       expect(
-        callEndLabel(CallEndReason.inviteTimeout, isOutgoing: true),
+        callEndLabel(en, CallEndReason.inviteTimeout, isOutgoing: true),
         'No answer',
       );
       expect(
-        callEndLabel(CallEndReason.inviteTimeout, isOutgoing: false),
+        callEndLabel(en, CallEndReason.inviteTimeout, isOutgoing: false),
         'Missed call',
       );
       expect(
-        callEndLabel(CallEndReason.userBusy, isOutgoing: true),
+        callEndLabel(en, CallEndReason.userBusy, isOutgoing: true),
         'They are on another call',
       );
       expect(
-        callEndLabel(CallEndReason.answeredElsewhere, isOutgoing: false),
+        callEndLabel(en, CallEndReason.answeredElsewhere, isOutgoing: false),
         'Answered on another device',
       );
       expect(
-        callEndLabel(CallEndReason.iceFailed, isOutgoing: true),
+        callEndLabel(en, CallEndReason.iceFailed, isOutgoing: true),
         'Could not connect',
       );
       expect(
-        callEndLabel(CallEndReason.mediaFailed, isOutgoing: true),
+        callEndLabel(en, CallEndReason.mediaFailed, isOutgoing: true),
         'Microphone or camera unavailable',
       );
       expect(
-        callEndLabel(CallEndReason.glareLost, isOutgoing: true),
+        callEndLabel(en, CallEndReason.glareLost, isOutgoing: true),
         'Your calls crossed',
       );
-      expect(callEndLabel(null, isOutgoing: true), 'Call ended');
+      expect(callEndLabel(en, null, isOutgoing: true), 'Call ended');
     });
 
     test('durations read as a phone shows them', () {
@@ -658,24 +668,27 @@ void main() {
 
     test('a call that could not be placed says which failure it was', () {
       expect(
-        callStartFailureLabel(CallStartFailure.busy),
+        callStartFailureLabel(en, CallStartFailure.busy),
         'You are already on a call.',
       );
       expect(
-        callStartFailureLabel(CallStartFailure.mediaUnavailable),
+        callStartFailureLabel(en, CallStartFailure.mediaUnavailable),
         contains('microphone'),
       );
       expect(
-        callStartFailureLabel(CallStartFailure.signallingFailed),
+        callStartFailureLabel(en, CallStartFailure.signallingFailed),
         contains('could not be sent'),
       );
     });
 
     test('every audio route has a name a person would use', () {
-      expect(callAudioRouteLabel(CallAudioRoute.earpiece), 'Receiver');
-      expect(callAudioRouteLabel(CallAudioRoute.speaker), 'Speaker');
-      expect(callAudioRouteLabel(CallAudioRoute.wiredHeadset), 'Headphones');
-      expect(callAudioRouteLabel(CallAudioRoute.bluetooth), 'Bluetooth');
+      expect(callAudioRouteLabel(en, CallAudioRoute.earpiece), 'Receiver');
+      expect(callAudioRouteLabel(en, CallAudioRoute.speaker), 'Speaker');
+      expect(
+        callAudioRouteLabel(en, CallAudioRoute.wiredHeadset),
+        'Headphones',
+      );
+      expect(callAudioRouteLabel(en, CallAudioRoute.bluetooth), 'Bluetooth');
     });
   });
 

@@ -169,6 +169,133 @@ nobody can find — scrolled out of every loaded timeline, in a leg the account
 has left — sends a plain message rather than losing what the user typed. The
 composer has already shown them the quote they were answering.
 
+## The ticks say only what is actually known
+
+One tick sent, two ticks delivered, two blue ticks read. The vocabulary is a
+decade of WhatsApp and is not Braid's to reinvent; what *is* Braid's is being
+honest with it, because the ticks are the most-read four pixels in a messenger
+and a client that is casually wrong about them is one whose ticks stop meaning
+anything.
+
+`resolveDeliveryState` in `weft_domain` is where every rule lives, as one
+function rather than a chain of conditions at the bubble: each of them is a way
+of *not* claiming more than is known, and a rule that lives at a call site is a
+rule the next call site will not have.
+
+- **Matrix has no delivery receipts.** `_deliveryFor` stops at `delivered` — the
+  server having echoed the event, which is the strongest guarantee at send time.
+  Read is derived from `m.read` receipts, never reported.
+- **The group semantic is *everyone*.** Blue ticks appear only when receipts
+  cover every other participant, matching WhatsApp. A group where one person of
+  nine has opened the message is not a message that has been read, and a client
+  that said so would make the mark useless in exactly the conversations it is
+  most looked at. This is why `ChatRepository.peerReadUpTo` returns **one entry
+  per reader** rather than one per room — a list collapsed to a room's newest
+  receipt cannot tell one out of nine from nine out of nine — and why the bridge
+  bot is excluded from it: it is a member of every bridged room, it will never
+  read anything, and counted it would satisfy a two-person group on its own.
+- **An unknown group size stops at delivered.** `Chat.peerCount` is null when the
+  membership has not loaded, which is ordinary for a bridged group, and one
+  receipt out of nine looks exactly like one out of one. A DM is 1 by definition
+  — that is what "not a group" means — so this only ever costs a group.
+- **A network can only say what it has.** `deliveryCeilingFor` caps SMS and email
+  at `delivered`; SMS carries a real delivery report and has no read receipts at
+  all, which is what `smsDeliveryState` says from the other side. The cap is
+  applied last so it can never promote a `failed` into a success.
+- **Receipts switched off is not "they have not read it".** Bridges relay the
+  public receipt to the remote network as its own read marker and nearly all of
+  them stop relaying the other direction in return, so the user who turned the
+  switch off is also the user whose blue ticks will never arrive.
+  `deliveryStateIsComplete` is false there, and the bubble says so in words on
+  the tooltip and in the screen-reader label rather than leaving two grey ticks
+  to be misread.
+
+The read tick's colour is corrected **per surface**, through
+`WeftPalette.readReceiptOn`. It is drawn on two backgrounds that could hardly be
+further apart — the inbox row's page and the own bubble's fill — and in a dark
+theme those are a near-black and a pale lavender, so no single blue clears 3:1
+against both. Corrected once for the page, it came out very nearly invisible on
+the bubble: the most important of the five marks, and the least legible. Found by
+the high-contrast golden in `delivery_golden_test`, which is also where
+`colorScheme.error` turned out to be a near-white pink drawn on a near-white
+bubble at 1.05:1.
+
+## Threads are a place, and most networks do not have one
+
+A Telegram forum topic arrives over the bridge as an `m.thread` relation, which
+is why threads exist in Braid at all: a forum group with forty topics flattened
+into one stream is not a conversation anybody can read. The domain shape is
+`ThreadSummary` and `ThreadGrouping` in `weft_domain`; the verb that produces
+them is `groupThreads` in `weft_richtext`, beside the other relation
+aggregations. `ChatView` renders both halves — the room with replies folded away
+behind their roots' indicators, and, with `threadRootId` set, one thread — from
+the same widget, because everything a thread needs is the machinery already
+there.
+
+### `m.thread` is not `m.in_reply_to`, and reading them as one breaks the room
+
+Nearly every thread reply carries **both**: the spec has the sender add a reply
+fallback so a client with no thread support renders the exchange as a chain
+rather than losing it. `threadRootEventId` therefore reads `rel_type`, and
+`replyTargetEventId` reads the nested `m.in_reply_to`, and they are separate
+functions over separate keys. Read the fallback as a thread relation and every
+answer in a group chat becomes a thread of its own.
+
+The same distinction on the way out is `is_falling_back`, which is why
+`sendThreadReply` takes `replyToEventId` and `threadLatestEventId` apart rather
+than as one argument. An explicit reply is a quote the reader should see; a
+fallback is one a thread-aware client must hide. Collapse them and every message
+in a thread quotes the one directly above it, in a view where they are already
+one under the other.
+
+### Degrading is about not losing messages
+
+Only Telegram, Discord, Slack, Mattermost and Matrix itself have somewhere to
+map a thread onto — `networkSupportsThreads`. **Signal and WhatsApp have no
+equivalent, and there a thread is a Matrix-side construct the remote network
+never sees.** A Signal room's events can still carry `m.thread` relations: a
+Matrix user in the room threaded a reply, and the bridge relayed the text
+without the relation ever meaning anything on Signal's side.
+
+So for those networks `ChatView` calls `ThreadGrouping.flatten` and every
+message stays in the timeline. This is a named constructor rather than a
+caller's `if` because the requirement is not "no indicator" but **no message
+hidden**: an indicator nobody on that network can open, over replies nobody can
+see, is worse than a flat conversation.
+
+The same rule governs the case that has nothing to do with networks. A reply
+whose root has not been paginated in **stays in the flat timeline**. Scrolling
+back through a forum group reaches replies long before it reaches the roots they
+hang off, and taking those out on the strength of a relation to an event nobody
+can see hides them behind an indicator that does not exist. They fold in when
+the root arrives.
+
+### Naming a thread
+
+A Matrix thread has no name — only the message it hangs off, which is what
+`threadTitleFromRoot` shows in its place. A Telegram forum topic *does*, and
+there is no spec key for one, so the bridges invent one; `kThreadNameKeys` lists
+the spellings mautrix-telegram and the Beeper fork use, in preference order, and
+`WeftMessage.threadName` carries whichever turned up. Per message rather than
+only on the root, because the bridges disagree about which event they stamp.
+
+An announced name always beats the root's words. A topic called "Bugs" labelled
+with the first thing anyone said in it is a topic nobody can find again.
+
+### Unread is counted per thread, which is the whole point
+
+A room's badge is one number, and in a forum group it answers nothing: "68
+unread" over forty topics is not something anyone can act on, where "Bugs has 3
+new" is. Counting per thread needs to know where *this account* stopped reading,
+which is what `ChatRepository.ownReadUpTo` is for — the other half of
+`peerReadUpTo`, and a different question.
+
+**No read marker means nothing unread, not everything.** A freshly-synced
+account whose receipt has not arrived would otherwise light up every topic in
+the room at once, which is indistinguishable from noise and trains the badge
+away within a day. Own replies never count either, whichever device they were
+sent from.
+
 ## Link previews are asked of the homeserver, and only if asked for
 
 A link in a message is a thing *received*. A client that fetched the url itself

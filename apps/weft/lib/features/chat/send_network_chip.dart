@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/localisation.dart';
+
 /// "Which app does this actually go out on?", as a chip.
 ///
 /// Lives in its own file because the answer has to be given in two places now:
@@ -47,7 +49,7 @@ class SendNetworkChip extends StatelessWidget {
         // The current leg, not just the verb. "Send via…" never said *what is
         // selected right now*, and the only other indication is an 18dp logo —
         // so the one fact this chip exists to state was the one it withheld.
-        tooltip: 'Send via ${current.label}',
+        tooltip: context.l10n.chatSendVia(current.label),
         onSelected: onPick,
         itemBuilder: (context) => [
           for (final n in networks ?? chat.networks)
@@ -91,7 +93,10 @@ class SendNetworkChip extends StatelessWidget {
             // over the composer — the tallest thing in the row, and the one
             // that matters least.
             padding: context.isDesktop
-                ? const EdgeInsets.symmetric(horizontal: 6, vertical: 3)
+                ? const EdgeInsets.symmetric(
+                    horizontal: WeftSpace.dense,
+                    vertical: WeftSpace.xxs,
+                  )
                 : const EdgeInsets.symmetric(
                     horizontal: WeftSpace.sm,
                     vertical: WeftSpace.sm,

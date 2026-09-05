@@ -4,6 +4,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../services/integrations/home_assistant.dart';
 import '../../services/integrations/paperless.dart';
@@ -91,7 +92,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
       await stores.setPaperlessToken(_paperlessToken.text.trim());
     }
     ref.read(settingsRevisionProvider.notifier).bump();
-    if (mounted) showWeftMessage(context, 'Saved.');
+    if (mounted) showWeftMessage(context, context.l10n.commonSaved);
   }
 
   Future<void> _test() async {
@@ -126,11 +127,11 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WeftAppBar(
-        title: const Text('Integrations'),
+        title: Text(context.l10n.integrationsTitle),
         actions: [
           TextButton(
             onPressed: _busy ? null : _save,
-            child: const Text('Save'),
+            child: Text(context.l10n.commonSave),
           ),
           const SizedBox(width: WeftSpace.sm),
         ],
@@ -140,39 +141,37 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
             SettingsSectionHeader(
-              title: 'Home Assistant',
-              subtitle:
-                  'Every message action "Send to Home Assistant" fires a '
-                  'weft_message event on your instance — automate anything '
-                  'against it. For the other direction, point a rest_command at '
-                  'Braid\'s MCP server and call its send_message tool.',
+              title: context.l10n.integrationsHomeAssistantTitle,
+              subtitle: context.l10n.integrationsHomeAssistantSubtitle,
             ),
-            _field(_haUrl, 'Base URL', hint: 'http://homeassistant.local:8123'),
+            _field(
+              _haUrl,
+              context.l10n.settingsBaseUrlField,
+              hint: 'http://homeassistant.local:8123',
+            ),
             _field(
               _haToken,
-              'Long-lived access token (stored in the keychain)',
+              context.l10n.integrationsTokenField,
               secret: true,
-              hint: 'leave blank to keep the current token',
+              hint: context.l10n.settingsKeepCurrentTokenHint,
             ),
             if (_haStatus != null) _status(_haStatus!),
             const SizedBox(height: WeftSpace.xl),
 
             SettingsSectionHeader(
-              title: 'paperless-ngx',
-              subtitle:
-                  'With this set, "Attach → Paperless document" lets you pick a '
-                  'document from your archive and share it into any chat.',
+              title: context.l10n.integrationsPaperlessTitle,
+              subtitle: context.l10n.integrationsPaperlessSubtitle,
             ),
             _field(
               _paperlessUrl,
-              'Base URL',
+              context.l10n.settingsBaseUrlField,
               hint: 'https://paperless.example',
             ),
             _field(
               _paperlessToken,
-              'API token (stored in the keychain)',
+              context.l10n.integrationsApiTokenField,
               secret: true,
-              hint: 'leave blank to keep the current token',
+              hint: context.l10n.settingsKeepCurrentTokenHint,
             ),
             if (_paperlessStatus != null) _status(_paperlessStatus!),
             const SizedBox(height: WeftSpace.xl),
@@ -186,7 +185,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.network_check_rounded, size: 18),
-              label: const Text('Save & test connections'),
+              label: Text(context.l10n.integrationsSaveAndTest),
             ),
           ],
         ),

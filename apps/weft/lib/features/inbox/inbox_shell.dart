@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -8,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/labels.dart';
+import '../../app/localisation.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../../app/providers.dart';
@@ -20,20 +20,10 @@ import '../status/status_bar.dart';
 import 'label_sheet.dart';
 import 'mac_shell.dart';
 import 'new_chat_sheet.dart';
+import 'requests_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
-
-/// Whether this platform drives with a pointer — right-click then owns the
-/// per-conversation verbs, mirroring what long-press-selection offers.
-bool get _isDesktopPointer =>
-    !kIsWeb &&
-    switch (defaultTargetPlatform) {
-      TargetPlatform.macOS ||
-      TargetPlatform.windows ||
-      TargetPlatform.linux => true,
-      _ => false,
-    };
 
 /// The conversation's verbs, at the cursor.
 ///
@@ -124,22 +114,19 @@ Future<void> showChatContextMenu(
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialog) => AlertDialog(
-          title: Text('Delete "${chat.title}"?'),
-          content: const Text(
-            'The conversation leaves this app. History on the network is '
-            'not affected.',
-          ),
+          title: Text(dialog.l10n.inboxDeleteChatTitle(chat.title)),
+          content: Text(dialog.l10n.inboxDeleteChatBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialog).pop(false),
-              child: const Text('Cancel'),
+              child: Text(dialog.l10n.commonCancel),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialog).pop(true),
               style: TextButton.styleFrom(
                 foregroundColor: Theme.of(dialog).colorScheme.error,
               ),
-              child: const Text('Delete'),
+              child: Text(dialog.l10n.commonDelete),
             ),
           ],
         ),
@@ -158,10 +145,14 @@ Future<void> showChatContextMenu(
 /// "Now". A default here would be a place for the same mistake to be made
 /// again quietly; a required argument makes each caller say which clock it
 /// means.
-String? formatInboxTime(DateTime? ts, {required DateTime now}) {
+String? formatInboxTime(
+  DateTime? ts, {
+  required DateTime now,
+  required String justNow,
+}) {
   if (ts == null) return null;
   final delta = now.difference(ts);
-  if (delta.inMinutes < 1) return 'Now';
+  if (delta.inMinutes < 1) return justNow;
   if (delta.inHours < 24) return DateFormat.Hm().format(ts);
   if (delta.inDays < 7) return DateFormat.E().format(ts);
   return DateFormat.yMd().format(ts);
@@ -208,7 +199,7 @@ class InboxShell extends ConsumerWidget {
           ? null
           : Consumer(
               builder: (context, ref, _) => FloatingActionButton(
-                tooltip: 'New chat',
+                tooltip: context.l10n.inboxNewChatTooltip,
                 onPressed: () => showNewChatSheet(context, ref),
                 child: const Icon(Icons.edit_rounded),
               ),
@@ -246,7 +237,7 @@ class InboxShell extends ConsumerWidget {
                               child: Consumer(
                                 builder: (context, ref, _) =>
                                     FloatingActionButton(
-                                      tooltip: 'New chat',
+                                      tooltip: context.l10n.inboxNewChatTooltip,
                                       onPressed: () =>
                                           showNewChatSheet(context, ref),
                                       child: const Icon(Icons.edit_rounded),
@@ -337,6 +328,11 @@ class _InboxPane extends ConsumerWidget {
                     ),
                   ),
                   SliverToBoxAdapter(child: _FilterRows(activeFilter: filter)),
+                  // Under the filters and above the conversations, so it is
+                  // the first row of the list rather than a fifth thing in the
+                  // header — and so a request cannot be filtered away by a
+                  // rail selection the user made for another purpose.
+                  const SliverToBoxAdapter(child: RequestsEntry()),
                 ],
                 if (chats.isEmpty)
                   const SliverFillRemaining(
@@ -345,8 +341,14 @@ class _InboxPane extends ConsumerWidget {
                   )
                 else
                   SliverPadding(
+                    // Both layouts, because both float a compose button over
+                    // this list: one pane hands it to `Scaffold` above, two
+                    // panes position it into the pane's own `Stack` at the same
+                    // 16pt inset. The second is easy to miss precisely because
+                    // it is not in the `floatingActionButton` slot — and it
+                    // covers the last conversation just as completely.
                     padding: const EdgeInsetsDirectional.only(
-                      bottom: WeftSpace.xl,
+                      bottom: WeftSpace.fabClearance,
                     ),
                     sliver: SliverList.builder(
                       itemCount: chats.length,
@@ -357,7 +359,12 @@ class _InboxPane extends ConsumerWidget {
                           index: i,
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
-                            onSecondaryTapUp: _isDesktopPointer
+                            // Silent to a screen reader, for the reason
+                            // `mac_shell.dart` gives: a right-click-only
+                            // detector exports an unnamed tappable node the
+                            // size of the row, over the named one.
+                            excludeFromSemantics: true,
+                            onSecondaryTapUp: context.hasPointer
                                 ? (details) => unawaited(
                                     showChatContextMenu(
                                       context,
@@ -411,6 +418,7 @@ class _InboxPane extends ConsumerWidget {
                               timeLabel: formatInboxTime(
                                 chat.lastMessage?.timestamp,
                                 now: ref.watch(clockProvider)(),
+                                justNow: context.l10n.inboxTimeNow,
                               ),
                               onTap: () {
                                 // While selecting, a tap toggles rather than opens
@@ -473,6 +481,7 @@ class InboxSelectionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final repository = ref.read(chatRepositoryProvider);
     final archived = ref.watch(showArchivedProvider);
     final allSelected = selected.length == visible.length;
@@ -487,12 +496,12 @@ class InboxSelectionBar extends ConsumerWidget {
         child: Row(
           children: [
             IconButton(
-              tooltip: 'Cancel',
+              tooltip: l10n.commonCancel,
               icon: const Icon(Icons.close_rounded),
               onPressed: () => ref.read(chatSelectionProvider.notifier).clear(),
             ),
             Text(
-              '${selected.length}',
+              l10n.inboxSelectedCount(selected.length),
               style: context.text.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -509,7 +518,9 @@ class InboxSelectionBar extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: allSelected ? 'Select none' : 'Select all',
+                      tooltip: allSelected
+                          ? l10n.inboxSelectNone
+                          : l10n.inboxSelectAll,
                       icon: Icon(
                         allSelected
                             ? Icons.deselect_rounded
@@ -527,12 +538,12 @@ class InboxSelectionBar extends ConsumerWidget {
                       },
                     ),
                     IconButton(
-                      tooltip: 'Mark read',
+                      tooltip: l10n.inboxMarkRead,
                       icon: const Icon(Icons.mark_email_read_outlined),
                       onPressed: () => _apply(ref, repository.markRead),
                     ),
                     IconButton(
-                      tooltip: 'Mark unread',
+                      tooltip: l10n.inboxMarkUnread,
                       icon: const Icon(Icons.mark_email_unread_outlined),
                       onPressed: () => _apply(ref, repository.markUnread),
                     ),
@@ -547,7 +558,9 @@ class InboxSelectionBar extends ConsumerWidget {
                         final allMuted =
                             chosen.isNotEmpty && chosen.every((c) => c.muted);
                         return IconButton(
-                          tooltip: allMuted ? 'Unmute' : 'Mute',
+                          tooltip: allMuted
+                              ? l10n.commonUnmute
+                              : l10n.commonMute,
                           icon: Icon(
                             allMuted
                                 ? Icons.notifications_active_outlined
@@ -561,7 +574,7 @@ class InboxSelectionBar extends ConsumerWidget {
                       },
                     ),
                     IconButton(
-                      tooltip: 'Label',
+                      tooltip: l10n.inboxLabelTooltip,
                       icon: const Icon(Icons.label_outline_rounded),
                       onPressed: () async {
                         final label = await showLabelSheet(
@@ -578,7 +591,9 @@ class InboxSelectionBar extends ConsumerWidget {
                       },
                     ),
                     IconButton(
-                      tooltip: archived ? 'Unarchive' : 'Archive',
+                      tooltip: archived
+                          ? l10n.inboxUnarchive
+                          : l10n.inboxArchive,
                       icon: Icon(
                         archived
                             ? Icons.unarchive_outlined
@@ -590,7 +605,7 @@ class InboxSelectionBar extends ConsumerWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Leave and delete',
+                      tooltip: l10n.inboxLeaveAndDelete,
                       icon: Icon(
                         Icons.delete_outline,
                         color: context.colors.error,
@@ -600,18 +615,14 @@ class InboxSelectionBar extends ConsumerWidget {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: Text(
-                              'Delete ${selected.length} conversation(s)?',
+                              l10n.inboxDeleteManyTitle(selected.length),
                             ),
-                            content: const Text(
-                              'This leaves and forgets the rooms. The history is gone '
-                              'from this account and cannot be recovered here. '
-                              'Archiving hides a chat without losing anything.',
-                            ),
+                            content: Text(l10n.inboxDeleteManyBody),
                             actions: [
                               TextButton(
                                 onPressed: () =>
                                     Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
+                                child: Text(l10n.commonCancel),
                               ),
                               FilledButton(
                                 style: FilledButton.styleFrom(
@@ -619,7 +630,7 @@ class InboxSelectionBar extends ConsumerWidget {
                                 ),
                                 onPressed: () =>
                                     Navigator.of(context).pop(true),
-                                child: const Text('Delete'),
+                                child: Text(l10n.commonDelete),
                               ),
                             ],
                           ),
@@ -662,7 +673,7 @@ class _InboxHeader extends ConsumerWidget {
               Expanded(
                 child: Text(
                   activeFilter.isEmpty
-                      ? 'Conversations'
+                      ? context.l10n.inboxTitleConversations
                       : activeFilter.map((n) => n.label).join(' · '),
                   style: context.text.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -673,12 +684,12 @@ class _InboxHeader extends ConsumerWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Appearance',
+                tooltip: context.l10n.commonAppearance,
                 icon: const Icon(Icons.palette_outlined),
                 onPressed: () => showAppearanceSheet(context),
               ),
               PopupMenuButton<String>(
-                tooltip: 'More',
+                tooltip: context.l10n.commonMore,
                 onSelected: (choice) {
                   final navigator = Navigator.of(context);
                   switch (choice) {
@@ -720,13 +731,13 @@ class _InboxHeader extends ConsumerWidget {
                 // "Keyboard shortcuts" — configuration now has a screen of
                 // its own with room to be grouped and explained.
                 itemBuilder: (_) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'select',
-                    child: Text('Select conversations'),
+                    child: Text(context.l10n.inboxMenuSelect),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'read_all',
-                    child: Text('Mark all as read'),
+                    child: Text(context.l10n.inboxMenuMarkAllRead),
                   ),
                   PopupMenuItem(
                     value: 'archived',
@@ -739,19 +750,22 @@ class _InboxHeader extends ConsumerWidget {
                       checked: ref.watch(showArchivedProvider),
                       child: Text(
                         ref.watch(showArchivedProvider)
-                            ? 'Show active chats'
-                            : 'Show archived',
+                            ? context.l10n.inboxMenuShowActive
+                            : context.l10n.inboxMenuShowArchived,
                       ),
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'merge',
-                    child: Text('Merged chats'),
+                    child: Text(context.l10n.commonMergedChats),
                   ),
-                  const PopupMenuItem(value: 'bridges', child: Text('Bridges')),
-                  const PopupMenuItem(
+                  PopupMenuItem(
+                    value: 'bridges',
+                    child: Text(context.l10n.commonBridges),
+                  ),
+                  PopupMenuItem(
                     value: 'settings',
-                    child: Text('Settings'),
+                    child: Text(context.l10n.commonSettings),
                   ),
                 ],
               ),
@@ -790,10 +804,10 @@ class _FilterRows extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final (value, label) in const [
-                  (InboxQuickFilter.unread, 'Unread'),
-                  (InboxQuickFilter.groups, 'Groups'),
-                  (InboxQuickFilter.people, 'People'),
+                for (final (value, label) in [
+                  (InboxQuickFilter.unread, context.l10n.inboxFilterUnread),
+                  (InboxQuickFilter.groups, context.l10n.inboxFilterGroups),
+                  (InboxQuickFilter.people, context.l10n.inboxFilterPeople),
                 ]) ...[
                   FilterChip(
                     label: Text(label),
@@ -808,7 +822,7 @@ class _FilterRows extends ConsumerWidget {
                 if (activeFilter.isNotEmpty)
                   ActionChip(
                     avatar: const Icon(Icons.close_rounded, size: 16),
-                    label: const Text('Clear network filter'),
+                    label: Text(context.l10n.inboxClearNetworkFilter),
                     visualDensity: VisualDensity.compact,
                     onPressed: () =>
                         ref.read(networkFilterProvider.notifier).clear(),
@@ -848,10 +862,10 @@ class _SearchField extends StatelessWidget {
     // Enter/Space together, which is the point of it.
     return WeftFocusable(
       onTap: open,
-      label: 'Search all conversations',
+      label: context.l10n.inboxSearchAll,
       borderRadius: WeftRadius.allMd,
       child: Tooltip(
-        message: 'Search all conversations',
+        message: context.l10n.inboxSearchAll,
         excludeFromSemantics: true,
         child: InkWell(
           borderRadius: WeftRadius.allMd,
@@ -861,9 +875,9 @@ class _SearchField extends StatelessWidget {
           canRequestFocus: false,
           onTap: open,
           child: InputDecorator(
-            decoration: const InputDecoration(
-              hintText: 'Search all conversations',
-              prefixIcon: Icon(Icons.search_rounded, size: 20),
+            decoration: InputDecoration(
+              hintText: context.l10n.inboxSearchAll,
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
             ),
             // Without this the hint is never painted: `isEmpty` defaults to
             // false, which tells the decorator the field it is dressing has
@@ -938,13 +952,13 @@ class _EmptyInbox extends StatelessWidget {
               ),
               const SizedBox(height: WeftSpace.md),
               Text(
-                'Nothing on these networks',
+                context.l10n.inboxEmptyTitle,
                 style: context.text.titleMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: WeftSpace.xs),
               Text(
-                'Clear the rail filter to see every conversation.',
+                context.l10n.inboxEmptyBody,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -996,10 +1010,13 @@ class _EmptyDetail extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: WeftSpace.lg),
-              Text('Pick a conversation', style: context.text.titleMedium),
+              Text(
+                context.l10n.inboxEmptyDetailTitle,
+                style: context.text.titleMedium,
+              ),
               const SizedBox(height: WeftSpace.xs),
               Text(
-                'Every network, one thread.',
+                context.l10n.inboxEmptyDetailBody,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),

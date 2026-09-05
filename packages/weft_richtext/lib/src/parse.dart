@@ -3,7 +3,6 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:weft_domain/weft_domain.dart';
 
-import 'fallback.dart';
 import 'links.dart';
 import 'mentions.dart';
 import 'span.dart';

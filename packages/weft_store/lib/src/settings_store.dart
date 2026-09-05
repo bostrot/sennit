@@ -197,6 +197,20 @@ abstract final class WeftSettings {
   static const String llmBaseUrl = 'ai.llm_base_url';
   static const String llmModel = 'ai.llm_model';
 
+  /// Every auto-reply rule, as one JSON blob under a `rules` key.
+  ///
+  /// One key rather than a row per rule, for the reasons [notifyPolicy] gives:
+  /// the list is read as a unit on every incoming message and written as a unit
+  /// by the editor, and `AutoReplyRule.listFromJson` already degrades rule by
+  /// rule — so a blob written by a newer build drops the rules this one cannot
+  /// understand and keeps the rest.
+  ///
+  /// Absent means no rules, which means the feature is dormant. There is no
+  /// master switch beside it on purpose: a rule is off unless someone turned it
+  /// on, and a second place to say "not now" would be a second place to forget
+  /// that a message is going out.
+  static const String autoReplyRules = 'ai.auto_reply_rules';
+
   /// Whether incoming-message notifications carry one or two AI-suggested
   /// answers. Its own gate on top of the endpoint existing, because
   /// configuring an LLM for anything sends every notified message's text to

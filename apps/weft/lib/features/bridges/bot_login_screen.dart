@@ -8,6 +8,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
 
 /// Signs in to a bridge through its bot's management room.
@@ -94,7 +95,9 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
       await room.sendTextEvent(text);
       _input.clear();
     } on Exception catch (e) {
-      if (mounted) showWeftMessage(context, 'Could not send: $e');
+      if (mounted) {
+        showWeftMessage(context, context.l10n.botLoginSendFailed('$e'));
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -134,7 +137,9 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
     final messages = _messages;
 
     return Scaffold(
-      appBar: WeftAppBar(title: Text('Sign in to ${widget.network.label}')),
+      appBar: WeftAppBar(
+        title: Text(context.l10n.botLoginTitle(widget.network.label)),
+      ),
       body: error != null
           ? Center(
               child: Padding(
@@ -161,15 +166,10 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
                           color: context.palette.online,
                         ),
                         const SizedBox(width: WeftSpace.sm),
-                        const Expanded(
-                          child: Text(
-                            'Signed in. The bridge is syncing your chats — '
-                            'they will appear in the inbox as they arrive.',
-                          ),
-                        ),
+                        Expanded(child: Text(context.l10n.botLoginSignedIn)),
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Done'),
+                          child: Text(context.l10n.commonDone),
                         ),
                       ],
                     ),
@@ -180,9 +180,7 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(WeftSpace.xl),
                             child: Text(
-                              'This is the bridge\'s management chat. '
-                              'Start sign-in below — the bridge will answer '
-                              'here with its own instructions.',
+                              context.l10n.botLoginEmpty,
                               textAlign: TextAlign.center,
                               style: context.text.bodyMedium?.copyWith(
                                 color: context.colors.onSurfaceVariant,
@@ -218,23 +216,23 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
                           children: [
                             ActionChip(
                               avatar: const Icon(Icons.login_rounded, size: 16),
-                              label: const Text('Start sign-in'),
+                              label: Text(context.l10n.botLoginStart),
                               onPressed: _sending ? null : () => _send('login'),
                             ),
                             ActionChip(
-                              label: const Text('My logins'),
+                              label: Text(context.l10n.botLoginMyLogins),
                               onPressed: _sending
                                   ? null
                                   : () => _send('list-logins'),
                             ),
                             ActionChip(
-                              label: const Text('Cancel action'),
+                              label: Text(context.l10n.botLoginCancelAction),
                               onPressed: _sending
                                   ? null
                                   : () => _send('cancel'),
                             ),
                             ActionChip(
-                              label: const Text('Help'),
+                              label: Text(context.l10n.botLoginHelp),
                               onPressed: _sending ? null : () => _send('help'),
                             ),
                           ],
@@ -244,15 +242,13 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
                           children: [
                             Expanded(
                               child: WeftLabelledField(
-                                label: 'Answer the bridge',
+                                label: context.l10n.botLoginAnswerField,
                                 child: TextField(
                                   controller: _input,
                                   autocorrect: false,
                                   onSubmitted: _send,
-                                  decoration: const InputDecoration(
-                                    hintText:
-                                        'Type an answer or command — e.g. a '
-                                        'phone number, or "login qr"',
+                                  decoration: InputDecoration(
+                                    hintText: context.l10n.botLoginAnswerHint,
                                     isDense: true,
                                   ),
                                 ),
@@ -264,7 +260,7 @@ class _BridgeBotLoginScreenState extends ConsumerState<BridgeBotLoginScreen> {
                                   ? null
                                   : () => _send(_input.text),
                               icon: const Icon(Icons.send_rounded, size: 18),
-                              tooltip: 'Send',
+                              tooltip: context.l10n.commonSend,
                             ),
                           ],
                         ),
@@ -350,7 +346,7 @@ class _BotImageState extends State<_BotImage> {
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
-    if (_failed) return const Text('The image could not be loaded.');
+    if (_failed) return Text(context.l10n.botLoginImageFailed);
     if (bytes == null) {
       return const SizedBox(
         width: 260,
@@ -360,9 +356,7 @@ class _BotImageState extends State<_BotImage> {
     }
     return Semantics(
       image: true,
-      label:
-          'Code from the bridge — usually the QR to scan with the phone that '
-          'has the account',
+      label: context.l10n.botLoginCodeSemantics,
       child: ClipRRect(
         borderRadius: WeftRadius.allSm,
         // White padding behind it: a QR on a dark theme's surface loses its

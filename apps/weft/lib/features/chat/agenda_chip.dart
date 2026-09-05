@@ -5,6 +5,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../services/agenda/agenda_service.dart';
 import '../../services/agenda/device_calendar.dart';
 import '../../services/agenda/event_detector.dart';
@@ -82,7 +83,7 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
             size: 16,
             color: context.colors.primary,
           ),
-          label: Text('$_when · Add to calendar'),
+          label: Text(context.l10n.chatAgendaAddToCalendar(_when)),
           labelStyle: context.text.labelSmall,
           materialTapTargetSize: MaterialTapTargetSize.padded,
           onPressed: _run,
@@ -96,7 +97,7 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
       await _add();
     } on Exception catch (e) {
       if (mounted) {
-        showWeftMessage(context, 'Could not open the calendar: $e');
+        showWeftMessage(context, context.l10n.chatAgendaCalendarFailed('$e'));
       }
     }
   }

@@ -106,9 +106,31 @@ abstract class ChatRepository {
     DateTime? end,
   }) async {}
 
-  /// Where the other side has read up to, one entry per source room that has
-  /// a peer receipt at all: the event it points at and when it was sent.
-  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+  /// Where the other side has read up to: one entry **per reader**, naming the
+  /// room, the person, the event their receipt points at, and when it was sent.
+  ///
+  /// Per reader rather than per room, and that is what makes the group tick
+  /// honest. Blue ticks mean *everyone* has read it, so the question at the
+  /// bubble is a count — and a list that collapsed a room's receipts to its
+  /// newest could not tell one reader out of nine from nine out of nine. In a
+  /// one-to-one chat the two shapes are the same list.
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  peerReadUpTo(String chatId) => const [];
+
+  /// Where the **local user** has read up to, in the same shape.
+  ///
+  /// The other half of [peerReadUpTo], and needed for a different question. A
+  /// room's unread badge is one number for the whole conversation, which is
+  /// exactly the thing a forum group makes useless: "68 unread" over forty
+  /// topics answers nothing, and "Bugs has 3 new" is what the user acts on.
+  /// Counting per thread means knowing where *this account* stopped reading,
+  /// which the room's own count cannot be divided back into.
+  ///
+  /// Empty is a real answer and means "no receipt yet", not "nothing read" —
+  /// see `groupThreads`, which treats it as nothing unread rather than
+  /// everything. A freshly-synced account would otherwise light up every topic
+  /// in the room at once, which is indistinguishable from noise.
+  List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
   ) => const [];
 
@@ -197,6 +219,59 @@ abstract class ChatRepository {
     required String replyToEventId,
     ChatNetwork? via,
   });
+
+  /// Sends [body] into the thread hanging off [threadRootId].
+  ///
+  /// Separate from [sendReply] because the two relations are different and only
+  /// one of them is a *place*. A reply names what it answers; a thread reply
+  /// says which sub-conversation it belongs to, and a message sent into an open
+  /// thread with only an `m.in_reply_to` lands in the room instead — visible to
+  /// everyone, out of the thread the user was looking at, and unrecoverable
+  /// except by deleting it.
+  ///
+  /// Rides the leg the root lives on, for the same reason [sendReply] does and
+  /// more sharply: a thread relation pointing at an event id the room has never
+  /// heard of is a thread nobody in that room can open.
+  ///
+  /// [replyToEventId] is a message inside the thread the user explicitly chose
+  /// to answer, and null for the ordinary case of simply typing into the thread.
+  /// [threadLatestEventId] is the newest event in it, which becomes the spec's
+  /// reply *fallback* so a client with no thread support renders the exchange as
+  /// a chain rather than as a run of unrelated messages.
+  ///
+  /// The two are separate because `is_falling_back` is the difference between
+  /// them: an explicit reply is a quote the reader should see, a fallback is one
+  /// a thread-aware client must hide. Collapsing them shows every message in a
+  /// thread quoting the one directly above it.
+  ///
+  /// Throws [StateError] when the root cannot be found. Unlike a reply, there is
+  /// no honest degradation: sending the message to the room instead would put it
+  /// somewhere the user did not choose, and they are looking at the thread while
+  /// they type.
+  Future<void> sendThreadReply(
+    String chatId,
+    String body, {
+    required String threadRootId,
+    String? replyToEventId,
+    String? threadLatestEventId,
+  });
+
+  /// Answers a pending chat request.
+  ///
+  /// One method for all three verbs rather than three, because what separates
+  /// them is data — [planChatRequest] — and three methods would be three places
+  /// for the one rule that actually matters to be forgotten: **nothing here
+  /// marks the conversation read**. A request the user declines must not tell
+  /// the sender it was opened; see [ChatRequestPlan.markRead].
+  ///
+  /// Returns the state the conversation is now in, so a caller can report
+  /// "Blocked" rather than re-deriving it. A chat that is not a pending request
+  /// is left alone and its current state returned, which is what makes a
+  /// double-tap on Accept harmless.
+  Future<ChatRequestState?> answerChatRequest(
+    String chatId,
+    ChatRequestAction action,
+  ) async => null;
 
   /// Adds the local user's [key] reaction to [eventId].
   ///
@@ -301,12 +376,20 @@ abstract class ChatRepository {
   /// audio — it is what separates [MessageKind.voice] from [MessageKind.audio].
   /// [durationMs] rides along for the same reason: only the recorder knows it
   /// without decoding the file, and the bubble draws it before download.
+  ///
+  /// [caption] is what the user typed under the picture. It rides *on* the
+  /// attachment's own event rather than going out as a message beside it —
+  /// `body` carries the words and `filename` carries the name, per MSC2530 —
+  /// which is what the bridges relay as a real caption. Sent as a separate text
+  /// event it arrives on WhatsApp and Signal as two messages, and the sentence
+  /// races the upload for which lands first.
   Future<void> sendAttachment(
     String chatId,
     AttachmentSource source, {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   });
 
   /// Uploads in flight, and recently finished ones, for this chat.

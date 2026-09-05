@@ -8,6 +8,7 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
@@ -16,6 +17,8 @@ import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
+import 'auto_reply_screen.dart';
+import 'backup_screen.dart';
 import 'integrations_screen.dart';
 import 'devices_screen.dart';
 import 'endpoints_screen.dart';
@@ -46,6 +49,8 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+
     void push(Widget screen) {
       Navigator.of(
         context,
@@ -87,111 +92,123 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Settings')),
+      appBar: WeftAppBar(title: Text(l10n.settingsTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.only(bottom: WeftSpace.xxl),
           children: [
-            header('Chats'),
+            header(l10n.settingsSectionChats),
             tile(
               icon: Icons.call_merge_rounded,
-              title: 'Merged chats',
-              subtitle: 'One person across several messengers, as one thread',
+              title: l10n.settingsMergedChatsTitle,
+              subtitle: l10n.settingsMergedChatsSubtitle,
               onTap: () => push(const MergeScreen()),
             ),
             tile(
               icon: Icons.hub_outlined,
-              title: 'Bridges',
-              subtitle: 'The messenger bridges on your Matrix server',
+              title: l10n.settingsBridgesTitle,
+              subtitle: l10n.settingsBridgesSubtitle,
               onTap: () => push(const BridgesScreen()),
             ),
             if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
               tile(
                 icon: Icons.sms_outlined,
-                title: 'SMS',
-                subtitle: 'Text messages on this phone, in the inbox',
+                title: l10n.settingsSmsTitle,
+                subtitle: l10n.settingsSmsSubtitle,
                 onTap: () => push(const SmsScreen()),
               ),
 
             const _StatusRingsToggle(),
 
-            header('Look & feel'),
+            header(l10n.settingsSectionLookAndFeel),
             tile(
               icon: Icons.palette_outlined,
-              title: 'Appearance',
-              subtitle: 'Theme, colour and density',
+              title: l10n.settingsAppearanceTitle,
+              subtitle: l10n.settingsAppearanceSubtitle,
               onTap: () => showAppearanceSheet(context),
             ),
             tile(
               icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              subtitle: 'What may interrupt you, and how',
+              title: l10n.settingsNotificationsTitle,
+              subtitle: l10n.settingsNotificationsSubtitle,
               onTap: () => push(const NotificationsScreen()),
             ),
             if (_hasKeyboard)
               tile(
                 icon: Icons.keyboard_outlined,
-                title: 'Keyboard shortcuts',
-                subtitle: 'Everything the keyboard can do here',
+                title: l10n.settingsShortcutsTitle,
+                subtitle: l10n.settingsShortcutsSubtitle,
                 onTap: () => showShortcutsSheet(context),
               ),
 
-            header('Search & intelligence'),
+            header(l10n.settingsSectionSearchAndIntelligence),
             tile(
               icon: Icons.manage_search_rounded,
-              title: 'Search & transcription',
-              subtitle: 'Semantic search and voice transcription endpoints',
+              title: l10n.settingsEndpointsTitle,
+              subtitle: l10n.settingsEndpointsSubtitle,
               onTap: () => push(const EndpointsScreen()),
             ),
             tile(
               icon: Icons.download_for_offline_outlined,
-              title: 'Local models',
-              subtitle: 'Run search and transcription on this device',
+              title: l10n.settingsModelsTitle,
+              subtitle: l10n.settingsModelsSubtitle,
               onTap: () => push(const ModelsScreen()),
+            ),
+            tile(
+              icon: Icons.smart_toy_outlined,
+              title: l10n.settingsAutoReplyTitle,
+              subtitle: l10n.settingsAutoReplySubtitle,
+              onTap: () => push(const AutoReplyScreen()),
             ),
             const _AgendaToggle(),
             const _SendOnEnterToggle(),
             const _HiddenNetworksSection(),
 
-            header('Privacy & security'),
+            header(l10n.settingsSectionPrivacyAndSecurity),
             const _ReadReceiptsToggle(),
             const _ContactNamesToggle(),
             tile(
               icon: Icons.link_rounded,
-              title: 'Link previews',
-              subtitle: 'Whether links in messages may be previewed',
+              title: l10n.settingsLinkPreviewsTitle,
+              subtitle: l10n.settingsLinkPreviewsSubtitle,
               onTap: () => push(const LinkPreviewsScreen()),
             ),
             tile(
               icon: Icons.devices_rounded,
-              title: 'Devices',
-              subtitle: 'Your other logins, and signing them out',
+              title: l10n.settingsDevicesTitle,
+              subtitle: l10n.settingsDevicesSubtitle,
               onTap: () => push(const DevicesScreen()),
             ),
             tile(
               icon: Icons.lock_outline_rounded,
-              title: 'Encryption',
-              subtitle: 'Cross-signing, key backup and recovery',
+              title: l10n.settingsEncryptionTitle,
+              subtitle: l10n.settingsEncryptionSubtitle,
               onTap: () => push(const SecurityScreen()),
             ),
+            tile(
+              icon: Icons.archive_outlined,
+              title: l10n.settingsBackupTitle,
+              subtitle: l10n.settingsBackupSubtitle,
+              onTap: () => push(const BackupScreen()),
+            ),
 
-            header('Connections'),
+            header(l10n.settingsSectionConnections),
             tile(
               icon: Icons.widgets_outlined,
-              title: 'Widgets & watch',
-              subtitle: 'Home screen widgets and the watch companion',
+              title: l10n.settingsSurfacesTitle,
+              subtitle: l10n.settingsSurfacesSubtitle,
               onTap: () => push(const SurfacesScreen()),
             ),
             tile(
               icon: Icons.home_outlined,
-              title: 'Integrations',
-              subtitle: 'Home Assistant and paperless-ngx, your own instances',
+              title: l10n.settingsIntegrationsTitle,
+              subtitle: l10n.settingsIntegrationsSubtitle,
               onTap: () => push(const IntegrationsScreen()),
             ),
             tile(
               icon: Icons.terminal_rounded,
-              title: 'MCP server',
-              subtitle: 'Let your own agents read and send through Braid',
+              title: l10n.settingsMcpTitle,
+              subtitle: l10n.settingsMcpSubtitle,
               onTap: () => push(const McpScreen()),
             ),
           ],
@@ -221,11 +238,8 @@ class _ReadReceiptsToggle extends ConsumerWidget {
 
     return SwitchListTile(
       secondary: const Icon(Icons.done_all_rounded),
-      title: const Text('Send read receipts'),
-      subtitle: const Text(
-        'Off, senders are not told you read their messages — on WhatsApp and '
-        'friends too, via the bridge. Your own devices still sync.',
-      ),
+      title: Text(context.l10n.settingsReadReceiptsTitle),
+      subtitle: Text(context.l10n.settingsReadReceiptsSubtitle),
       value: stores.settings.getBool(
         WeftSettings.sendReadReceipts,
         fallback: true,
@@ -257,21 +271,23 @@ class _HiddenNetworksSection extends ConsumerWidget {
     }
     if (networks.isEmpty) return const SizedBox.shrink();
     final hidden = ref.watch(hiddenFromAllProvider);
+    final l10n = context.l10n;
 
     return ExpansionTile(
       leading: const Icon(Icons.visibility_off_outlined),
-      title: const Text('Hide networks from All'),
+      title: Text(l10n.settingsHiddenNetworksTitle),
       subtitle: Text(
         hidden.isEmpty
-            ? 'Every network shows in the combined inbox'
-            : 'Hidden: ${hidden.map((n) => n.label).join(', ')} — tap the '
-                  'network in the rail to see its chats',
+            ? l10n.settingsHiddenNetworksNone
+            : l10n.settingsHiddenNetworksSome(
+                hidden.map((n) => n.label).join(', '),
+              ),
       ),
       children: [
         for (final network in networks)
           SwitchListTile(
             dense: true,
-            title: Text('Show ${network.label} in All'),
+            title: Text(l10n.settingsShowNetworkInAll(network.label)),
             value: !hidden.contains(network),
             onChanged: (_) =>
                 ref.read(hiddenFromAllProvider.notifier).toggle(network),
@@ -301,12 +317,8 @@ class _ContactNamesToggle extends ConsumerWidget {
 
     return SwitchListTile(
       secondary: const Icon(Icons.person_pin_rounded),
-      title: const Text('Use address book names'),
-      subtitle: const Text(
-        'Name people the way your contacts app does when a phone number '
-        'matches, instead of the name WhatsApp or Signal reports. Matched on '
-        'this device only.',
-      ),
+      title: Text(context.l10n.settingsContactNamesTitle),
+      subtitle: Text(context.l10n.settingsContactNamesSubtitle),
       value: stores.settings.getBool(WeftSettings.useDeviceContactNames),
       onChanged: (value) async {
         if (value) {
@@ -314,10 +326,7 @@ class _ContactNamesToggle extends ConsumerWidget {
           final names = await loadDeviceContactNames();
           if (names == null) {
             if (context.mounted) {
-              showWeftMessage(
-                context,
-                'Braid was not allowed to read your contacts.',
-              );
+              showWeftMessage(context, context.l10n.settingsContactsDenied);
             }
             return;
           }
@@ -358,11 +367,11 @@ class _SendOnEnterToggle extends ConsumerWidget {
     final on = stores.settings.getBool(WeftSettings.sendOnEnter);
     return SwitchListTile(
       secondary: const Icon(Icons.keyboard_return_rounded),
-      title: const Text('Return sends the message'),
+      title: Text(context.l10n.settingsSendOnEnterTitle),
       subtitle: Text(
         on
-            ? 'Shift+Return starts a new line.'
-            : 'Return starts a new line. Cmd or Ctrl + Return sends.',
+            ? context.l10n.settingsSendOnEnterSubtitleOn
+            : context.l10n.settingsSendOnEnterSubtitleOff,
       ),
       value: on,
       onChanged: (value) {
@@ -392,11 +401,8 @@ class _AgendaToggle extends ConsumerWidget {
 
     return SwitchListTile(
       secondary: const Icon(Icons.event_available_rounded),
-      title: const Text('Detect appointments'),
-      subtitle: const Text(
-        'Offer "add to calendar" under messages that name a date. '
-        'Runs entirely on this device.',
-      ),
+      title: Text(context.l10n.settingsAgendaTitle),
+      subtitle: Text(context.l10n.settingsAgendaSubtitle),
       value: stores.settings.getBool(WeftSettings.agendaDetect, fallback: true),
       onChanged: (value) {
         stores.settings.setBool(WeftSettings.agendaDetect, value: value);
@@ -422,6 +428,7 @@ class _StatusRingsToggle extends ConsumerWidget {
     }
     final mode = ref.watch(statusModeProvider);
     final hidden = ref.watch(hiddenStatusSendersProvider);
+    final l10n = context.l10n;
 
     void setMode(StatusMode next) {
       stores.settings.setString(WeftSettings.statusMode, switch (next) {
@@ -437,14 +444,11 @@ class _StatusRingsToggle extends ConsumerWidget {
       children: [
         ListTile(
           leading: const Icon(Icons.donut_large_rounded),
-          title: const Text('Statuses'),
+          title: Text(l10n.settingsStatusesTitle),
           subtitle: Text(switch (mode) {
-            StatusMode.rings =>
-              'Shown as story rings above the inbox. The broadcast group '
-                  'stays hidden.',
-            StatusMode.group =>
-              'Shown as the "Status Broadcast" group chat, like any other.',
-            StatusMode.off => 'Not shown anywhere.',
+            StatusMode.rings => l10n.settingsStatusesSubtitleRings,
+            StatusMode.group => l10n.settingsStatusesSubtitleGroup,
+            StatusMode.off => l10n.settingsStatusesSubtitleOff,
           }),
         ),
         Padding(
@@ -457,9 +461,9 @@ class _StatusRingsToggle extends ConsumerWidget {
             spacing: WeftSpace.sm,
             children: [
               for (final (value, label) in [
-                (StatusMode.rings, 'Rings'),
-                (StatusMode.group, 'Group chat'),
-                (StatusMode.off, 'Off'),
+                (StatusMode.rings, l10n.settingsStatusModeRings),
+                (StatusMode.group, l10n.settingsStatusModeGroup),
+                (StatusMode.off, l10n.settingsStatusModeOff),
               ])
                 ChoiceChip(
                   label: Text(label),
@@ -469,7 +473,7 @@ class _StatusRingsToggle extends ConsumerWidget {
               if (hidden.isNotEmpty)
                 ActionChip(
                   avatar: const Icon(Icons.visibility_rounded, size: 16),
-                  label: Text('Unhide ${hidden.length}'),
+                  label: Text(l10n.settingsUnhideStatusSenders(hidden.length)),
                   onPressed: () =>
                       ref.read(hiddenStatusSendersProvider.notifier).reset(),
                 ),

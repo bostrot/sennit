@@ -28,12 +28,61 @@ enum SmsAvailability {
   ready,
 }
 
+/// How a request for the default-SMS-app role ended.
+///
+/// Not a boolean, and the reason is the bug this replaced. Four different things
+/// can happen after the button is tapped and only one of them is a decline, but
+/// the old signature had one word for all four — so a role the system granted
+/// while the activity was being recreated came back as `false` and the screen
+/// said *"Nothing changed. Braid is not your SMS app"* to somebody who had just
+/// made Braid their SMS app. See the phase-05 diagnosis note.
+///
+/// The wire strings are [SmsRole.Outcome] on the Kotlin side; the two lists are
+/// the same list and neither may be extended alone.
+enum SmsRoleOutcome {
+  /// Braid holds the role, confirmed by asking the system after the dialog
+  /// closed rather than by trusting its result code.
+  granted,
+
+  /// The dialog was shown and the answer was no. **The only outcome the
+  /// "nothing changed" copy belongs on.**
+  denied,
+
+  /// No dialog could be shown: no telephony, no `ROLE_SMS` on this ROM, a build
+  /// missing a component the role requires, or no activity to raise it from.
+  /// The user was never asked, so they did not refuse.
+  unavailable,
+
+  /// A second request replaced this one. Silent by design — the request that
+  /// superseded it is the one still on screen and it will report for both.
+  superseded,
+
+  /// The activity went away while the dialog was up. The system knows the
+  /// answer; this call simply did not carry it back. Re-read the status.
+  interrupted;
+
+  /// The platform's string, defaulting to [interrupted].
+  ///
+  /// An unrecognised value is a Kotlin side newer than this Dart, which is a
+  /// hot-restart reality in development. [interrupted] is the safe default
+  /// because it means "go and ask the system", which is right for any answer
+  /// this enum cannot name.
+  static SmsRoleOutcome fromWire(Object? value) => switch (value) {
+    'granted' => SmsRoleOutcome.granted,
+    'denied' => SmsRoleOutcome.denied,
+    'unavailable' => SmsRoleOutcome.unavailable,
+    'superseded' => SmsRoleOutcome.superseded,
+    _ => SmsRoleOutcome.interrupted,
+  };
+}
+
 /// What the platform says about SMS on this device.
 @immutable
 class SmsPlatformStatus {
   const SmsPlatformStatus({
     required this.availability,
     this.canRequestRole = false,
+    this.roleAvailable = false,
     this.hasPermissions = false,
     this.defaultPackage,
   });
@@ -51,6 +100,13 @@ class SmsPlatformStatus {
   /// does not exist — a button wired to this cannot be tapped into a dialog
   /// that will not appear.
   final bool canRequestRole;
+
+  /// Whether this device has a default-SMS-app role to give at all.
+  ///
+  /// Stays true once Braid holds it, which is what separates it from
+  /// [canRequestRole]: "there is nothing left to ask for" and "this ROM has no
+  /// such role" are both `canRequestRole: false` and are opposite sentences.
+  final bool roleAvailable;
 
   /// Whether the SMS permission group is actually granted.
   ///
@@ -81,6 +137,14 @@ class SmsPlatformStatus {
           ? SmsAvailability.ready
           : SmsAvailability.notDefault,
       canRequestRole: map['canRequestRole'] == true,
+      // Absent on a platform side older than this Dart, where "can request it"
+      // was the only answer there was. Reading `canRequestRole` as the fallback
+      // keeps that build's screen exactly as it was rather than telling it the
+      // role does not exist.
+      roleAvailable:
+          map['roleAvailable'] == true ||
+          (map['roleAvailable'] == null &&
+              (map['canRequestRole'] == true || map['isDefault'] == true)),
       hasPermissions: map['hasPermissions'] == true,
       defaultPackage: map['defaultPackage'] as String?,
     );
@@ -91,12 +155,18 @@ class SmsPlatformStatus {
       other is SmsPlatformStatus &&
       other.availability == availability &&
       other.canRequestRole == canRequestRole &&
+      other.roleAvailable == roleAvailable &&
       other.hasPermissions == hasPermissions &&
       other.defaultPackage == defaultPackage;
 
   @override
-  int get hashCode =>
-      Object.hash(availability, canRequestRole, hasPermissions, defaultPackage);
+  int get hashCode => Object.hash(
+    availability,
+    canRequestRole,
+    roleAvailable,
+    hasPermissions,
+    defaultPackage,
+  );
 
   @override
   String toString() =>
@@ -143,10 +213,12 @@ class SmsMmsPush {
 abstract interface class SmsGateway {
   Future<SmsPlatformStatus> status();
 
-  /// Shows the system's default-SMS-app dialog and resolves to whether Braid
-  /// holds the role afterwards. False is a decline, and a decline is an answer,
-  /// not an error.
-  Future<bool> requestRole();
+  /// Shows the system's default-SMS-app dialog and resolves to how it ended.
+  ///
+  /// [SmsRoleOutcome.denied] is an answer, not an error. So is
+  /// [SmsRoleOutcome.unavailable] — it is a fact about the device — and neither
+  /// throws. Callers must not treat "not granted" as one case; see the enum.
+  Future<SmsRoleOutcome> requestRole();
 
   /// Opens Android's default-apps settings, resolving to whether it opened.
   ///
@@ -226,8 +298,14 @@ class SmsPlatform implements SmsGateway {
   }
 
   @override
-  Future<bool> requestRole() async =>
-      await _invoke<bool>('requestRole') ?? false;
+  Future<SmsRoleOutcome> requestRole() async {
+    final answer = await _invoke<Object>('requestRole');
+    // Null is the `_invoke` swallow: a missing plugin, or the role changing
+    // under the call. Neither is a decline — there is no dialog on a platform
+    // with no channel — so it reads as unavailable.
+    if (answer == null) return SmsRoleOutcome.unavailable;
+    return SmsRoleOutcome.fromWire(answer);
+  }
 
   @override
   Future<bool> openDefaultAppSettings() async =>

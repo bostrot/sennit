@@ -7,6 +7,7 @@ import 'package:weft/features/inbox/inbox_shell.dart';
 import 'package:weft/features/inbox/mac_shell.dart';
 
 import 'support/golden_harness.dart';
+import 'package:weft/app/localisation.dart';
 
 /// What changes when Braid is a Mac window.
 ///
@@ -59,11 +60,7 @@ void main() {
 
   group('the shell', () {
     testWidgets('is the desktop one on a Mac', (tester) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
       expect(find.byType(MacInboxShell), findsOneWidget);
       expect(find.byType(MacSidebar), findsOneWidget);
@@ -77,11 +74,7 @@ void main() {
     });
 
     testWidgets('has no floating action button', (tester) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
       expect(
         find.byType(FloatingActionButton),
@@ -99,11 +92,7 @@ void main() {
     testWidgets('the sidebar lists the smart folders and the networks', (
       tester,
     ) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
       expect(find.text('All conversations'), findsWidgets);
       expect(find.text('Unread'), findsOneWidget);
@@ -118,11 +107,7 @@ void main() {
     testWidgets('selecting a conversation opens it beside the list', (
       tester,
     ) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
       expect(find.text('No conversation selected'), findsOneWidget);
       await tester.tap(find.text('Anna Maven').first);
@@ -137,11 +122,7 @@ void main() {
     });
 
     testWidgets('the sidebar hides and comes back', (tester) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
       await tester.tap(find.byTooltip('Hide sidebar'));
       await tester.pumpAndSettle();
@@ -165,6 +146,7 @@ void main() {
       final theme = WeftTheme.build(surface: surface);
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: theme,
           home: Scaffold(
             body: Center(
@@ -241,15 +223,9 @@ void main() {
 
   group('the conversation row', () {
     testWidgets('is the system list row on a Mac', (tester) async {
-      await pumpWeft(
-        tester,
-        const InboxShell(),
-        surface: WeftSurface.mac,
-      );
+      await pumpWeft(tester, const InboxShell(), surface: WeftSurface.mac);
 
-      final avatar = tester.widget<WeftAvatar>(
-        find.byType(WeftAvatar).first,
-      );
+      final avatar = tester.widget<WeftAvatar>(find.byType(WeftAvatar).first);
       expect(avatar.size, 32, reason: 'a 46pt avatar is a phone row');
     });
 

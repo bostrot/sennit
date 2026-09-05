@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml`, which carries the reasoning behind
+     each string; this one only the words. `app_name`, `tile_name` and
+     `complication_name` are the product's own name and stay as they are. -->
+<resources>
+    <string name="app_name">Weft</string>
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">Vos messages non lus et vos conversations les plus récentes.</string>
+    <string name="complication_name">Weft unread</string>
+    <string name="inbox_heading">Récentes</string>
+    <string name="signed_out_title">Connectez-vous à Weft</string>
+    <string name="signed_out_body">Ouvrez Weft sur votre téléphone et connectez-vous.</string>
+    <string name="disabled_title">La montre est désactivée</string>
+    <string name="disabled_body">Ouvrez Weft sur votre téléphone et activez Montre dans Widgets et montre.</string>
+    <string name="stale_title">Ouvrez Weft sur votre téléphone</string>
+    <string name="stale_body">Ceci n’est plus à jour. Ouvrez Weft pour actualiser.</string>
+    <string name="empty_title">Aucune conversation</string>
+    <string name="empty_body">Rien à afficher pour l’instant. Les conversations sur des réseaux exclus n’apparaissent jamais ici.</string>
+    <string name="merged">Conversation fusionnée</string>
+    <string name="unread_label">non lus</string>
+    <string name="reply_heading">Répondre</string>
+    <string name="reply_dictate">Dicter</string>
+    <string name="reply_dictate_hint">Répondre à %1$s</string>
+    <string name="reply_sending">Envoi…</string>
+    <string name="reply_sent">Envoyé</string>
+    <string name="reply_sent_via">Envoyé via %1$s</string>
+    <string name="reply_failed">Non envoyé</string>
+    <string name="reply_failed_unknown_chat">Cette conversation n’est plus dans Weft.</string>
+    <string name="reply_failed_not_signed_in">Non envoyé. Personne n’est connecté sur votre téléphone.</string>
+    <string name="reply_failed_send_failed">Non envoyé. Ouvrez Weft sur votre téléphone pour réessayer.</string>
+    <string name="reply_failed_timed_out">Non envoyé. Votre téléphone n’a pas répondu.</string>
+    <string name="reply_failed_overflowed">Non envoyé. Trop de réponses à la fois.</string>
+    <string name="reply_failed_app_not_running">Non envoyé. Ouvrez Weft sur votre téléphone.</string>
+    <string name="canned_yes">Oui</string>
+    <string name="canned_no">Non</string>
+    <string name="canned_on_my_way">J’arrive</string>
+    <string name="canned_thanks">Merci !</string>
+    <string name="canned_call_later">Je peux rappeler plus tard ?</string>
+    <string name="canned_cant_talk">Je ne peux pas parler là</string>
+
+    <plurals name="unread_count">
+        <item quantity="one">%1$d message non lu</item>
+        <item quantity="other">%1$d messages non lus</item>
+    </plurals>
+</resources>

@@ -49,6 +49,7 @@
 		95027DF1923E6A0763676331 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5874EE747A203BA4B9285D9E /* Cocoa.framework */; };
 		A24E6189E3022D79A692A32E /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 9488B1EEC921E273D58832BC /* RunnerUITests.m */; };
 		C7655C589F811FEB406BA9CA /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F405CF297D5667EE4C74EC5B /* Pods_Runner.framework */; };
+		A21710000000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A21710000000000000000001 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -160,6 +161,11 @@
 		E63B8F2223B93CC75C16EF34 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		F405CF297D5667EE4C74EC5B /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FDBCB0931CD65559DE16F691 /* Pods-Runner-RunnerUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.debug.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		A2171000000000000000000A /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "es"; path = "es.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A2171000000000000000000B /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "de"; path = "de.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A2171000000000000000000C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "fr"; path = "fr.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A2171000000000000000000D /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A2171000000000000000000E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -293,6 +299,7 @@
 		33FAB671232836740065AC1E /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				A21710000000000000000001 /* InfoPlist.strings */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				5F40000000000000000000C1 /* WeftClipboardChannel.swift */,
@@ -485,6 +492,11 @@
 			knownRegions = (
 				en,
 				Base,
+				"es",
+				"de",
+				"fr",
+				"pt-BR",
+				"zh-Hans",
 			);
 			mainGroup = 33CC10E42044A3C60003C045;
 			packageReferences = (
@@ -522,6 +534,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A21710000000000000000002 /* InfoPlist.strings in Resources */,
 				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
 				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 			);
@@ -794,6 +807,18 @@
 			);
 			name = MainMenu.xib;
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		A21710000000000000000001 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A2171000000000000000000A /* es */,
+				A2171000000000000000000B /* de */,
+				A2171000000000000000000C /* fr */,
+				A2171000000000000000000D /* pt-BR */,
+				A2171000000000000000000E /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

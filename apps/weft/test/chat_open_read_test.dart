@@ -3,13 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/notification_providers.dart';
 import 'package:weft/app/providers.dart';
+import 'package:weft/services/notifications/conversation_clearer.dart';
 import 'package:weft/services/notifications/notification_actions.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
 
 import 'support/recording_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Stands in for the dismisser `main` installs once the service exists.
 class _RecordingDismisser extends NotificationDismisserNotifier {
@@ -18,7 +21,8 @@ class _RecordingDismisser extends NotificationDismisserNotifier {
   final List<String> cleared;
 
   @override
-  NotificationDismisser? build() => (String chatId) async => cleared.add(chatId);
+  NotificationDismisser? build() =>
+      (String chatId) async => cleared.add(chatId);
 }
 
 /// Opening a conversation reads it.
@@ -61,6 +65,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: ChatView(chatId: chatId),
         ),
@@ -99,6 +104,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: const ChatView(chatId: '!konrad_wa_room:example.org'),
         ),
@@ -114,5 +120,149 @@ void main() {
     final cleared = await pump(tester, chatId: 'merged:nobody');
     expect(readCalls(), isEmpty);
     expect(cleared, isEmpty);
+  });
+
+  testWidgets('opening a thread reads the conversation it belongs to', (
+    tester,
+  ) async {
+    // A thread is a screen of its own with a bar and a composer of its own, and
+    // it is easy to build one that quietly stops doing the two things every
+    // door into a conversation has to do.
+    final cleared = <String>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          chatRepositoryProvider.overrideWithValue(repository),
+          notificationDismisserProvider.overrideWith(
+            () => _RecordingDismisser(cleared),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          theme: WeftTheme.build(),
+          home: const ChatView(chatId: mergedChat, threadRootId: r'$anything'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(readCalls(), contains(mergedChat));
+    expect(cleared, contains(mergedChat));
+  });
+
+  group('clearing every surface', () {
+    test('the shade is cancelled and the companions are republished', () async {
+      // Two different mechanisms, one verb. The shade has rows that persist on
+      // their own and are cancelled; the watch and the widget read the
+      // snapshot and clear by it being written again.
+      final dismissed = <String>[];
+      var republished = 0;
+      final clearer = ConversationClearer(
+        dismissChat: (id) async => dismissed.add(id),
+        republish: () async => republished++,
+      );
+
+      await clearer.clear('merged:anna');
+
+      expect(dismissed, ['merged:anna']);
+      expect(republished, 1);
+    });
+
+    test('a failing shade cancel still refreshes the companions', () async {
+      // Each failure is one surface out of date; letting it become two is the
+      // thing worth avoiding.
+      var republished = 0;
+      final clearer = ConversationClearer(
+        dismissChat: (_) async => throw StateError('no notification service'),
+        republish: () async => republished++,
+      );
+
+      await clearer.clear('merged:anna');
+
+      expect(republished, 1);
+    });
+
+    test('a failing republish does not stop the shade being cleared', () async {
+      final dismissed = <String>[];
+      final clearer = ConversationClearer(
+        dismissChat: (id) async => dismissed.add(id),
+        republish: () async => throw StateError('no container'),
+      );
+
+      await clearer.clear('merged:anna');
+
+      expect(dismissed, ['merged:anna']);
+    });
+
+    test('nothing wired up is a silent no-op, not a crash', () async {
+      // The state a cold start and every widget test is in.
+      const clearer = ConversationClearer(dismissChat: null, republish: null);
+      await expectLater(clearer.clear('merged:anna'), completes);
+    });
+  });
+
+  group('read on another device', () {
+    Chat chat(String id, {int unread = 0}) => Chat(
+      id: id,
+      title: id,
+      unreadCount: unread,
+      sources: [ChatSource(roomId: id, network: ChatNetwork.matrix)],
+    );
+
+    late List<String> cleared;
+    late ReadElsewhereWatcher watcher;
+
+    setUp(() {
+      cleared = [];
+      watcher = ReadElsewhereWatcher(
+        ConversationClearer(
+          dismissChat: (id) async => cleared.add(id),
+          republish: () async {},
+        ),
+      );
+    });
+
+    test('a chat that stops being unread is cleared', () async {
+      // Nothing on this device did anything: the laptop's `m.read` synced, the
+      // count dropped, and the row is still in the shade. The clearing push
+      // covers a phone that is asleep; this covers one that is awake.
+      await watcher.onChats([chat('!a', unread: 2)]);
+      expect(cleared, isEmpty, reason: 'still unread');
+
+      await watcher.onChats([chat('!a')]);
+      expect(cleared, ['!a']);
+    });
+
+    test('a chat that was already read is not cleared again', () async {
+      // The transition is what matters, not the state. A *new* notification
+      // can legitimately be posted between two ticks, and clearing on every
+      // tick would wipe it.
+      await watcher.onChats([chat('!a')]);
+      await watcher.onChats([chat('!a')]);
+      expect(cleared, isEmpty);
+    });
+
+    test('a chat that becomes unread again can be cleared again', () async {
+      await watcher.onChats([chat('!a', unread: 1)]);
+      await watcher.onChats([chat('!a')]);
+      await watcher.onChats([chat('!a', unread: 1)]);
+      await watcher.onChats([chat('!a')]);
+      expect(cleared, ['!a', '!a']);
+    });
+
+    test('a chat that leaves the list entirely is not cleared', () async {
+      // Archived, deleted, or the account signed out — and `_stopInboxSurfaces`
+      // owns all three. Clearing here would be a second answer to a question
+      // that has already been answered somewhere with more context.
+      await watcher.onChats([chat('!a', unread: 1)]);
+      await watcher.onChats([]);
+      expect(cleared, isEmpty);
+    });
+
+    test('only the chats that changed are cleared', () async {
+      await watcher.onChats([chat('!a', unread: 1), chat('!b', unread: 3)]);
+      await watcher.onChats([chat('!a'), chat('!b', unread: 3)]);
+      expect(cleared, ['!a']);
+    });
   });
 }

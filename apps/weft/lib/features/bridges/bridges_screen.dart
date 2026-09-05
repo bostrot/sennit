@@ -9,6 +9,8 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
@@ -172,11 +174,15 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
       );
     } on BridgeException catch (e) {
       if (!mounted) return;
+      // The bridge's own sentence when it sent one — it is specific and
+      // already in whatever language the bridge speaks — and Braid's
+      // translated one for a status code the bridge said nothing about.
+      final reason = context.l10n.bridgeFailure(e) ?? e.message;
       setState(() {
         _health[bridge.id] = null;
-        _errors[bridge.id] = e.message;
+        _errors[bridge.id] = reason;
       });
-      announce(context, '$name bridge could not be reached. ${e.message}');
+      announce(context, context.l10n.bridgesUnreachable(name, reason));
     }
   }
 
@@ -185,27 +191,22 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     final added = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add a bridge'),
+        title: Text(context.l10n.bridgesAddTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'The provisioning URL of a mautrix bridge you run — where the '
-              'bridge\'s own web API is reachable, e.g. '
-              'https://bridge.example.org/_matrix/provision. It enables the '
-              'guided sign-in flow here.\n\n'
-              'No URL handy? Opening the bridge\'s chat from the list works '
-              'without one: send "login" to the bot there.',
-            ),
+            Text(context.l10n.bridgesAddBody),
             const SizedBox(height: WeftSpace.md),
             WeftLabelledField(
-              label: 'Provisioning URL',
+              label: context.l10n.bridgesProvisioningUrlField,
               child: TextField(
                 controller: url,
                 autofocus: true,
                 autocorrect: false,
                 keyboardType: TextInputType.url,
-                decoration: const InputDecoration(hintText: 'Provisioning URL'),
+                decoration: InputDecoration(
+                  hintText: context.l10n.bridgesProvisioningUrlField,
+                ),
               ),
             ),
           ],
@@ -213,11 +214,11 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(url.text.trim()),
-            child: const Text('Add'),
+            child: Text(context.l10n.commonAdd),
           ),
         ],
       ),
@@ -230,7 +231,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     if (added == null || added.isEmpty) return;
     final parsed = Uri.tryParse(added);
     if (parsed == null || parsed.host.isEmpty) {
-      if (mounted) showWeftMessage(context, 'That is not a URL.');
+      if (mounted) showWeftMessage(context, context.l10n.bridgesNotAUrl);
       return;
     }
 
@@ -283,7 +284,9 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     try {
       roomId = await client.startDirectChat(botUserId);
     } on Exception catch (e) {
-      if (mounted) showWeftMessage(context, 'Could not open the chat: $e');
+      if (mounted) {
+        showWeftMessage(context, context.l10n.bridgesOpenChatFailed('$e'));
+      }
       return;
     }
 
@@ -310,7 +313,9 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     try {
       flows = await client.loginFlows();
     } on BridgeException catch (e) {
-      if (mounted) showWeftMessage(context, e.message);
+      if (mounted) {
+        showWeftMessage(context, context.l10n.bridgeFailure(e) ?? e.message);
+      }
       return;
     }
     if (!mounted || flows.isEmpty) return;
@@ -358,7 +363,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WeftAppBar(
-        title: const Text('Bridges'),
+        title: Text(context.l10n.commonBridges),
         actions: [
           // A desktop has a toolbar, so the page's primary action belongs in
           // it. A floating button hovering over the bottom-right corner of a
@@ -367,10 +372,10 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
             TextButton.icon(
               onPressed: _addBridge,
               icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Add bridge'),
+              label: Text(context.l10n.bridgesAddBridge),
             ),
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: context.l10n.commonRefresh,
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _probeAll,
           ),
@@ -381,7 +386,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
           : FloatingActionButton.extended(
               onPressed: _addBridge,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add bridge'),
+              label: Text(context.l10n.bridgesAddBridge),
             ),
       body: _bridges.isEmpty && _detected.isEmpty
           ? Center(
@@ -390,9 +395,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(WeftSpace.xl),
                   child: Text(
-                    'No bridges yet.\n\nBraid connects to bridges you run on '
-                    'your own server — mautrix-whatsapp, -signal, -telegram '
-                    'and friends. Add one by its provisioning URL.',
+                    context.l10n.bridgesEmpty,
                     textAlign: TextAlign.center,
                     style: context.text.bodyMedium?.copyWith(
                       color: context.colors.onSurfaceVariant,
@@ -403,13 +406,20 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
             )
           : WeftReadingPane(
               child: ListView(
-                padding: const EdgeInsets.all(WeftSpace.md),
+                // See `merge_screen.dart`: the bottom side clears the FAB, the
+                // other three keep the screen's own margin.
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  WeftSpace.md,
+                  WeftSpace.md,
+                  WeftSpace.md,
+                  WeftSpace.fabClearance,
+                ),
                 children: [
                   if (_detected.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.all(WeftSpace.sm),
                       child: Text(
-                        'Detected on your server',
+                        context.l10n.bridgesDetected,
                         style: context.text.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -626,18 +636,18 @@ class _DetectedBridgeCard extends StatelessWidget {
         FilledButton.tonalIcon(
           onPressed: onSignIn,
           icon: const WeftMirroredIcon(Icons.login_rounded, size: 15),
-          label: const Text('Sign in'),
+          label: Text(context.l10n.loginSignIn),
         ),
         const SizedBox(width: WeftSpace.sm),
         OutlinedButton.icon(
           onPressed: onOpenChat,
           icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-          label: const Text('Open chat'),
+          label: Text(context.l10n.bridgesOpenChat),
         ),
       ] else
         OutlinedButton(
           onPressed: onAddUrl,
-          child: const Text('Add provisioning URL'),
+          child: Text(context.l10n.bridgesAddProvisioningUrl),
         ),
     ];
 
@@ -784,16 +794,16 @@ class _BridgeCard extends StatelessWidget {
                   // Material's default is "Show menu", which on a screen with
                   // four bridge cards is four identical buttons for four
                   // different bridges — and the one action behind it deletes.
-                  tooltip:
-                      'Actions for the '
-                      '${whoami?.networkName ?? network.label} bridge',
+                  tooltip: context.l10n.bridgesActionsFor(
+                    whoami?.networkName ?? network.label,
+                  ),
                   onSelected: (choice) {
                     if (choice == 'remove') onRemove();
                   },
-                  itemBuilder: (_) => const [
+                  itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'remove',
-                      child: Text('Remove bridge'),
+                      child: Text(context.l10n.bridgesRemove),
                     ),
                   ],
                 ),
@@ -817,7 +827,7 @@ class _BridgeCard extends StatelessWidget {
                     const SizedBox(width: WeftSpace.sm),
                     Expanded(
                       child: Semantics(
-                        label: 'Not reachable. ${error!}',
+                        label: context.l10n.bridgesNotReachable(error!),
                         excludeSemantics: true,
                         child: Text(
                           error!,
@@ -832,12 +842,14 @@ class _BridgeCard extends StatelessWidget {
               )
             else if (whoami == null)
               Semantics(
-                label: 'Checking the ${network.label} bridge',
+                label: context.l10n.bridgesChecking(network.label),
                 child: const LinearProgressIndicator(minHeight: 2),
               )
             else if (whoami!.logins.isEmpty)
               Text(
-                'Not signed in to ${whoami!.networkName ?? network.label} yet.',
+                context.l10n.bridgesNotSignedIn(
+                  whoami!.networkName ?? network.label,
+                ),
                 style: context.text.bodySmall,
               )
             else
@@ -864,8 +876,13 @@ class _BridgeCard extends StatelessWidget {
                       const SizedBox(width: WeftSpace.sm),
                       Expanded(
                         child: Text(
-                          '${login.label} — ${login.state.name}'
-                          '${login.errorMessage == null ? '' : ' (${login.errorMessage})'}',
+                          context.l10n.bridgesLoginState(
+                            login.label,
+                            login.state.name,
+                            login.errorMessage == null
+                                ? ''
+                                : ' (${login.errorMessage})',
+                          ),
                           style: context.text.bodySmall,
                         ),
                       ),
@@ -873,11 +890,11 @@ class _BridgeCard extends StatelessWidget {
                       // "Sign out", and signing out of the wrong one costs a
                       // full re-pairing.
                       NamedButton(
-                        label: 'Sign out of ${login.label}',
+                        label: context.l10n.bridgesSignOutOf(login.label),
                         onPressed: () => onLogout(login.id),
                         child: TextButton(
                           onPressed: () => onLogout(login.id),
-                          child: const Text('Sign out'),
+                          child: Text(context.l10n.devicesSignOut),
                         ),
                       ),
                     ],
@@ -893,8 +910,8 @@ class _BridgeCard extends StatelessWidget {
                 icon: const WeftMirroredIcon(Icons.login_rounded, size: 18),
                 label: Text(
                   (whoami?.logins.isEmpty ?? true)
-                      ? 'Sign in'
-                      : 'Add another account',
+                      ? context.l10n.loginSignIn
+                      : context.l10n.bridgesAddAnotherAccount,
                 ),
               ),
             ),

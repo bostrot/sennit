@@ -3,6 +3,8 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_sms/weft_sms.dart';
 
+import '../../app/localisation.dart';
+
 /// What sending this text over SMS actually means, above the composer.
 ///
 /// Two facts, and both of them are things the rest of Weft's inbox lets a user
@@ -30,6 +32,7 @@ class SmsComposerBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final plan = segmentMessage(body);
     // The text derivation, not the fill one: every use of `accent` on this bar
     // is a word or a glyph on the app surface, so it owes 4.5:1 rather than the
@@ -44,7 +47,7 @@ class SmsComposerBar extends StatelessWidget {
     return Semantics(
       container: true,
       excludeSemantics: true,
-      label: 'Not encrypted. ${_cost(plan)}',
+      label: l10n.smsComposerSemantics(_cost(l10n, plan)),
       child: Padding(
         padding: const EdgeInsets.only(bottom: WeftSpace.xs),
         child: Row(
@@ -52,7 +55,7 @@ class SmsComposerBar extends StatelessWidget {
             Icon(Icons.lock_open_rounded, size: 14, color: accent),
             const SizedBox(width: WeftSpace.xs),
             Text(
-              'Not encrypted',
+              l10n.smsNotEncrypted,
               style: context.text.labelSmall?.copyWith(
                 color: accent,
                 fontWeight: FontWeight.w600,
@@ -60,7 +63,7 @@ class SmsComposerBar extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              _cost(plan),
+              _cost(l10n, plan),
               style: context.text.labelSmall?.copyWith(
                 // The count only turns the network's colour once it has become a
                 // charge the user did not expect. Colouring it from the first
@@ -80,11 +83,11 @@ class SmsComposerBar extends StatelessWidget {
   /// The encoding is named only when it is the *reason* for the count — a
   /// single GSM-7 segment needs no explanation, whereas "2 messages · UCS-2"
   /// tells someone who pasted a curly quote what to look for.
-  static String _cost(SegmentPlan plan) {
+  static String _cost(AppL10n l10n, SegmentPlan plan) {
     final unicode = plan.isUnicode ? ' · ${plan.encoding.label}' : '';
     if (!plan.isMultipart) {
-      return '${plan.remainingInLastSegment} left$unicode';
+      return '${l10n.smsCharactersLeft(plan.remainingInLastSegment)}$unicode';
     }
-    return '${plan.segments} messages$unicode';
+    return '${l10n.smsSegmentCount(plan.segments)}$unicode';
   }
 }

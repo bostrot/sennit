@@ -137,6 +137,16 @@ class StubChatRepository extends DemoChatRepository {
   /// full-size fetch was asked for rather than a 96-pixel crop.
   bool? lastThumbnail;
 
+  /// The stated history, for every room.
+  ///
+  /// Overridden as well as [timelineFor] because a repository that replaced one
+  /// and not the other would disagree with itself: `timelineFor` hands the
+  /// screen one set of messages while every target lookup — a reply, a
+  /// reaction, a thread send — walks the demo fixtures and finds nothing.
+  @override
+  List<WeftMessage> historyFor(ChatSource source, String title) =>
+      history ?? super.historyFor(source, title);
+
   @override
   Future<MergedTimeline> timelineFor(String chatId) async {
     final replacement = history;

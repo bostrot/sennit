@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import 'send_network_chip.dart';
@@ -17,20 +18,31 @@ import 'send_network_chip.dart';
 /// not worth it for a 60 MP RAW, which gets its icon instead.
 const int kPreviewDecodeMaxBytes = 12 * 1024 * 1024;
 
-/// Confirms what is about to be sent, and to which network.
+/// What the user confirmed in the preview sheet: the files, and the words.
+///
+/// A record rather than a bare list because the caption cannot be recovered
+/// afterwards — the sheet is gone by the time the caller sends, and a second
+/// out-parameter threaded through `showWeftPanel`'s `Future` is not a thing
+/// there is a way to spell.
+typedef ConfirmedAttachments = ({
+  List<AttachmentSource> sources,
+  String? caption,
+});
+
+/// Confirms what is about to be sent, with what caption, and to which network.
 ///
 /// Between the picker and the send because a picker gives no second chance:
 /// once `sendAttachment` is called the file is in the room, and "I picked the
-/// wrong photo" is then a redaction rather than a tap. Returns the files the
-/// user kept, or null if they backed out — an empty list is impossible, since
+/// wrong photo" is then a redaction rather than a tap. Returns what the user
+/// kept, or null if they backed out — an empty source list is impossible, since
 /// removing the last file closes the sheet as a cancellation.
-Future<List<AttachmentSource>?> showAttachmentPreviewSheet(
+Future<ConfirmedAttachments?> showAttachmentPreviewSheet(
   BuildContext context, {
   required Chat chat,
   required List<AttachmentSource> sources,
   required ValueChanged<ChatNetwork> onPickNetwork,
 }) {
-  return showWeftPanel<List<AttachmentSource>>(
+  return showWeftPanel<ConfirmedAttachments>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -61,6 +73,24 @@ class _AttachmentPreviewSheet extends ConsumerStatefulWidget {
 class _AttachmentPreviewSheetState
     extends ConsumerState<_AttachmentPreviewSheet> {
   late final List<AttachmentSource> _kept = [...widget.sources];
+  final TextEditingController _caption = TextEditingController();
+
+  /// Focused on desktop and pointedly *not* on a phone.
+  ///
+  /// On a desktop the sheet has already taken the window and there is a real
+  /// keyboard under the user's hands: landing in the field means a caption is
+  /// one sentence and Enter away. On a phone the same autofocus raises the soft
+  /// keyboard over the file list — the half of the sheet the user opened it to
+  /// look at — before they have decided whether they want to write anything at
+  /// all, and dismissing it is a second gesture to get back to where they were.
+  final FocusNode _captionFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _caption.dispose();
+    _captionFocus.dispose();
+    super.dispose();
+  }
 
   void _remove(AttachmentSource source) {
     setState(() => _kept.remove(source));
@@ -68,6 +98,20 @@ class _AttachmentPreviewSheetState
     // empty sheet up with a dead Send button makes the user find the drag
     // handle to say what they have already said.
     if (_kept.isEmpty) Navigator.of(context).pop();
+  }
+
+  /// Hands back the files and the caption, trimmed to null when it is blank.
+  ///
+  /// Normalised here as well as in `planUpload` because this is where the
+  /// question "did the user write a caption?" is actually asked — a field
+  /// holding two spaces has to leave through this sheet as "no caption", not as
+  /// a string that is only later found to be empty.
+  void _send() {
+    final caption = _caption.text.trim();
+    Navigator.of(context).pop((
+      sources: List<AttachmentSource>.unmodifiable(_kept),
+      caption: caption.isEmpty ? null : caption,
+    ));
   }
 
   @override
@@ -97,16 +141,17 @@ class _AttachmentPreviewSheetState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _kept.length == 1
-                      ? 'Send 1 file'
-                      : 'Send ${_kept.length} files',
+                  context.l10n.attachmentPreviewSendCount(_kept.length),
                   style: context.text.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: WeftSpace.xxs),
                 Text(
-                  '${formatAttachmentSize(total)} to ${chat.title}',
+                  context.l10n.attachmentPreviewSizeTo(
+                    formatAttachmentSize(total),
+                    chat.title,
+                  ),
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
                   ),
@@ -138,38 +183,69 @@ class _AttachmentPreviewSheetState
             ),
             child: SafeArea(
               top: false,
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // The same chip the composer shows, driven by the same
-                  // setter: a merged chat must not send its photos somewhere
-                  // other than where its text goes.
-                  if (chat.isMerged && sendNetwork != null) ...[
-                    SendNetworkChip(
-                      chat: chat,
-                      current: sendNetwork,
-                      onPick: widget.onPickNetwork,
-                    ),
-                    const SizedBox(width: WeftSpace.sm),
-                    Expanded(
-                      child: Text(
-                        'via ${sendNetwork.label}',
-                        style: context.text.labelMedium?.copyWith(
-                          color: context.colors.onSurfaceVariant,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                  // Above the buttons, not above the file list: the caption is
+                  // the last thing decided before Send, and a field at the top
+                  // of a scrolling sheet scrolls away exactly when the soft
+                  // keyboard opens over it.
+                  TextField(
+                    controller: _caption,
+                    focusNode: _captionFocus,
+                    autofocus: context.isDesktop,
+                    minLines: 1,
+                    maxLines: 4,
+                    // Newline rather than a send action. The Send button is two
+                    // centimetres below and unambiguous; an Enter that fired the
+                    // send would make a two-line caption impossible to write.
+                    textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: context.l10n.attachmentPreviewCaption,
+                      hintText: context.l10n.attachmentPreviewCaptionHint(
+                        _kept.length,
                       ),
                     ),
-                  ] else
-                    const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: WeftSpace.sm),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.of(context).pop(_kept),
-                    icon: const Icon(Icons.send_rounded, size: 18),
-                    label: const Text('Send'),
+                  const SizedBox(height: WeftSpace.sm),
+                  Row(
+                    children: [
+                      // The same chip the composer shows, driven by the same
+                      // setter: a merged chat must not send its photos
+                      // somewhere other than where its text goes.
+                      if (chat.isMerged && sendNetwork != null) ...[
+                        SendNetworkChip(
+                          chat: chat,
+                          current: sendNetwork,
+                          onPick: widget.onPickNetwork,
+                        ),
+                        const SizedBox(width: WeftSpace.sm),
+                        Expanded(
+                          child: Text(
+                            context.l10n.attachmentPreviewVia(
+                              sendNetwork.label,
+                            ),
+                            style: context.text.labelMedium?.copyWith(
+                              color: context.colors.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(context.l10n.commonCancel),
+                      ),
+                      const SizedBox(width: WeftSpace.sm),
+                      FilledButton.icon(
+                        onPressed: _send,
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: Text(context.l10n.commonSend),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -206,7 +282,7 @@ class _PickedFileTile extends StatelessWidget {
       // Named: a preview of eight files is eight identical "Remove" buttons,
       // and which one a reader is on is exactly what they cannot see.
       trailing: IconButton(
-        tooltip: 'Remove ${source.basename}',
+        tooltip: context.l10n.attachmentPreviewRemove(source.basename),
         icon: const Icon(Icons.close_rounded),
         onPressed: onRemove,
       ),

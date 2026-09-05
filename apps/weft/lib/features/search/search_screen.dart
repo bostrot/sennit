@@ -6,6 +6,9 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_search/weft_search.dart';
+import '../../app/l10n_labels.dart';
+
+import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../app/search_providers.dart';
@@ -134,16 +137,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: context.isDesktop ? WeftSpace.sm : 0,
-                vertical: context.isDesktop ? 5 : 0,
+                vertical: context.isDesktop ? WeftSpace.xs : 0,
               ),
               child: WeftLabelledField(
-                label: 'Search all conversations',
+                label: context.l10n.inboxSearchAll,
                 child: TextField(
                   controller: _controller,
                   autofocus: true,
                   onChanged: _onChanged,
                   decoration: InputDecoration(
-                    hintText: 'Search messages…',
+                    hintText: context.l10n.searchHint,
                     // All three borders, not just `border` — and only on a
                     // desktop. The theme gives every field a two-point focus
                     // ring, and this one is autofocused inside a 52-point
@@ -174,7 +177,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 width: 16,
                 height: 16,
                 child: Semantics(
-                  label: 'Searching',
+                  label: context.l10n.searchSearching,
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
@@ -243,7 +246,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       },
                     );
                   },
-                  child: const Text('Backfill now'),
+                  child: Text(context.l10n.searchBackfillNow),
                 ),
               ),
             if (_searchedOnce)
@@ -265,7 +268,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (_searchedOnce) return const SizedBox.shrink();
       return Center(
         child: Text(
-          'Messages become searchable as their chats are opened.',
+          context.l10n.searchNotIndexedYet,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
@@ -322,7 +325,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           button: true,
           excludeSemantics: true,
           onTap: open,
-          label: _resultLabel(result, when),
+          label: _resultLabel(context.l10n, result, when),
           child: ListTile(
             leading: NetworkGlyph(
               network: result.network,
@@ -359,11 +362,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 const SizedBox(width: WeftSpace.sm),
                 if (result.matchedSemantic && !result.matchedKeyword)
                   _MethodTag(
-                    label: 'meaning',
+                    label: context.l10n.searchTagMeaning,
                     color: context.palette.mergedAccent,
                   ),
                 if (result.matchedKeyword && result.matchedSemantic)
-                  _MethodTag(label: 'both', color: context.colors.primary),
+                  _MethodTag(
+                    label: context.l10n.searchTagBoth,
+                    color: context.colors.primary,
+                  ),
               ],
             ),
             onTap: open,
@@ -451,20 +457,20 @@ class _ChatResultTile extends ConsumerWidget {
 /// The chat is dropped when it is the same word as the sender, which for a
 /// direct message it usually is — "Anna Maven, Anna Maven, see you at six" is
 /// the kind of label that makes a reader turn the feature off.
-String _resultLabel(SearchResult result, String when) {
+String _resultLabel(AppL10n l10n, SearchResult result, String when) {
   final sender = result.senderName.trim();
   final chat = result.chatTitle.trim();
   return semanticsSentence([
-    chat.isEmpty || chat == sender ? null : 'In $chat',
+    chat.isEmpty || chat == sender ? null : l10n.searchResultInChat(chat),
     sender.isEmpty ? null : sender,
     result.network.label,
-    result.kind == MessageKind.text ? null : messageKindLabel(result.kind),
+    result.kind == MessageKind.text ? null : l10n.messageKind(result.kind),
     result.body,
     when,
     if (result.matchedSemantic && !result.matchedKeyword)
-      'matched by meaning, not by these words'
+      l10n.searchResultMatchedMeaning
     else if (result.matchedKeyword && result.matchedSemantic)
-      'matched by words and by meaning',
+      l10n.searchResultMatchedBoth,
   ]);
 }
 
@@ -481,11 +487,9 @@ class _ResultSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = switch (count) {
-      0 => 'Nothing matched.',
-      1 => '1 result',
-      _ => '$count results',
-    };
+    final text = count == 0
+        ? context.l10n.searchNothingMatched
+        : context.l10n.searchResultCount(count);
     return Semantics(
       liveRegion: true,
       label: text,
@@ -522,11 +526,14 @@ class _MethodTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: label == 'meaning'
-          ? 'Matched by meaning, not by the words you typed'
-          : 'Matched by the words you typed and by meaning',
+      message: label == context.l10n.searchTagMeaning
+          ? context.l10n.searchTagMeaningTooltip
+          : context.l10n.searchTagBothTooltip,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.dense,
+          vertical: WeftSpace.xxs,
+        ),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
           borderRadius: WeftRadius.pill,

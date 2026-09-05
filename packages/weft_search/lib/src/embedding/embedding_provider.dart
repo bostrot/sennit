@@ -8,13 +8,37 @@ import '../vector/vector_math.dart';
 
 /// Thrown when an embedding backend fails in a way worth showing the user.
 class EmbeddingException implements Exception {
-  const EmbeddingException(this.message, {this.statusCode});
+  const EmbeddingException(this.message, {this.statusCode, this.failure});
 
+  /// An English sentence, kept for logs and for a caller with no translations.
+  /// When [failure] is set the app words that instead — see
+  /// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
   final String message;
   final int? statusCode;
 
+  /// Which of the common failures this was, for the app to word.
+  final EmbeddingFailure? failure;
+
   @override
   String toString() => 'EmbeddingException: $message';
+}
+
+/// The endpoint failures worth telling the user apart.
+enum EmbeddingFailure {
+  /// 401 or 403: the endpoint refused the API key.
+  rejectedKey,
+
+  /// 404: nothing answering at that base URL.
+  notFound,
+
+  /// 429: throttled. Backfill retries on its own.
+  rateLimited,
+
+  /// 5xx: the endpoint itself failed.
+  server,
+
+  /// Anything else, with the response body attached.
+  other,
 }
 
 /// Turns text into vectors.
@@ -111,6 +135,7 @@ class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
     if (response.statusCode != 200) {
       throw EmbeddingException(
         _describeFailure(response),
+        failure: failureFor(response.statusCode),
         statusCode: response.statusCode,
       );
     }
@@ -161,20 +186,36 @@ class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
 
   /// Turns the common failures into something actionable rather than dumping
   /// a raw body at the user.
-  static String _describeFailure(http.Response response) {
-    final body = response.body.length > 300
-        ? '${response.body.substring(0, 300)}…'
-        : response.body;
+  static EmbeddingFailure failureFor(int status) => switch (status) {
+    401 || 403 => EmbeddingFailure.rejectedKey,
+    404 => EmbeddingFailure.notFound,
+    429 => EmbeddingFailure.rateLimited,
+    >= 500 => EmbeddingFailure.server,
+    _ => EmbeddingFailure.other,
+  };
 
-    return switch (response.statusCode) {
-      401 || 403 => 'The embedding endpoint rejected the API key.',
-      404 =>
-        'No embeddings endpoint at that URL. The base URL usually ends in /v1.',
-      429 => 'The embedding endpoint is rate limiting. Backfill will retry.',
-      >= 500 => 'The embedding endpoint failed (${response.statusCode}).',
-      _ => 'Embedding request failed (${response.statusCode}): $body',
-    };
-  }
+  /// The truncated response body, which the app needs for
+  /// [EmbeddingFailure.other] and nothing else shows.
+  static String truncatedBody(http.Response response) =>
+      response.body.length > 300
+      ? '${response.body.substring(0, 300)}…'
+      : response.body;
+
+  static String _describeFailure(http.Response response) =>
+      switch (failureFor(response.statusCode)) {
+        EmbeddingFailure.rejectedKey =>
+          'The embedding endpoint rejected the API key.',
+        EmbeddingFailure.notFound =>
+          'No embeddings endpoint at that URL. The base URL usually ends in '
+              '/v1.',
+        EmbeddingFailure.rateLimited =>
+          'The embedding endpoint is rate limiting. Backfill will retry.',
+        EmbeddingFailure.server =>
+          'The embedding endpoint failed (${response.statusCode}).',
+        EmbeddingFailure.other =>
+          'Embedding request failed (${response.statusCode}): '
+              '${truncatedBody(response)}',
+      };
 
   @override
   void dispose() {

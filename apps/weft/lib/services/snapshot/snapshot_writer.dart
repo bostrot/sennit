@@ -6,6 +6,9 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_snapshot/weft_snapshot.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
+
 /// The privacy gate on companion surfaces, as the app stores it.
 ///
 /// [SnapshotPolicy] is the pure-Dart half — what a row is allowed to say — and
@@ -324,10 +327,16 @@ class SnapshotWriter {
     if (chats == null) return;
 
     final at = now ?? clock.now();
+    // The device's locale, not a widget's: a widget row is drawn by the system
+    // from a file this writes, possibly while the app is not running.
+    final l10n = weftPlatformL10n();
     final snapshot = buildSnapshot(
       chats: chats,
       policy: _settings.policy,
       now: at,
+      words: weftNotifyStringsFrom(l10n),
+      redactedTitle: l10n.snapshotRedactedRowTitle,
+      deletedPreview: l10n.chatMessageDeleted,
     );
 
     final last = _written;

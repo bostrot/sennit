@@ -64,6 +64,14 @@ engine:
 | `call_test.dart` | 3 | live Synapse |
 | `attachment_flow_test.dart` | 1 | a real engine only (`WEFT_DEMO=true`) |
 
+> **Since Phase 04** the directory holds a fourth file, `route_walk_test.dart`
+> — one test that opens every surface in the app, photographs it and measures
+> it. It needs a real engine and `WEFT_DEMO=true` and no homeserver, it is the
+> other side of the `patrol/README.md` rule rather than a Patrol scenario, and
+> it has its own row in [Results](#run-2026-08-28-the-suites-that-are-not-the-matrix)
+> below. What it covers is [`ui-audit.md`](ui-audit.md); what it walks is
+> [`route-inventory.md`](route-inventory.md).
+
 `matrix_session_test.dart` is the one the Patrol suite is descended from, and
 four things in its setup are load-bearing enough that the Patrol support helper
 must repeat them rather than re-derive them:
@@ -332,7 +340,7 @@ unauthenticated one, and the audit entries; the tunnel is asserted to be
 
 ## The scenarios
 
-Thirteen files under `apps/weft/integration_test/patrol/`, holding **39
+Thirteen files under `apps/weft/integration_test/patrol/`, holding **40
 scenarios** between them, plus a shared `patrol/support/` and a
 `harness_test.dart` that is not a scenario — it is the two checks that answer
 "is any of this real". Each file is independently runnable and cleans up the rooms it
@@ -354,6 +362,22 @@ sqflite trap above.
 
 **`chat_actions_test.dart`** — reply, react, edit, redact (Phase 05), each
 asserted on the *peer's* timeline, not only locally.
+
+**Threads and chat requests (Phase 06) are not here, and that is deliberate.**
+Both are Matrix-side constructs with no device surface of their own: a thread is
+an `m.thread` relation the local timeline groups, and a request is a membership
+the inbox holds back. Everything a device could add — that the relation reaches
+the peer, that a declined room is actually left — is already asserted against a
+real homeserver by `flutter test` and by the unit suites, and a Patrol scenario
+would be the same assertions with an emulator boot in front of them. What *is*
+device-only for those two is the notification behaviour, which is below.
+
+The read indicator's per-network degradation is in the same position.
+`messaging_test.dart` already asserts the sending → sent → delivered transitions
+and the read receipt against a live peer; what Phase 06 added on top is the
+*group* rule and the receipts-off rule, and neither has a device dependency —
+they are arithmetic over receipts, asserted in `weft_domain`'s `delivery_test`
+and through the widget in `receipts_and_presence_test`.
 
 ### Attachments and media
 
@@ -397,6 +421,17 @@ foreground by design (`README.md`) — the test asserts that, it does not work
 around it. The *merged* half of "the correct merged conversation" belongs to
 `merge_test`; what this asserts is that the tap follows the link rather than the
 inbox's top row.
+
+**`notification_test.dart` (Phase 06 addition)** — *opening the conversation
+takes its notifications out of the shade*. Two messages, so the claim is about
+the conversation being cleared rather than one row happening to go: Weft groups
+a chat's notifications under one key, and a dismissal that took only the summary
+down would leave the individual rows standing on Android. Opened from the inbox
+rather than by tapping the notification, because a tap routes through the
+deep-link handler — one door of several — and the ordinary door is the one that
+had never been checked against a real notification service. The failure it
+catches is a cancel aimed at an id or a tag the row was never posted under,
+which looks identical from inside the app.
 
 **`notification_mute_test.dart`** — a muted chat produces nothing; an explicit
 mention in a mentions-only chat produces one. Asserting an *absence* needs a
@@ -1536,7 +1571,7 @@ Four findings, two of them fixed here and verified against the device.
 | The devices-list scroll fix works | the verification scenario passed twice after failing twice, with no other change |
 | The file-store fix works | `chat_actions_test`: two `weft.sqlite-journal` failures before, zero after; one scenario converted from fail to pass |
 | Nothing regressed | `flutter analyze` clean, `dart format --set-exit-if-changed` clean, `dart analyze integration_test/patrol` clean, and the unit suites — see the commit |
-| **Not** checked | every one of the eleven matrix rows; 27 of the 39 scenarios, nine files of which have never run anywhere; any iOS anything; the macOS row past the automation handshake; whether findings ③, ⑤ and ⑥ are app defects or suite defects |
+| **Not** checked | every one of the eleven matrix rows; 28 of the 40 scenarios, nine files of which have never run anywhere; any iOS anything; the macOS row past the automation handshake; whether findings ③, ⑤ and ⑥ are app defects or suite defects |
 
 That last cell is the honest headline. This task moved the suite from *nothing
 executed* to *twelve scenarios executed on an off-matrix Android emulator*, and
@@ -1547,7 +1582,7 @@ hazard. It did not establish that the matrix passes, on any row.
 > **Counts corrected, 2026-08-19, closing the phase.** This section originally
 > said "thirteen scenarios executed … nineteen not executed" out of
 > "thirty-two". Counted against the tree — 41 `patrolTest` bodies, of which 2
-> are `harness_test`'s — the suite holds **39 scenarios**, of which **12** ran
+> are `harness_test`'s — the suite holds **40 scenarios**, of which **12** ran
 > and **27** did not. The earlier figures counted the two-check `harness_test`
 > as a single scenario and undercounted the files nobody reached. The pass and
 > fail *results* above are unchanged and are what the device printed; only the
@@ -1558,9 +1593,142 @@ hazard. It did not establish that the matrix passes, on any row.
 
 ## Results
 
+Three runs, and they answer different questions. The first is Phase 05's
+platform-boundary fixes, verified on a device because three of the four could
+not have been verified any other way; the second is everything in this
+repository that needs no device farm, run in full on 2026-08-28 closing Phase 04;
+the third is the eleven-row device matrix this document was written to define,
+filled in on 2026-08-19 closing Phase 09.
+
+### Run 2026-08-28: Phase 05, platform bug fixes
+
+macOS 26.3.1 on Apple silicon, Flutter 3.44.0 / Dart 3.12.0, the Synapse in
+`tooling/docker` on `localhost:8008` reached through `adb reverse`, and the
+`Medium_Phone_API_36.1` emulator on **Android 16 (API 36)**.
+
+| Suite | Command | Result |
+|---|---|---|
+| App unit, widget and golden | `flutter test` in `apps/weft` | **1397 pass**, 0 fail, 1 suite skipped ⓐ |
+| `weft_design` | `flutter test` | **274 pass**, 0 fail |
+| `weft_matrix` | `flutter test` | **312 pass** |
+| `weft_domain` | `dart test` | **80 pass** |
+| `weft_richtext` | `dart test` | **200 pass** |
+| `weft_attachments` | `dart test` | **160 pass** |
+| `weft_mcp` | `dart test` | **46 pass** |
+| `weft_notify` | `dart test` | **182 pass** |
+| `weft_snapshot` | `dart test` | **101 pass** |
+| `weft_sms` | `dart test` | **103 pass** |
+| `weft_merge` | `dart test` | **69 pass** |
+| `weft_store` | `flutter test` | **44 pass** |
+| `weft_search` | `dart test` | **45 pass** |
+| `weft_bridges` | `dart test` | **21 pass** |
+| `weft_share` | `dart test` | **93 pass** |
+| `weft_transcribe` | `dart test` | **15 pass** |
+| `weft_call` | `dart test` | **122 pass** |
+| Route walk (macOS) | `flutter test integration_test/route_walk_test.dart -d macos` | **25 steps, 0 skipped**, 8 tap-target findings ⓖ |
+| Integration vs Synapse | `matrix_session_test`, `attachment_flow_test`, `call_test` on `-d macos` | **9 pass** |
+| Android build | `flutter build apk --debug` | **pass** |
+| Formatting | `dart format` over the changed set | **clean** — 168 files |
+| Analyzer | `dart analyze` | **clean** — the four errors and three infos pre-existing at `HEAD` ⓔ were fixed in Phase 06 |
+
+The manual pass, all of it on the emulator, all of it watched:
+
+| Checked on the device | Evidence |
+|---|---|
+| Braid is *eligible* for `ROLE_SMS` | The system's own dialog lists Braid beside Google Messages — the role controller resolved all four required components |
+| The role prompt appears, and a decline is a decline | Cancel → the screen keeps "Off" and shows "Nothing changed…", no SnackBar, the offer still there |
+| The role prompt is accepted, and the screen tells the truth | "Set as default" → status flips to **On**, the RCS section swaps to the role-held wording, the offer is replaced by "Choose a different SMS app", **and no note is shown at all** |
+| The role survives a reboot | `SatelliteController: … defaultSmsPackageName: com.bostrot.weft` after `adb reboot` |
+| The MCP tunnel is honest on mobile | The row is dimmed with a cloud-off glyph, **no Start button**, and the sentence names the two real alternatives — local network, or a machine that stays on |
+| A reply renders in the conversation list | A real rich reply sent from `@bob:localhost` shows as **↩ yes, see you then**; no `>` and no mxid anywhere in the row |
+| The boot receiver fires | `ActivityManager: Start proc … for broadcast {com.bostrot.weft/.sync.SyncBootReceiver}` |
+| The foreground service is allowed to start at boot | `Background started FGS: Allowed [… cmp=…/.sync.WeftSyncService; code:BOOT_COMPLETED …]`, then `isForeground=true foregroundId=7411` |
+| A notification arrives after a reboot with the app never opened | Message on `weft.messages.matrix`, `actions=3`, with the conversation shortcut attached — while `dumpsys activity activities` counted **0** instances of `MainActivity` ⓕ |
+
+**ⓐ** The same `preview`-tagged suite as the run below.
+
+**ⓖ** All eight are tap targets under 24dp on the Mac composer and toolbar, and
+all eight predate Phase 06 — the two reported against `22-thread` are the *same*
+composer controls as `20-chat`, seen on a second screen. The walk reports
+findings without failing on them; what it fails on is a step it cannot reach.
+
+**ⓕ** The *first* message sent after the reboot did not notify, and the reason is
+the harness rather than the app: `adb reverse tcp:8008` does not survive a
+reboot, so the daemon had no route to the homeserver for the minute between boot
+and the tunnel being re-established. The second message, sent once the route was
+back, notified within seconds. Recorded rather than quietly retried, because the
+distinction matters — the app was never opened in either case.
+
+**What the device found that no test could.** The reported bug was not the one
+the phase was written against. `RoleManager.createRequestRoleIntent` was already
+being called and its `onActivityResult` already handled; the missing pieces were
+two *manifest permissions*. When the role is granted, AOSP's `SmsApplication`
+assigns the app-ops the role carries, cannot assign an op for a permission the
+package never declared, and then disqualifies the app for having "lost" it — so
+`RoleManager` reported the role granted while
+`Telephony.Sms.getDefaultSmsPackage()` kept naming the previous holder. The
+entire evidence is one line from a system class:
+
+```
+E SmsApplication: com.bostrot.weft lost android:receive_wap_push: (no permission to fix)
+```
+
+`RECEIVE_WAP_PUSH` and then `READ_CELL_BROADCASTS` — the second only surfaced
+once the first was added — are now declared, with the reasoning beside them, and
+`sms_manifest_test.dart` holds the set at six. Neither is a capability Braid
+uses. The full trail is in the phase's working note.
+
+### Run 2026-08-28: the suites that are not the matrix
+
+macOS 26.3.1 on Apple silicon, Flutter 3.44.0 / Dart 3.12.0, the Synapse in
+`tooling/docker` on `localhost:8008`, and the `Medium_Phone_API_36.1` emulator.
+
+| Suite | What it is | Command | Result |
+|---|---|---|---|
+| Pure Dart packages | the 13 packages CI's `unit` job names | `dart test` per package | **1155 pass**, 0 fail |
+| Flutter packages | `weft_design`, `weft_matrix`, `weft_store` | `flutter test` per package | **604 pass**, 0 fail |
+| App unit, widget and golden | `apps/weft/test`, goldens included | `flutter test` | **1318 pass**, 0 fail, 1 suite skipped ⓐ |
+| Plain integration, homeserver | `matrix_session_test`, `call_test` | `flutter test integration_test/… -d macos` | **8 pass**, 0 fail |
+| Plain integration, demo | `attachment_flow_test` | `… -d macos --dart-define=WEFT_DEMO=true` | **1 pass**, 0 fail ⓑ |
+| **Route walk, Mac window** | every surface, opened and measured | `… route_walk_test.dart -d macos` | **pass** — 23 steps, 0 skipped, 6 findings ⓒ |
+| **Route walk, touch shell** | the same, on the phone layout | `… route_walk_test.dart -d emulator-5554` | **pass** — 26 steps, 1 skipped, 0 findings ⓓ |
+| Patrol harness | is the automator alive on this host | `e2e.sh -t patrol/harness_test.dart` | **2 pass** |
+| Localisation | audit, lint, `gen-l10n` | `tooling/scripts/l10n_{audit,lint}.dart` | **clean** — 184 files, 0 unextracted literals; 1028 keys × 5 locales |
+| Formatting | tracked Dart only | `dart format --set-exit-if-changed` | **clean** — 441 files, 0 changed |
+| Analyzer | whole workspace | `dart analyze` | **4 errors, 3 infos** — all four pre-existing at `HEAD` ⓔ |
+
+**ⓐ** `test/tools/desktop_preview_test.dart`, which is `@Tags(['preview'])` and
+skipped by `apps/weft/dart_test.yaml` on purpose: it renders the desktop shell
+to disk to be looked at, asserts nothing, and writes outside the repository.
+Asked for by name with `--tags preview`.
+
+**ⓑ** Failed on first run and was fixed, not excused. It looks for
+`find.byTooltip('Attach')`, and since Phase 02 that word comes from an ARB file
+— so on a German machine the app draws *Anhängen* and the finder matched
+nothing. The locale is now pinned to English in the test the way
+`route_walk_test.dart` pins it. CI never saw this because a `ubuntu-latest`
+runner is `en_US`; a contributor on a non-English desktop met it immediately.
+
+**ⓒ** Six controls under the pointer floor, all icon-only, all deferred with
+their reasons — UI-04 and UI-05 in [`ui-audit.md`](ui-audit.md#open).
+
+**ⓓ** `05-status-viewer`, whose precondition the demo fixtures do not carry.
+Reported by name in the walk's own output rather than passing silently; UI-10.
+The touch run also found and closed a defect in the harness itself this time
+round — UI-11, an overflow the walk had invented by pinning the view's *size*
+and not its *insets*.
+
+**ⓔ** `desktop_tokens.dart:141,142` name two `WeftSurface` constants the enum
+does not have, and there are two unused imports in `mac_panels.dart` and
+`weft_app_bar.dart`. All four are at `HEAD` and none is this phase's; they are
+UI-08 in [`ui-audit.md`](ui-audit.md#low). They mean CI's `analyze` job does not
+currently pass, which is worth someone's attention and is not a device question.
+
+### Run 2026-08-19: the device matrix
+
 Filled in 2026-08-19, closing Phase 09. This is the table the whole document was
 built to be able to fill in honestly, and the honest answer is that **not one of
-the eleven matrix rows has been executed**. Twelve of the 39 scenarios ran, all
+the eleven matrix rows has been executed**. Twelve of the 40 scenarios ran, all
 of them on an **API 36** phone emulator that is not a row of this matrix, and
 they are reported in their own **A36-P** column rather than written into an A35
 cell.
@@ -1607,30 +1775,31 @@ is also untrue.
 | 19 | a backgrounded Weft posts to the shade, and the tap opens that chat | · ④ | · ④ | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
 | 20 | a reply typed into the shade reaches the peer | · | · | · | · | · | · | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ① | · Ⓔ |
 | 21 | marking read from the shade posts a receipt and clears the notification | · | · | · | · | · | · | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ⑤ | n/a ① | · Ⓔ |
+| 22 | opening the conversation takes its notifications out of the shade | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
 | | **`notification_mute_test`** | | | | | | | | | | | | |
-| 22 | a muted conversation stays out of the shade while an unmuted one does not | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
-| 23 | mentions-only silences the chatter and lets a mention through | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
+| 23 | a muted conversation stays out of the shade while an unmuted one does not | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
+| 24 | mentions-only silences the chatter and lets a mention through | · | · | · | · | · | · | · ⑤ | · ⑤ | · ⑤ | · ⑤ | n/a ① | · Ⓔ |
 | | **`deeplink_test`** | | | | | | | | | | | | |
-| 24 | `weft://chat/<id>` fired by the OS opens that conversation | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
-| 25 | `weft://search?q=` fired by the OS opens search on that query | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
-| 26 | `weft://user/<id>` is delivered and pushes nothing, which is the app today | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
-| 27 | a link for a conversation this account is not in says so | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 25 | `weft://chat/<id>` fired by the OS opens that conversation | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 26 | `weft://search?q=` fired by the OS opens search on that query | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 27 | `weft://user/<id>` is delivered and pushes nothing, which is the app today | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
+| 28 | a link for a conversation this account is not in says so | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · ⑥ | · Ⓔ |
 | | **`merge_test`** | | | | | | | | | | | | |
-| 28 | a suggestion names both handles and shows the evidence behind it | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 29 | accepting a suggestion collapses both chats into one ordered thread | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 30 | unmerging gives both conversations back | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 31 | "Not the same person" retires a suggestion for good | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 29 | a suggestion names both handles and shows the evidence behind it | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 30 | accepting a suggestion collapses both chats into one ordered thread | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 31 | unmerging gives both conversations back | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 32 | "Not the same person" retires a suggestion for good | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
 | | **`search_test`** | | | | | | | | | | | | |
-| 32 | a message becomes findable once its conversation has been opened | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 33 | a voice message is findable by words that were only ever spoken | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 34 | semantic search returns a message containing none of the typed words | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 33 | a message becomes findable once its conversation has been opened | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 34 | a voice message is findable by words that were only ever spoken | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 35 | semantic search returns a message containing none of the typed words | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
 | | **`bridges_test`** | | | | | | | | | | | | |
-| 35 | a bridge that is not a bridge reports what the server actually said | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
-| 36 | a reachable bridge renders its network and the state of each login | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
-| 37 | the QR login shows a scannable code and a payload that can be copied | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
+| 36 | a bridge that is not a bridge reports what the server actually said | · | · | · | · | · | · | · | · | · | · | · | · Ⓔ |
+| 37 | a reachable bridge renders its network and the state of each login | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
+| 38 | the QR login shows a scannable code and a payload that can be copied | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓕ | · Ⓔ |
 | | **`mcp_test`** | | | | | | | | | | | | |
-| 38 | the server answers a key it knows, refuses one it does not, and logs one | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
-| 39 | a key is refused by scope, logged as denied, and dead once revoked | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
+| 39 | the server answers a key it knows, refuses one it does not, and logs one | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
+| 40 | a key is refused by scope, logged as denied, and dead once revoked | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · ⑦ | · | · Ⓔ |
 
 `harness_test.dart` is not in the table because it is not a scenario. Its two
 checks — the bundle runs on the device, and the platform automator answers
@@ -1642,9 +1811,9 @@ anywhere else. They are the reason anything above them can be believed.
 
 - **Skip reason ⑤ splits.** `shade.dart` declares `shadeIsReachable` (Android
   and iOS) separately from `shadeActionsAreReachable` (Android only), so on the
-  four iOS rows scenario 19 applies and scenarios 20 and 21 are **n/a** — Patrol's
+  four iOS rows scenarios 19 and 22 apply and scenarios 20 and 21 are **n/a** — Patrol's
   automator has no gesture that expands a banner to reach an action button. The
-  ⑤ still marked on 19 and on 22–23 is the other half of that reason: no APNs
+  ⑤ still marked on 19, on 22 and on 23–24 is the other half of that reason: no APNs
   push in this repository, so what runs on iOS is the locally-posted path only.
 - **Skip reason ⑥ is not a macOS reason.** It is a reason about *cold start*,
   and cold start is unreachable on **every** row, because `PatrolJUnitRunner`
@@ -1664,6 +1833,48 @@ the camera source outright — so on the four iOS rows as CI runs them (simulato
 it will report skipped rather than passed. On a physical iPhone or iPad it
 applies. The Android rows are unaffected: `e2e.yaml` sets
 `-camera-back emulated` for exactly this.
+
+### Implemented, or aspirational
+
+Asked directly, because a table of 40 rows with a `·` in almost every cell reads
+like a plan and half of it is code. Counted from the tree on 2026-08-28:
+
+| File | `patrolTest` bodies | Scenarios in the table |
+|---|--:|--:|
+| `login_test` | 3 | 1–3 |
+| `messaging_test` | 3 | 4–6 |
+| `chat_actions_test` | 4 | 7–10 |
+| `attachment_test` | 3 | 11–13 |
+| `share_in_test` | 3 | 14–16 |
+| `permissions_test` | 2 | 17–18 |
+| `notification_test` | 4 | 19–22 |
+| `notification_mute_test` | 2 | 23–24 |
+| `deeplink_test` | 4 | 25–28 |
+| `merge_test` | 4 | 29–32 |
+| `search_test` | 3 | 33–35 |
+| `bridges_test` | 3 | 36–38 |
+| `mcp_test` | 2 | 39–40 |
+| | **40** | **40** |
+
+So **no scenario in this document is aspirational as a scenario**: every one of
+the 40 is a written, compiled test body, and `harness_test`'s two are the
+fourteenth file. What is aspirational is the *matrix* — the eleven rows, which
+are a hardware statement and not a code one, and which no amount of writing
+tests will satisfy.
+
+Three things are aspirational **inside** implemented scenarios, and each is a
+weaker assertion than the row title promises rather than a missing test. All
+three are named elsewhere in this section and are gathered here so a reader does
+not have to find them:
+
+- **36 and 37 assert against a stub.** `BridgeStub` speaks the mautrix
+  provisioning API from inside the app's own process. What passes is that Weft
+  reads a well-formed response correctly — not that a real bridge produces one.
+  See Ⓕ.
+- **Every notification scenario exercises the locally-posted path.** There is no
+  push gateway and no Firebase config here, so 19–23 never cross APNs or FCM.
+- **Deep links are warm-start only, on every row.** `PatrolJUnitRunner` launches
+  the app once. See the third refinement above.
 
 ### Why each cell is not executed
 
@@ -1712,12 +1923,306 @@ and Weft aiming the SDK's file-store garbage collector at its own database
 (finding 4) — the second a data-loss hazard for a dormant account, found only
 because a device ran the code.
 
+### Re-run 2026-08-28: the device suite regressed, and the run was abandoned
+
+Attempted again on A36-P as part of Phase 04's verification, on the same host and
+the same `Medium_Phone_API_36.1` emulator. It did not get far enough to be worth
+a table, and this is what happened instead.
+
+`harness_test` **2/2 pass** — the bundle runs, the automator answers, and the
+prerequisites in `e2e.sh` are all still satisfied on this machine. Everything
+below is therefore about the app and not about the harness.
+
+The full `--subset android` run was then started and **stopped after 8
+consecutive failures**, across four files:
+
+| Scenario | Was, 2026-08-19 | Now |
+|--:|---|---|
+| 1 refuses a wrong password, then signs in | pass | **fail** Ⓖ |
+| 2 verifies this device against another session | pass | **fail** Ⓖ |
+| 3 signing this device out leaves no session behind | fail Ⓐ | **fail** Ⓖ |
+| 4 an encrypted message reaches the peer | fail Ⓑ | **fail** Ⓖ |
+| 5 a message from the peer is read | pass | **fail** Ⓖ |
+| 6 the inbox reorders | pass | **fail** Ⓖ |
+| 7 a reply quotes the peer's message | fail Ⓒ | **fail** Ⓖ |
+
+Four scenarios that passed six weeks ago now fail, and they fail *before* their
+own assertions — in `signIn`, which every scenario in the suite calls. Stopping
+was the right call: 31 more scenarios sharing one broken sign-in would have
+produced 31 more copies of the same stack trace and about two hours of
+emulator time.
+
+**Ⓖ `chatRepositoryProvider` is read before the session is initialised, and
+latches.**
+
+```
+ProviderException: Tried to use a provider that is in error state.
+  Bad state: WeftMatrixSession.initialize() has not been called
+  at WeftMatrixSession.client              (weft_matrix/src/session.dart:62)
+  at MatrixChatRepository._client          (matrix_chat_repository.dart:286)
+  at MatrixChatRepository._refreshIdentityGraph (…:1564)
+  at MatrixChatRepository._rebuild         (…:1487)
+  at new MatrixChatRepository              (…:96)
+  at chatRepositoryProvider.<anonymous closure> (app/providers.dart:30)
+```
+
+The sign-in itself works — the address resolves, the wrong password is refused
+on screen, the right one is accepted, and the verification gate appears and is
+dismissed. What never appears is the inbox. `providers.dart:27` says of this
+provider that *"reading it before the session is initialised is a programming
+error, and the auth gate guarantees it cannot happen"*, and the guarantee does
+not hold: something reads it early, the provider caches the failure — *"in error
+state"* is Riverpod reporting a **latched** error, not a fresh one — and every
+read after the successful sign-in gets the stale exception back.
+
+Three things were ruled out before this was written down:
+
+- **Not the harness.** `harness_test` passes; the same tap sequence is reported
+  green step by step in the log, right up to the gate.
+- **Not a slow homeserver.** A `/sync` for `@alice` on this Synapse returns in
+  **30 ms**. The first attempt failed as a 60-second *timeout* waiting for the
+  inbox, which looked like slowness — it was the same latched provider, seen
+  through `pumpUntil`'s deadline instead of its exception.
+- **Not accumulated state.** The homeserver had grown 24 rooms and 68 devices
+  across previous runs (nothing prunes a device per test login, which is worth
+  knowing on its own). Pruning them changed the failure's *shape* and not its
+  outcome, so it was reset the documented way — `down -v`, `rm -rf
+  synapse-data`, regenerate, re-seed — and a pristine Synapse with freshly wiped
+  app data fails **3/3 login scenarios identically**.
+
+**Not bisected.** Whether Ⓖ is a regression introduced by phases 01–04 or a
+defect that was always there and that the 2026-08-19 run got past by luck of
+timing is unanswered — it would need a build at that commit, and Phase 04's
+remit is the UI audit. It is the first thing Phase 05 should pick up, and it is
+more urgent than Ⓐ–Ⓓ, because it is upstream of all of them: no scenario in this
+suite reaches its own assertions until sign-in leaves the app on an inbox.
+
 ### Coverage, in one paragraph
 
-39 scenarios exist. 12 have been executed, all on one off-matrix emulator; 5 of
-those passed. **0 of 11 matrix rows** have been executed. 9 of the 13 scenario
-files have never run on any device. The suite has found 4 defects, 2 of which
-were fixed and verified on the device, and it has not yet demonstrated that any
-row of this matrix passes. Everything needed to change that is either a CI
-dispatch (Android), a signing identity plus a runtime (iOS), or one click at a
-keyboard (macOS).
+39 scenarios exist and all 39 are written. 12 have been executed, all on one
+off-matrix emulator; 5 of those passed on 2026-08-19 and, of the 7 re-attempted
+on 2026-08-28, **none did**. **0 of 11 matrix rows** have been executed. 9 of the
+13 scenario files have never run on any device. The suite has found 5 defects
+(Ⓐ–Ⓓ and now Ⓖ), 2 of which were fixed and verified on the device, and it has
+not yet demonstrated that any row of this matrix passes — it currently cannot
+demonstrate that any *scenario* passes. Everything needed to change the row
+situation is either a CI dispatch (Android), a signing identity plus a runtime
+(iOS), or one click at a keyboard (macOS); what is needed to change the scenario
+situation is Ⓖ.
+
+The suites that do not need a device are a different picture and are the first
+table in this section: **3086 tests and two route walks, zero failures** —
+1155 pure Dart, 604 Flutter package, 1318 app, 9 plain integration, and every
+screen in the app opened and measured on both shells.
+
+---
+
+## Run 2026-08-28: Phase 08, encrypted backup and restore
+
+macOS 26.3.1 on Apple silicon, Flutter 3.44.0 / Dart 3.12.0. No homeserver and
+no emulator: nothing in this phase touches either.
+
+| Suite | Command | Result |
+|---|---|---|
+| Analyzer, whole workspace | `flutter analyze` | **clean** — 0 issues |
+| `weft_backup` | `dart test` | **73 pass**, 0 fail |
+| `weft_store` | `flutter test` | **62 pass**, 0 fail (incl. the end-to-end case below) |
+| App unit, widget and golden | `flutter test` in `apps/weft` | **1458 pass**, 0 fail, 1 skipped |
+| Localisation lint | `dart run tooling/scripts/l10n_lint.dart` | **clean** — 1123 keys × 5 locales |
+| Formatting | `dart format --set-exit-if-changed` | **clean** — 443 files, 0 changed |
+| macOS build and launch | `flutter build macos --debug --dart-define=WEFT_DEMO=true` | **built and launched**, no crash ⓧ |
+
+**ⓧ** The app was built, opened and left running for ~25 s without exiting, which
+is what confirms the new `cryptography` dependency links and the new screen does
+not break startup. **No screenshot was taken:** `screencapture` on this host
+returns *"could not create image from display"* because the shell has no
+Screen Recording grant, so the visual check rests on the goldens instead —
+`backup_screen_*`, `backup_passphrase_*` and `backup_replace_*`, fourteen images
+across both themes and the four Phase 04 accessibility variants. A human at this
+keyboard should still open Settings ▸ Backup once.
+
+### The end-to-end pass
+
+The phase brief asked for a manual pass: export with media on macOS, wipe a test
+profile, restore, confirm chats, media, reactions and merges come back. It is
+written down as `packages/weft_store/test/backup_e2e_test.dart` instead of as a
+checklist, because a checklist is run once and a test is run every time.
+
+What it does, all on real files and at the **shipping** Argon2id cost of 64 MiB
+and three passes — not the 8 KiB the other suites use:
+
+1. Opens a SQLite database *on disk*, seeds it with two merged handles for one
+   person across WhatsApp and SMS, 401 indexed messages, a transcript, and three
+   attachment files in a media directory — two of which are byte-identical, so
+   deduplication has something real to do.
+2. Exports to a `.braid` file, asserting the `.part` file is gone, that dedup
+   collapsed the duplicate photo, that progress was reported, and that the
+   header's preview is readable **without the passphrase**.
+3. Deletes the database and the media directory outright.
+4. Opens the archive, checks the manifest carries the network list the plaintext
+   header withheld, and restores into an empty profile.
+5. Asserts what came back: 401 messages on both networks, still findable through
+   FTS; the merge verdict with its exact timestamp; both attachments byte-identical
+   in the folders the viewer looks in; the transcript; the send-network preference;
+   the theme setting; that `notify.push_key` did **not** travel; that every
+   restored message is queued for embedding; and that the media staging directory
+   did not survive the commit.
+6. Confirms a wrong passphrase is rejected as `WrongPassphraseFailure`.
+
+**Result: pass**, in 2.1 s including both real Argon2id derivations — which is
+its own finding. The KDF cost was chosen against a mid-range Android phone; on
+Apple silicon it is imperceptible, and the parameters are in the archive header
+precisely so they can be raised without orphaning files written under the old
+ones.
+
+Two limits worth stating rather than leaving implied:
+
+- **Reactions are not in the round trip**, because Braid's store does not persist
+  them — they are aggregated live from the Matrix timeline. The archive format
+  carries a `reactions` field on every message record and the round-trip suite
+  exercises it, but no *source* populates it yet. See
+  `docs/architecture/backup-restore.md`.
+- **The export never ran against a real homeserver-backed profile**, only against
+  a seeded one. Nothing in the export path talks to a homeserver, so this is a
+  gap in realism rather than in coverage — but it is a gap.
+
+It is tagged `slow` and declared in `packages/weft_store/dart_test.yaml`, so a
+fast loop can skip it with `--exclude-tags slow`.
+
+### Pre-existing failures repaired along the way
+
+The localisation gate was **red on arrival** — 10 findings, all in strings added
+by the uncommitted Phase 06/07 work and none present at `HEAD`. Verifying this
+phase against a red gate would have meant nothing, so they were fixed: three
+French non-breaking spaces before `: ;`, thirteen guillemet pairs, four Chinese
+`plural` messages carrying an `=1` branch that Chinese can never select, and
+three German entries added to `lint_allow.json` where the translation really is
+the English word. The gate is now clean at 1123 keys × 5 locales.
+
+## Run 2026-08-28: Phase 09, LLM auto-reply
+
+macOS 26.3.1 on Apple silicon, Flutter 3.44.0 / Dart 3.12.0, the Synapse in
+`tooling/docker` on `localhost:8008`, and the `Medium_Phone_API_36.1` emulator.
+
+| Suite | Command | Result |
+|---|---|---|
+| Analyzer, whole workspace | `dart analyze` | **clean** — 0 issues |
+| Formatting, tracked Dart | `dart format --set-exit-if-changed` | **clean** — 443 files, 0 changed |
+| `weft_autoreply` | `dart test` | **92 pass**, 0 fail |
+| The other pure-Dart packages | `dart test` per package (15 of them) | **1402 pass**, 0 fail ⓐ |
+| `weft_matrix`, `weft_store`, `weft_design` | `flutter test` per package | **655 pass**, 0 fail |
+| App unit, widget and golden | `flutter test` in `apps/weft` | **1545 pass**, 0 fail, 1 skipped |
+| Localisation audit | `dart run tooling/scripts/l10n_audit.dart` | **clean of new debt** — 194 files, 3 unextracted literals, none in this phase's code ⓑ |
+| Localisation lint | `dart run tooling/scripts/l10n_lint.dart` | **clean** — 1177 keys × 5 locales ⓒ |
+| **Route walk, Mac window** | `… route_walk_test.dart -d macos` | **pass** — 29 steps, 0 skipped, 12 tap-target findings, all pre-existing ⓓ |
+| **Route walk, touch shell** | `… route_walk_test.dart -d emulator-5554` | **pass** — 31 steps, 1 skipped, **0 findings** |
+| Auto-reply end to end vs Synapse | `flutter test integration_test/auto_reply_test.dart -d macos` | **pass** ⓔ |
+| The other plain integration tests | each file, `-d macos` | **pass** — `matrix_session` 5, `attachment_flow` 1, `call` 3, `desktop_selection` 1 ⓕ |
+
+**ⓐ** `weft_backup` and `weft_autoreply` were both **absent from CI's unit job**
+— a package with no row there is silently untested, which is exactly what that
+job's own comment warns about. Both are in the list now, and the loop no longer
+names its packages twice.
+
+**ⓑ** The three are `thread_indicator.dart` ×2 and `backup_service.dart` ×1, all
+pre-existing. The auto-reply screens contribute none: the one literal they did
+have — a `HH:00` hour label in the schedule dropdown — is now
+`MaterialLocalizations.formatTimeOfDay`, which also means a locale that writes
+"9 AM" gets it and the device's 24-hour setting is honoured.
+
+**ⓒ** Four findings on arrival, all in this phase's new strings, all fixed: one
+French ordinary space before a semicolon (the sentence was rewritten to use a
+comma, which reads better than the narrow no-break space would have), and three
+German entries added to `lint_allow.json` where the German word really is the
+English one — *Name*, *Prompt*, *Label*, the last matching the existing
+`contactLabels` precedent.
+
+**ⓓ** All twelve are on `01-inbox`, `06-search`, `20-chat`, `22-thread` and
+`89-chat-selection` — the composer and toolbar controls the register has carried
+since Phase 04. None is on an auto-reply surface. The walk reports findings
+without failing on them.
+
+**ⓔ** `integration_test/auto_reply_test.dart`, written as a test rather than as
+a checklist for the reason the Phase 08 backup pass was. Against a real
+homeserver with two real accounts: Bob opens a conversation, Alice replies once
+and reads it, Bob writes again, and a rule answers him. It then asserts the
+things only a homeserver can settle — the reply reached Bob carrying
+`com.bostrot.weft.auto_reply`, Alice's room is still `markedUnread` with a
+non-zero `Chat.unreadCount` **read back out of `MatrixChatRepository` after a
+sync**, her read marker has not moved past the message she had already read, and
+a *second Alice session* — a fresh login with nothing but what the homeserver
+told it — also sees the room as unread. That last one is the multi-device half,
+and no unit test can reach it.
+
+**ⓕ** Run one file per invocation. `flutter test integration_test/*_test.dart -d
+macos` fails to load every file after the first on this host — "Failed to
+foreground app" — which reproduces with two *pre-existing* files and nothing
+from this phase. CI runs the glob on Linux, where it works.
+
+### What the end-to-end pass found
+
+The first version of `auto_reply_test.dart` failed, and the failure was the
+feature working. Bob was a stranger to Alice, so the conversation was a
+**pending chat request**, and `shouldReply` refused it outright — no reply, and
+deliberately no line in the attempt log either, because a stranger's message is
+ordinary traffic. The test was wrong, not the guard: it now has Alice speak and
+read first, which is what makes the conversation an ordinary one. Recorded
+because it is the guard the phase brief calls out by name, and it fired against
+a real homeserver before any assertion in this file did.
+
+### A walk-harness bug this phase exposed
+
+Adding one row to the settings screen broke the **backup** step of the touch
+walk, and the mechanism is worth writing down because it would have hit whichever
+step was unlucky next.
+
+`RouteWalker.tapText` scrolls with `scrollTo`, which stops the moment the finder
+matches. In a `ListView` a row is *built* slightly before it can be *seen* — the
+cache extent reaches past the bottom edge — so a row that lands in that band is
+found, tapped at a centre outside the viewport, and takes nothing. `visible`
+falls back to the first match, `warnIfMissed` stays quiet because the hit test
+found *some* widget, and the step reports "never arrived" about a door that was
+never pressed.
+
+`tapText` now calls `bringOnScreen` between the two, which uses
+`tester.ensureVisible` only when no match is wholly in the viewport. The touch
+walk goes from one failure to 31 steps and zero findings.
+
+## Phase 10: the walk on a phone, and on a Mac at both ends
+
+The route walk had always been run on one device at one size. Phase 10 ran it on
+an Android emulator at phone width and on a macOS window at three, and the two
+runs are now the recorded shape of a pre-release pass:
+
+```
+# Android — a phone, dark, 2.0× text, and right-to-left
+flutter test integration_test/route_walk_test.dart -d emulator-5554 \
+  --dart-define=WEFT_DEMO=true \
+  --dart-define=WEFT_WALK_HOLD=180 \
+  --dart-define=WEFT_WALK_PASSES=phone,phone-dark,phone-xl,phone-rtl
+adb pull /sdcard/Android/data/com.bostrot.weft/files/route-walk .
+
+# macOS — the minimum window, a wide one, and dark
+flutter test integration_test/route_walk_test.dart -d macos \
+  --dart-define=WEFT_DEMO=true \
+  --dart-define=WEFT_WALK_PASSES=default,desk-narrow,desk-wide,desk-dark
+```
+
+Neither belongs in CI as it stands. The Android passes need a device and about
+nine minutes for four boots; the Mac passes need a Mac, which is the same reason
+the `mac` surface has never been in the **Route walk & UI audit** job. Both are
+local and pre-release, and what they found is in
+[`manual-walkthrough.md`](manual-walkthrough.md).
+
+`WEFT_WALK_HOLD` is the part that is not obvious. Every directory the app can
+write to on Android is inside the app — the private one and the external one
+both — and `flutter test` uninstalls the app when the run ends, taking the
+screenshots with it. The hold parks the run in `tearDownAll`, which is before
+the uninstall, for as long as it is given. It defaults to zero, so the CI job
+never waits.
+
+The findings that survived the phase are now widget tests rather than walk
+steps: `test/a11y/large_text_layout_test.dart` and
+`test/fab_and_pane_clearance_test.dart` assert the same things in the ordinary
+suite, at 412×915 and at 720×480, without a device. The walk is what *found*
+them; it should not be what keeps them from coming back.

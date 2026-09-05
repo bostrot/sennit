@@ -52,6 +52,14 @@ enum NotificationSuppression {
 
   /// Quiet hours are in force and nothing exempted this message from them.
   quietHours,
+
+  /// The conversation is a pending request and this is not its first message.
+  ///
+  /// A stranger gets one quiet notification and then nothing. Without this,
+  /// anyone who can find the user's handle can put forty rows in their shade by
+  /// sending forty messages — the request would be *held out of the inbox* and
+  /// still ringing the phone, which is the worst of both.
+  pendingRequest,
 }
 
 /// A nightly window in which notifications do not arrive.
@@ -696,6 +704,12 @@ class NotificationDedupe {
 /// optional so a caller with no long-lived state — a test, or a one-shot
 /// re-evaluation — gets a pure function.
 ///
+/// [isFirstFromSender] only matters for a pending request, where it is the
+/// difference between one silent notification and none at all. It defaults to
+/// true because for every other conversation it is unread, and a caller that
+/// cannot cheaply answer it — a background push isolate with no timeline —
+/// should not be forced to invent an answer that changes ordinary behaviour.
+///
 /// Order matters. Cheap and unarguable rules come first (own message, redacted,
 /// already read), then the switches the user set, then the ones a mention can
 /// break through. The first rule that fires wins and is reported as *the*
@@ -710,6 +724,7 @@ NotificationDecision evaluateNotification({
   required Set<String> ownUserIds,
   Set<String> ownDisplayNames = const {},
   NotificationDedupe? dedupe,
+  bool isFirstFromSender = true,
 }) {
   // Before anything else, so that a second delivery of an event already
   // decided on is reported as a duplicate whatever the first verdict was.
@@ -798,6 +813,29 @@ NotificationDecision evaluateNotification({
         ? NotificationDecision.silent(mentioned: mentioned)
         : const NotificationDecision.suppress(
             NotificationSuppression.quietHours,
+          );
+  }
+
+  // Last, and after the mute rules rather than before them, so a request the
+  // user has *also* muted reads as muted — the setting they would go and
+  // change. A stranger gets one silent notification and nothing after it.
+  //
+  // Silent rather than suppressed for the first message, because a request the
+  // user is never told about is a request they never answer: it sits in a
+  // section they have no reason to open, and the message may be the one they
+  // were waiting for. Silent rather than loud because a stranger must not be
+  // able to make the phone ring — a handle that anyone can find is otherwise a
+  // way to buzz a person at three in the morning.
+  //
+  // Deliberately ignores `mentioned`. A mention breaks through a mute because
+  // the user chose to mute a conversation they are in; it must not break
+  // through this, because writing the user's name is free and is exactly what
+  // someone trying to get past the hold would do.
+  if (chat.isPendingRequest) {
+    return isFirstFromSender
+        ? const NotificationDecision.silent()
+        : const NotificationDecision.suppress(
+            NotificationSuppression.pendingRequest,
           );
   }
 

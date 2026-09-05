@@ -1,15 +1,59 @@
 import 'package:flutter/material.dart';
 
 /// Spacing scale. A 4pt grid — every gap in Weft is one of these.
+///
+/// Fine at the bottom and coarse at the top, which is where the eye needs the
+/// resolution: the difference between a 2pt and a 4pt gap inside a chip is
+/// visible, the difference between 32 and 36 between sections is not.
+///
+/// [dense] is the one step that is not on the 4pt grid, and it is here because
+/// the Mac's chrome is not either — see its own note. The route walk in
+/// `apps/weft/integration_test/route_walk_test.dart` scans the live widget tree
+/// for gaps that are not one of these, so a number added by hand shows up in
+/// `docs/quality/ui-audit.md` rather than in nobody's review.
 abstract final class WeftSpace {
   static const double xxs = 2;
   static const double xs = 4;
+
+  /// The half-step between [xs] and [sm], for the Mac's denser chrome.
+  ///
+  /// Added in the Phase 04 audit, which found the same 6 written by hand in
+  /// five places and nowhere else: a sidebar row's side inset, the gap between
+  /// a sidebar row's glyph and its label, a conversation row's vertical inset
+  /// in the Mac list, the toolbar search field's, and the unread badge's side
+  /// padding. Every one of them is a control whose size the system dictates —
+  /// a 24pt macOS row is 24pt — and rounding them to [xs] or [sm] changes
+  /// controls that were measured against the platform rather than against this
+  /// scale.
+  ///
+  /// Not a general-purpose step. If a *phone* layout wants 6, it wants [xs] or
+  /// [sm] and has not decided which.
+  static const double dense = 6;
+
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 16;
   static const double xl = 24;
   static const double xxl = 32;
   static const double huge = 48;
+
+  /// Bottom padding for a scroll view that a floating action button sits over.
+  ///
+  /// Not a rhythm step like the rest of this scale — a *clearance*, and it is
+  /// here because it is arithmetic rather than taste: a `FloatingActionButton`
+  /// is 56 tall and `Scaffold` floats it [lg] above the bottom edge, so a list
+  /// needs 56 + 16 of bottom padding before its last row clears the button, and
+  /// [sm] more before the two stop touching. Any smaller and the final row of
+  /// the list sits under the FAB for ever — which on a screen whose rows carry
+  /// their own buttons, like the merge screen's *Unmerge*, means a control that
+  /// cannot be pressed at all.
+  ///
+  /// Added in the Phase 10 manual walkthrough, which found the four screens
+  /// with a FAB using four different bottom paddings — [md], [lg], [xl] and a
+  /// hand-written `xxl * 2` — and only the last of them anywhere near enough.
+  /// Use it for the scroll view under a FAB and nothing else; a section gap
+  /// that wants 80 wants [huge] and has not decided why.
+  static const double fabClearance = 80;
 }
 
 /// Corner radii. Weft leans soft — squircle-ish surfaces, fully round pills.

@@ -7,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../services/models/model_catalog.dart';
 import '../../services/models/model_installer.dart';
@@ -91,16 +92,13 @@ class _ModelsScreenState extends ConsumerState<ModelsScreen> {
     ref.watch(settingsRevisionProvider);
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Local models')),
+      appBar: WeftAppBar(title: Text(context.l10n.modelsTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
             Text(
-              'Run search embeddings and voice transcription on this device '
-              'instead of an endpoint — nothing leaves the phone. Downloads are '
-              'large; they continue in the background with a notification, '
-              'resume if interrupted, and it is safe to leave the app.',
+              context.l10n.modelsIntro,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
@@ -186,8 +184,8 @@ class _ModelCard extends StatelessWidget {
                 // squiggle is not distinguishable from another by ear.
                 Semantics(
                   label: spec.capability == ModelCapability.embedding
-                      ? 'Search model'
-                      : 'Speech model',
+                      ? context.l10n.modelsSearchModel
+                      : context.l10n.modelsSpeechModel,
                   child: Icon(
                     spec.capability == ModelCapability.embedding
                         ? Icons.psychology_outlined
@@ -224,24 +222,29 @@ class _ModelCard extends StatelessWidget {
                   // The user asks "how far along?" by navigating here; the
                   // *end* of the download is what gets announced, below.
                   Semantics(
-                    label: 'Downloading ${spec.displayName}',
-                    value: '${(progress * 100).round()}%',
+                    label: context.l10n.modelsDownloading(spec.displayName),
+                    value: context.l10n.uploadPercent((progress * 100).round()),
                     child: LinearProgressIndicator(value: progress),
                   ),
                   const SizedBox(height: WeftSpace.sm),
                   Row(
                     children: [
                       Text(
-                        '${_mb(state.receivedBytes)} of ${_mb(spec.totalBytes)}',
+                        context.l10n.modelsBytesOf(
+                          _mb(state.receivedBytes),
+                          _mb(spec.totalBytes),
+                        ),
                         style: context.text.labelSmall,
                       ),
                       const Spacer(),
                       NamedButton(
-                        label: 'Cancel downloading ${spec.displayName}',
+                        label: context.l10n.modelsCancelDownload(
+                          spec.displayName,
+                        ),
                         onPressed: onCancel,
                         child: TextButton(
                           onPressed: onCancel,
-                          child: const Text('Cancel'),
+                          child: Text(context.l10n.commonCancel),
                         ),
                       ),
                     ],
@@ -257,7 +260,9 @@ class _ModelCard extends StatelessWidget {
                       // which is nothing at all if you were not watching it.
                       Semantics(
                         liveRegion: true,
-                        label: '${spec.displayName} installed',
+                        label: context.l10n.modelsInstalledLive(
+                          spec.displayName,
+                        ),
                         excludeSemantics: true,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -268,17 +273,17 @@ class _ModelCard extends StatelessWidget {
                               color: context.palette.online,
                             ),
                             const SizedBox(width: WeftSpace.sm),
-                            const Text('Installed'),
+                            Text(context.l10n.modelsInstalled),
                           ],
                         ),
                       ),
                       const Spacer(),
                       NamedButton(
-                        label: 'Delete ${spec.displayName}',
+                        label: context.l10n.modelsDelete(spec.displayName),
                         onPressed: onDelete,
                         child: TextButton(
                           onPressed: onDelete,
-                          child: const Text('Delete'),
+                          child: Text(context.l10n.commonDelete),
                         ),
                       ),
                     ],
@@ -287,10 +292,8 @@ class _ModelCard extends StatelessWidget {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      title: const Text('Use for voice messages'),
-                      subtitle: const Text(
-                        'Transcribes on this device instead of your endpoint.',
-                      ),
+                      title: Text(context.l10n.modelsUseForVoiceTitle),
+                      subtitle: Text(context.l10n.modelsUseForVoiceSubtitle),
                       value: selectedForVoice,
                       onChanged: (_) => onUseForVoice!(),
                     ),
@@ -298,11 +301,8 @@ class _ModelCard extends StatelessWidget {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      title: const Text('Use for search'),
-                      subtitle: const Text(
-                        'Embeds on this device instead of your endpoint. '
-                        'Switching re-indexes every message for this model.',
-                      ),
+                      title: Text(context.l10n.modelsUseForSearchTitle),
+                      subtitle: Text(context.l10n.modelsUseForSearchSubtitle),
                       value: selectedForSearch,
                       onChanged: (_) => onUseForSearch!(),
                     ),
@@ -313,12 +313,13 @@ class _ModelCard extends StatelessWidget {
                 children: [
                   Semantics(
                     liveRegion: true,
-                    label:
-                        '${spec.displayName} failed to download. '
-                        '${state.error ?? ''}',
+                    label: context.l10n.modelsFailedLive(
+                      spec.displayName,
+                      state.error ?? '',
+                    ),
                     excludeSemantics: true,
                     child: Text(
-                      state.error ?? 'Download failed',
+                      state.error ?? context.l10n.modelsDownloadFailed,
                       style: context.text.bodySmall?.copyWith(
                         color: context.colors.error,
                       ),
@@ -326,11 +327,11 @@ class _ModelCard extends StatelessWidget {
                   ),
                   const SizedBox(height: WeftSpace.sm),
                   NamedButton(
-                    label: 'Retry downloading ${spec.displayName}',
+                    label: context.l10n.modelsRetryDownload(spec.displayName),
                     onPressed: onInstall,
                     child: FilledButton.tonal(
                       onPressed: onInstall,
-                      child: const Text('Retry (resumes)'),
+                      child: Text(context.l10n.modelsRetryResumes),
                     ),
                   ),
                 ],
@@ -340,14 +341,15 @@ class _ModelCard extends StatelessWidget {
               ModelPhase.notInstalled => Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: NamedButton(
-                  label:
-                      'Download ${spec.displayName}, '
-                      '${_mb(spec.totalBytes)}',
+                  label: context.l10n.modelsDownloadNamed(
+                    spec.displayName,
+                    _mb(spec.totalBytes),
+                  ),
                   onPressed: onInstall,
                   child: FilledButton.tonalIcon(
                     onPressed: onInstall,
                     icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Download'),
+                    label: Text(context.l10n.modelsDownload),
                   ),
                 ),
               ),

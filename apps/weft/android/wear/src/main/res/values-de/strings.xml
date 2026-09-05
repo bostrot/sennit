@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml`, which carries the reasoning behind
+     each string; this one only the words. `app_name`, `tile_name` and
+     `complication_name` are the product's own name and stay as they are. -->
+<resources>
+    <string name="app_name">Weft</string>
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">Deine ungelesenen Nachrichten und letzten Unterhaltungen.</string>
+    <string name="complication_name">Weft unread</string>
+    <string name="inbox_heading">Zuletzt</string>
+    <string name="signed_out_title">Bei Weft anmelden</string>
+    <string name="signed_out_body">Öffne Weft auf deinem Telefon und melde dich an.</string>
+    <string name="disabled_title">Die Uhr ist aus</string>
+    <string name="disabled_body">Öffne Weft auf deinem Telefon und schalte Uhr unter Widgets &amp; Uhr ein.</string>
+    <string name="stale_title">Öffne Weft auf deinem Telefon</string>
+    <string name="stale_body">Das ist nicht mehr aktuell. Öffne Weft, um es zu aktualisieren.</string>
+    <string name="empty_title">Keine Unterhaltungen</string>
+    <string name="empty_body">Noch nichts zu zeigen. Unterhaltungen in ausgeschlossenen Netzwerken erscheinen hier nie.</string>
+    <string name="merged">Zusammengeführte Unterhaltung</string>
+    <string name="unread_label">ungelesen</string>
+    <string name="reply_heading">Antworten</string>
+    <string name="reply_dictate">Diktieren</string>
+    <string name="reply_dictate_hint">An %1$s antworten</string>
+    <string name="reply_sending">Wird gesendet…</string>
+    <string name="reply_sent">Gesendet</string>
+    <string name="reply_sent_via">Gesendet über %1$s</string>
+    <string name="reply_failed">Nicht gesendet</string>
+    <string name="reply_failed_unknown_chat">Diese Unterhaltung ist nicht mehr in Weft.</string>
+    <string name="reply_failed_not_signed_in">Nicht gesendet. Auf deinem Telefon ist niemand angemeldet.</string>
+    <string name="reply_failed_send_failed">Nicht gesendet. Öffne Weft auf deinem Telefon und versuche es erneut.</string>
+    <string name="reply_failed_timed_out">Nicht gesendet. Dein Telefon hat nicht geantwortet.</string>
+    <string name="reply_failed_overflowed">Nicht gesendet. Zu viele Antworten auf einmal.</string>
+    <string name="reply_failed_app_not_running">Nicht gesendet. Öffne Weft auf deinem Telefon.</string>
+    <string name="canned_yes">Ja</string>
+    <string name="canned_no">Nein</string>
+    <string name="canned_on_my_way">Bin unterwegs</string>
+    <string name="canned_thanks">Danke!</string>
+    <string name="canned_call_later">Kann ich später anrufen?</string>
+    <string name="canned_cant_talk">Kann gerade nicht reden</string>
+
+    <plurals name="unread_count">
+        <item quantity="one">%1$d ungelesene Nachricht</item>
+        <item quantity="other">%1$d ungelesene Nachrichten</item>
+    </plurals>
+</resources>

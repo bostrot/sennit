@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simplified Chinese, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml` — the base file carries the reasoning
+     behind each string, and this one only the words. A key here that is not
+     there (or missing from here) fails `l10n_test.dart`. -->
+<resources>
+    <string name="weft_widget_unread_name">Braid 未读</string>
+    <string name="weft_widget_unread_description">你在所有对话中共有多少条未读消息。</string>
+    <string name="weft_widget_inbox_name">Braid 对话</string>
+    <string name="weft_widget_inbox_description">你最近的对话。点按其中一条即可打开。</string>
+    <string name="weft_widget_inbox_heading">最近</string>
+    <string name="weft_widget_unread_label">未读</string>
+    <string name="weft_widget_merged">合并的对话</string>
+    <string name="weft_widget_signed_out_title">登录 Braid</string>
+    <string name="weft_widget_signed_out_body">打开 Braid 并登录，即可在此看到你的对话。</string>
+    <string name="weft_widget_disabled_title">小组件已关闭</string>
+    <string name="weft_widget_disabled_body">打开 Braid，在「小组件与手表」中启用主屏幕小组件。</string>
+    <string name="weft_widget_stale_title">请在手机上打开 Braid</string>
+    <string name="weft_widget_stale_body">内容已过期。打开 Braid 即可刷新。</string>
+    <string name="weft_widget_empty_title">没有对话</string>
+    <string name="weft_widget_empty_body">暂时没有可显示的内容。被排除网络上的对话永远不会在此显示。</string>
+    <string name="call_channel_name">通话</string>
+    <string name="call_channel_description">来电。</string>
+    <string name="call_incoming">来电</string>
+    <string name="call_incoming_video">视频来电</string>
+    <string name="call_in_progress">通话进行中</string>
+    <string name="call_in_progress_video">视频通话进行中</string>
+    <string name="call_phone_account">Braid 通话</string>
+    <string name="connection_channel_name">连接</string>
+    <string name="connection_channel_description">保持 Braid 连接，使消息在其关闭时也能送达。</string>
+    <string name="connection_title">正在监听消息</string>
+    <string name="connection_body">Braid 在后台保持连接。</string>
+
+    <plurals name="weft_widget_unread_count">
+        <item quantity="one">%1$d 条未读消息</item>
+        <item quantity="other">%1$d 条未读消息</item>
+    </plurals>
+</resources>

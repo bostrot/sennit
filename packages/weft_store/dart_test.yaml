@@ -1,0 +1,10 @@
+# Declares the tags this package's tests use, so the runner does not warn about
+# one it has never heard of.
+#
+# `slow` is the real-cost end-to-end pass in `backup_e2e_test.dart`: a database
+# on disk, real files, and two Argon2id derivations at the shipping 64 MiB. It
+# is minutes rather than milliseconds and is meant to be, which is why it can be
+# left out of a fast loop with `--exclude-tags slow`.
+tags:
+  slow:
+    timeout: 10x

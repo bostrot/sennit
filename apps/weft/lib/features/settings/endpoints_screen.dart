@@ -9,6 +9,7 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../services/ai/smart_replies.dart' show probeLlm;
 import 'models_screen.dart';
@@ -221,13 +222,13 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.network_check_rounded, size: 16),
-            label: const Text('Test connection'),
+            label: Text(context.l10n.endpointsTestConnection),
           ),
           const SizedBox(width: WeftSpace.md),
           if (hasResult)
             Expanded(
               child: Text(
-                result ?? 'Connected',
+                result ?? context.l10n.endpointsConnected,
                 style: context.text.bodySmall?.copyWith(
                   color: result == null
                       ? context.palette.online
@@ -307,8 +308,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     if (keyFailures.isNotEmpty) {
       showWeftMessage(
         context,
-        'Saved — but the system keychain refused the '
-        '${keyFailures.join(', ')} API key. Everything else is stored.',
+        context.l10n.endpointsKeychainRefused(keyFailures.join(', ')),
       );
     }
     Navigator.of(context).pop();
@@ -318,9 +318,9 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WeftAppBar(
-        title: const Text('Endpoints'),
+        title: Text(context.l10n.endpointsTitle),
         actions: [
-          TextButton(onPressed: _save, child: const Text('Save')),
+          TextButton(onPressed: _save, child: Text(context.l10n.commonSave)),
           const SizedBox(width: WeftSpace.sm),
         ],
       ),
@@ -328,23 +328,14 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
-            const PrivacyNotice(
-              message:
-                  'These endpoints receive decrypted message text or audio. For '
-                  'a remote endpoint, that undoes end-to-end encryption for '
-                  'whatever is sent to it. Point them at software you run '
-                  'yourself to keep everything local.',
-            ),
+            PrivacyNotice(message: context.l10n.endpointsNotice),
             const SizedBox(height: WeftSpace.lg),
             Card(
               margin: EdgeInsets.zero,
               child: ListTile(
                 leading: const Icon(Icons.download_for_offline_outlined),
-                title: const Text('Local models'),
-                subtitle: const Text(
-                  'Run search and transcription on this device instead of an '
-                  'endpoint. If you use these, the settings below can stay off.',
-                ),
+                title: Text(context.l10n.modelsTitle),
+                subtitle: Text(context.l10n.endpointsLocalModelsSubtitle),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(builder: (_) => const ModelsScreen()),
@@ -354,18 +345,13 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             const SizedBox(height: WeftSpace.xl),
 
             SettingsSectionHeader(
-              title: 'Semantic search embeddings',
-              subtitle:
-                  'Only needed if you are NOT using an on-device model. With a '
-                  'local model installed and switched on, leave this off — the '
-                  'device does the work and nothing is sent anywhere.',
+              title: context.l10n.endpointsEmbeddingsTitle,
+              subtitle: context.l10n.endpointsEmbeddingsSubtitle,
             ),
             SwitchListTile(
-              title: const PrivacyGatedTitle(
-                title: 'Enable embeddings',
-                warning:
-                    'Turning this on sends the text of your messages to the '
-                    'endpoint below.',
+              title: PrivacyGatedTitle(
+                title: context.l10n.endpointsEnableEmbeddings,
+                warning: context.l10n.endpointsEnableEmbeddingsWarning,
               ),
               value: _embeddingEnabled,
               onChanged: (v) => setState(() => _embeddingEnabled = v),
@@ -374,54 +360,64 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             if (_embeddingEnabled) ...[
               _field(
                 _embeddingUrl,
-                'Base URL',
+                context.l10n.settingsBaseUrlField,
                 hint: 'http://localhost:8080/v1',
               ),
-              _field(_embeddingModel, 'Model', hint: 'text-embedding-3-small'),
-              _field(_embeddingDims, 'Dimensions', hint: '1536', number: true),
+              _field(
+                _embeddingModel,
+                context.l10n.settingsModelField,
+                hint: 'text-embedding-3-small',
+              ),
+              _field(
+                _embeddingDims,
+                context.l10n.settingsDimensionsField,
+                hint: '1536',
+                number: true,
+              ),
               _field(
                 _embeddingKey,
-                'API key (stored in the system keychain)',
+                context.l10n.settingsApiKeyField,
                 secret: true,
-                hint: 'leave blank to keep the current key',
+                hint: context.l10n.settingsKeepCurrentKeyHint,
               ),
               _testRow('embeddings', _probeEmbeddings),
             ],
             const SizedBox(height: WeftSpace.xl),
 
             SettingsSectionHeader(
-              title: 'Voice transcription',
-              subtitle:
-                  'Only needed if you are NOT using an on-device model. A local '
-                  'Whisper model switched on for voice always takes precedence '
-                  'over anything configured here.',
+              title: context.l10n.endpointsTranscriptionTitle,
+              subtitle: context.l10n.endpointsTranscriptionSubtitle,
             ),
             SwitchListTile(
-              title: const PrivacyGatedTitle(
-                title: 'Enable transcription',
-                warning:
-                    'Turning this on sends the audio of your voice messages to '
-                    'the endpoint below.',
+              title: PrivacyGatedTitle(
+                title: context.l10n.endpointsEnableTranscription,
+                warning: context.l10n.endpointsEnableTranscriptionWarning,
               ),
               value: _sttEnabled,
               onChanged: (v) => setState(() => _sttEnabled = v),
               contentPadding: EdgeInsets.zero,
             ),
             if (_sttEnabled) ...[
-              _field(_sttUrl, 'Base URL', hint: 'http://localhost:9000/v1'),
-              _field(_sttModel, 'Model', hint: 'whisper-1'),
+              _field(
+                _sttUrl,
+                context.l10n.settingsBaseUrlField,
+                hint: 'http://localhost:9000/v1',
+              ),
+              _field(
+                _sttModel,
+                context.l10n.settingsModelField,
+                hint: 'whisper-1',
+              ),
               _field(
                 _sttKey,
-                'API key (stored in the system keychain)',
+                context.l10n.settingsApiKeyField,
                 secret: true,
-                hint: 'leave blank to keep the current key',
+                hint: context.l10n.settingsKeepCurrentKeyHint,
               ),
               _testRow('whisper', _probeWhisper),
               SwitchListTile(
-                title: const Text('Transcribe voice messages automatically'),
-                subtitle: const Text(
-                  'Otherwise each voice message has a Transcribe action.',
-                ),
+                title: Text(context.l10n.endpointsAutoTranscribeTitle),
+                subtitle: Text(context.l10n.endpointsAutoTranscribeSubtitle),
                 value: _sttAuto,
                 onChanged: (v) => setState(() => _sttAuto = v),
                 contentPadding: EdgeInsets.zero,
@@ -430,21 +426,24 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             const SizedBox(height: WeftSpace.xl),
 
             SettingsSectionHeader(
-              title: 'AI assistant (LLM)',
-              subtitle:
-                  'Any OpenAI-compatible chat endpoint. Point it at an Ollama '
-                  'or llama.cpp server on your own machine and message text '
-                  'never leaves your network — the same self-hosted rule as '
-                  'transcription and search above. Powers reply suggestions '
-                  'in notifications.',
+              title: context.l10n.endpointsLlmTitle,
+              subtitle: context.l10n.endpointsLlmSubtitle,
             ),
-            _field(_llmUrl, 'Base URL', hint: 'http://localhost:11434/v1'),
-            _field(_llmModel, 'Model', hint: 'llama3.2'),
+            _field(
+              _llmUrl,
+              context.l10n.settingsBaseUrlField,
+              hint: 'http://localhost:11434/v1',
+            ),
+            _field(
+              _llmModel,
+              context.l10n.settingsModelField,
+              hint: 'llama3.2',
+            ),
             _field(
               _llmKey,
-              'API key (stored in the system keychain)',
+              context.l10n.settingsApiKeyField,
               secret: true,
-              hint: 'leave blank to keep the current key',
+              hint: context.l10n.settingsKeepCurrentKeyHint,
             ),
             _testRow('llm', _probeLlmEndpoint),
           ],

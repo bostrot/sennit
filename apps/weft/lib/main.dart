@@ -7,7 +7,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import 'app/auto_reply_providers.dart';
 import 'app/intents.dart';
+import 'app/design_strings.dart';
 import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
@@ -26,6 +28,7 @@ import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
 import 'services/notifications/background_push.dart';
+import 'services/notifications/conversation_clearer.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 import 'services/notifications/unified_push.dart';
@@ -128,6 +131,16 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// stops being.
   ProviderSubscription<AsyncValue<List<Chat>>>? _inboxSurfaces;
 
+  /// Clears a conversation the user read somewhere else.
+  ///
+  /// Held here rather than in a provider because it is *stateful in the way
+  /// that matters*: what it remembers is which chats were unread on the last
+  /// tick, and a rebuilt instance would have an empty set and clear nothing on
+  /// the tick after — which is exactly the tick a laptop's receipt lands on.
+  late final ReadElsewhereWatcher _readElsewhere = ReadElsewhereWatcher(
+    ref.read(conversationClearerProvider),
+  );
+
   /// Follows the inbox for as long as there is one.
   ///
   /// Every tick, and deliberately: [ShareShortcutService] and [SnapshotWriter]
@@ -163,6 +176,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       // that still exists. Cheap on every tick — with an empty queue it assigns
       // a field and returns.
       unawaited(ref.read(watchReplyHandlerProvider).refresh(chats));
+      // And a fourth: a chat that has stopped being unread with nothing on
+      // *this* device having read it was read on another one. The clearing
+      // push covers a phone that is asleep; this covers one that is awake and
+      // holding a socket open, which the gateway may skip entirely.
+      unawaited(_readElsewhere.onChats(chats));
       // A launch drain almost always arrives before the first chat list does,
       // and a share sheet with no conversations in it is not worth spending a
       // staged share on. This is where the inbox finally exists.
@@ -279,6 +297,13 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     ref.read(notificationDismisserProvider.notifier).use(service.dismissChat);
 
     await service.start();
+
+    // Started alongside notifications rather than in a step of its own,
+    // because they subscribe to the same stream for the same reason: a message
+    // has arrived and something has to decide about it. The guard above covers
+    // both — a second subscription would answer every message twice, which for
+    // this one means sending two messages.
+    ref.read(autoReplyServiceProvider)?.start();
 
     await _ensureNotificationPermission();
     // Registration and rule reconciliation both need permission to have been
@@ -449,6 +474,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     });
 
     return MaterialApp(
+      // l10n-ignore: the app's own name, never translated.
       title: 'Braid',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
@@ -465,6 +491,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         highContrast: highContrast,
         reduceMotion: reduceMotion,
         surface: weftSurface,
+        // The two are not the same question, and Windows and Linux are where
+        // they part: the touch layout, driven with a mouse.
+        pointer: weftHasPointer,
       ),
       // Both above the navigator, and for the same reason: a ringing call
       // appears over whatever route is open — a chat, the settings, a share
@@ -479,13 +508,19 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // what makes a timestamp in an Arabic UI Arabic. Idempotent — it
         // compares before it assigns — which is what makes it safe in a build.
         applyFormattingLocale(Localizations.localeOf(context));
-        return WeftMenuBar(
-          navigatorKey: _navigatorKey,
-          child: WeftShortcuts(
+        // And the first place `weft_design` can be handed the app's words:
+        // a `ChatTile` draws a preview line and an unread count, and the
+        // package has no ARB files of its own to get them from.
+        return WeftDesignStringsScope(
+          strings: weftDesignStringsFrom(context.l10n),
+          child: WeftMenuBar(
             navigatorKey: _navigatorKey,
-            child: CallOverlay(
+            child: WeftShortcuts(
               navigatorKey: _navigatorKey,
-              child: child ?? const SizedBox.shrink(),
+              child: CallOverlay(
+                navigatorKey: _navigatorKey,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

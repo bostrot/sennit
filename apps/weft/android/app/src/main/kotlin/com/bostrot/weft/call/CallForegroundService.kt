@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import com.bostrot.weft.R
 
 /// Keeps a call alive while Weft is in the background.
 ///
@@ -36,7 +37,7 @@ class CallForegroundService : Service() {
         val video = intent?.getBooleanExtra(EXTRA_VIDEO, false) ?: false
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        if (manager != null) CallNotifications.ensureChannel(manager)
+        if (manager != null) CallNotifications.ensureChannel(this, manager)
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -86,7 +87,15 @@ class CallForegroundService : Service() {
         return builder
             .setSmallIcon(applicationInfo.icon)
             .setContentTitle(name)
-            .setContentText(if (video) "Video call in progress" else "Call in progress")
+            .setContentText(
+                getString(
+                    if (video) {
+                        R.string.call_in_progress_video
+                    } else {
+                        R.string.call_in_progress
+                    },
+                ),
+            )
             .setContentIntent(pending)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_CALL)

@@ -36,11 +36,18 @@ class MediaUnavailableException implements Exception {
 
 /// A name to write [message]'s attachment under.
 ///
-/// The timeline carries no filename field — for an attachment the *body* is the
-/// filename, which is exactly why `attachmentCaption` exists to hide it under
-/// the picture. Here it is wanted rather than hidden, but it cannot be trusted:
-/// a bridge writes "Forwarded", a caption-carrying client writes a sentence, and
-/// either would become a file called `Forwarded` in the user's Downloads.
+/// A sender who wrote [WeftMessage.attachmentName] said what the file is called,
+/// and that is the answer — the whole reason MSC2530 splits the key. It is still
+/// run through [_sanitise] and [p.basename] rather than trusted onto the disk:
+/// the name arrives from whatever client or bridge sent the event, and
+/// `../../.bashrc` is a perfectly well-formed `filename`.
+///
+/// Without one there is no filename field at all — for an attachment the *body*
+/// is the filename, which is exactly why `attachmentCaption` exists to hide it
+/// under the picture. Here it is wanted rather than hidden, but it cannot be
+/// trusted: a bridge writes "Forwarded", a caption-carrying client writes a
+/// sentence, and either would become a file called `Forwarded` in the user's
+/// Downloads.
 ///
 /// So the body is used only when [looksLikeFilename] says so — the same rule the
 /// caption heuristic reads the other way round — and otherwise the event id
@@ -48,6 +55,16 @@ class MediaUnavailableException implements Exception {
 /// one. Path separators are stripped whatever the source: a body of
 /// `../../.bashrc` must not decide where the file lands.
 String attachmentFileName(WeftMessage message, {String? mimeType}) {
+  final declared = message.attachmentName?.trim();
+  if (declared != null && declared.isNotEmpty) {
+    final named = _sanitise(p.basename(declared));
+    // A declared name that sanitises to nothing usable falls through to the
+    // event id rather than becoming the literal word "attachment", which is
+    // what `_sanitise` returns for an empty result and which would collide
+    // across every such file in one folder.
+    if (named != 'attachment') return named;
+  }
+
   final body = message.body.trim();
   final candidate = body.isEmpty ? '' : p.basename(body);
   if (looksLikeFilename(candidate)) return _sanitise(candidate);

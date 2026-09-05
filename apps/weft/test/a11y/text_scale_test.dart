@@ -11,6 +11,7 @@ import 'package:weft/features/chat/rich_text_view.dart';
 
 import '../support/a11y_harness.dart';
 import '../support/attachment_fixtures.dart';
+import 'package:weft/app/localisation.dart';
 import '../support/golden_harness.dart' show loadGoldenFonts;
 
 /// The three text-scale findings no golden scene reaches.
@@ -162,6 +163,7 @@ void main() {
           MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: MaterialApp(
+              localizationsDelegates: weftLocalizationsDelegates,
               theme: WeftTheme.build(),
               home: Scaffold(
                 body: Center(
@@ -200,6 +202,7 @@ void main() {
       // keeps the box the design specified when nobody has touched the setting.
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: const Scaffold(
             body: Center(
@@ -247,6 +250,7 @@ void main() {
           MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: MaterialApp(
+              localizationsDelegates: weftLocalizationsDelegates,
               theme: WeftTheme.build(),
               home: Scaffold(
                 body: Center(
@@ -286,6 +290,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: Scaffold(
             body: Center(

@@ -7,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_mcp/weft_mcp.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/mcp_service.dart';
 
 /// The MCP server: on/off, API keys, tunnel, audit log.
@@ -41,8 +42,8 @@ class _McpScreenState extends ConsumerState<McpScreen> {
         showWeftMessage(
           context,
           on
-              ? 'Could not start the MCP server: ${_reason(error)}'
-              : 'Could not stop the MCP server.',
+              ? context.l10n.mcpStartFailed(_reason(context.l10n, error))
+              : context.l10n.mcpStopFailed,
         );
       }
     } finally {
@@ -55,13 +56,13 @@ class _McpScreenState extends ConsumerState<McpScreen> {
   /// A `SocketException` stringifies to two lines of address and errno, which
   /// is the wrong thing to put in a snack bar; the two cases anyone actually
   /// hits are worth naming.
-  String _reason(Object error) {
-    if (error is! SocketException) return 'see the log for details.';
+  String _reason(AppL10n l10n, Object error) {
+    if (error is! SocketException) return l10n.mcpReasonSeeLog;
     final code = error.osError?.errorCode;
     return switch (code) {
-      1 => 'the sandbox refused the socket.',
-      48 || 98 => 'that port is already in use.',
-      _ => error.osError?.message ?? 'the socket could not be opened.',
+      1 => l10n.mcpReasonSandbox,
+      48 || 98 => l10n.mcpReasonPortInUse,
+      _ => error.osError?.message ?? l10n.mcpReasonSocketFailed,
     };
   }
 
@@ -73,7 +74,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('New API key'),
+          title: Text(context.l10n.mcpNewKeyTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,22 +82,22 @@ class _McpScreenState extends ConsumerState<McpScreen> {
               TextField(
                 controller: label,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Label',
-                  hintText: 'e.g. laptop agent',
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpKeyLabelField,
+                  hintText: context.l10n.mcpKeyLabelHint,
                 ),
               ),
               const SizedBox(height: WeftSpace.lg),
-              const Text('Scopes'),
+              Text(context.l10n.mcpScopesTitle),
               for (final scope in McpScope.values)
                 CheckboxListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   title: Text(scope.name),
                   subtitle: Text(switch (scope) {
-                    McpScope.read => 'Read chats and search',
-                    McpScope.send => 'Send messages as you',
-                    McpScope.admin => 'Merge contacts, manage settings',
+                    McpScope.read => context.l10n.mcpScopeRead,
+                    McpScope.send => context.l10n.mcpScopeSend,
+                    McpScope.admin => context.l10n.mcpScopeAdmin,
                   }),
                   value: scopes.contains(scope),
                   onChanged: (v) => setDialogState(() {
@@ -112,13 +113,13 @@ class _McpScreenState extends ConsumerState<McpScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.commonCancel),
             ),
             FilledButton(
               onPressed: scopes.isEmpty
                   ? null
                   : () => Navigator.of(context).pop(true),
-              child: const Text('Create'),
+              child: Text(context.l10n.commonCreate),
             ),
           ],
         ),
@@ -131,7 +132,9 @@ class _McpScreenState extends ConsumerState<McpScreen> {
     }
 
     final generated = _service.createKey(
-      label: label.text.trim().isEmpty ? 'unnamed' : label.text.trim(),
+      label: label.text.trim().isEmpty
+          ? context.l10n.mcpUnnamedKey
+          : label.text.trim(),
       scopes: scopes,
     );
     label.dispose();
@@ -140,15 +143,12 @@ class _McpScreenState extends ConsumerState<McpScreen> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Copy this key now'),
+        title: Text(context.l10n.mcpCopyKeyTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'This is the only time the key is shown. Braid stores only a '
-              'hash; if it is lost, revoke it and create a new one.',
-            ),
+            Text(context.l10n.mcpCopyKeyBody),
             const SizedBox(height: WeftSpace.md),
             Container(
               padding: const EdgeInsets.all(WeftSpace.md),
@@ -161,9 +161,9 @@ class _McpScreenState extends ConsumerState<McpScreen> {
               // one run is announced as one word nobody can transcribe. Spelled
               // out, and with Copy named as the shorter road.
               child: Semantics(
-                label:
-                    'API key. Copy it with the Copy button, or write it down: '
-                    '${spelledOut(generated.secret)}',
+                label: context.l10n.mcpKeySpelledOut(
+                  spelledOut(generated.secret),
+                ),
                 excludeSemantics: true,
                 child: SelectableText(
                   generated.secret,
@@ -178,11 +178,11 @@ class _McpScreenState extends ConsumerState<McpScreen> {
             onPressed: () =>
                 Clipboard.setData(ClipboardData(text: generated.secret)),
             icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy'),
+            label: Text(context.l10n.commonCopy),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
+            child: Text(context.l10n.commonDone),
           ),
         ],
       ),
@@ -197,39 +197,41 @@ class _McpScreenState extends ConsumerState<McpScreen> {
     final keys = service.loadKeys().where((k) => !k.revoked).toList();
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('MCP server')),
+      appBar: WeftAppBar(title: Text(context.l10n.mcpTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
             Text(
-              'Lets AI agents read and act on your messages over the Model '
-              'Context Protocol. Every call needs one of the API keys below, is '
-              'scope-checked, rate-limited and logged.',
+              context.l10n.mcpIntro,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: WeftSpace.lg),
             SwitchListTile(
-              title: const Text('Run the MCP server'),
+              title: Text(context.l10n.mcpRunServerTitle),
               subtitle: Text(
                 running
-                    ? 'Listening on 127.0.0.1:${service.boundPort} (loopback only)'
-                    : 'Stopped',
+                    ? context.l10n.mcpListeningOn(service.boundPort!)
+                    : context.l10n.mcpStopped,
               ),
               value: running,
               onChanged: _busy ? null : _toggleServer,
               contentPadding: EdgeInsets.zero,
             ),
-            if (running) _TunnelTile(service: service),
+            if (running)
+              McpTunnelTile(
+                tunnel: service.tunnel,
+                localPort: service.boundPort ?? 0,
+              ),
             const Divider(height: WeftSpace.xl),
 
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'API keys',
+                    context.l10n.mcpApiKeysTitle,
                     style: context.text.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -238,14 +240,14 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                 FilledButton.tonalIcon(
                   onPressed: _createKey,
                   icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('New key'),
+                  label: Text(context.l10n.mcpNewKeyButton),
                 ),
               ],
             ),
             const SizedBox(height: WeftSpace.sm),
             if (keys.isEmpty)
               Text(
-                'No keys yet. The server refuses every request until one exists.',
+                context.l10n.mcpNoKeys,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -257,10 +259,13 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                   leading: const Icon(Icons.key_rounded),
                   title: Text(key.label),
                   subtitle: Text(
-                    '${key.id} · ${key.scopes.map((s) => s.name).join(", ")}',
+                    context.l10n.mcpKeySubtitle(
+                      key.id,
+                      key.scopes.map((s) => s.name).join(', '),
+                    ),
                   ),
                   trailing: NamedButton(
-                    label: 'Revoke the key named ${key.label}',
+                    label: context.l10n.mcpRevokeNamed(key.label),
                     onPressed: () {
                       service.revokeKey(key.id);
                       setState(() {});
@@ -270,14 +275,14 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                         service.revokeKey(key.id);
                         setState(() {});
                       },
-                      child: const Text('Revoke'),
+                      child: Text(context.l10n.mcpRevoke),
                     ),
                   ),
                 ),
             const Divider(height: WeftSpace.xl),
 
             Text(
-              'Recent activity',
+              context.l10n.mcpRecentActivity,
               style: context.text.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -285,7 +290,7 @@ class _McpScreenState extends ConsumerState<McpScreen> {
             const SizedBox(height: WeftSpace.sm),
             if (service.auditLog.entries.isEmpty)
               Text(
-                'Nothing yet.',
+                context.l10n.mcpNothingYet,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -295,13 +300,15 @@ class _McpScreenState extends ConsumerState<McpScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: WeftSpace.xs),
                   child: Text(
+                    // l10n-ignore: a machine-readable audit line; its screen-reader label is translated.
                     '$entry',
                     // Allowed and denied differ by colour and by nothing else, on
                     // the log whose whole job is to show an agent being refused.
                     // The word goes first because that is the one a reader
                     // skimming thirty rows is listening for.
-                    semanticsLabel:
-                        '${entry.allowed ? 'Allowed' : 'Denied'}: $entry',
+                    semanticsLabel: entry.allowed
+                        ? context.l10n.mcpAuditAllowed('$entry')
+                        : context.l10n.mcpAuditDenied('$entry'),
                     style: context.text.bodySmall?.copyWith(
                       fontFamily: 'monospace',
                       fontSize: 11,
@@ -318,52 +325,106 @@ class _McpScreenState extends ConsumerState<McpScreen> {
   }
 }
 
-class _TunnelTile extends StatelessWidget {
-  const _TunnelTile({required this.service});
+/// The Cloudflare tunnel row: what the tunnel is doing, and how to change it.
+///
+/// On Android and iOS it is a row with no button. A tunnel is a long-lived
+/// child process, neither platform lets an app run one, and the row used to
+/// offer Start anyway — which produced a failure whose text was the package's
+/// own English: *"Could not start cloudflared. Install it and make sure it is
+/// on PATH."* There is no PATH on a phone to put it on. Saying so before the
+/// tap, and saying what to do instead, is the whole of the fix.
+class McpTunnelTile extends StatelessWidget {
+  const McpTunnelTile({
+    required this.tunnel,
+    required this.localPort,
+    super.key,
+  });
 
-  final McpService service;
+  /// The supervisor, rather than the whole [McpService], so the row can be
+  /// pumped on its own. Which is the only way the state that matters here is
+  /// reachable from a test: the mobile branch needs a platform override and no
+  /// bound socket, and building an `McpService` to get at it would drag in the
+  /// store, the registry and a listening port.
+  final CloudflaredSupervisor tunnel;
+
+  /// The port the MCP server is listening on, which the tunnel is pointed at.
+  final int localPort;
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<TunnelState>(
-      stream: service.tunnel.states,
-      initialData: service.tunnel.state,
+      stream: tunnel.states,
+      initialData: tunnel.state,
       builder: (context, snapshot) {
+        final supported = tunnel.isSupportedPlatform;
         final state = snapshot.data ?? TunnelState.stopped;
-        final url = service.tunnel.publicUrl;
+        final url = tunnel.publicUrl;
 
         return ListTile(
           contentPadding: EdgeInsets.zero,
+          // Dimmed on a platform that cannot run one, the same way a disabled
+          // control reads everywhere else: the row is information, not an
+          // offer, and it should not look like one that failed.
+          enabled: supported,
           // The glyph's colour is the state; the subtitle beside it says the
           // state in words, so the glyph has nothing left to contribute.
           leading: ExcludeSemantics(
             child: Icon(
-              Icons.cloud_outlined,
-              color: state == TunnelState.running
+              supported ? Icons.cloud_outlined : Icons.cloud_off_outlined,
+              color: state == TunnelState.running && supported
                   ? context.palette.online
                   : context.colors.onSurfaceVariant,
             ),
           ),
-          title: const Text('Cloudflare tunnel'),
-          subtitle: Text(switch (state) {
-            TunnelState.running => url ?? 'Running (named tunnel)',
-            TunnelState.starting => 'Starting…',
-            TunnelState.failed => service.tunnel.lastError ?? 'Failed to start',
-            TunnelState.stopped => 'Off. Requires cloudflared on this machine.',
-          }),
-          trailing: switch (state) {
-            TunnelState.stopped => TextButton(
-              onPressed: () =>
-                  service.tunnel.start(localPort: service.boundPort ?? 0),
-              child: const Text('Start'),
-            ),
-            _ => TextButton(
-              onPressed: service.tunnel.stop,
-              child: const Text('Stop'),
-            ),
-          },
+          title: Text(context.l10n.mcpTunnelTitle),
+          subtitle: Text(
+            !supported
+                ? context.l10n.mcpTunnelUnsupported
+                : switch (state) {
+                    TunnelState.running =>
+                      url ?? context.l10n.mcpTunnelRunningNamed,
+                    TunnelState.starting => context.l10n.mcpTunnelStarting,
+                    TunnelState.failed => _failureText(context),
+                    TunnelState.stopped => context.l10n.mcpTunnelStopped,
+                  },
+          ),
+          // No control at all rather than a disabled one. A greyed-out Start
+          // invites a tap that will never be allowed, and the sentence beside
+          // it already says the tunnel belongs on another machine.
+          trailing: !supported
+              ? null
+              : switch (state) {
+                  TunnelState.stopped => TextButton(
+                    onPressed: () => tunnel.start(localPort: localPort),
+                    child: Text(context.l10n.commonStart),
+                  ),
+                  _ => TextButton(
+                    onPressed: tunnel.stop,
+                    child: Text(context.l10n.commonStop),
+                  ),
+                },
         );
       },
     );
+  }
+
+  /// A failure as a sentence in the reader's language.
+  ///
+  /// The supervisor reports a [TunnelFailure] and an exit code, and the words
+  /// are assembled here — `weft_mcp` has no ARB files, so a package that
+  /// carried the sentence could only ever carry it in English. See
+  /// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
+  String _failureText(BuildContext context) {
+    final l10n = context.l10n;
+    final code = tunnel.lastExitCode;
+    return switch (tunnel.failure) {
+      TunnelFailure.unsupportedPlatform => l10n.mcpTunnelUnsupported,
+      TunnelFailure.notInstalled => l10n.mcpTunnelNotInstalled,
+      TunnelFailure.exited when code != null => l10n.mcpTunnelExited(code),
+      TunnelFailure.gaveUp when code != null => l10n.mcpTunnelGaveUp(code),
+      // Failed with nothing to say about why, which the supervisor should not
+      // produce — but a subtitle is not the place to find that out.
+      _ => l10n.mcpTunnelFailed,
+    };
   }
 }

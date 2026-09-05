@@ -1,5 +1,7 @@
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/localisation.dart';
+
 /// Where a bridged conversation's call actually happens.
 ///
 /// Braid's own calls ride Matrix, and a bridged contact's ghost will never
@@ -20,7 +22,11 @@ class ExternalCallRoute {
 /// Preference order is the chat's own: the active send network first, then the
 /// other bridged legs, then a bare phone number for the dialler. A Matrix-native
 /// chat returns null — the in-app call button already handles it.
-ExternalCallRoute? externalCallRouteFor(Chat chat, UnifiedContact? contact) {
+ExternalCallRoute? externalCallRouteFor(
+  AppL10n l10n,
+  Chat chat,
+  UnifiedContact? contact,
+) {
   final ordered = <ChatNetwork>[
     if (chat.sendNetwork != null) chat.sendNetwork!,
     ...chat.networks,
@@ -32,20 +38,26 @@ ExternalCallRoute? externalCallRouteFor(Chat chat, UnifiedContact? contact) {
     final phone = handle?.phoneE164;
     anyPhone ??= phone;
 
-    final route = _routeFor(network, phone: phone, remoteId: handle?.remoteId);
+    final route = _routeFor(
+      l10n,
+      network,
+      phone: phone,
+      remoteId: handle?.remoteId,
+    );
     if (route != null) return route;
   }
 
   if (anyPhone != null) {
     return ExternalCallRoute(
       uri: Uri.parse('tel:$anyPhone'),
-      label: 'Call $anyPhone',
+      label: l10n.callExternalAnyPhone(anyPhone),
     );
   }
   return null;
 }
 
 ExternalCallRoute? _routeFor(
+  AppL10n l10n,
   ChatNetwork network, {
   String? phone,
   String? remoteId,
@@ -58,13 +70,13 @@ ExternalCallRoute? _routeFor(
       if (digits == null || digits.isEmpty) return null;
       return ExternalCallRoute(
         uri: Uri.parse('https://wa.me/$digits'),
-        label: 'Call in WhatsApp',
+        label: l10n.callExternalInNetwork(ChatNetwork.whatsapp.label),
       );
     case ChatNetwork.signal:
       if (phone == null) return null;
       return ExternalCallRoute(
         uri: Uri.parse('https://signal.me/#p/$phone'),
-        label: 'Call in Signal',
+        label: l10n.callExternalInNetwork(ChatNetwork.signal.label),
       );
     case ChatNetwork.telegram:
       // Telegram ids are not phone numbers; a phone is only known when the
@@ -72,14 +84,14 @@ ExternalCallRoute? _routeFor(
       if (phone == null) return null;
       return ExternalCallRoute(
         uri: Uri.parse('https://t.me/$phone'),
-        label: 'Call in Telegram',
+        label: l10n.callExternalInNetwork(ChatNetwork.telegram.label),
       );
     case ChatNetwork.sms || ChatNetwork.gmessages:
       final number = phone ?? remoteId;
       if (number == null || number.isEmpty) return null;
       return ExternalCallRoute(
         uri: Uri.parse('tel:$number'),
-        label: 'Call $number',
+        label: l10n.callExternalAnyPhone(number),
       );
     default:
       return null;

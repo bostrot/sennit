@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import com.bostrot.weft.R
 
 /// The one connection the OS allows, held by Weft itself.
 ///
@@ -89,12 +90,12 @@ class WeftSyncService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Connection",
+                getString(R.string.connection_channel_name),
                 // MIN keeps it out of the status bar on most launchers; the
                 // user can silence or shade-hide it entirely from settings.
                 NotificationManager.IMPORTANCE_MIN,
             ).apply {
-                description = "Keeps Braid connected so messages arrive while it is closed."
+                description = getString(R.string.connection_channel_description)
                 setShowBadge(false)
             },
         )
@@ -117,8 +118,8 @@ class WeftSyncService : Service() {
             Notification.Builder(this)
         }
         return builder
-            .setContentTitle("Listening for messages")
-            .setContentText("Braid stays connected in the background.")
+            .setContentTitle(getString(R.string.connection_title))
+            .setContentText(getString(R.string.connection_body))
             .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
             .setContentIntent(pending)
             .setOngoing(true)

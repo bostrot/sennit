@@ -15,6 +15,7 @@ import android.telecom.TelecomManager
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import com.bostrot.weft.R
 
 /// Android's end of `com.bostrot.weft/call`: Telecom, and nothing else.
 ///
@@ -133,7 +134,7 @@ object CallBridge {
                 // not a telephone number, and `tel` would put it in front of a
                 // dialer that would try to ring it.
                 .addSupportedUriScheme(PhoneAccount.SCHEME_SIP)
-                .setShortDescription("Weft calls")
+                .setShortDescription(context.getString(R.string.call_phone_account))
                 .build()
             telecom.registerPhoneAccount(account)
             true

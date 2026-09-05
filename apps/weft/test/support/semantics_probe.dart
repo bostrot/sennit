@@ -90,6 +90,54 @@ List<String> controlNamesIn(WidgetTester tester) {
   return names;
 }
 
+/// Every control a screen reader would announce as nothing.
+///
+/// The inverse of [controlNamesIn], and deliberately the same definition of a
+/// control so the two partition the same set: a node offering a tap, not a
+/// link, not hidden, not a text field. An icon-only button with neither a
+/// `Semantics` label nor a tooltip lands here — which is the register the route
+/// walk's audit reports — and so does any other silent tappable, which is the
+/// right generalisation. A widget-type check for `IconButton` would miss the
+/// `InkWell` around two glyphs, and that is where these actually come from.
+///
+/// `value` counts as a name: a chip whose visible content is its own label
+/// needs no annotation on top of it.
+///
+/// Each entry is the node's size, because a silent control has nothing else to
+/// identify it by — which is the whole finding.
+List<String> unnamedControlsIn(WidgetTester tester) {
+  final found = <String>[];
+  void walk(SemanticsNode node) {
+    final data = node.getSemanticsData();
+    final named =
+        data.label.isNotEmpty ||
+        data.tooltip.isNotEmpty ||
+        data.value.isNotEmpty;
+    final hidden =
+        node.isInvisible ||
+        // A merged node is not one a reader ever lands on — its label, its
+        // actions and its flags all belong to the ancestor that absorbed it,
+        // and that ancestor is what gets checked. Without this every
+        // `SwitchListTile` in settings reports its switch as an unnamed 60×40
+        // control, which is Material's own structure and not a defect.
+        // `MinimumTapTargetGuideline` skips them for the same reason.
+        node.isMergedIntoParent ||
+        data.flagsCollection.isHidden ||
+        data.flagsCollection.isTextField ||
+        data.flagsCollection.isLink;
+    if (data.hasAction(SemanticsAction.tap) && !named && !hidden) {
+      found.add('${node.rect.width.round()}×${node.rect.height.round()}');
+    }
+    node.visitChildren((child) {
+      walk(child);
+      return true;
+    });
+  }
+
+  walk(_root(tester));
+  return found;
+}
+
 /// The name of the node the framework currently reports as focused.
 ///
 /// Read off the semantics tree rather than off [FocusManager], because the two

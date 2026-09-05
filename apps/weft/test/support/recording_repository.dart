@@ -72,9 +72,22 @@ class RecordingChatRepository implements ChatRepository {
   }) async {}
 
   @override
-  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  peerReadUpTo(String chatId) => const [];
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
-  ) => const [];
+  ) => inner.ownReadUpTo(chatId);
+
+  @override
+  Future<ChatRequestState?> answerChatRequest(
+    String chatId,
+    ChatRequestAction action,
+  ) {
+    calls.add(RecordedCall('answerChatRequest', key: action.name));
+    return inner.answerChatRequest(chatId, action);
+  }
 
   @override
   void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
@@ -161,6 +174,28 @@ class RecordingChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> sendThreadReply(
+    String chatId,
+    String body, {
+    required String threadRootId,
+    String? replyToEventId,
+    String? threadLatestEventId,
+  }) {
+    // Recorded against the *root*, which is where a thread reply lands. The
+    // in-thread reply target, when there is one, is a quote inside it.
+    calls.add(
+      RecordedCall('sendThreadReply', eventId: threadRootId, body: body),
+    );
+    return inner.sendThreadReply(
+      chatId,
+      body,
+      threadRootId: threadRootId,
+      replyToEventId: replyToEventId,
+      threadLatestEventId: threadLatestEventId,
+    );
+  }
+
+  @override
   Future<void> react(String chatId, String eventId, String key) {
     calls.add(RecordedCall('react', eventId: eventId, key: key));
     return inner.react(chatId, eventId, key);
@@ -216,6 +251,7 @@ class RecordingChatRepository implements ChatRepository {
     calls.add(RecordedCall('markRead', key: chatId));
     return inner.markRead(chatId);
   }
+
   @override
   Future<void> setArchived(String chatId, {required bool archived}) =>
       inner.setArchived(chatId, archived: archived);
@@ -242,8 +278,14 @@ class RecordingChatRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
-  }) =>
-      inner.sendAttachment(chatId, source, via: via, isVoiceNote: isVoiceNote);
+    String? caption,
+  }) => inner.sendAttachment(
+    chatId,
+    source,
+    via: via,
+    isVoiceNote: isVoiceNote,
+    caption: caption,
+  );
   @override
   Stream<List<UploadTask>> watchUploads(String chatId) =>
       inner.watchUploads(chatId);

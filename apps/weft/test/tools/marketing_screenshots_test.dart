@@ -32,9 +32,7 @@ void main() {
     final emoji = File('/System/Library/Fonts/Apple Color Emoji.ttc');
     if (emoji.existsSync()) {
       final loader = FontLoader('Roboto')
-        ..addFont(
-          Future.value(emoji.readAsBytesSync().buffer.asByteData()),
-        );
+        ..addFont(Future.value(emoji.readAsBytesSync().buffer.asByteData()));
       await loader.load();
     }
   });
@@ -50,13 +48,17 @@ void main() {
     WeftThemeMode mode = WeftThemeMode.light,
     String? chatToOpen,
   }) async {
-    await pumpWeft(tester, RepaintBoundary(child: child), size: logical, mode: mode);
+    await pumpWeft(
+      tester,
+      RepaintBoundary(child: child),
+      size: logical,
+      mode: mode,
+    );
     await tester.pumpAndSettle();
 
-    final boundary = tester
-        .renderObject<RenderRepaintBoundary>(
-          find.byType(RepaintBoundary).first,
-        );
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byType(RepaintBoundary).first,
+    );
     await tester.runAsync(() async {
       final image = await boundary.toImage(pixelRatio: scale);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);

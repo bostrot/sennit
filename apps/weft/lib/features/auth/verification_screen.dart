@@ -4,6 +4,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
 import '../components/qr_card.dart';
 import '../components/qr_scanner.dart';
@@ -151,8 +152,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 const SizedBox(height: WeftSpace.lg),
                 Text(
                   widget.deviceId == null
-                      ? 'Verify this device'
-                      : 'Verify ${widget.deviceId}',
+                      ? context.l10n.verifyThisDeviceTitle
+                      : context.l10n.verifyNamedDeviceTitle(widget.deviceId!),
                   textAlign: TextAlign.center,
                   style: context.text.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
@@ -161,16 +162,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 const SizedBox(height: WeftSpace.sm),
                 Text(
                   widget.deviceId != null
-                      ? 'Compare the emoji below on both devices. Once they '
-                            'match, each trusts the other and your encrypted '
-                            'chats stop warning about it.'
+                      ? context.l10n.verifyOtherDeviceBody
                       : session.crossSigningExists
-                      ? 'Confirm it is really you from a device you already '
-                            'use. Until you do, Braid cannot read messages sent '
-                            'before this device signed in.'
-                      : 'This is your first device. Setting up encryption now '
-                            'means you can verify future devices and recover your '
-                            'messages if you lose this one.',
+                      ? context.l10n.verifyExistingBody
+                      : context.l10n.verifyFirstDeviceBody,
                   textAlign: TextAlign.center,
                   style: context.text.bodyMedium?.copyWith(
                     color: context.colors.onSurfaceVariant,
@@ -215,8 +210,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                         : const Icon(Icons.qr_code_scanner_rounded, size: 18),
                     label: Text(
                       widget.deviceId == null
-                          ? 'Verify with another device'
-                          : 'Start verification',
+                          ? context.l10n.verifyWithAnotherDevice
+                          : context.l10n.verifyStart,
                     ),
                   ),
 
@@ -225,12 +220,12 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   onPressed: widget.onContinue,
                   child: Text(
                     widget.deviceId == null
-                        ? 'Continue without verifying'
-                        : 'Not now',
+                        ? context.l10n.verifySkip
+                        : context.l10n.commonNotNow,
                   ),
                 ),
                 Text(
-                  'You can verify later from Settings.',
+                  context.l10n.verifyLater,
                   textAlign: TextAlign.center,
                   style: context.text.labelSmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
@@ -264,12 +259,12 @@ class _VerificationBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (verification.state) {
-      KeyVerificationState.waitingAccept => const _Waiting(
-        message: 'Waiting for your other device to accept…',
+      KeyVerificationState.waitingAccept => _Waiting(
+        message: context.l10n.verifyWaitingAccept,
       ),
       KeyVerificationState.askAccept => _Prompt(
-        message: 'Your other device wants to verify this one.',
-        confirmLabel: 'Accept',
+        message: context.l10n.verifyAskAccept,
+        confirmLabel: context.l10n.commonAccept,
         onConfirm: verification.acceptVerification,
         onReject: verification.rejectVerification,
       ),
@@ -287,31 +282,27 @@ class _VerificationBody extends StatelessWidget {
       // We scanned their code and it checked out. They still have to confirm
       // they can see that, which is what stops a code photographed over
       // somebody's shoulder from verifying itself.
-      KeyVerificationState.showQRSuccess => const _Waiting(
-        message:
-            'That code checked out. Tell your other device you scanned it '
-            'successfully.',
+      KeyVerificationState.showQRSuccess => _Waiting(
+        message: context.l10n.verifyQrSuccess,
         icon: Icons.verified_rounded,
       ),
       // They scanned ours. Confirming is a statement about the physical world,
       // so the question names what to look at rather than asking for a yes.
       KeyVerificationState.confirmQRScan => _Prompt(
-        message:
-            'Your other device says it scanned this code. Is it now showing '
-            'that this device is verified?',
-        confirmLabel: 'Yes, it is',
+        message: context.l10n.verifyConfirmQrScan,
+        confirmLabel: context.l10n.verifyYesItIs,
         onConfirm: verification.acceptQRScanConfirmation,
         onReject: verification.rejectVerification,
       ),
       KeyVerificationState.done => _Result(
         icon: Icons.check_circle_rounded,
-        message: 'This device is verified. Your history is unlocking now.',
+        message: context.l10n.verifyDone,
         onDone: onDone,
         success: true,
       ),
       KeyVerificationState.error => _Result(
         icon: Icons.error_rounded,
-        message: 'Verification failed or was cancelled.',
+        message: context.l10n.verifyFailed,
         onDone: onDone,
         success: false,
       ),
@@ -346,7 +337,7 @@ class _Choice extends StatelessWidget {
       children: [
         if (showQr && qrBytes != null) ...[
           Text(
-            'Scan this from your other device.',
+            context.l10n.verifyScanThis,
             textAlign: TextAlign.center,
             style: context.text.bodyMedium,
           ),
@@ -355,13 +346,7 @@ class _Choice extends StatelessWidget {
           // payload is two ed25519 keys and a shared secret, and rendering it
           // as characters would be a string nobody can read out and nothing can
           // scan. The honest label says so and names the path that does work.
-          QrCard.bytes(
-            qrBytes,
-            semanticsLabel:
-                'QR code for verifying this device. It can only be scanned by '
-                'a camera. If you cannot scan it, use Compare emoji instead — '
-                'it ends in the same place.',
-          ),
+          QrCard.bytes(qrBytes, semanticsLabel: context.l10n.verifyQrSemantics),
           const SizedBox(height: WeftSpace.lg),
         ],
         if (choices.contains(VerificationChoice.scanQr)) ...[
@@ -369,13 +354,11 @@ class _Choice extends StatelessWidget {
             FilledButton.icon(
               onPressed: onScan,
               icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-              label: const Text("Scan the other device's code"),
+              label: Text(context.l10n.verifyScanOther),
             )
           else
             Text(
-              'This build of Braid cannot open a camera to read a code. Show '
-              'the code above on whichever device has one, or compare emoji '
-              'instead — both end up in the same place.',
+              context.l10n.verifyNoCamera,
               textAlign: TextAlign.center,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
@@ -387,7 +370,11 @@ class _Choice extends StatelessWidget {
           OutlinedButton(
             onPressed: () =>
                 chooseVerification(verification, VerificationChoice.emoji),
-            child: Text(showQr ? 'Compare emoji instead' : 'Compare emoji'),
+            child: Text(
+              showQr
+                  ? context.l10n.verifyCompareEmojiInstead
+                  : context.l10n.verifyCompareEmoji,
+            ),
           ),
         const SizedBox(height: WeftSpace.lg),
       ],
@@ -448,8 +435,7 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
     return Column(
       children: [
         Text(
-          'Enter your recovery key to unlock this account\'s signing keys. '
-          'Without them this device can be checked but not vouched for.',
+          context.l10n.verifyUnlockBody,
           textAlign: TextAlign.center,
           style: context.text.bodyMedium,
         ),
@@ -458,8 +444,8 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
           controller: _controller,
           autofocus: true,
           enabled: !_busy,
-          decoration: const InputDecoration(
-            labelText: 'Recovery key or passphrase',
+          decoration: InputDecoration(
+            labelText: context.l10n.securityKeyOrPassphraseField,
           ),
         ),
         if (_error case final message?) ...[
@@ -480,7 +466,7 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
         const SizedBox(height: WeftSpace.lg),
         FilledButton(
           onPressed: _busy ? null : _unlock,
-          child: const Text('Unlock'),
+          child: Text(context.l10n.verifyUnlock),
         ),
         const SizedBox(height: WeftSpace.sm),
         TextButton(
@@ -489,7 +475,7 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
           onPressed: _busy
               ? null
               : () => widget.verification.openSSSS(skip: true),
-          child: const Text('Continue without it'),
+          child: Text(context.l10n.verifyContinueWithoutKey),
         ),
         const SizedBox(height: WeftSpace.lg),
       ],
@@ -510,7 +496,7 @@ class _EmojiCompare extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'Do these appear, in this order, on your other device?',
+          context.l10n.verifyEmojiQuestion,
           textAlign: TextAlign.center,
           style: context.text.bodyMedium,
         ),
@@ -535,14 +521,14 @@ class _EmojiCompare extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: verification.rejectSas,
-                child: const Text("They don't match"),
+                child: Text(context.l10n.verifyEmojiNoMatch),
               ),
             ),
             const SizedBox(width: WeftSpace.md),
             Expanded(
               child: FilledButton(
                 onPressed: verification.acceptSas,
-                child: const Text('They match'),
+                child: Text(context.l10n.verifyEmojiMatch),
               ),
             ),
           ],
@@ -598,7 +584,7 @@ class SasEmojiCell extends StatelessWidget {
       // fourteen nodes, and the *order* is half of what the user is being
       // asked to check — "do these appear, in this order" is a question a
       // reader could not answer.
-      label: '${index + 1} of $total, $name',
+      label: context.l10n.verifyEmojiCell(index + 1, total, name),
       excludeSemantics: true,
       child: Container(
         width: width,
@@ -688,7 +674,7 @@ class _Prompt extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: onReject,
-                child: const Text('Reject'),
+                child: Text(context.l10n.verifyReject),
               ),
             ),
             const SizedBox(width: WeftSpace.md),
@@ -731,7 +717,10 @@ class _Result extends StatelessWidget {
         const SizedBox(height: WeftSpace.md),
         Text(message, textAlign: TextAlign.center),
         const SizedBox(height: WeftSpace.lg),
-        FilledButton(onPressed: onDone, child: const Text('Continue')),
+        FilledButton(
+          onPressed: onDone,
+          child: Text(context.l10n.commonContinue),
+        ),
         const SizedBox(height: WeftSpace.lg),
       ],
     );

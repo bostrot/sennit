@@ -25,6 +25,7 @@ import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/data/matrix_chat_repository.dart'
     show AttachmentBytesLoader;
+import 'package:weft/services/backup/backup_service.dart';
 import 'package:weft/services/links/link_preview_service.dart';
 
 bool _fontsLoaded = false;
@@ -255,13 +256,37 @@ Future<void> pumpWeft(
   Color seed = WeftTheme.defaultSeed,
   WeftGoldenVariant variant = weftGoldenBaseline,
   WeftSurface surface = WeftSurface.touch,
+
+  /// Whether the scene is driven with a pointer and a hardware keyboard.
+  ///
+  /// Null means "whatever [surface] implies", which is what nearly every test
+  /// wants: a Mac has a mouse and a phone does not. Pass it explicitly for the
+  /// case the two come apart — Windows and Linux, which draw the touch layout
+  /// and still right-click, hover and drag-select.
+  bool? pointer,
   ChatRepository? repository,
   AttachmentBytesLoader? fileReader,
   WeftStores? stores,
   LinkPreviewFetch? linkPreviewFetch,
   DeviceManager? deviceManager,
   KeyBackup? keyBackup,
+
+  /// The backup screen's export and restore, which otherwise reach the file
+  /// system, the share sheet and a file dialog — three method channels a
+  /// golden has none of. The same idea as [deviceManager] and [keyBackup]:
+  /// state what the platform would have said, so a scene can be pinned that
+  /// the app cannot be put into on demand.
+  BackupService? backupService,
   List<DetectedBridge>? detectedBridges,
+
+  /// Whether the account sends public read receipts.
+  ///
+  /// A named parameter rather than a general overrides list because Riverpod's
+  /// `Override` is not exported from either barrel — which is also why the list
+  /// below is never given an explicit type — so a scene cannot hand one over.
+  /// Null leaves the real provider in place, which reads the settings store and
+  /// defaults to on.
+  bool? readReceipts,
   bool settle = true,
 }) async {
   tester.view.physicalSize = size;
@@ -301,11 +326,18 @@ Future<void> pumpWeft(
         if (deviceManager != null)
           deviceManagerProvider.overrideWithValue(deviceManager),
         if (keyBackup != null) keyBackupProvider.overrideWithValue(keyBackup),
+        if (backupService != null)
+          backupServiceProvider.overrideWithValue(backupService),
         // What the homeserver appears to run. Without this the bridges screen
         // can only ever be drawn empty, which is the one state a person who
         // runs bridges never sees.
         if (detectedBridges != null)
           detectedBridgesProvider.overrideWithValue(detectedBridges),
+        // The ticks read this as well as the sender does: with receipts off,
+        // two grey ticks mean "we are not being told" rather than "they have
+        // not looked at it", and the bubble says so.
+        if (readReceipts != null)
+          sendReadReceiptsProvider.overrideWithValue(readReceipts),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -320,6 +352,7 @@ Future<void> pumpWeft(
           Brightness.dark,
           highContrast: variant.highContrast,
           surface: surface,
+          pointer: pointer,
         ),
         // Under the navigator rather than over the app, which is where the app
         // itself reads these: a `MediaQuery` above `MaterialApp` is rebuilt

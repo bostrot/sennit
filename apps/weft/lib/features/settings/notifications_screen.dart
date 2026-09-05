@@ -12,6 +12,7 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
@@ -31,13 +32,15 @@ import 'settings_section.dart';
 /// network and three things they might want from it, so that is what the screen
 /// offers and this is the mapping between the two shapes.
 enum _NetworkMode {
-  on('On'),
-  muted('Muted'),
-  off('Off');
+  on,
+  muted,
+  off;
 
-  const _NetworkMode(this.label);
-
-  final String label;
+  String label(AppL10n l10n) => switch (this) {
+    _NetworkMode.on => l10n.notificationsModeOn,
+    _NetworkMode.muted => l10n.notificationsModeMuted,
+    _NetworkMode.off => l10n.notificationsModeOff,
+  };
 }
 
 /// When to interrupt, and about what.
@@ -206,7 +209,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final quiet = policy.quietHours;
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Notifications')),
+      appBar: WeftAppBar(title: Text(context.l10n.notificationsTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
@@ -214,11 +217,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             const _BuiltInConnectionSection(),
             const _UnifiedPushSection(),
             SwitchListTile(
-              title: const Text('Notifications'),
-              subtitle: const Text(
-                'The master switch. Off means nothing is posted, on any device '
-                'this app is running on.',
-              ),
+              title: Text(context.l10n.notificationsTitle),
+              subtitle: Text(context.l10n.notificationsMasterSubtitle),
               value: policy.enabled,
               onChanged: (v) => _update((p) => p.copyWith(enabled: v)),
               contentPadding: EdgeInsets.zero,
@@ -226,11 +226,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
             if (policy.enabled) ...[
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Networks',
-                subtitle:
-                    'Muted still lets a mention through, if the setting below '
-                    'allows it. Off does not — off is off.',
+              SettingsSectionHeader(
+                title: context.l10n.settingsNetworksSectionTitle,
+                subtitle: context.l10n.notificationsNetworksSubtitle,
               ),
               for (final network in networks)
                 _NetworkRow(
@@ -240,35 +238,28 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ),
               if (networks.isEmpty)
                 Text(
-                  'No bridges are configured yet, so there is nothing to switch '
-                  'off. Networks appear here as they connect.',
+                  context.l10n.notificationsNoBridges,
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
                   ),
                 ),
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'What gets through',
-                subtitle:
-                    'Applies everywhere. A single chat can disagree with this '
-                    'from its own screen.',
+              SettingsSectionHeader(
+                title: context.l10n.notificationsWhatGetsThroughTitle,
+                subtitle: context.l10n.notificationsWhatGetsThroughSubtitle,
               ),
               SwitchListTile(
-                title: const Text('Only notify for mentions'),
-                subtitle: const Text(
-                  'Matches your name, your Matrix id, the name each bridge gives '
-                  'you, and @room.',
-                ),
+                title: Text(context.l10n.notificationsMentionsOnlyTitle),
+                subtitle: Text(context.l10n.notificationsMentionsOnlySubtitle),
                 value: policy.mentionsOnly,
                 onChanged: (v) => _update((p) => p.copyWith(mentionsOnly: v)),
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
-                title: const Text('Mentions break through a mute'),
-                subtitle: const Text(
-                  'On: mute a busy group and still get paged in it. Off: a mute '
-                  'is silence, which is what Matrix itself means by one.',
+                title: Text(context.l10n.notificationsMentionsBypassTitle),
+                subtitle: Text(
+                  context.l10n.notificationsMentionsBypassSubtitle,
                 ),
                 value: policy.mentionsBypassMute,
                 onChanged: (v) =>
@@ -276,11 +267,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
-                title: const Text('Show message text on the lock screen'),
-                subtitle: const Text(
-                  'Off still notifies — it says "New message" instead of what was '
-                  'said. The sender and the chat are still shown.',
-                ),
+                title: Text(context.l10n.notificationsShowPreviewsTitle),
+                subtitle: Text(context.l10n.notificationsShowPreviewsSubtitle),
                 value: policy.showPreviews,
                 onChanged: (v) => _update((p) => p.copyWith(showPreviews: v)),
                 contentPadding: EdgeInsets.zero,
@@ -288,15 +276,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               const _SmartRepliesTile(),
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Quiet hours',
-                subtitle:
-                    'A time of day that recurs, stored with your UTC offset so a '
-                    'notification decided in the background agrees with one '
-                    'decided while the app is open.',
+              SettingsSectionHeader(
+                title: context.l10n.notificationsQuietHoursTitle,
+                subtitle: context.l10n.notificationsQuietHoursSubtitle,
               ),
               SwitchListTile(
-                title: const Text('Quiet hours'),
+                title: Text(context.l10n.notificationsQuietHoursTitle),
                 value: quiet != null,
                 onChanged: (v) => _update(
                   (p) =>
@@ -311,20 +296,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 // fact about the screen.
                 _QuietHourTile(
                   icon: Icons.bedtime_outlined,
-                  label: 'Quiet hours start',
+                  label: context.l10n.notificationsQuietStartLabel,
                   value: _formatMinute(context, quiet.startMinute),
-                  title: 'From',
+                  title: context.l10n.notificationsQuietFrom,
                   onTap: () => _pickQuietHour(start: true),
                 ),
                 _QuietHourTile(
                   icon: Icons.wb_sunny_outlined,
-                  label: 'Quiet hours end',
+                  label: context.l10n.notificationsQuietEndLabel,
                   value: _formatMinute(context, quiet.endMinute),
-                  title: 'Until',
+                  title: context.l10n.notificationsQuietUntil,
                   onTap: () => _pickQuietHour(start: false),
                 ),
                 SwitchListTile(
-                  title: const Text('Let mentions through'),
+                  title: Text(context.l10n.notificationsLetMentionsThrough),
                   value: quiet.allowMentions,
                   onChanged: (v) => _update(
                     (p) => p.copyWith(
@@ -336,10 +321,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
                 SwitchListTile(
-                  title: const Text('Deliver silently instead of hiding'),
-                  subtitle: const Text(
-                    'The notification is waiting in the shade in the morning, '
-                    'without having made a sound.',
+                  title: Text(context.l10n.notificationsDeliverSilentlyTitle),
+                  subtitle: Text(
+                    context.l10n.notificationsDeliverSilentlySubtitle,
                   ),
                   value: quiet.deliverSilently,
                   onChanged: (v) => _update(
@@ -354,24 +338,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ],
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Muted chats',
-                subtitle:
-                    'Everything currently silenced, whichever way it was muted. '
-                    'A timed mute is Braid\'s own — Matrix push rules cannot '
-                    'express an expiry.',
+              SettingsSectionHeader(
+                title: context.l10n.notificationsMutedChatsTitle,
+                subtitle: context.l10n.notificationsMutedChatsSubtitle,
               ),
               _MutedChats(policy: policy, chats: chats),
             ],
 
             const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Push',
-              subtitle:
-                  'How this device is woken when Braid is not running. Braid hosts '
-                  'no gateway; point this at a sygnal instance you run, exactly '
-                  'as you do your homeserver. Left empty, notifications still '
-                  'arrive while the app is open.',
+            SettingsSectionHeader(
+              title: context.l10n.notificationsPushTitle,
+              subtitle: context.l10n.notificationsPushSubtitle,
             ),
             const _PushStatus(),
             Padding(
@@ -380,8 +357,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 controller: _gateway,
                 autocorrect: false,
                 keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Push gateway',
+                decoration: InputDecoration(
+                  labelText: context.l10n.notificationsGatewayField,
                   hintText: 'https://sygnal.example.org/_matrix/push/v1/notify',
                 ),
                 onSubmitted: (_) => _saveGateway(),
@@ -391,24 +368,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               alignment: AlignmentDirectional.centerEnd,
               child: FilledButton.tonal(
                 onPressed: _saveGateway,
-                child: const Text('Save gateway'),
+                child: Text(context.l10n.notificationsSaveGateway),
               ),
             ),
 
             const Divider(height: WeftSpace.xl),
-            const SettingsSectionHeader(
-              title: 'Check it works',
-              subtitle:
-                  'Runs a message Braid made up through the same rules, the same '
-                  'rendering and the same channel a real one takes. If nothing '
-                  'appears, the reason is below.',
+            SettingsSectionHeader(
+              title: context.l10n.notificationsTestTitle,
+              subtitle: context.l10n.notificationsTestSubtitle,
             ),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: FilledButton.icon(
                 onPressed: _testing ? null : () => unawaited(_sendTest()),
                 icon: const Icon(Icons.notifications_active_outlined, size: 18),
-                label: const Text('Send test notification'),
+                label: Text(context.l10n.notificationsSendTest),
               ),
             ),
             if (_test case final result?) ...[
@@ -448,7 +422,7 @@ class _QuietHourTile extends StatelessWidget {
       button: true,
       label: label,
       value: value,
-      hint: 'change the time',
+      hint: context.l10n.notificationsChangeTimeHint,
       excludeSemantics: true,
       // Restated because excluding the subtree excludes the `ListTile`'s own
       // tap action with it.
@@ -508,9 +482,12 @@ class _NetworkRow extends StatelessWidget {
                   // identical words and no way to tell which three belong to
                   // the row they are in.
                   label: Semantics(
-                    label: '${network.label}: ${option.label}',
+                    label: context.l10n.notificationsNetworkMode(
+                      network.label,
+                      option.label(context.l10n),
+                    ),
                     excludeSemantics: true,
-                    child: Text(option.label),
+                    child: Text(option.label(context.l10n)),
                   ),
                 ),
             ],
@@ -554,7 +531,7 @@ class _MutedChats extends ConsumerWidget {
 
     if (ids.isEmpty) {
       return Text(
-        'Nothing is muted.',
+        context.l10n.notificationsNothingMuted,
         style: context.text.bodySmall?.copyWith(
           color: context.colors.onSurfaceVariant,
         ),
@@ -573,6 +550,7 @@ class _MutedChats extends ConsumerWidget {
             title: Text(titles[id] ?? id),
             subtitle: Text(
               _muteDetail(
+                context.l10n,
                 policy.overrideFor(id),
                 onServer: serverMuted.contains(id),
                 now: now,
@@ -582,7 +560,7 @@ class _MutedChats extends ConsumerWidget {
               onPressed: () => unawaited(
                 _unmute(ref, id, onServer: serverMuted.contains(id)),
               ),
-              child: const Text('Unmute'),
+              child: Text(context.l10n.commonUnmute),
             ),
           ),
       ],
@@ -631,7 +609,7 @@ class _PushStatus extends ConsumerWidget {
         value.isRegistered
             ? Icons.check_circle_outline
             : Icons.info_outline_rounded,
-        value.message ?? _pushStatusLabel(value.status),
+        value.message ?? _pushStatusLabel(context.l10n, value.status),
       ),
     };
 
@@ -644,7 +622,7 @@ class _PushStatus extends ConsumerWidget {
       title: Semantics(liveRegion: true, child: Text(text)),
       trailing: TextButton(
         onPressed: () => ref.invalidate(pushRegistrationProvider),
-        child: const Text('Retry'),
+        child: Text(context.l10n.commonRetry),
       ),
     );
   }
@@ -661,15 +639,12 @@ class _TestResult extends StatelessWidget {
   Widget build(BuildContext context) {
     final delivered = decision.delivers;
     final text = switch (decision) {
-      NotifyDecision() =>
-        'Posted on the ${network.label} channel. If nothing '
-            'appeared, the block is the operating system rather than Braid — '
-            'check its notification settings for this app.',
-      SilentDecision() =>
-        'Posted silently: quiet hours are in force and set to deliver without '
-            'a sound. It is in the shade rather than on your screen.',
+      NotifyDecision() => context.l10n.notificationsTestPosted(network.label),
+      SilentDecision() => context.l10n.notificationsTestSilent,
       SuppressedDecision(:final reason) =>
-        'Nothing was posted. ${_suppressionLabel(reason)}',
+        context.l10n.notificationsTestSuppressed(
+          _suppressionLabel(context.l10n, reason),
+        ),
     };
 
     // This box is the whole result of pressing "Send test notification", and it
@@ -679,7 +654,9 @@ class _TestResult extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: '${delivered ? 'Delivered' : 'Blocked'}. $text',
+      label: delivered
+          ? context.l10n.notificationsTestDelivered(text)
+          : context.l10n.notificationsTestBlocked(text),
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(WeftSpace.md),
@@ -727,67 +704,61 @@ String _formatMinute(BuildContext context, int minute) =>
 
 /// Why one chat is silent, said once however many mutes are on it.
 String _muteDetail(
+  AppL10n l10n,
   ChatNotificationOverride override, {
   required bool onServer,
   required DateTime now,
 }) {
   final parts = <String>[];
   if (override.muted) {
-    parts.add('Muted in Braid');
+    parts.add(l10n.notificationsMutedInApp);
   } else if (override.mutedUntil case final until?) {
-    parts.add('Muted for another ${_remaining(until.difference(now))}');
+    parts.add(
+      l10n.notificationsMutedFor(_remaining(l10n, until.difference(now))),
+    );
   }
-  if (onServer) parts.add('Muted on the homeserver');
-  return parts.isEmpty ? 'Muted' : parts.join(' · ');
+  if (onServer) parts.add(l10n.notificationsMutedOnServer);
+  return parts.isEmpty ? l10n.notificationsMuted : parts.join(' · ');
 }
 
 /// Rounded up, never down: "for another 0 minutes" on a mute that is still in
 /// force reads as a bug in the mute.
-String _remaining(Duration left) {
-  if (left.inHours >= 1) {
-    final hours = left.inHours;
-    return '$hours hour${hours == 1 ? '' : 's'}';
-  }
+String _remaining(AppL10n l10n, Duration left) {
+  if (left.inHours >= 1) return l10n.notificationsRemainingHours(left.inHours);
   final minutes = left.inMinutes + (left.inSeconds % 60 == 0 ? 0 : 1);
-  final clamped = minutes < 1 ? 1 : minutes;
-  return '$clamped minute${clamped == 1 ? '' : 's'}';
+  return l10n.notificationsRemainingMinutes(minutes < 1 ? 1 : minutes);
 }
 
-String _pushStatusLabel(PushRegistrationStatus status) => switch (status) {
-  PushRegistrationStatus.registered => 'Registered with your homeserver.',
-  PushRegistrationStatus.unchanged => 'Registered with your homeserver.',
-  PushRegistrationStatus.unsupportedPlatform =>
-    'This platform has no push. Notifications arrive while Braid is running.',
-  PushRegistrationStatus.notConfigured =>
-    'No push gateway configured, so this device is not woken.',
-  PushRegistrationStatus.noToken =>
-    'Waiting for a token from the operating system.',
-  PushRegistrationStatus.failed => 'Registration failed.',
-};
+String _pushStatusLabel(AppL10n l10n, PushRegistrationStatus status) =>
+    switch (status) {
+      PushRegistrationStatus.registered ||
+      PushRegistrationStatus.unchanged => l10n.pushStatusRegistered,
+      PushRegistrationStatus.unsupportedPlatform => l10n.pushStatusUnsupported,
+      PushRegistrationStatus.notConfigured => l10n.pushStatusNotConfigured,
+      PushRegistrationStatus.noToken => l10n.pushStatusNoToken,
+      PushRegistrationStatus.failed => l10n.pushStatusFailed,
+    };
 
 /// The rule that fired, named as the setting the user would go and change.
 ///
 /// `evaluateNotification` reports the *first* rule that matched rather than all
 /// of them, which is what makes this a single actionable sentence instead of a
 /// list of everything currently silencing a message.
-String _suppressionLabel(NotificationSuppression reason) => switch (reason) {
-  NotificationSuppression.globallyDisabled =>
-    'Notifications are switched off at the top of this screen.',
-  NotificationSuppression.networkDisabled =>
-    'That network is set to Off, and nothing breaks through Off.',
-  NotificationSuppression.networkMuted => 'That network is muted.',
-  NotificationSuppression.chatMuted => 'That chat is muted.',
-  NotificationSuppression.sourceMuted =>
-    'That chat is muted on the network the message arrived on.',
-  NotificationSuppression.mentionsOnly =>
-    'Only mentions get through, and a test message does not mention you.',
-  NotificationSuppression.quietHours => 'Quiet hours are in force.',
+String _suppressionLabel(
+  AppL10n l10n,
+  NotificationSuppression reason,
+) => switch (reason) {
+  NotificationSuppression.globallyDisabled => l10n.suppressionGloballyDisabled,
+  NotificationSuppression.networkDisabled => l10n.suppressionNetworkDisabled,
+  NotificationSuppression.networkMuted => l10n.suppressionNetworkMuted,
+  NotificationSuppression.chatMuted => l10n.suppressionChatMuted,
+  NotificationSuppression.sourceMuted => l10n.suppressionSourceMuted,
+  NotificationSuppression.mentionsOnly => l10n.suppressionMentionsOnly,
+  NotificationSuppression.quietHours => l10n.suppressionQuietHours,
   // The remaining reasons cannot fire for a synthetic message — it is not
   // yours, not redacted, not a state event, has no read marker and is not
   // deduped — so there is nothing for the user to act on if one ever does.
-  _ =>
-    'It was suppressed as ${reason.name}, which should not happen for a '
-        'test. Please report it.',
+  _ => l10n.suppressionUnexpected(reason.name),
 };
 
 /// Background push over UnifiedPush — the self-hosted answer to "messages
@@ -820,15 +791,11 @@ class _SmartRepliesTile extends ConsumerWidget {
         false;
 
     return SwitchListTile(
-      title: const Text('AI reply suggestions'),
+      title: Text(context.l10n.notificationsSmartRepliesTitle),
       subtitle: Text(
         configured
-            ? 'One or two tappable answers on each message notification, '
-                  'written by your configured LLM. The message text is sent '
-                  'to that endpoint.'
-            : 'Needs an LLM endpoint under Settings → Endpoints → '
-                  'AI assistant first — an Ollama on your own server '
-                  'works, and keeps message text on your network.',
+            ? context.l10n.notificationsSmartRepliesSubtitle
+            : context.l10n.notificationsSmartRepliesDisabled,
       ),
       value: enabled && configured,
       onChanged: !configured || settings == null
@@ -938,20 +905,16 @@ class _BuiltInConnectionSectionState
     final open = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Notifications are off'),
-        content: const Text(
-          'The background connection exists to show you messages, and '
-          'Android is currently blocking every notification from Braid. '
-          'Allow notifications in system settings, then try again.',
-        ),
+        title: Text(context.l10n.notificationsBlockedTitle),
+        content: Text(context.l10n.notificationsBlockedBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Not now'),
+            child: Text(context.l10n.commonNotNow),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Open settings'),
+            child: Text(context.l10n.notificationsOpenSettings),
           ),
         ],
       ),
@@ -972,21 +935,16 @@ class _BuiltInConnectionSectionState
     final wanted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('One more step'),
-        content: const Text(
-          'When the phone sleeps deeply, Android cuts background '
-          'connections unless the app is allowed unrestricted battery use. '
-          'Android will now ask — allowing it is what makes messages arrive '
-          'at night too. You can change it any time in system settings.',
-        ),
+        title: Text(context.l10n.notificationsBatteryTitle),
+        content: Text(context.l10n.notificationsBatteryBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Not now'),
+            child: Text(context.l10n.commonNotNow),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Continue'),
+            child: Text(context.l10n.commonContinue),
           ),
         ],
       ),
@@ -1013,12 +971,8 @@ class _BuiltInConnectionSectionState
                   ? context.palette.online
                   : context.colors.onSurfaceVariant,
             ),
-            title: const Text('Stay connected in the background'),
-            subtitle: const Text(
-              'Braid keeps its own connection open behind a small permanent '
-              'notification, so messages arrive while the app is closed — '
-              'nothing else to install. Survives reboots.',
-            ),
+            title: Text(context.l10n.notificationsStayConnectedTitle),
+            subtitle: Text(context.l10n.notificationsStayConnectedSubtitle),
             value: _enabled,
             onChanged: (v) => unawaited(_setEnabled(v)),
           ),
@@ -1028,11 +982,8 @@ class _BuiltInConnectionSectionState
                 Icons.battery_alert_rounded,
                 color: context.colors.error,
               ),
-              title: const Text('Allow unrestricted battery use'),
-              subtitle: const Text(
-                'Without this, deep sleep cuts the connection and messages '
-                'wait until the phone wakes. The dialog is Android\'s own.',
-              ),
+              title: Text(context.l10n.notificationsBatteryToggleTitle),
+              subtitle: Text(context.l10n.notificationsBatteryToggleSubtitle),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => unawaited(
                 _channel
@@ -1085,7 +1036,7 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
                 const SizedBox(width: WeftSpace.sm),
                 Expanded(
                   child: Text(
-                    'Background push',
+                    context.l10n.notificationsUnifiedPushTitle,
                     style: context.text.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -1096,13 +1047,8 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
             const SizedBox(height: WeftSpace.xs),
             Text(
               configured
-                  ? 'Messages reach this phone even with Braid closed, through '
-                        'your UnifiedPush distributor.'
-                  : 'An alternative to the built-in connection: a UnifiedPush '
-                        'distributor (the ntfy app) wakes this phone through '
-                        'your own push server, and Braid holds no connection '
-                        'of its own. Lightest on battery when several apps '
-                        'share the distributor.',
+                  ? context.l10n.notificationsUnifiedPushOn
+                  : context.l10n.notificationsUnifiedPushOff,
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
@@ -1124,7 +1070,7 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
                         ref.read(settingsRevisionProvider.notifier).bump();
                         if (mounted) setState(() => _busy = false);
                       },
-                      child: const Text('Turn off'),
+                      child: Text(context.l10n.notificationsTurnOff),
                     )
                   : FilledButton.tonal(
                       onPressed: () async {
@@ -1138,12 +1084,11 @@ class _UnifiedPushSectionState extends ConsumerState<_UnifiedPushSection> {
                         } else {
                           showWeftMessage(
                             context,
-                            'Registering… the distributor confirms in a '
-                            'moment.',
+                            context.l10n.notificationsRegistering,
                           );
                         }
                       },
-                      child: const Text('Set up'),
+                      child: Text(context.l10n.notificationsSetUp),
                     ),
             ),
           ],

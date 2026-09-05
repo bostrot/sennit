@@ -5,6 +5,7 @@
 /// rebuild never takes the user's merge decisions with it.
 library;
 
+export 'src/backup_adapter.dart';
 export 'src/identity_store.dart';
 export 'src/link_preview_store.dart';
 export 'src/migrations.dart';

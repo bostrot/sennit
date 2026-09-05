@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Generated from lib/l10n/*.arb by `flutter gen-l10n`, which `generate: true`
+# in pubspec.yaml runs on every `pub get` and build. The ARB files are the
+# source; this is derived, and committing it means reviewing a diff nobody
+# wrote. See docs/architecture/l10n-pipeline.md.
+lib/l10n/gen/

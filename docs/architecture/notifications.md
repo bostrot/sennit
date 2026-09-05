@@ -204,6 +204,62 @@ sequenceDiagram
   P->>P: dismissRoom → cancel the row
 ```
 
+### Three surfaces, one verb, two mechanisms
+
+The shade is not the only place a conversation is still saying it has something
+unread. The watch companion and the home screen widget are showing the same
+message, and a user who has read it expects all three to stop — a phone that
+looks caught up while the wrist keeps buzzing is worse than one that clears
+nothing.
+
+`ConversationClearer` in
+`apps/weft/lib/services/notifications/conversation_clearer.dart` is that one
+verb, and it exists because the three do **not** clear the same way:
+
+- **The shade** is cancelled by group key. It is the only one with rows that
+  persist independently of the inbox.
+- **The watch and the widget** read [the snapshot](companion-surfaces.md), which
+  is derived from the chat list — so they clear by that list being *republished*
+  with the count at zero. There is nothing to cancel; the only honest action is
+  to publish the truth again, immediately, rather than waiting for whatever tick
+  would have done it minutes later.
+
+Both halves are attempted even when the first throws. Each failure is one
+surface out of date, and letting it become two is what is worth avoiding.
+
+The republish deliberately takes no argument. The list it should publish is
+whatever the repository holds *now*, and a snapshot captured by a caller is one
+taken before the read was recorded — which would put back the unread count the
+clear was meant to remove. For the same reason `ChatView` sequences the clear
+after `markRead` rather than beside it.
+
+Every door into a conversation goes through it: the inbox tile, a notification
+tap through the deep-link handler, a `weft://` deeplink, the two-pane
+click-through, and — since threads — a thread opened from an indicator, which is
+`ChatView` again with a root set and therefore covered by construction.
+
+### Read on another device, while this one is awake
+
+Reading on a laptop moves the account's `m.read`, the receipt syncs, and this
+phone's unread count for that chat drops to zero **with nothing on the phone
+having done anything**. The clearing push above covers a phone that is asleep.
+`ReadElsewhereWatcher` covers one that is awake and holding a socket open, which
+the gateway may skip entirely: it watches the chat list and clears any chat that
+was unread on the previous tick and is not on this one.
+
+The *transition* is what it acts on, not the state. A chat that has been read
+for a week must not be cleared on every tick, because a new notification for it
+can legitimately be posted between two ticks and would be wiped by the next one.
+A chat that leaves the list entirely is deliberately not cleared either — it was
+archived, deleted, or the account signed out, and `_stopInboxSurfaces` owns all
+three.
+
+It watches the chat list rather than raw receipts because a receipt is a *room*
+fact and a notification is a *conversation* fact. Turning one into the other is
+the merge fold, which the repository has already performed by the time a chat
+reaches the watcher; a watcher over receipts would have to redo it, and would
+get a merged contact wrong in exactly the way `dismissRoom`'s fallback describes.
+
 ## Server-side rules stop the push; the policy stops the display
 
 Two places can silence a message and they are not interchangeable, so
@@ -251,6 +307,139 @@ which would make the open app quieter than the woken one; the raw stream plus
 `evaluateNotification` is what makes the two agree. The server's rules are not
 lost — `Chat.muted` and `ChatSource.muted` are derived from `room.pushRuleState`,
 so a server-muted room suppresses locally too.
+
+## Coming back after a reboot
+
+A messenger that stops delivering when the phone restarts, and does not start
+again until somebody opens it, is a messenger people miss messages on for a day
+without knowing. The two platforms solve it in ways that share no code and no
+shape, so the honest thing is to describe them separately rather than to
+pretend there is one mechanism.
+
+### Android: a broadcast starts a service
+
+`SyncBootReceiver` hears the boot broadcast and starts `WeftSyncService`, which
+is the same foreground service the in-app toggle starts — so every rule about
+foreground types and the daemon engine stays in one place, and a reboot goes
+through the path that is already exercised.
+
+Three things about it are easy to get wrong and each fails in silence:
+
+- **Three actions, not one.** `BOOT_COMPLETED` is the documented broadcast and
+  the only one most devices send. A number of vendor ROMs — HTC's originally,
+  and the Chinese OEM forks that inherited its power management — send
+  `android.intent.action.QUICKBOOT_POWERON` or
+  `com.htc.intent.action.QUICKBOOT_POWERON` *instead*, after their "fast boot"
+  shutdown, which on those phones is the ordinary way the device turns off. An
+  app listening only for the documented one is never started on them, and it
+  presents exactly as the bug was reported.
+- **`specialUse`, not `dataSync`.** Android 15 forbids starting a `dataSync`
+  foreground service from `BOOT_COMPLETED`; `specialUse` is not on that list.
+  The type must be declared in the manifest *and* matched by
+  `FOREGROUND_SERVICE_SPECIAL_USE`, or Android 14+ refuses the start. The
+  service posts its notification inside `onStartCommand`, before the Dart engine
+  starts, because the system allows roughly ten seconds and a cold device at
+  boot is not fast.
+- **A refused start is caught.** Android 12+ may refuse the foreground start
+  outright. That costs one boot's connection and nothing else — opening the app
+  restores it — and an uncaught exception in a boot receiver is a crash dialog
+  on a phone somebody has just switched on.
+
+**Between a reboot and the first unlock, an encrypted Android phone does not
+sync, and that is deliberate.** The receiver is not `directBootAware` and does
+not listen for `LOCKED_BOOT_COMPLETED`. Before the first unlock only
+device-protected storage is readable, and everything the service needs — the
+Matrix session, the account's own keys, the Olm store, and the preference saying
+the connection is wanted at all — is credential-protected. A receiver woken
+there would start a foreground service, post a notification on the lock screen,
+fail to sign in, and stop: a visible failure in exchange for nothing. Moving
+that data into device-protected storage to make direct boot work is the same
+question answered worse — it would put an end-to-end encrypted messenger's
+long-term keys somewhere the OS decrypts before anybody has proved they own the
+phone. Push still wakes the app in that window if a gateway is configured,
+because that path belongs to the system.
+
+### iOS: there is no boot broadcast, and there does not need to be
+
+iOS has no equivalent of `BOOT_COMPLETED`, no way for an app to arrange to be
+launched at startup, and no long-lived background process. Asking for the
+Android behaviour on iOS is asking for something the platform does not have.
+
+What replaces it is that **a push wakes the app**, and nothing about a reboot
+changes that. APNs holds the device's token across restarts, and a notification
+delivered to a phone that has rebooted and not been opened since still launches
+the app's notification service extension. Three pieces have to be in place, and
+all three are:
+
+| Piece | Where | Why it matters here |
+| --- | --- | --- |
+| `remote-notification` background mode | `ios/Runner/Info.plist`, `UIBackgroundModes` | Without it a data push never wakes the app at all |
+| `mutable-content: 1` | `kIosDefaultPayload` in `push_registration.dart` | The only thing that gives the service extension a chance to run |
+| The extension target | `ios/NotificationService/` | Where an `event_id_only` push becomes something to display |
+
+The extension is registered and built and **does not yet decrypt** — see the
+file's own comment and `docs/decisions/adr-002-ios-signing-handoff.md`. Until it
+does, a push arriving after a reboot presents the placeholder alert from
+`kIosDefaultPayload` and the real notification is posted when the app next runs.
+That is a shape limitation, not a delivery one: the notification arrives, at the
+right time, without the app having been opened.
+
+### What the user must not do, on each platform
+
+Different on the two platforms, and worth saying plainly because the advice is
+opposite to what people expect:
+
+- **Android — do not "force stop" Braid**, and where the phone has an
+  aggressive battery manager (Samsung, Xiaomi, OnePlus, Huawei), exempt Braid
+  from it. Force-stopping puts an app into a stopped state from which it
+  receives *no broadcasts at all*, including `BOOT_COMPLETED`, until it is
+  launched by hand. Swiping the app away from Recents is fine — `onTaskRemoved`
+  hands the connection to the daemon and the service survives.
+- **iOS — do not force-quit Braid from the app switcher.** A force-quit on iOS
+  stops the system delivering background pushes to that app until it is opened
+  again. Locking the phone, switching apps and rebooting are all fine; the swipe
+  up out of the app switcher is the one action that is not.
+
+### Verifying it on a device
+
+Nothing above is provable from a test runner: `sync_boot_test.dart` holds the
+manifest and the receiver's handler to the same list of actions, and asserts the
+direct-boot decision is still the one written down — but whether Android
+delivers the broadcast, whether the foreground service is allowed to start at
+boot, and whether the session survives are device facts. The steps:
+
+```bash
+# 1. Turn the built-in connection on in Settings, and confirm the service is up.
+adb shell dumpsys activity services com.bostrot.weft | grep WeftSyncService
+
+# 2. Reboot, and do NOT open the app afterwards.
+adb reboot
+adb wait-for-device
+
+# 3. Unlock the phone — on an encrypted device BOOT_COMPLETED lands here — and
+#    leave the app closed. The service should be running again.
+adb shell dumpsys activity services com.bostrot.weft | grep WeftSyncService
+
+# 4. Send a message from another account, still without opening the app.
+#    The notification must arrive.
+adb shell dumpsys notification --noredact | grep -A3 weft.messages
+
+# 5. The negative case, which is the one that catches a receiver that never ran:
+#    force-stop, reboot, and confirm nothing starts until the app is opened.
+adb shell am force-stop com.bostrot.weft
+adb reboot
+```
+
+Step 3 is the assertion. A service missing there and present after the app is
+opened is a boot receiver that did not fire — check `adb logcat -s WeftSync` for
+the refused-start warning, which distinguishes "Android said no" from "the
+broadcast never arrived".
+
+On iOS the equivalent is: reboot the device, do not open Braid, and send a
+message from another account. The notification should arrive; if the extension
+has not been provisioned it arrives as the placeholder alert, which still proves
+delivery. Force-quitting Braid from the app switcher before the reboot is the
+control case — the notification should then *not* arrive until the app is opened.
 
 ## Tap routing has one router and two front doors
 

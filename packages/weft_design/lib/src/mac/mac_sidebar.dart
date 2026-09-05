@@ -36,7 +36,7 @@ class MacSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (top != null) top!,
+            ?top,
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.only(
@@ -105,7 +105,7 @@ class MacSidebarSection extends StatelessWidget {
               ),
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -222,7 +222,10 @@ class _MacSidebarRowState extends State<MacSidebarRow> {
           duration: context.motion.instant,
           height: MacMetrics.sidebarRowHeight,
           margin: const EdgeInsets.symmetric(vertical: 1),
-          padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+          padding: const EdgeInsetsDirectional.only(
+            start: WeftSpace.dense,
+            end: WeftSpace.dense,
+          ),
           decoration: BoxDecoration(
             color: fill,
             borderRadius: BorderRadius.circular(MacMetrics.sidebarRowRadius),
@@ -238,7 +241,7 @@ class _MacSidebarRowState extends State<MacSidebarRow> {
                   color: selected ? colors.onPrimary : colors.primary,
                 ),
               if (widget.leading != null || widget.icon != null)
-                const SizedBox(width: 6),
+                const SizedBox(width: WeftSpace.dense),
               Expanded(
                 child: Text(
                   widget.label,

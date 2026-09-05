@@ -9,6 +9,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/seeded_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The two things the composer has to say when the next message is an SMS.
 ///
@@ -40,6 +41,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(seeded)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: ChatView(chatId: seeded.chatId),
         ),
@@ -107,6 +109,7 @@ void main() {
   group('SmsComposerBar on its own', () {
     Future<void> pumpBar(WidgetTester tester, String body) => tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(body: SmsComposerBar(body: body)),
       ),

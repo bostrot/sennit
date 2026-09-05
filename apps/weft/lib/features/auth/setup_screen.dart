@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_store/weft_store.dart';
+import '../../app/localisation.dart';
 
 import '../../app/notification_providers.dart';
 import '../../app/stores.dart';
@@ -41,43 +42,35 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   /// The steps this platform actually has. Desktop needs no permission for
   /// notifications and has no connection service or contact store, so there
   /// the flow finishes before it starts.
-  late final List<_SetupStep> _steps = [
-    if (NotificationPlatform.needsPermissionPrompt)
-      _SetupStep(
-        icon: Icons.notifications_active_outlined,
-        title: 'Get told about messages',
-        body:
-            'Braid shows who wrote and what they said, with reply buttons '
-            'right on the notification. Android asks once — this is that '
-            'moment.',
-        action: 'Allow notifications',
-        run: _enableNotifications,
-      ),
-    if (_isAndroid)
-      _SetupStep(
-        icon: Icons.sync_rounded,
-        title: 'Stay connected',
-        body:
-            'Messages arrive while Braid is closed: the app keeps its own '
-            'connection open behind a small silent notification — nothing '
-            'else to install, survives reboots. Android will also ask to '
-            'exempt Braid from battery limits so messages arrive at night '
-            'too.',
-        action: 'Stay connected',
-        run: _enableConnection,
-      ),
-    if (_isAndroid || defaultTargetPlatform == TargetPlatform.iOS)
-      _SetupStep(
-        icon: Icons.person_pin_rounded,
-        title: 'Your names for people',
-        body:
-            'When a phone number matches, chats are named the way your '
-            'contacts app names them — not whatever name someone set for '
-            'themselves on WhatsApp. Matching happens on this phone only.',
-        action: 'Use my contacts',
-        run: _enableContactNames,
-      ),
-  ];
+  List<_SetupStep> get _steps {
+    final l10n = context.l10n;
+    return [
+      if (NotificationPlatform.needsPermissionPrompt)
+        _SetupStep(
+          icon: Icons.notifications_active_outlined,
+          title: l10n.setupNotificationsTitle,
+          body: l10n.setupNotificationsBody,
+          action: l10n.setupNotificationsAction,
+          run: _enableNotifications,
+        ),
+      if (_isAndroid)
+        _SetupStep(
+          icon: Icons.sync_rounded,
+          title: l10n.setupConnectionTitle,
+          body: l10n.setupConnectionBody,
+          action: l10n.setupConnectionTitle,
+          run: _enableConnection,
+        ),
+      if (_isAndroid || defaultTargetPlatform == TargetPlatform.iOS)
+        _SetupStep(
+          icon: Icons.person_pin_rounded,
+          title: l10n.setupContactsTitle,
+          body: l10n.setupContactsBody,
+          action: l10n.setupContactsAction,
+          run: _enableContactNames,
+        ),
+    ];
+  }
 
   SettingsStore? get _settings {
     try {
@@ -202,7 +195,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
               const SizedBox(height: WeftSpace.sm),
               TextButton(
                 onPressed: _busy ? null : () => _advance(granted: false),
-                child: const Text('Not now'),
+                child: Text(context.l10n.commonNotNow),
               ),
             ],
           ),

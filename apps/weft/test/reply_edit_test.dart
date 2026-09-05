@@ -11,6 +11,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import 'support/recording_repository.dart';
 import 'support/seeded_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Replying and editing, from the long-press to the event that goes out.
 ///
@@ -39,6 +40,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: const ChatView(chatId: mergedChat),
         ),
@@ -446,6 +448,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(seeded)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: seeded.chatId),
           ),
@@ -514,6 +517,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(seeded)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: seeded.chatId),
           ),

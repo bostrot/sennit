@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -73,9 +72,63 @@ class DemoChatRepository implements ChatRepository {
   }) async {}
 
   @override
-  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  peerReadUpTo(String chatId) => const [];
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
-  ) => const [];
+  ) {
+    // Demo mode has no receipts of its own, so the honest answer is the newest
+    // message the fixture user sent: everything up to their own last word has
+    // plainly been read, and nothing after it is claimed either way. Empty
+    // would read as "no marker", which the thread grouping treats as nothing
+    // unread — and then no demo thread ever shows a badge to look at.
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return const [];
+
+    final markers = <({String roomId, String eventId, DateTime at})>[];
+    for (final source in chat.sources) {
+      WeftMessage? newest;
+      for (final message in historyFor(source, chat.title)) {
+        if (!message.isOwn) continue;
+        if (newest == null || message.timestamp.isAfter(newest.timestamp)) {
+          newest = message;
+        }
+      }
+      if (newest != null) {
+        markers.add((
+          roomId: source.roomId,
+          eventId: newest.eventId,
+          at: newest.timestamp,
+        ));
+      }
+    }
+    return markers;
+  }
+
+  @override
+  Future<ChatRequestState?> answerChatRequest(
+    String chatId,
+    ChatRequestAction action,
+  ) async {
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    if (index < 0) return null;
+    final current = _chats[index].request;
+    if (!isPendingRequest(current)) return current;
+
+    final next = applyChatRequestAction(current!, action);
+    // Accepting clears the flag outright; the other two leave it set so the
+    // inbox can take the row out. Demo mode has no room to leave and no ignore
+    // list to write to — [planChatRequest] is what a real repository consults,
+    // and asserting the plan is `weft_domain`'s job, not this one's.
+    _chats = [..._chats]
+      ..[index] = _chats[index].copyWith(
+        request: next == ChatRequestState.accepted ? null : next,
+      );
+    _controller.add(_chats);
+    return next;
+  }
 
   @override
   void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
@@ -185,7 +238,7 @@ class DemoChatRepository implements ChatRepository {
             roomId: source.roomId,
             network: source.network,
             pageSize: 12,
-            history: _historyFor(source, chat.title),
+            history: historyFor(source, chat.title),
             fold: _withRelations,
             sessionMessages: (roomId) =>
                 _localMessages[roomId] ?? const <WeftMessage>[],
@@ -307,6 +360,60 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
+  Future<void> sendThreadReply(
+    String chatId,
+    String body, {
+    required String threadRootId,
+    String? replyToEventId,
+    String? threadLatestEventId,
+  }) async {
+    final index = _chats.indexWhere((c) => c.id == chatId);
+    if (index < 0) return;
+    final chat = _chats[index];
+
+    // The root's room, never the chat's send network. A thread relation
+    // pointing at an event id the destination room has never heard of is a
+    // thread nobody in that room can open — the same rule replies and reactions
+    // follow, and sharper here because the thread *is* the destination.
+    final root = _messageIn(chatId, threadRootId);
+    if (root == null) {
+      throw StateError(
+        'Cannot reply in thread $threadRootId: it is not in $chatId',
+      );
+    }
+    final network = chat.sources
+        .firstWhere(
+          (s) => s.roomId == root.roomId,
+          orElse: () => sendSourceFor(chat),
+        )
+        .network;
+
+    final message = WeftMessage(
+      eventId: '\$local_${DateTime.now().microsecondsSinceEpoch}',
+      roomId: root.roomId,
+      network: network,
+      senderId: _localUserId,
+      senderName: 'You',
+      timestamp: DateTime.now(),
+      kind: MessageKind.text,
+      isOwn: true,
+      body: body,
+      // Only an explicit answer carries a visible quote. The spec's fallback is
+      // for clients that cannot render threads, and demo mode's timeline can —
+      // writing it here would show every thread message quoting the one above.
+      replyToEventId: replyToEventId,
+      threadRootId: threadRootId,
+      threadName: root.threadName,
+      deliveryState: DeliveryState.sent,
+    );
+
+    _localMessages.putIfAbsent(root.roomId, () => []).add(message);
+    _chats = [..._chats]
+      ..[index] = chat.copyWith(lastMessage: message, unreadCount: 0);
+    _controller.add(_chats);
+  }
+
+  @override
   Future<void> react(String chatId, String eventId, String key) async {
     final target = _messageIn(chatId, eventId);
     if (target == null) {
@@ -394,7 +501,7 @@ class DemoChatRepository implements ChatRepository {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return null;
     for (final source in chat.sources) {
-      for (final message in _historyFor(source, chat.title)) {
+      for (final message in historyFor(source, chat.title)) {
         if (message.eventId == eventId) return message;
       }
     }
@@ -542,6 +649,7 @@ class DemoChatRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   }) async {
     // An unknown id is an ArgumentError here rather than the silent return the
     // other demo mutators take: losing a file is not the same as failing to
@@ -560,6 +668,7 @@ class DemoChatRepository implements ChatRepository {
       maxUploadBytes: kDemoMaxUploadBytes,
       isVoiceNote: isVoiceNote,
       durationMs: durationMs,
+      caption: caption,
     );
     if (decision is UploadRejection) {
       throw AttachmentRejectedException(decision);
@@ -621,12 +730,17 @@ class DemoChatRepository implements ChatRepository {
       timestamp: DateTime.now(),
       kind: plan.kind,
       isOwn: true,
-      body: plan.filename,
+      // The same split `toEventContent` writes and `mapEvent` reads back: the
+      // caption is the body and the name moves aside, or the name is the body
+      // and there is no separate name at all. Fabricating it any other way
+      // would make demo mode the one place a caption renders differently.
+      body: plan.caption ?? plan.filename,
       deliveryState: DeliveryState.sent,
       // The event id, exactly as `mapEvent` writes it: the field is a flag
       // saying "there is a file here", and the bytes are fetched by event id —
       // which is why the slice moves to the same key here.
       attachmentUrl: eventId,
+      attachmentName: plan.caption == null ? null : plan.filename,
       durationMs: plan.durationMs,
       mediaWidth: plan.dimensions?.width,
       mediaHeight: plan.dimensions?.height,
@@ -756,6 +870,7 @@ class DemoChatRepository implements ChatRepository {
     return [
       Chat(
         id: 'merged:anna',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Anna Maven',
         contactId: _graph.contactIdOf('anna_wa'),
         sources: const [
@@ -784,6 +899,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!konrad_wa_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Konrad Majewski',
         sources: const [
           ChatSource(
@@ -802,6 +918,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!sofia_tg_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Sofia Martinez',
         sources: const [
           ChatSource(
@@ -819,8 +936,32 @@ class DemoChatRepository implements ChatRepository {
           delivery: DeliveryState.read,
         ),
       ),
+      // A stranger, held out of the inbox until the user answers. One, not
+      // several: the requests row exists to be noticed and a demo inbox with a
+      // queue of them would misrepresent how often this actually happens.
+      Chat(
+        id: '!unknown_sg_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
+        title: '+1 555 0143',
+        sources: const [
+          ChatSource(
+            roomId: '!unknown_sg_room:example.org',
+            network: ChatNetwork.signal,
+          ),
+        ],
+        request: ChatRequestState.pending,
+        unreadCount: 1,
+        lastMessage: _msg(
+          '!unknown_sg_room:example.org',
+          ChatNetwork.signal,
+          '+1 555 0143',
+          'Hi, is this the right number for Sam?',
+          38,
+        ),
+      ),
       Chat(
         id: '!james_ig_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Dr. James Anderson',
         sources: const [
           ChatSource(
@@ -839,6 +980,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!isabella_tg_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Isabella Garcia',
         sources: const [
           ChatSource(
@@ -857,6 +999,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: 'merged:michael',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Michael Johnson',
         sources: const [
           ChatSource(
@@ -878,6 +1021,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!david_wa_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Prof. David Wilson',
         sources: const [
           ChatSource(
@@ -895,6 +1039,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!alex_sl_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Alexandra Thompson',
         sources: const [
           ChatSource(
@@ -912,6 +1057,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!emma_sg_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Emma Robinson',
         sources: const [
           ChatSource(
@@ -929,6 +1075,7 @@ class DemoChatRepository implements ChatRepository {
       ),
       Chat(
         id: '!design_room:example.org',
+        // l10n-ignore: demo fixture, never shipped to a real inbox.
         title: 'Design Team',
         isGroup: true,
         sources: const [
@@ -959,6 +1106,8 @@ class DemoChatRepository implements ChatRepository {
     MessageKind kind = MessageKind.text,
     String? transcript,
     DeliveryState? delivery,
+    String? threadRootId,
+    String? threadName,
   }) {
     return WeftMessage(
       eventId: '\$${roomId}_$minutesAgo',
@@ -972,17 +1121,84 @@ class DemoChatRepository implements ChatRepository {
       body: body,
       transcript: transcript,
       deliveryState: delivery,
+      threadRootId: threadRootId,
+      threadName: threadName,
       durationMs: kind == MessageKind.voice ? 8400 : null,
     );
   }
 
+  /// The Telegram room that carries a forum topic, so the thread surfaces are
+  /// reachable without a homeserver.
+  ///
+  /// One room rather than all of them: threads are the exception in a real
+  /// inbox and a demo where every conversation had one would misrepresent both
+  /// the feature and the ordinary case. The route walk opens this room by name.
+  static const String kThreadRoomId = '!isabella_tg_room:example.org';
+
+  /// That room's title, so a test can open it by name rather than by position.
+  // l10n-ignore: demo fixture, never shipped to a real inbox.
+  static const String kThreadChatTitle = 'Isabella Garcia';
+
+  /// The topic's opening message, which the indicator hangs under.
+  static const String kThreadRootEventId = '\$!isabella_tg_room:example.org_44';
+
+  /// A Telegram forum topic: a root, and three replies inside it.
+  ///
+  /// Named "Deploy" because a topic's *name* is the thing the bridge carries
+  /// that a plain Matrix thread does not, and an unnamed one here would leave
+  /// the interesting half of `threadTitle` undemonstrated.
+  static List<WeftMessage> _forumTopic() =>
+      const [
+            (
+              44,
+              'Isabella Garcia',
+              'Anyone free to look at the deploy?',
+              false,
+              null,
+            ),
+            (
+              40,
+              'Isabella Garcia',
+              'It fell over on the migration step',
+              false,
+              true,
+            ),
+            (36, 'You', 'Looking now', true, true),
+            (32, 'Isabella Garcia', 'Thank you!', false, true),
+          ]
+          .map((row) {
+            final (minutesAgo, sender, body, isOwn, inThread) = row;
+            return _msg(
+              kThreadRoomId,
+              ChatNetwork.telegram,
+              sender,
+              body,
+              minutesAgo,
+              isOwn: isOwn,
+              delivery: isOwn ? DeliveryState.delivered : null,
+              threadRootId: inThread == null ? null : kThreadRootEventId,
+              threadName: 'Deploy',
+            );
+          })
+          .toList(growable: false);
+
   /// Synthesises a plausible back-and-forth for a room, staggered per network
   /// so a merged chat genuinely interleaves.
-  List<WeftMessage> _historyFor(ChatSource source, String title) {
+  /// Synthesised history for one room.
+  ///
+  /// `@protected` and overridable rather than private, because a subclass that
+  /// replaces the *timeline* and not this is a repository that disagrees with
+  /// itself: `timelineFor` would hand over one set of messages while
+  /// `_messageIn` — which is what a reply, a reaction and a thread send all
+  /// resolve their target through — walked another and found nothing.
+  @protected
+  @visibleForOverriding
+  List<WeftMessage> historyFor(ChatSource source, String title) {
     final seed = source.roomId.hashCode.abs();
     final lines =
         _sampleLines[source.network] ?? _sampleLines[ChatNetwork.matrix]!;
     return [
+      if (source.roomId == kThreadRoomId) ..._forumTopic(),
       // Anything sent this session comes first: the fixtures are a fixed past,
       // and an attachment the user just sent belongs on top of it.
       ..._localMessages[source.roomId] ?? const <WeftMessage>[],

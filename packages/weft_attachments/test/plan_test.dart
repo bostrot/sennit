@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
@@ -32,6 +33,7 @@ void main() {
     int maxUploadBytes = 100 * 1024 * 1024,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   }) {
     final decision = planUpload(
       source(
@@ -44,6 +46,7 @@ void main() {
       maxUploadBytes: maxUploadBytes,
       isVoiceNote: isVoiceNote,
       durationMs: durationMs,
+      caption: caption,
     );
     return decision as UploadPlan;
   }
@@ -552,10 +555,81 @@ void main() {
         png(width: 2, height: 2),
         filename: 'photo.png',
         sizeBytes: 99,
-      ).toEventContent(uri: 'mxc://weft.test/a', caption: 'the cat again');
+        caption: 'the cat again',
+      ).toEventContent(uri: 'mxc://weft.test/a');
 
       expect(content['body'], 'the cat again');
       expect(content['filename'], 'photo.png');
+    });
+
+    test('a caption is trimmed on the way in', () {
+      final planned = plan(
+        png(width: 2, height: 2),
+        filename: 'photo.png',
+        sizeBytes: 99,
+        caption: '  at the beach\n',
+      );
+
+      expect(planned.caption, 'at the beach');
+      expect(
+        planned.toEventContent(uri: 'mxc://weft.test/a')['body'],
+        'at the beach',
+      );
+    });
+
+    test('a blank caption is no caption at all', () {
+      // The regression: a composer that submitted an untouched field would
+      // otherwise send `body: "   "` with the name pushed aside, which renders
+      // as an empty line under the picture on every client — and, worse, is
+      // what the *name* would have been showing.
+      for (final blank in ['', '   ', '\n', '\t \n']) {
+        final planned = plan(
+          png(width: 2, height: 2),
+          filename: 'photo.png',
+          sizeBytes: 99,
+          caption: blank,
+        );
+
+        expect(planned.caption, isNull, reason: 'for ${jsonEncode(blank)}');
+        final content = planned.toEventContent(uri: 'mxc://weft.test/a');
+        expect(content['body'], 'photo.png');
+        expect(content.containsKey('filename'), isFalse);
+      }
+    });
+
+    test('a caption on an encrypted plan does not disturb the file block', () {
+      // The caption is the one part of the content that is *not* structural,
+      // and the shape rules are the part that leaks a preview when they are
+      // wrong. Asserted together because a caption arriving through a second
+      // parameter used to be threaded past exactly this branch.
+      final content = plan(
+        png(width: 2, height: 2),
+        filename: 'photo.png',
+        sizeBytes: 99,
+        encrypted: true,
+        caption: 'the cat again',
+      ).toEventContent(uri: 'mxc://weft.test/a', file: key);
+
+      expect(content['body'], 'the cat again');
+      expect(content['filename'], 'photo.png');
+      expect(content.containsKey('url'), isFalse);
+      expect((content['file']! as Map)['url'], 'mxc://weft.test/a');
+    });
+
+    test('a captioned voice note keeps both MSC keys', () {
+      final content = plan(
+        ogg(),
+        filename: 'note.ogg',
+        sizeBytes: 5000,
+        isVoiceNote: true,
+        durationMs: 3400,
+        caption: 'sorry about the noise',
+      ).toEventContent(uri: 'mxc://weft.test/a');
+
+      expect(content['body'], 'sorry about the noise');
+      expect(content['filename'], 'note.ogg');
+      expect(content['org.matrix.msc3245.voice'], isEmpty);
+      expect(content['org.matrix.msc1767.audio'], {'duration': 3400});
     });
   });
 

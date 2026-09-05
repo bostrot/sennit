@@ -51,6 +51,7 @@ void main() {
     int? width,
     int? height,
     DeliveryState? delivery,
+    String? attachmentName,
   }) => WeftMessage(
     eventId: eventId,
     roomId: chatId,
@@ -62,6 +63,7 @@ void main() {
     isOwn: isOwn,
     body: body,
     attachmentUrl: 'mxc://example.org/$eventId',
+    attachmentName: attachmentName,
     durationMs: durationMs,
     mediaSizeBytes: sizeBytes,
     mediaWidth: width,
@@ -182,6 +184,55 @@ void main() {
           minutesAgo: 1,
           width: 400,
           height: 225,
+        ),
+      ],
+    );
+  });
+
+  testWidgets('captioned bubbles, both themes', (tester) async {
+    await expectChatGolden(
+      tester,
+      'attachment_caption',
+      bytes: kPhoto,
+      size: const Size(560, 1040),
+      history: [
+        // The peer's caption, on the peer bubble's fill. The name is carried
+        // separately, so this is a caption without any heuristic having to
+        // decide it is one.
+        message(
+          eventId: 'photo_in',
+          kind: MessageKind.image,
+          body: 'the light was extraordinary',
+          attachmentName: 'IMG_4021.HEIC',
+          minutesAgo: 8,
+          width: 400,
+          height: 225,
+        ),
+        // The user's own, on the primary fill — the case where the caption's
+        // colour has to come from `ownBubbleText` rather than from the accent,
+        // which is derived from the fill it would be drawn on.
+        message(
+          eventId: 'photo_out',
+          kind: MessageKind.image,
+          body: 'ours from the same evening',
+          attachmentName: 'harbour.jpg',
+          minutesAgo: 5,
+          isOwn: true,
+          width: 400,
+          height: 225,
+          delivery: DeliveryState.read,
+        ),
+        // A caption that would fail the filename heuristic outright. Nothing
+        // here is allowed to look at the words: the separate name is the whole
+        // signal, and a bubble that dropped this sentence would be a caption
+        // silently lost.
+        message(
+          eventId: 'file_in',
+          kind: MessageKind.file,
+          body: 'screenshot.png',
+          attachmentName: 'quarterly-report.pdf',
+          minutesAgo: 2,
+          sizeBytes: 2 * 1024 * 1024 + 400 * 1024,
         ),
       ],
     );

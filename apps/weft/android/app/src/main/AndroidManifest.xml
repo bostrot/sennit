@@ -19,6 +19,42 @@
     <uses-permission android:name="android.permission.SEND_SMS"/>
     <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <uses-permission android:name="android.permission.RECEIVE_MMS"/>
+    <!-- The fifth, and the one whose absence produced the whole "Nothing
+         changed" bug. It is not about receiving a WAP push — `MmsReceiver` is
+         reached through `RECEIVE_MMS` above — it is about being *allowed to be
+         the default app at all*.
+
+         When the role is granted, AOSP's `SmsApplication` assigns the app-ops
+         the role carries: OP_WRITE_SMS, OP_RECEIVE_SMS, OP_RECEIVE_MMS,
+         OP_SEND_SMS, OP_READ_SMS and OP_RECEIVE_WAP_PUSH. An app-op cannot be
+         granted for a permission the package never declared, so the last one
+         silently fails and `SmsApplication` then *disqualifies* the app for
+         having "lost" a required op. The visible result is the one that was
+         reported: `RoleManager` says Braid holds ROLE_SMS, and
+         `Telephony.Sms.getDefaultSmsPackage()` — which is what the app, the
+         provider and every other app read — still names the previous holder.
+         Nothing throws. The only trace is one logcat line from a system class:
+
+             E SmsApplication: com.bostrot.weft lost android:receive_wap_push:
+             (no permission to fix)
+
+         Found by running the role request on a device, not by reading the
+         code; `sms_manifest_test.dart` now holds it. -->
+    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH"/>
+    <!-- And the sixth, for exactly the same reason and found the same way:
+         with RECEIVE_WAP_PUSH added, the role was granted and the default
+         still did not move, and the log line moved on to the next op in
+         `SmsApplication`'s list:
+
+             E SmsApplication: com.bostrot.weft lost
+             android:read_cell_broadcasts: (no permission to fix)
+
+         The set is all-or-nothing. Weft does not read cell broadcasts and has
+         no screen for emergency alerts; the permission is declared because the
+         *role* carries the op, and an app that cannot hold every op the role
+         assigns cannot hold the role in the way that matters — which is the
+         only way `Telephony.Sms.getDefaultSmsPackage()` will name it. -->
+    <uses-permission android:name="android.permission.READ_CELL_BROADCASTS"/>
     <!-- Calling. `MANAGE_OWN_CALLS` is what lets Weft register a *self-managed*
          phone account and hand Telecom a call of its own; it is a normal
          permission, granted at install, and without it `addNewIncomingCall`
@@ -67,6 +103,7 @@
          optional so the Play listing does not exclude hardware that works. -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+    <!-- l10n-ignore: the app's own name, never translated. -->
     <application
         android:label="Braid"
         android:name="${applicationName}"
@@ -262,12 +299,32 @@
         </service>
         <!-- Brings the connection back after a reboot, only when the user
              turned it on. Exported because BOOT_COMPLETED is a system
-             broadcast. -->
+             broadcast.
+
+             Three actions, not one. BOOT_COMPLETED is the documented one and
+             the only one most devices send; both QUICKBOOT_POWERON spellings
+             are what a number of vendor ROMs send *instead* after their
+             "fast boot" shutdown, which on those phones is the ordinary way
+             the device turns off. Listening for BOOT_COMPLETED alone means the
+             app is never started on them, and it presents as notifications
+             that stop after a restart until the app is opened by hand.
+
+             No LOCKED_BOOT_COMPLETED and no android:directBootAware. Before the
+             first unlock only device-protected storage is readable, and every
+             thing this service needs — the Matrix session, the account's keys,
+             the Olm store, and the preference saying the connection is wanted
+             at all — is credential-protected. A receiver woken there would post
+             a foreground notification, fail to sign in and stop. Moving the
+             keys to device-protected storage to fix it would put an E2EE
+             messenger's long-term secrets where the OS decrypts them before
+             anyone has proved they own the phone. See SyncBootReceiver. -->
         <receiver
             android:name=".sync.SyncBootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
         <!-- Answer and decline on the incoming-call notification. A receiver

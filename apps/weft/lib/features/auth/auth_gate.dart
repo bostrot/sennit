@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_store/weft_store.dart' show SettingsStore, WeftSettings;
+import '../../app/localisation.dart';
 
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
@@ -115,7 +116,7 @@ class _Splash extends StatelessWidget {
               // A slow start is a blank screen with a spinner on it, and a
               // spinner with no label is a screen with nothing on it at all.
               child: Semantics(
-                label: 'Starting Braid',
+                label: context.l10n.authStarting,
                 child: const CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
@@ -147,9 +148,13 @@ class _StartupError extends StatelessWidget {
                 color: context.colors.error,
               ),
               const SizedBox(height: WeftSpace.lg),
-              Text('Braid could not start', style: context.text.titleMedium),
+              Text(
+                context.l10n.authStartupFailed,
+                style: context.text.titleMedium,
+              ),
               const SizedBox(height: WeftSpace.sm),
               Text(
+                // l10n-ignore: the underlying error, in English, from the SDK.
                 '$error',
                 textAlign: TextAlign.center,
                 style: context.text.bodySmall?.copyWith(
@@ -157,7 +162,10 @@ class _StartupError extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: WeftSpace.xl),
-              FilledButton(onPressed: onRetry, child: const Text('Try again')),
+              FilledButton(
+                onPressed: onRetry,
+                child: Text(context.l10n.settingsTryAgain),
+              ),
             ],
           ),
         ),

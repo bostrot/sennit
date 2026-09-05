@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:weft_design/weft_design.dart';
+import '../../app/localisation.dart';
 
 import '../../services/call/call_video.dart';
 
@@ -140,7 +141,9 @@ class _CallVideoViewState extends State<CallVideoView> {
     // nothing useful to say about the *picture* — this says what the region is,
     // which is what stops it being a hole in the screen.
     return Semantics(
-      label: widget.mirror ? 'Your camera' : 'Video from the other person',
+      label: widget.mirror
+          ? context.l10n.callYourCamera
+          : context.l10n.callPeerVideo,
       child: rtc.RTCVideoView(
         renderer,
         mirror: widget.mirror,
@@ -157,7 +160,7 @@ class _NoPicture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'No picture yet',
+      label: context.l10n.callNoPictureYet,
       excludeSemantics: true,
       child: ColoredBox(
         color: context.colors.surfaceContainerHighest,

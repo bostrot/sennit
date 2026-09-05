@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/localisation.dart';
+
 /// The tally chips under a bubble.
 ///
 /// One chip per key, counting *people* — the tallies arrive from
@@ -51,13 +53,20 @@ class ReactionBar extends StatelessWidget {
     // stepping through them to count.
     return Semantics(
       container: true,
-      label: people == 1 ? '1 reaction' : '$people reactions',
+      label: context.l10n.reactionsSummary(people),
       // No padding of its own any more. Every chip below carries a 48dp tap
       // target around a pill that still paints at its old size, so the gap this
       // used to add is now inside the chips — spare height that is live rather
       // than dead, since a tap anywhere in it reaches the chip.
+      //
+      // That spare height is aligned to the *top* of each chip
+      // (`WeftTapTarget.alignment`), which is what makes the pills sit against
+      // the bubble instead of floating half a thumb below it. [runSpacing] is
+      // the gap between rows of a bar that wrapped, and was missing entirely —
+      // a second row of reactions was flush against the first.
       child: Wrap(
         spacing: WeftSpace.xs,
+        runSpacing: WeftSpace.xxs,
         alignment: own ? WrapAlignment.end : WrapAlignment.start,
         children: [
           for (final tally in tallies)
@@ -106,12 +115,20 @@ class ReactionChip extends StatelessWidget {
       // The long-press — who reacted — was an action a screen reader had no way
       // to discover. Naming it puts it in the actions rotor beside the tap.
       onLongPress: onLongPress,
-      onLongPressHint: onLongPress == null ? null : 'see who reacted',
-      label: '${tally.key} ${tally.count}',
+      onLongPressHint: onLongPress == null
+          ? null
+          : context.l10n.reactionSeeWhoHint,
+      label: context.l10n.reactionChipSemantics(tally.key, tally.count),
       // Inside the annotation, so the node the reader touches and the box the
       // guideline measures are both the grown one. A 28dp pill is comfortable
       // to read and roughly half of what a thumb can be asked to find.
+      //
+      // Grown *downwards*: the extra height a thumb needs is spent in the
+      // margin before the next message rather than half above the pill, which
+      // is what used to hold the bar a finger's width off the bubble it
+      // belongs to. The target is the same size; only the ink moved.
       child: WeftTapTarget(
+        alignment: Alignment.topCenter,
         child: Material(
           color: mine
               ? accent.withValues(alpha: 0.22)
@@ -126,7 +143,7 @@ class ReactionChip extends StatelessWidget {
               curve: WeftMotion.standard,
               padding: const EdgeInsets.symmetric(
                 horizontal: WeftSpace.sm,
-                vertical: 3,
+                vertical: WeftSpace.xxs,
               ),
               decoration: BoxDecoration(
                 borderRadius: WeftRadius.pill,
@@ -144,7 +161,7 @@ class ReactionChip extends StatelessWidget {
                   Text(tally.key, style: const TextStyle(fontSize: 13)),
                   const SizedBox(width: WeftSpace.xs),
                   Text(
-                    '${tally.count}',
+                    context.l10n.reactionCount(tally.count),
                     style: context.text.labelSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: mine ? accent : context.colors.onSurfaceVariant,
@@ -173,12 +190,15 @@ class _AddReactionChip extends StatelessWidget {
     // nothing: an unlabelled button sitting after a row of labelled ones.
     return Semantics(
       button: true,
-      label: 'Add reaction',
+      label: context.l10n.reactionAdd,
       excludeSemantics: true,
       onTap: () => onTap(context),
+      // Top-aligned like its neighbours, or the "+" would sit half a chip lower
+      // than the tallies it follows.
       child: WeftTapTarget(
+        alignment: Alignment.topCenter,
         child: Tooltip(
-          message: 'Add reaction',
+          message: context.l10n.reactionAdd,
           excludeFromSemantics: true,
           child: Material(
             color: context.colors.surfaceContainerHighest,
@@ -189,7 +209,7 @@ class _AddReactionChip extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: WeftSpace.sm,
-                  vertical: 4,
+                  vertical: WeftSpace.xs,
                 ),
                 child: Icon(
                   Icons.add_reaction_outlined,
@@ -237,7 +257,7 @@ Future<void> showReactionSendersSheet(
                 Text(tally.key, style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: WeftSpace.sm),
                 Text(
-                  tally.count == 1 ? '1 person' : '${tally.count} people',
+                  context.l10n.reactionPeopleCount(tally.count),
                   style: context.text.titleSmall,
                 ),
               ],

@@ -179,6 +179,31 @@ final attachmentFileReaderProvider = Provider<AttachmentBytesLoader>(
   (ref) => readAttachmentFile,
 );
 
+/// Whether the user sends public read receipts.
+///
+/// Read by the *ticks* as well as by the sender, and that is the point of it
+/// being a provider rather than a lookup inside `markRead`. Turning receipts off
+/// is a two-way switch: bridges relay the public receipt to the remote network
+/// as its own read marker, and nearly all of them stop relaying the other
+/// direction in return — so the user who switched it off is also the user whose
+/// blue ticks will never arrive again. A bubble that went on drawing two grey
+/// ticks would be telling them the other side has not looked at their message,
+/// which is not what happened.
+///
+/// Defaults to **on**, matching the sender's own fallback, so the two cannot
+/// disagree about what an unset key means.
+final sendReadReceiptsProvider = Provider<bool>((ref) {
+  ref.watch(settingsRevisionProvider);
+  try {
+    return ref
+        .read(storesProvider)
+        .settings
+        .getBool(WeftSettings.sendReadReceipts, fallback: true);
+  } on Object {
+    return true;
+  }
+});
+
 /// Whether Return sends the message, or breaks the line.
 ///
 /// Off by default. Braid's composer grows to five lines and people write
@@ -188,10 +213,7 @@ final attachmentFileReaderProvider = Provider<AttachmentBytesLoader>(
 final sendOnEnterProvider = Provider<bool>((ref) {
   ref.watch(settingsRevisionProvider);
   try {
-    return ref
-        .read(storesProvider)
-        .settings
-        .getBool(WeftSettings.sendOnEnter);
+    return ref.read(storesProvider).settings.getBool(WeftSettings.sendOnEnter);
   } on Object {
     // `Object`, not `StateError`: reading a provider that threw during its own
     // creation rethrows a `ProviderException` wrapping the cause, so catching
@@ -395,6 +417,12 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
         .where(
           (c) =>
               c.archived == showArchived &&
+              // Held out of the inbox proper, which is the whole feature: a
+              // conversation from someone the user has never talked to should
+              // be something they *choose* to look at, not a row that has
+              // already pushed a real conversation down the list. They are in
+              // [pendingRequestsProvider], one tap away.
+              !c.isPendingRequest &&
               !service.contains(c.id) &&
               c.id != statusChatId &&
               (label == null || labels.ofChat(c.id).contains(label)) &&
@@ -421,6 +449,36 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
     if (at == null || bt == null) return 0;
     return bt.compareTo(at);
   });
+});
+
+/// Conversations waiting for the user to accept or decline them.
+///
+/// Deliberately *not* narrowed by the rail's network filter, the label filter
+/// or the quick filters. A request is a decision the user has not made yet, and
+/// a decision hidden by a filter they set for another purpose is one they never
+/// make — the conversation simply never appears again. The archived split is
+/// honoured, because an archived room is one they have already dealt with.
+///
+/// Service chats are excluded for the same reason they are excluded everywhere:
+/// a bridge bot messaging its own management room is plumbing, and it would
+/// otherwise arrive as a stranger asking to talk.
+///
+/// Newest first, so the one that just arrived is the one at the top.
+final pendingRequestsProvider = Provider<List<Chat>>((ref) {
+  final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
+  final service = ref.watch(chatRepositoryProvider).serviceChatIds;
+  final requests = chats
+      .where(
+        (c) => c.isPendingRequest && !c.archived && !service.contains(c.id),
+      )
+      .toList();
+  requests.sort((a, b) {
+    final at = a.lastMessage?.timestamp;
+    final bt = b.lastMessage?.timestamp;
+    if (at == null || bt == null) return 0;
+    return bt.compareTo(at);
+  });
+  return List.unmodifiable(requests);
 });
 
 /// Unread totals per network, for the rail badges.

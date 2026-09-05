@@ -16,10 +16,15 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft_richtext/weft_richtext.dart';
+
 import '../../app/a11y.dart';
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/attachments/attachment_byte_cache.dart';
 import '../../services/audio/voice_player.dart';
+import 'rich_text_view.dart';
 
 /// The hero tag joining a bubble's thumbnail to its full-screen self.
 ///
@@ -62,9 +67,16 @@ bool rendersAsAttachment(WeftMessage message) =>
 /// `IMG_4021.jpg` under a photo of a dog. Both are noise rather than captions.
 /// Lifted out of the old inline heuristic so the file bubble, which shows the
 /// name deliberately, does not have to re-derive the same rule backwards.
+///
+/// A sender who wrote [WeftMessage.attachmentName] said which key is which, and
+/// is believed without further argument. Running the heuristic over a body that
+/// has already been declared a caption can only lose: a one-word caption naming
+/// a file — "screenshot.png", typed by a person, under a screenshot — would be
+/// thrown away for looking like the thing the sender explicitly said it is not.
 String? attachmentCaption(WeftMessage message) {
   final caption = message.body.trim();
   if (caption.isEmpty) return null;
+  if (message.attachmentName != null) return caption;
   if (caption.toLowerCase() == 'forwarded') return null;
   // A body that is exactly the filename is a filename, not a caption. The same
   // rule the save path uses to decide whether that body is worth writing the
@@ -72,6 +84,17 @@ String? attachmentCaption(WeftMessage message) {
   if (looksLikeFilename(caption)) return null;
   return caption;
 }
+
+/// What to call the file in a bubble that shows a name: a PDF, an archive, an
+/// audio file, a contact card.
+///
+/// [WeftMessage.attachmentName] when the sender separated the two keys, and
+/// [WeftMessage.body] otherwise — which is the same fallback every client that
+/// predates MSC2530 makes, and correct there because without a caption `body`
+/// *is* the name. Empty when there is neither, which the callers word for
+/// themselves rather than being handed an invented placeholder to render.
+String attachmentFilename(WeftMessage message) =>
+    message.attachmentName ?? message.body;
 
 /// Playback length as `m:ss`, or null when the sender never announced one.
 String? formatMediaDuration(int? milliseconds) {
@@ -96,6 +119,9 @@ class AttachmentBubble extends StatelessWidget {
     this.transcribing = false,
     this.onTranscribe,
     this.onRetranscribe,
+    this.accent,
+    this.onTapLink,
+    this.onTapMention,
   });
 
   final WeftMessage message;
@@ -112,31 +138,64 @@ class AttachmentBubble extends StatelessWidget {
   final VoidCallback? onTranscribe;
   final VoidCallback? onRetranscribe;
 
+  /// Link and mention colour for a caption, matching the text bubble's. Null
+  /// falls back to the bubble's own foreground, which is what an own bubble
+  /// uses anyway.
+  final Color? accent;
+
+  /// The same handlers the text bubble passes to [RichTextView]. A caption is
+  /// message text that happens to sit under a picture: a link in one has to open
+  /// the same way a link in the other does, and a mention of the reader has to
+  /// resolve to the same person.
+  final void Function(String url, String label)? onTapLink;
+  final void Function(RichMention mention)? onTapMention;
+
   @override
   Widget build(BuildContext context) {
     return switch (message.kind) {
       MessageKind.image ||
       MessageKind.video ||
-      MessageKind.sticker => MediaAttachment(message: message, onOpen: onOpen),
+      MessageKind.sticker => MediaAttachment(
+        message: message,
+        own: own,
+        onOpen: onOpen,
+        accent: accent,
+        onTapLink: onTapLink,
+        onTapMention: onTapMention,
+      ),
       MessageKind.audio => _AudioAttachment(
         message: message,
         own: own,
         transcribing: transcribing,
         onTranscribe: onTranscribe,
         onRetranscribe: onRetranscribe,
+        accent: accent,
+        onTapLink: onTapLink,
+        onTapMention: onTapMention,
       ),
       _ when _isContactCard(message) => _ContactAttachment(
         message: message,
         own: own,
         onOpen: onOpen,
       ),
-      _ => _FileAttachment(message: message, own: own, onOpen: onOpen),
+      _ => _FileAttachment(
+        message: message,
+        own: own,
+        onOpen: onOpen,
+        accent: accent,
+        onTapLink: onTapLink,
+        onTapMention: onTapMention,
+      ),
     };
   }
 
   /// A vCard riding as a file — how every bridge relays "shared a contact".
+  ///
+  /// Reads the *name*, not the body: a captioned vCard puts the sender's words
+  /// in `body`, and a caption that happened to end in ".vcf" would otherwise
+  /// decide the bubble's whole shape.
   static bool _isContactCard(WeftMessage message) {
-    final name = message.body.toLowerCase();
+    final name = attachmentFilename(message).toLowerCase();
     return name.endsWith('.vcf') || name.endsWith('.vcard');
   }
 }
@@ -160,18 +219,17 @@ class _ContactAttachment extends StatelessWidget {
     final palette = context.palette;
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
     // "Anna Maven.vcf" → "Anna Maven".
-    final name = message.body.replaceFirst(
-      RegExp(r'\.(vcf|vcard)$', caseSensitive: false),
-      '',
-    );
+    final name = attachmentFilename(
+      message,
+    ).replaceFirst(RegExp(r'\.(vcf|vcard)$', caseSensitive: false), '');
 
     return WeftFocusable(
       button: onOpen != null,
       onTap: onOpen,
       label: semanticsSentence([
-        'Contact card',
+        context.l10n.attachmentContactCard,
         name,
-        if (onOpen != null) 'opens to save the contact',
+        if (onOpen != null) context.l10n.attachmentContactOpensToSave,
       ]),
       borderRadius: WeftRadius.allSm,
       child: Row(
@@ -188,14 +246,16 @@ class _ContactAttachment extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                name.isEmpty ? 'Contact' : name,
+                name.isEmpty
+                    ? context.l10n.attachmentContactFallbackName
+                    : name,
                 style: context.text.bodyMedium?.copyWith(
                   color: onBubble,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'Contact card · tap to save',
+                context.l10n.attachmentContactSubtitle,
                 style: context.text.labelSmall?.copyWith(
                   color: palette.mutedOnBubble(own),
                 ),
@@ -215,10 +275,27 @@ class _ContactAttachment extends StatelessWidget {
 /// filename, or "Forwarded" for a forwarded picture — which looked like the
 /// picture had been lost.
 class MediaAttachment extends ConsumerStatefulWidget {
-  const MediaAttachment({super.key, required this.message, this.onOpen});
+  const MediaAttachment({
+    super.key,
+    required this.message,
+    this.own = true,
+    this.onOpen,
+    this.accent,
+    this.onTapLink,
+    this.onTapMention,
+  });
 
   final WeftMessage message;
+
+  /// Which bubble fill the caption is read against. Defaults to the own bubble
+  /// because the pre-send preview — the one caller that has no message yet — is
+  /// always drawing the user's own photo.
+  final bool own;
+
   final VoidCallback? onOpen;
+  final Color? accent;
+  final void Function(String url, String label)? onTapLink;
+  final void Function(RichMention mention)? onTapMention;
 
   @override
   ConsumerState<MediaAttachment> createState() => _MediaAttachmentState();
@@ -273,9 +350,12 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
       button: _bytes != null && widget.onOpen != null,
       onTap: _bytes == null ? null : widget.onOpen,
       label: semanticsSentence([
-        messageKindLabel(widget.message.kind),
+        context.l10n.messageKind(widget.message.kind),
         caption,
-        if (_failed) 'could not be loaded' else if (_bytes == null) 'loading',
+        if (_failed)
+          context.l10n.attachmentCouldNotLoad
+        else if (_bytes == null)
+          context.l10n.attachmentLoading,
       ]),
       borderRadius: WeftRadius.allSm,
       child: Column(
@@ -336,11 +416,13 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
               ),
             ),
           ),
-          if (caption != null)
-            Padding(
-              padding: const EdgeInsets.only(top: WeftSpace.xs),
-              child: Text(caption, style: context.text.bodyMedium),
-            ),
+          AttachmentCaption(
+            message: widget.message,
+            own: widget.own,
+            accent: widget.accent,
+            onTapLink: widget.onTapLink,
+            onTapMention: widget.onTapMention,
+          ),
         ],
       ),
     );
@@ -396,6 +478,67 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   }
 }
 
+/// The sender's words under an attachment, or nothing when they wrote none.
+///
+/// Rendered through [RichTextView], not as a bare `Text`, and that is the point
+/// of the widget rather than a detail of it. A caption **is** message text: it
+/// carries the sender's `formatted_body` when they wrote one, and a link or a
+/// mention inside it has to behave exactly as it would three bubbles up. Drawn
+/// as plain text it showed the markup source — `**at the beach**`, asterisks and
+/// all — and a mention pill arrived as a bare user id.
+///
+/// Shared by all three attachment shapes because a caption on a PDF is the same
+/// thing as a caption on a photo, and the version that existed only under
+/// pictures meant a captioned file bubble simply lost the sentence.
+class AttachmentCaption extends StatelessWidget {
+  const AttachmentCaption({
+    super.key,
+    required this.message,
+    required this.own,
+    this.accent,
+    this.onTapLink,
+    this.onTapMention,
+  });
+
+  final WeftMessage message;
+  final bool own;
+  final Color? accent;
+  final void Function(String url, String label)? onTapLink;
+  final void Function(RichMention mention)? onTapMention;
+
+  @override
+  Widget build(BuildContext context) {
+    // Gated on `attachmentCaption`, not on a non-empty body: for an attachment
+    // with no MSC2530 `filename` the body is the *name*, and rendering it here
+    // prints `IMG_4021.jpg` under the photo it names.
+    if (attachmentCaption(message) == null) return const SizedBox.shrink();
+
+    final palette = context.palette;
+    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
+
+    // Excluded because every caller already folds the caption into one sentence
+    // about the whole attachment — "Photo, at the beach". Without this a reader
+    // hears the words twice, once in that sentence and once on their own.
+    return Padding(
+      padding: const EdgeInsets.only(top: WeftSpace.xs),
+      child: ExcludeSemantics(
+        child: RichTextView.message(
+          message: message,
+          baseStyle:
+              context.text.bodyMedium?.copyWith(color: onBubble) ??
+              TextStyle(color: onBubble),
+          // Same rule as the text bubble: an own-bubble link takes the bubble's
+          // own ink, because the accent it is derived from is invisible against
+          // the primary fill.
+          accent: own ? onBubble : (accent ?? onBubble),
+          onTapLink: onTapLink,
+          onTapMention: onTapMention,
+        ),
+      ),
+    );
+  }
+}
+
 /// The play affordance on a video poster.
 ///
 /// Its own scrim disc rather than a bare icon: a white glyph vanishes on a
@@ -437,6 +580,9 @@ class _AudioAttachment extends ConsumerWidget {
     required this.transcribing,
     this.onTranscribe,
     this.onRetranscribe,
+    this.accent,
+    this.onTapLink,
+    this.onTapMention,
   });
 
   final WeftMessage message;
@@ -444,6 +590,9 @@ class _AudioAttachment extends ConsumerWidget {
   final bool transcribing;
   final VoidCallback? onTranscribe;
   final VoidCallback? onRetranscribe;
+  final Color? accent;
+  final void Function(String url, String label)? onTapLink;
+  final void Function(RichMention mention)? onTapMention;
 
   Future<void> _toggle(BuildContext context, WidgetRef ref) async {
     try {
@@ -461,6 +610,7 @@ class _AudioAttachment extends ConsumerWidget {
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
     final bubble = own ? palette.ownBubble : palette.peerBubble;
     final duration = formatMediaDuration(message.durationMs);
+    final name = attachmentFilename(message);
 
     final playback = ref.watch(voicePlayerProvider);
     final isCurrent = playback.eventId == message.eventId;
@@ -482,10 +632,10 @@ class _AudioAttachment extends ConsumerWidget {
               button: true,
               excludeSemantics: true,
               label: loading
-                  ? 'Loading audio'
+                  ? context.l10n.attachmentAudioLoading
                   : playing
-                  ? 'Pause audio'
-                  : 'Play audio',
+                  ? context.l10n.attachmentAudioPause
+                  : context.l10n.attachmentAudioPlay,
               child: SizedBox(
                 width: 48,
                 height: 48,
@@ -496,7 +646,9 @@ class _AudioAttachment extends ConsumerWidget {
                       )
                     : IconButton(
                         padding: EdgeInsets.zero,
-                        tooltip: playing ? 'Pause' : 'Play',
+                        tooltip: playing
+                            ? context.l10n.commonPause
+                            : context.l10n.commonPlay,
                         icon: Icon(
                           playing
                               ? Icons.pause_rounded
@@ -517,17 +669,18 @@ class _AudioAttachment extends ConsumerWidget {
                 container: true,
                 excludeSemantics: true,
                 label: semanticsSentence([
-                  'Audio',
-                  message.body.isEmpty ? null : message.body,
+                  context.l10n.messageKindAudio,
+                  name.isEmpty ? null : name,
+                  attachmentCaption(message),
                   duration,
-                  if (playing) 'playing',
+                  if (playing) context.l10n.attachmentPlaying,
                 ]),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      message.body.isEmpty ? 'Audio' : message.body,
+                      name.isEmpty ? context.l10n.messageKindAudio : name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: context.text.bodyMedium?.copyWith(
@@ -548,6 +701,13 @@ class _AudioAttachment extends ConsumerWidget {
             ),
           ],
         ),
+        AttachmentCaption(
+          message: message,
+          own: own,
+          accent: accent,
+          onTapLink: onTapLink,
+          onTapMention: onTapMention,
+        ),
         AttachmentTranscript(
           message: message,
           own: own,
@@ -566,11 +726,17 @@ class _FileAttachment extends StatelessWidget {
     required this.message,
     required this.own,
     this.onOpen,
+    this.accent,
+    this.onTapLink,
+    this.onTapMention,
   });
 
   final WeftMessage message;
   final bool own;
   final VoidCallback? onOpen;
+  final Color? accent;
+  final void Function(String url, String label)? onTapLink;
+  final void Function(RichMention mention)? onTapMention;
 
   @override
   Widget build(BuildContext context) {
@@ -579,62 +745,81 @@ class _FileAttachment extends StatelessWidget {
     final bubble = own ? palette.ownBubble : palette.peerBubble;
     final bytes = message.mediaSizeBytes;
     final size = bytes == null ? null : formatAttachmentSize(bytes);
+    final name = attachmentFilename(message);
+    final caption = attachmentCaption(message);
 
     // The kind the glyph is picked from is stated in words. A reader was told
     // "report.pdf, 2.3 MB" and never that it was a PDF — which is the one thing
     // the icon exists to say, and the thing that decides whether the file is
     // worth opening.
-    return Semantics(
-      button: onOpen != null,
-      excludeSemantics: true,
-      onTap: onOpen,
-      label: semanticsSentence([
-        _kindLabelFor(message.body),
-        message.body.isEmpty ? 'File' : message.body,
-        size,
-      ]),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: WeftRadius.allSm,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _AttachmentGlyph(
-              icon: _iconFor(message.body),
-              tint: onBubble,
-              bubble: bubble,
-            ),
-            const SizedBox(width: WeftSpace.sm),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    message.body.isEmpty ? 'File' : message.body,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: onBubble,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  // No size line at all when the sender omitted `info.size`: an
-                  // invented "0 B" reads as a broken file rather than as a
-                  // missing field.
-                  if (size != null)
-                    Text(
-                      size,
-                      style: context.text.labelSmall?.copyWith(
-                        color: palette.muted(onBubble, bubble, alpha: 0.7),
+    // The row is the tap target and the caption is not: a link inside a caption
+    // has its own recogniser, and a wrapping `InkWell` would swallow the tap
+    // before the span ever saw it — opening the file instead of the link.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          button: onOpen != null,
+          excludeSemantics: true,
+          onTap: onOpen,
+          label: semanticsSentence([
+            _kindLabelFor(context.l10n, name),
+            name.isEmpty ? context.l10n.messageKindFile : name,
+            size,
+            caption,
+          ]),
+          child: InkWell(
+            onTap: onOpen,
+            borderRadius: WeftRadius.allSm,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AttachmentGlyph(
+                  icon: _iconFor(name),
+                  tint: onBubble,
+                  bubble: bubble,
+                ),
+                const SizedBox(width: WeftSpace.sm),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name.isEmpty ? context.l10n.messageKindFile : name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.text.bodyMedium?.copyWith(
+                          color: onBubble,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                      // No size line at all when the sender omitted
+                      // `info.size`: an invented "0 B" reads as a broken file
+                      // rather than as a missing field.
+                      if (size != null)
+                        Text(
+                          size,
+                          style: context.text.labelSmall?.copyWith(
+                            color: palette.muted(onBubble, bubble, alpha: 0.7),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        AttachmentCaption(
+          message: message,
+          own: own,
+          accent: accent,
+          onTapLink: onTapLink,
+          onTapMention: onTapMention,
+        ),
+      ],
     );
   }
 
@@ -662,14 +847,19 @@ class _FileAttachment extends StatelessWidget {
   /// gets a generic glyph, and saying "File" twice — once as the kind and once
   /// as the name — is noise, so it returns null and the sentence joiner drops
   /// it.
-  static String? _kindLabelFor(String filename) =>
+  static String? _kindLabelFor(AppL10n l10n, String filename) =>
       switch (_extension(filename)) {
-        'pdf' => 'PDF',
-        'zip' || 'gz' || 'tar' || '7z' || 'rar' => 'Archive',
-        'doc' || 'docx' || 'odt' || 'rtf' || 'txt' || 'md' => 'Document',
-        'xls' || 'xlsx' || 'ods' || 'csv' => 'Spreadsheet',
-        'ppt' || 'pptx' || 'odp' => 'Presentation',
-        'apk' || 'exe' || 'dmg' || 'deb' => 'Application',
+        'pdf' => l10n.attachmentKindPdf,
+        'zip' || 'gz' || 'tar' || '7z' || 'rar' => l10n.attachmentKindArchive,
+        'doc' ||
+        'docx' ||
+        'odt' ||
+        'rtf' ||
+        'txt' ||
+        'md' => l10n.attachmentKindDocument,
+        'xls' || 'xlsx' || 'ods' || 'csv' => l10n.attachmentKindSpreadsheet,
+        'ppt' || 'pptx' || 'odp' => l10n.attachmentKindPresentation,
+        'apk' || 'exe' || 'dmg' || 'deb' => l10n.attachmentKindApplication,
         _ => null,
       };
 
@@ -775,7 +965,7 @@ class AttachmentTranscript extends StatelessWidget {
                 ),
                 const SizedBox(width: WeftSpace.sm),
                 Text(
-                  'Transcribing…',
+                  context.l10n.attachmentTranscribing,
                   style: context.text.labelSmall?.copyWith(
                     color: palette.muted(onBubble, bubble, alpha: 0.8),
                   ),
@@ -798,7 +988,7 @@ class AttachmentTranscript extends StatelessWidget {
                 color: palette.muted(onBubble, bubble, alpha: 0.8),
               ),
               label: Text(
-                'Transcribe',
+                context.l10n.attachmentTranscribe,
                 style: context.text.labelSmall?.copyWith(
                   color: palette.muted(onBubble, bubble, alpha: 0.8),
                 ),
@@ -818,9 +1008,9 @@ class AttachmentTranscript extends StatelessWidget {
             // reader finds "transcribe again" in the rotor, but neither is
             // told it activates.
             button: false,
-            label: 'Transcript: $transcript',
+            label: context.l10n.attachmentTranscriptLabel(transcript),
             onLongPress: onRetranscribe,
-            onLongPressHint: 'transcribe again in another language',
+            onLongPressHint: context.l10n.attachmentRetranscribeHint,
             borderRadius: WeftRadius.allSm,
             ringInset: 0,
             child: Container(
@@ -841,16 +1031,22 @@ class AttachmentTranscript extends StatelessWidget {
                     color: palette.muted(onBubble, transcriptFill, alpha: 0.7),
                   ),
                   const SizedBox(width: WeftSpace.xs),
+                  // The one run of message text that does not go through
+                  // `RichTextView`, so it states its own line break: without
+                  // it a dragged selection welds the transcript onto the
+                  // caption above it.
                   Flexible(
-                    child: Text(
-                      transcript,
-                      style: context.text.bodySmall?.copyWith(
-                        color: palette.muted(
-                          onBubble,
-                          transcriptFill,
-                          alpha: 0.9,
+                    child: WeftSelectionLine(
+                      child: Text(
+                        transcript,
+                        style: context.text.bodySmall?.copyWith(
+                          color: palette.muted(
+                            onBubble,
+                            transcriptFill,
+                            alpha: 0.9,
+                          ),
+                          fontStyle: FontStyle.italic,
                         ),
-                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
@@ -959,8 +1155,8 @@ class UploadProgressBubble extends StatelessWidget {
               // "Cancel upload" three times over is three identical buttons
               // with three different consequences.
               tooltip: failed
-                  ? 'Discard ${plan.filename}'
-                  : 'Cancel upload of ${plan.filename}',
+                  ? context.l10n.attachmentDiscardUpload(plan.filename)
+                  : context.l10n.attachmentCancelUpload(plan.filename),
               icon: Icon(
                 Icons.close_rounded,
                 color: palette.muted(onBubble, bubble, alpha: 0.8),
@@ -978,7 +1174,9 @@ class UploadProgressBubble extends StatelessWidget {
           // nothing at all to a reader. `value` is the field a screen reader
           // reads for exactly this.
           child: Semantics(
-            value: '${(task.progress.clamp(0.0, 1.0) * 100).round()}%',
+            value: context.l10n.uploadPercent(
+              (task.progress.clamp(0.0, 1.0) * 100).round(),
+            ),
             child: ClipRRect(
               borderRadius: WeftRadius.pill,
               child: LinearProgressIndicator(
@@ -1001,7 +1199,7 @@ class UploadProgressBubble extends StatelessWidget {
                 minimumSize: const Size(0, 28),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 14),
-              label: const Text('Retry'),
+              label: Text(context.l10n.commonRetry),
             ),
           ),
       ],
@@ -1014,15 +1212,19 @@ class UploadProgressBubble extends StatelessWidget {
   /// encrypting the file, which can take a visible moment on a large video and
   /// during which "0%" would look like a stall.
   static String _statusLine(BuildContext context, UploadTask task) {
+    final l10n = context.l10n;
     final size = formatAttachmentSize(task.plan.sizeBytes);
     return switch (task.state) {
-      UploadState.queued => 'Waiting · $size',
-      UploadState.hashing => 'Preparing · $size',
-      UploadState.uploading => '${(task.progress * 100).round()}% of $size',
-      UploadState.retrying => 'Retrying · attempt ${task.attempts + 1}',
-      UploadState.sent => 'Sending…',
-      UploadState.cancelled => 'Cancelled',
-      UploadState.failed => task.failure ?? 'Upload failed',
+      UploadState.queued => l10n.uploadWaiting(size),
+      UploadState.hashing => l10n.uploadPreparing(size),
+      UploadState.uploading => l10n.uploadProgress(
+        l10n.uploadPercent((task.progress * 100).round()),
+        size,
+      ),
+      UploadState.retrying => l10n.uploadRetrying(task.attempts + 1),
+      UploadState.sent => l10n.uploadSending,
+      UploadState.cancelled => l10n.uploadCancelled,
+      UploadState.failed => task.failure ?? l10n.uploadFailed,
     };
   }
 

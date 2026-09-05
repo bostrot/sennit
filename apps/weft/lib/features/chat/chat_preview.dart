@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:weft_design/weft_design.dart';
+import '../../app/localisation.dart';
 
 import 'chat_view.dart';
 
@@ -184,7 +185,7 @@ class _PreviewFooter extends StatelessWidget {
           const SizedBox(width: WeftSpace.sm),
           Flexible(
             child: Text(
-              'Preview — still unread',
+              context.l10n.chatPreviewStillUnread,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.text.labelSmall?.copyWith(
@@ -195,7 +196,7 @@ class _PreviewFooter extends StatelessWidget {
           const SizedBox(width: WeftSpace.md),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Open'),
+            child: Text(context.l10n.commonOpen),
           ),
         ],
       ),

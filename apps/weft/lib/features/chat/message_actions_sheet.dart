@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
+import '../../app/localisation.dart';
 
 import 'emoji_picker_sheet.dart';
 
@@ -150,44 +151,64 @@ class _MessageActionsSheet extends StatelessWidget {
                     horizontal: WeftSpace.md,
                     vertical: WeftSpace.xs,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // A bare emoji `Text` inside an `InkWell` is not a button
-                      // to a screen reader — it is a character, announced by
-                      // whatever name the platform has for that glyph, with no
-                      // hint that tapping it sends a reaction.
-                      for (final key in kQuickReactions)
-                        Semantics(
-                          button: true,
-                          label: 'React with $key',
-                          excludeSemantics: true,
-                          onTap: () => choose(MessageAction.react, emoji: key),
-                          // A glyph plus 8dp of padding is 50dp tall and 27dp
-                          // wide — tall enough and half as wide as it needs to
-                          // be, in a row of six identical neighbours where the
-                          // cost of missing is sending the wrong reaction.
-                          child: WeftTapTarget(
-                            child: InkWell(
-                              onTap: () =>
-                                  choose(MessageAction.react, emoji: key),
-                              borderRadius: WeftRadius.pill,
-                              child: Padding(
-                                padding: const EdgeInsets.all(WeftSpace.sm),
-                                child: Text(
-                                  key,
-                                  style: const TextStyle(fontSize: 24),
+                  // `Wrap`, not `Row`. An emoji is text and scales with the
+                  // text scaler, so six of them plus the picker button are 116
+                  // points too wide for a phone at 2.0× — and because this row
+                  // is the *first* thing in the sheet, what got clipped was the
+                  // picker button, which is the way to every emoji that is not
+                  // one of the six. `spaceBetween` on a `Wrap` spreads a run
+                  // exactly as the `Row` did, and starts a second run instead of
+                  // painting over the edge.
+                  // Full width: the `Column` this sits in centres and therefore
+                  // shrink-wraps its children, and a shrink-wrapped `Wrap` has
+                  // no free space for `spaceBetween` to distribute — the seven
+                  // controls would bunch together in the middle instead of
+                  // spreading across the sheet the way the `Row` spread them.
+                  // Same trap as `requests_screen.dart` and `merge_screen.dart`.
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      runSpacing: WeftSpace.xs,
+                      children: [
+                        // A bare emoji `Text` inside an `InkWell` is not a button
+                        // to a screen reader — it is a character, announced by
+                        // whatever name the platform has for that glyph, with no
+                        // hint that tapping it sends a reaction.
+                        for (final key in kQuickReactions)
+                          Semantics(
+                            button: true,
+                            label: context.l10n.messageActionReactWith(key),
+                            excludeSemantics: true,
+                            onTap: () =>
+                                choose(MessageAction.react, emoji: key),
+                            // A glyph plus 8dp of padding is 50dp tall and 27dp
+                            // wide — tall enough and half as wide as it needs to
+                            // be, in a row of six identical neighbours where the
+                            // cost of missing is sending the wrong reaction.
+                            child: WeftTapTarget(
+                              child: InkWell(
+                                onTap: () =>
+                                    choose(MessageAction.react, emoji: key),
+                                borderRadius: WeftRadius.pill,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(WeftSpace.sm),
+                                  child: Text(
+                                    key,
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
+                        IconButton(
+                          tooltip: context.l10n.messageActionMoreReactions,
+                          icon: const Icon(Icons.add_reaction_outlined),
+                          onPressed: () => choose(MessageAction.moreReactions),
                         ),
-                      IconButton(
-                        tooltip: 'More reactions',
-                        icon: const Icon(Icons.add_reaction_outlined),
-                        onPressed: () => choose(MessageAction.moreReactions),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 Divider(color: context.palette.divider, height: WeftSpace.lg),
@@ -195,7 +216,7 @@ class _MessageActionsSheet extends StatelessWidget {
                     message.deliveryState == DeliveryState.failed) ...[
                   ListTile(
                     leading: const Icon(Icons.refresh_rounded),
-                    title: const Text('Retry sending'),
+                    title: Text(context.l10n.messageActionRetrySend),
                     onTap: () => choose(MessageAction.retrySend),
                   ),
                   ListTile(
@@ -204,7 +225,7 @@ class _MessageActionsSheet extends StatelessWidget {
                       color: context.colors.error,
                     ),
                     title: Text(
-                      'Discard unsent message',
+                      context.l10n.messageActionDiscardSend,
                       style: TextStyle(color: context.colors.error),
                     ),
                     onTap: () => choose(MessageAction.discardSend),
@@ -212,65 +233,65 @@ class _MessageActionsSheet extends StatelessWidget {
                 ],
                 ListTile(
                   leading: const Icon(Icons.reply_rounded),
-                  title: const Text('Reply'),
+                  title: Text(context.l10n.messageActionReply),
                   onTap: () => choose(MessageAction.reply),
                 ),
                 if (message.isOwn && message.kind == MessageKind.text)
                   ListTile(
                     leading: const Icon(Icons.edit_outlined),
-                    title: const Text('Edit'),
+                    title: Text(context.l10n.messageActionEdit),
                     onTap: () => choose(MessageAction.edit),
                   ),
                 if (message.isOwn && message.calendarInvite != null)
                   ListTile(
                     leading: const Icon(Icons.edit_calendar_rounded),
-                    title: const Text('Change the time'),
+                    title: Text(context.l10n.messageActionEditInvite),
                     onTap: () => choose(MessageAction.editInvite),
                   ),
                 if (message.body.trim().isNotEmpty) ...[
                   ListTile(
                     leading: const Icon(Icons.copy_rounded),
-                    title: const Text('Copy text'),
+                    title: Text(context.l10n.messageActionCopy),
                     onTap: () => choose(MessageAction.copy),
                   ),
                   ListTile(
                     leading: const Icon(Icons.text_fields_rounded),
-                    title: const Text('Select text'),
+                    title: Text(context.l10n.messageActionSelectText),
                     onTap: () => choose(MessageAction.selectText),
                   ),
                 ],
                 ListTile(
                   leading: const Icon(Icons.forward_rounded),
-                  title: const Text('Forward'),
+                  title: Text(context.l10n.messageActionForward),
                   onTap: () => choose(MessageAction.forward),
                 ),
                 ListTile(
                   leading: const Icon(Icons.alarm_add_rounded),
-                  title: const Text('Remind me'),
+                  title: Text(context.l10n.messageActionRemind),
                   onTap: () => choose(MessageAction.remind),
                 ),
                 if (homeAssistant)
                   ListTile(
                     leading: const Icon(Icons.home_outlined),
-                    title: const Text('Send to Home Assistant'),
+                    title: Text(context.l10n.messageActionSendToHomeAssistant),
                     onTap: () => choose(MessageAction.sendToHomeAssistant),
                   ),
                 if (message.editHistory.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.history_rounded),
-                    title: const Text('Edit history'),
+                    title: Text(context.l10n.editHistoryTitle),
                     onTap: () => choose(MessageAction.editHistory),
                   ),
                 if (canTranscribe && !hasTranscript)
                   ListTile(
                     leading: const Icon(Icons.graphic_eq_rounded),
-                    title: const Text('Transcribe'),
+                    title: Text(context.l10n.attachmentTranscribe),
                     onTap: () => choose(MessageAction.transcribe),
                   ),
                 if (canTranscribe && hasTranscript)
                   ListTile(
                     leading: const Icon(Icons.translate_rounded),
-                    title: const Text('Re-transcribe in…'),
+                    title: Text(context.l10n.messageActionRetranscribe),
                     onTap: () => choose(MessageAction.retranscribe),
                   ),
               ],
@@ -281,7 +302,7 @@ class _MessageActionsSheet extends StatelessWidget {
                     color: context.colors.error,
                   ),
                   title: Text(
-                    'Delete',
+                    context.l10n.commonDelete,
                     style: TextStyle(color: context.colors.error),
                   ),
                   onTap: () => choose(MessageAction.delete),
@@ -307,6 +328,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
   bool homeAssistant = false,
 }) {
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final l10n = context.l10n;
   final live = !message.redacted;
 
   PopupMenuItem<MessageActionChoice> item(
@@ -354,64 +376,76 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
           ),
         ),
       if (message.isOwn && message.deliveryState == DeliveryState.failed) ...[
-        item(MessageAction.retrySend, Icons.refresh_rounded, 'Retry sending'),
+        item(
+          MessageAction.retrySend,
+          Icons.refresh_rounded,
+          l10n.messageActionRetrySend,
+        ),
         item(
           MessageAction.discardSend,
           Icons.close_rounded,
-          'Discard unsent message',
+          l10n.messageActionDiscardSend,
           color: Theme.of(context).colorScheme.error,
         ),
       ],
       if (live) ...[
-        item(MessageAction.reply, Icons.reply_rounded, 'Reply'),
+        item(MessageAction.reply, Icons.reply_rounded, l10n.messageActionReply),
         if (message.isOwn && message.kind == MessageKind.text)
-          item(MessageAction.edit, Icons.edit_outlined, 'Edit'),
+          item(MessageAction.edit, Icons.edit_outlined, l10n.messageActionEdit),
         if (message.isOwn && message.calendarInvite != null)
           item(
             MessageAction.editInvite,
             Icons.edit_calendar_rounded,
-            'Change the time',
+            l10n.messageActionEditInvite,
           ),
         if (message.body.trim().isNotEmpty) ...[
-          item(MessageAction.copy, Icons.copy_rounded, 'Copy text'),
+          item(MessageAction.copy, Icons.copy_rounded, l10n.messageActionCopy),
           item(
             MessageAction.selectText,
             Icons.text_fields_rounded,
-            'Select text',
+            l10n.messageActionSelectText,
           ),
         ],
-        item(MessageAction.forward, Icons.forward_rounded, 'Forward'),
-        item(MessageAction.remind, Icons.alarm_add_rounded, 'Remind me'),
+        item(
+          MessageAction.forward,
+          Icons.forward_rounded,
+          l10n.messageActionForward,
+        ),
+        item(
+          MessageAction.remind,
+          Icons.alarm_add_rounded,
+          l10n.messageActionRemind,
+        ),
         if (homeAssistant)
           item(
             MessageAction.sendToHomeAssistant,
             Icons.home_outlined,
-            'Send to Home Assistant',
+            l10n.messageActionSendToHomeAssistant,
           ),
         if (message.editHistory.isNotEmpty)
           item(
             MessageAction.editHistory,
             Icons.history_rounded,
-            'Edit history',
+            l10n.editHistoryTitle,
           ),
         if (canTranscribe && !hasTranscript)
           item(
             MessageAction.transcribe,
             Icons.graphic_eq_rounded,
-            'Transcribe',
+            l10n.attachmentTranscribe,
           ),
         if (canTranscribe && hasTranscript)
           item(
             MessageAction.retranscribe,
             Icons.translate_rounded,
-            'Re-transcribe in…',
+            l10n.messageActionRetranscribe,
           ),
       ],
       if (message.isOwn)
         item(
           MessageAction.delete,
           Icons.delete_outline_rounded,
-          'Delete',
+          l10n.commonDelete,
           color: Theme.of(context).colorScheme.error,
         ),
     ],
@@ -427,22 +461,19 @@ Future<bool> confirmRedaction(BuildContext context) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Delete this message?'),
-      content: const Text(
-        'It is removed for everyone in the conversation. This cannot be '
-        'undone.',
-      ),
+      title: Text(context.l10n.messageActionDeleteTitle),
+      content: Text(context.l10n.messageActionDeleteBody),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.commonCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(true),
           style: TextButton.styleFrom(
             foregroundColor: Theme.of(context).colorScheme.error,
           ),
-          child: const Text('Delete'),
+          child: Text(context.l10n.commonDelete),
         ),
       ],
     ),

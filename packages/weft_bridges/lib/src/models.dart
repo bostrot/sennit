@@ -295,14 +295,49 @@ class LoginStep {
 
 /// Raised when a bridge call fails in a way worth showing the user.
 class BridgeException implements Exception {
-  const BridgeException(this.message, {this.statusCode, this.errorCode});
+  const BridgeException(
+    this.message, {
+    this.statusCode,
+    this.errorCode,
+    this.failure,
+  });
 
+  /// The bridge's own sentence when it sent one, and an English fallback when
+  /// it did not.
+  ///
+  /// A bridge writes genuinely useful errors and they arrive in whatever
+  /// language it was configured in — there is nothing to translate and nothing
+  /// that should be. [failure] is the other case: a status code this package
+  /// turned into a sentence itself, which the app re-words in the reader's
+  /// language. When [failure] is set, prefer it.
   final String message;
   final int? statusCode;
 
   /// The bridge's own `errcode`, when it sent one.
   final String? errorCode;
 
+  /// Set only when [message] is this package's own English, not the bridge's.
+  final BridgeFailure? failure;
+
   @override
   String toString() => 'BridgeException: $message';
+}
+
+/// A transport failure this package described itself, for the app to word.
+///
+/// A package cannot hold translations — see
+/// `docs/architecture/l10n-pipeline.md`, "Packages and their words" — so the
+/// status code becomes a value here and a sentence in the app.
+enum BridgeFailure {
+  /// 401 or 403: the bridge will not serve this Matrix account.
+  rejected,
+
+  /// 404: nothing answering the provisioning API at that URL.
+  notFound,
+
+  /// 502, 503 or 504: starting up, or down.
+  unavailable,
+
+  /// Anything else, with [BridgeException.statusCode] carrying the number.
+  other,
 }

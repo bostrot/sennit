@@ -14,6 +14,7 @@ import 'package:weft/services/notifications/notification_actions.dart';
 
 import 'support/golden_harness.dart';
 import 'support/recording_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Looking at a conversation without having read it.
 ///
@@ -27,7 +28,8 @@ class _RecordingDismisser extends NotificationDismisserNotifier {
   final List<String> cleared;
 
   @override
-  NotificationDismisser? build() => (String chatId) async => cleared.add(chatId);
+  NotificationDismisser? build() =>
+      (String chatId) async => cleared.add(chatId);
 }
 
 void main() {
@@ -57,6 +59,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(surface: WeftSurface.mac),
           home: ChatView(chatId: chatId, preview: preview),
         ),
@@ -142,6 +145,7 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(surface: WeftSurface.mac),
             home: Builder(
               builder: (context) => Scaffold(

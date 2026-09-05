@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/matrix.dart' as sdk;
+import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_richtext/weft_richtext.dart';
@@ -386,6 +389,251 @@ void main() {
       expect(message.body, 'contract.pdf');
       expect(message.attachmentUrl, isNotNull);
       expect(message.mediaWidth, isNull);
+    });
+
+    test('a thread reply names its root', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'in the topic',
+        'm.relates_to': {
+          'rel_type': 'm.thread',
+          'event_id': r'$topic:example.org',
+          'is_falling_back': true,
+          'm.in_reply_to': {'event_id': r'$previous:example.org'},
+        },
+      })!;
+
+      expect(message.threadRootId, r'$topic:example.org');
+      // The fallback is still read as a reply, because that is what it is: a
+      // client with no thread support has to render the chain.
+      expect(message.replyToEventId, r'$previous:example.org');
+    });
+
+    test('an ordinary reply is not a thread', () {
+      // The regression this guards is the whole feature coming apart: read the
+      // nested `m.in_reply_to` as a thread relation and every answer in a group
+      // chat becomes a thread of its own.
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'answering you',
+        'm.relates_to': {
+          'm.in_reply_to': {'event_id': r'$question:example.org'},
+        },
+      })!;
+
+      expect(message.threadRootId, isNull);
+      expect(message.replyToEventId, r'$question:example.org');
+      expect(message.isThreadReply, isFalse);
+    });
+
+    test('a thread relation with no event id is not a thread', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'nowhere',
+        'm.relates_to': {'rel_type': 'm.thread', 'event_id': ''},
+      })!;
+
+      expect(message.threadRootId, isNull);
+    });
+
+    test('only m.thread is a thread', () {
+      // Read directly rather than through `map`, because an `m.replace` never
+      // reaches a message at all — it is folded into the event it replaces —
+      // and the rule being asserted is about the `rel_type` table, not about
+      // which events survive mapping.
+      expect(
+        threadRootEventId({
+          'm.relates_to': {
+            'rel_type': 'm.replace',
+            'event_id': r'$original:example.org',
+          },
+        }),
+        isNull,
+      );
+      expect(
+        threadRootEventId({
+          'm.relates_to': {
+            'rel_type': 'm.annotation',
+            'event_id': r'$target:example.org',
+            'key': '👍',
+          },
+        }),
+        isNull,
+      );
+      expect(
+        threadRootEventId({
+          'm.relates_to': {
+            'rel_type': 'm.thread',
+            'event_id': r'$topic:example.org',
+          },
+        }),
+        r'$topic:example.org',
+      );
+      // No relation, and a relation that is not a map: both arrive from
+      // whatever client sent the event, and neither may throw.
+      expect(threadRootEventId(const {}), isNull);
+      expect(threadRootEventId(const {'m.relates_to': 'nonsense'}), isNull);
+    });
+
+    test('a bridged forum topic keeps its name', () {
+      for (final key in kThreadNameKeys) {
+        final message = map({
+          'msgtype': 'm.text',
+          'body': 'in the topic',
+          key: 'Bugs',
+          'm.relates_to': {
+            'rel_type': 'm.thread',
+            'event_id': r'$topic:example.org',
+          },
+        })!;
+
+        expect(message.threadName, 'Bugs', reason: 'for the $key spelling');
+      }
+    });
+
+    test('a nested topic-name object is read too', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'in the topic',
+        'com.beeper.thread.name': {'name': ' Off-topic '},
+        'm.relates_to': {
+          'rel_type': 'm.thread',
+          'event_id': r'$topic:example.org',
+        },
+      })!;
+
+      expect(message.threadName, 'Off-topic');
+    });
+
+    test('an empty topic name is no name at all', () {
+      // A bridge that writes the key with no value has said nothing, and an
+      // indicator captioned with the empty string reads as a rendering bug.
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'in the topic',
+        'com.beeper.thread.name': '   ',
+        'm.relates_to': {
+          'rel_type': 'm.thread',
+          'event_id': r'$topic:example.org',
+        },
+      })!;
+
+      expect(message.threadName, isNull);
+    });
+
+    test('a captioned photo reads back as caption plus name', () {
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'at the beach',
+        'filename': 'IMG_4021.jpg',
+        'url': 'mxc://example.org/photo',
+        'info': {'mimetype': 'image/jpeg', 'w': 1400, 'h': 900},
+      })!;
+
+      expect(message.body, 'at the beach');
+      expect(message.attachmentName, 'IMG_4021.jpg');
+    });
+
+    test('a captionless photo announces no name of its own', () {
+      // The one that must not regress. `attachmentName` non-null is read
+      // downstream as "the body is a caption, print it under the picture", so
+      // an uncaptioned photo inventing one puts `holiday.jpg` under the
+      // holiday photo.
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'holiday.jpg',
+        'url': 'mxc://example.org/photo',
+        'info': {'mimetype': 'image/jpeg'},
+      })!;
+
+      expect(message.body, 'holiday.jpg');
+      expect(message.attachmentName, isNull);
+    });
+
+    test('a filename echoing the body is not a caption', () {
+      // Several bridges write the name into both keys. Taken at face value
+      // that says "the body is a caption", and the caption is the filename.
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'holiday.jpg',
+        'filename': 'holiday.jpg',
+        'url': 'mxc://example.org/photo',
+      })!;
+
+      expect(message.attachmentName, isNull);
+    });
+
+    test('a filename with no file behind it names nothing', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'have a look at holiday.jpg',
+        'filename': 'holiday.jpg',
+      })!;
+
+      expect(message.attachmentUrl, isNull);
+      expect(message.attachmentName, isNull);
+    });
+
+    test('a caption survives the trip out and back', () {
+      // The writer and the reader asserted against each other rather than each
+      // against a literal. `toEventContent` is what Braid puts in the room and
+      // `mapEvent` is what Braid reads out of it, and a caption that came back
+      // as a filename — or a filename that came back as a caption — is the one
+      // failure the whole MSC2530 split exists to prevent.
+      final decision = planUpload(
+        AttachmentSource(
+          filename: 'IMG_4021.jpg',
+          sizeBytes: 91234,
+          header: Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0]),
+        ),
+        encrypted: false,
+        maxUploadBytes: 0,
+        caption: 'at the beach',
+      );
+
+      final message = map(
+        (decision as UploadPlan).toEventContent(uri: 'mxc://example.org/photo'),
+      )!;
+
+      expect(message.kind, MessageKind.image);
+      expect(message.body, 'at the beach');
+      expect(message.attachmentName, 'IMG_4021.jpg');
+    });
+
+    test('no caption survives the same trip as no caption', () {
+      final decision = planUpload(
+        AttachmentSource(
+          filename: 'IMG_4021.jpg',
+          sizeBytes: 91234,
+          header: Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0]),
+        ),
+        encrypted: false,
+        maxUploadBytes: 0,
+      );
+
+      final message = map(
+        (decision as UploadPlan).toEventContent(uri: 'mxc://example.org/photo'),
+      )!;
+
+      expect(message.body, 'IMG_4021.jpg');
+      expect(message.attachmentName, isNull);
+    });
+
+    test('an encrypted captioned attachment keeps both halves', () {
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'the cat again',
+        'filename': 'cat.png',
+        'file': {
+          'url': 'mxc://example.org/ciphertext',
+          'iv': 'aaaa',
+          'hashes': {'sha256': 'bbbb'},
+          'key': {'k': 'cccc', 'alg': 'A256CTR'},
+        },
+      })!;
+
+      expect(message.body, 'the cat again');
+      expect(message.attachmentName, 'cat.png');
     });
 
     test('an encrypted attachment counts even with no top-level url', () {

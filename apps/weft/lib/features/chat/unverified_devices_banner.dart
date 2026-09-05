@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 
+import '../../app/localisation.dart';
+
 /// Says, in the chat it applies to, that something here can read what you send
 /// and has not been checked.
 ///
@@ -46,13 +48,8 @@ class UnverifiedDevicesBanner extends StatelessWidget {
     final devices = trust.unverifiedDevices;
     final people = trust.unverifiedUsers;
     final message = own
-        ? 'One of your own devices is not verified, so Braid cannot promise the '
-              'messages here are only reaching you.'
-        : devices == 1
-        ? 'One device here has not been verified.'
-        : '$devices devices belonging to '
-              '${people == 1 ? 'someone here' : '$people people here'} '
-              'have not been verified.';
+        ? context.l10n.chatUnverifiedOwnDevice
+        : context.l10n.chatUnverifiedOtherDevices(devices, people);
 
     // A live region, because the strip *appearing* is the event. It arrives in
     // response to a trust change — someone in the room signed in on a new
@@ -109,7 +106,7 @@ class UnverifiedDevicesBanner extends StatelessWidget {
                 // "Verify" alone is a verb with no object once it is read out
                 // of the strip it sits in.
                 Semantics(
-                  label: 'Verify your device',
+                  label: context.l10n.chatVerifyYourDevice,
                   button: true,
                   excludeSemantics: true,
                   onTap: onVerify,
@@ -118,7 +115,7 @@ class UnverifiedDevicesBanner extends StatelessWidget {
                     style: TextButton.styleFrom(
                       foregroundColor: context.colors.onErrorContainer,
                     ),
-                    child: const Text('Verify'),
+                    child: Text(context.l10n.commonVerify),
                   ),
                 ),
               ],

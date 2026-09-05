@@ -188,17 +188,37 @@ class MatrixNotificationPipeline {
     required NotificationPolicyLookup policy,
     NotificationDedupe? dedupe,
     DateTime Function()? now,
+    WeftNotifyStrings Function()? words,
   }) : _session = session,
        _chatForRoom = chatForRoom,
        _policy = policy,
        _dedupe = dedupe ?? NotificationDedupe(),
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _words = words ?? _englishWords;
 
   final MatrixNotificationSession _session;
   final ChatForRoom _chatForRoom;
   final NotificationPolicyLookup _policy;
   final NotificationDedupe _dedupe;
+
+  /// Chats that have already had their one notification as a pending request.
+  ///
+  /// A stranger gets announced once. Anyone who can find the user's handle
+  /// could otherwise put forty rows in their shade by sending forty messages —
+  /// the conversation would be held out of the inbox and still ringing the
+  /// phone, which is the worst of both.
+  ///
+  /// Not bounded, unlike [_dedupe], and it does not need to be: it only ever
+  /// grows by one per *conversation that is a request*, which is a number
+  /// measured in tens over the life of an account, and answering one takes it
+  /// out of the set the next time it is asked about.
+  final Set<String> _announcedRequests = <String>{};
   final DateTime Function() _now;
+
+  /// Read per notification rather than held, so a locale change between two
+  /// messages reaches the second one. English when the caller supplied none —
+  /// see `docs/architecture/l10n-pipeline.md`, "Packages and their words".
+  final WeftNotifyStrings Function() _words;
 
   final _controller = StreamController<MatrixNotification>.broadcast();
   StreamSubscription<WeftMessage>? _sub;
@@ -306,6 +326,13 @@ class MatrixNotificationPipeline {
       ownUserIds: _session.ownUserIds,
       ownDisplayNames: _session.ownDisplayNames,
       dedupe: dedupe ? _dedupe : null,
+      // Only ever consulted for a pending request, where it is the difference
+      // between one silent notification and none. Recorded per chat rather
+      // than derived from the timeline: a background isolate handling a push
+      // has no timeline to count, and "have we already announced this
+      // stranger?" is a question about what *this* app has done.
+      isFirstFromSender:
+          !chat.isPendingRequest || _announcedRequests.add(chat.id),
     );
 
     if (decision case final DeliveredDecision delivered) {
@@ -314,6 +341,7 @@ class MatrixNotificationPipeline {
         chat: chat,
         policy: policy,
         decision: delivered,
+        words: _words(),
       );
       if (!_controller.isClosed) {
         _controller.add(
@@ -424,3 +452,5 @@ int? _asInt(Object? value) => switch (value) {
   final String v => int.tryParse(v.trim()),
   _ => null,
 };
+
+WeftNotifyStrings _englishWords() => WeftNotifyStrings.english;

@@ -3,6 +3,7 @@ import 'package:meta/meta.dart';
 
 import 'message.dart';
 import 'network.dart';
+import 'request.dart';
 
 /// One room feeding a chat, on one network.
 @immutable
@@ -56,6 +57,8 @@ class Chat {
     this.pinned = false,
     this.archived = false,
     this.muted = false,
+    this.request,
+    this.participantCount,
     ChatNetwork? preferredSendNetwork,
   }) : _preferredSendNetwork = preferredSendNetwork;
 
@@ -75,6 +78,47 @@ class Chat {
   final bool pinned;
   final bool archived;
   final bool muted;
+
+  /// Where this conversation stands as a chat *request*, or null — the normal
+  /// case — for a conversation that was never one.
+  ///
+  /// Null rather than a `none` member of [ChatRequestState] so that the
+  /// ordinary path stays the default: `chat.request == null` is what almost
+  /// every chat is, and a value everything had to compare against `none` would
+  /// make the rare case the one the code is written around.
+  final ChatRequestState? request;
+
+  /// How many people are in this conversation *besides* the user, or null when
+  /// the membership is not known.
+  ///
+  /// Carried for one purpose: the group read semantic. Blue ticks mean everyone
+  /// has read it, and "everyone" is a number — without it a client holding one
+  /// receipt cannot tell one reader out of one from one out of nine, and the
+  /// honest answer is then to stop at delivered. See [resolveDeliveryState].
+  ///
+  /// Null is the normal state for a bridged group whose membership the bridge
+  /// has not backfilled, and is not an error. It costs a mark that would have
+  /// been wrong as often as it was right.
+  final int? participantCount;
+
+  /// How many people have to have read a message before it counts as read.
+  ///
+  /// [participantCount] when the membership is known, and **1 for a chat that is
+  /// not a group** whatever the membership says — that is what "not a group"
+  /// means, and a DM whose summary has not arrived would otherwise lose its blue
+  /// ticks for no reason a user could name.
+  ///
+  /// Null only for a group whose size is genuinely unknown, where
+  /// [resolveDeliveryState] stops at delivered rather than guessing: one receipt
+  /// out of nine looks exactly like one out of one.
+  int? get peerCount => participantCount ?? (isGroup ? null : 1);
+
+  /// Whether this conversation is still waiting for the user to answer it.
+  ///
+  /// The inbox holds these out of the main list; the notification rules treat
+  /// them differently; and nothing here sends a read receipt. See
+  /// [ChatRequestPlan.markRead] for why that last one is the load-bearing part.
+  bool get isPendingRequest => request == ChatRequestState.pending;
 
   final ChatNetwork? _preferredSendNetwork;
 
@@ -127,6 +171,8 @@ class Chat {
     bool? pinned,
     bool? archived,
     bool? muted,
+    Object? request = _sentinel,
+    int? participantCount,
     Object? preferredSendNetwork = _sentinel,
   }) {
     return Chat(
@@ -141,6 +187,14 @@ class Chat {
       pinned: pinned ?? this.pinned,
       archived: archived ?? this.archived,
       muted: muted ?? this.muted,
+      // A sentinel rather than `??`, because clearing it is what accepting a
+      // request *is*: an accepted conversation is an ordinary one, and a null
+      // that meant "leave it alone" would leave the row in the requests
+      // section for ever.
+      request: identical(request, _sentinel)
+          ? this.request
+          : request as ChatRequestState?,
+      participantCount: participantCount ?? this.participantCount,
       preferredSendNetwork: identical(preferredSendNetwork, _sentinel)
           ? _preferredSendNetwork
           : preferredSendNetwork as ChatNetwork?,

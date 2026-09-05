@@ -8,12 +8,14 @@ import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/attachment_bubble.dart';
 import 'package:weft/features/chat/attachment_preview_sheet.dart';
 import 'package:weft/features/chat/chat_view.dart';
+import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft/services/attachments/attachment_picker.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/attachment_fixtures.dart';
+import 'package:weft/app/localisation.dart';
 
 /// A picker that never touches a platform channel.
 ///
@@ -66,6 +68,7 @@ void main() {
     int? width,
     int? height,
     String? transcript,
+    String? attachmentName,
   }) => WeftMessage(
     eventId: '\$event',
     roomId: roomId,
@@ -77,6 +80,7 @@ void main() {
     isOwn: false,
     body: body,
     attachmentUrl: attachmentUrl,
+    attachmentName: attachmentName,
     durationMs: durationMs,
     mediaSizeBytes: sizeBytes,
     mediaWidth: width,
@@ -102,6 +106,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: Scaffold(body: Center(child: child)),
         ),
@@ -145,6 +150,64 @@ void main() {
           message(kind: MessageKind.image, body: 'here is report.pdf'),
         ),
         'here is report.pdf',
+      );
+    });
+
+    test('a declared filename settles what the body is, with no guessing', () {
+      // The heuristic above is a guess made when the sender said nothing. Once
+      // they have separated the two keys there is nothing left to guess, and
+      // guessing anyway loses in both directions.
+      expect(
+        attachmentCaption(
+          message(
+            kind: MessageKind.image,
+            body: 'screenshot.png',
+            attachmentName: 'IMG_4021.HEIC',
+          ),
+        ),
+        'screenshot.png',
+        reason: 'a caption that names a file is still a caption',
+      );
+      expect(
+        attachmentCaption(
+          message(
+            kind: MessageKind.image,
+            body: 'Forwarded',
+            attachmentName: 'IMG_4021.HEIC',
+          ),
+        ),
+        'Forwarded',
+        reason: 'a sender who wrote "Forwarded" under a photo meant to',
+      );
+      // An empty body is still nothing to show, declared name or not.
+      expect(
+        attachmentCaption(
+          message(
+            kind: MessageKind.image,
+            body: '',
+            attachmentName: 'IMG_4021.HEIC',
+          ),
+        ),
+        isNull,
+      );
+    });
+
+    test('the name shown is the declared one, or the body', () {
+      expect(
+        attachmentFilename(
+          message(
+            kind: MessageKind.file,
+            body: 'the contract, finally',
+            attachmentName: 'contract.pdf',
+          ),
+        ),
+        'contract.pdf',
+      );
+      // No declared name: the body *is* the name, which is what every client
+      // that predates MSC2530 writes.
+      expect(
+        attachmentFilename(message(kind: MessageKind.file, body: 'notes.txt')),
+        'notes.txt',
       );
     });
 
@@ -416,6 +479,91 @@ void main() {
       expect(find.text('call me back'), findsOneWidget);
       expect(find.text('Transcribe'), findsNothing);
     });
+
+    testWidgets('a captioned photo draws the words and not the name', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(
+            kind: MessageKind.image,
+            body: 'at the beach',
+            attachmentName: 'IMG_4021.HEIC',
+          ),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('at the beach'), findsOneWidget);
+      expect(find.text('IMG_4021.HEIC'), findsNothing);
+    });
+
+    testWidgets('a caption is rendered as rich text, not as markup', (
+      tester,
+    ) async {
+      // The regression: a bare `Text` printed the sender's HTML source under
+      // the picture, and a mention arrived as a raw user id.
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(
+            kind: MessageKind.image,
+            body: 'at the beach',
+            attachmentName: 'IMG_4021.HEIC',
+          ).copyWith(formattedBody: 'at <em>the</em> beach'),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RichTextView), findsOneWidget);
+      expect(find.textContaining('<em>'), findsNothing);
+    });
+
+    testWidgets('a captioned file shows both the name and the words', (
+      tester,
+    ) async {
+      // A file bubble is the case a caption used to be lost in entirely: the
+      // name is what the row is *for*, so there was nowhere for the sentence
+      // to go.
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(
+            kind: MessageKind.file,
+            body: 'the contract, finally',
+            attachmentName: 'contract.pdf',
+            sizeBytes: 183000,
+          ),
+          own: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('contract.pdf'), findsOneWidget);
+      expect(find.text('the contract, finally'), findsOneWidget);
+    });
+
+    testWidgets('an uncaptioned photo still shows nothing under it', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, body: 'IMG_4021.HEIC'),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('IMG_4021.HEIC'), findsNothing);
+      expect(find.byType(RichTextView), findsNothing);
+    });
   });
 
   group('UploadProgressBubble', () {
@@ -547,6 +695,7 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: chatId),
           ),
@@ -693,6 +842,126 @@ void main() {
       // progress bubble the user could only dismiss.
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+
+    testWidgets('a caption typed in the preview rides on the photo', (
+      tester,
+    ) async {
+      final picker = _FakePicker([photo()]);
+      final repository = await pumpChat(tester, picker);
+
+      await tester.tap(find.byTooltip('Attach'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Photo or video'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Caption'),
+        'at the beach',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+      await tester.pumpAndSettle();
+
+      final chats = await repository.watchChats().first;
+      final sent = chats.firstWhere((c) => c.id == roomId).lastMessage!;
+      // One event carrying both, not a photo with a sentence racing it.
+      expect(sent.kind, MessageKind.image);
+      expect(sent.body, 'at the beach');
+      expect(sent.attachmentName, 'holiday.jpg');
+    });
+
+    testWidgets('a caption left blank sends the filename, as before', (
+      tester,
+    ) async {
+      final picker = _FakePicker([photo()]);
+      final repository = await pumpChat(tester, picker);
+
+      await tester.tap(find.byTooltip('Attach'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Photo or video'));
+      await tester.pumpAndSettle();
+
+      // Touched and then cleared, which is the shape that produced a body of
+      // whitespace: the field is non-empty right up to the moment it is read.
+      final field = find.widgetWithText(TextField, 'Caption');
+      await tester.enterText(field, 'never mind');
+      await tester.pumpAndSettle();
+      await tester.enterText(field, '   ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+      await tester.pumpAndSettle();
+
+      final chats = await repository.watchChats().first;
+      final sent = chats.firstWhere((c) => c.id == roomId).lastMessage!;
+      expect(sent.body, 'holiday.jpg');
+      expect(sent.attachmentName, isNull);
+    });
+
+    testWidgets('one caption goes on the first of a batch, not on each', (
+      tester,
+    ) async {
+      final picker = _FakePicker([
+        photo(name: 'one.jpg'),
+        photo(name: 'two.jpg'),
+      ]);
+      final repository = await pumpChat(tester, picker);
+
+      await tester.tap(find.byTooltip('Attach'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Photo or video'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Caption'),
+        'the whole afternoon',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Send'));
+      await tester.pumpAndSettle();
+
+      final timeline = await repository.timelineFor(roomId);
+      await timeline.loadMore();
+      final sent = timeline
+          .view()
+          .messages
+          .where((m) => m.isOwn && m.kind == MessageKind.image)
+          .toList();
+
+      // Newest first, so the reverse of the pick order. The caption belongs to
+      // `one.jpg` — repeated on both it is the same sentence shouted twice.
+      expect(sent.map((m) => m.attachmentName ?? m.body), [
+        'two.jpg',
+        'one.jpg',
+      ]);
+      expect(sent.last.body, 'the whole afternoon');
+      expect(sent.first.body, 'two.jpg');
+    });
+
+    testWidgets('the caption field is cleared with the sheet', (tester) async {
+      // The controller belongs to the sheet's state, so a second pick must not
+      // arrive pre-loaded with the last one's words — which is exactly what a
+      // caption hoisted to the composer would do.
+      final picker = _FakePicker([photo()]);
+      await pumpChat(tester, picker);
+
+      Future<void> openPreview() async {
+        await tester.tap(find.byTooltip('Attach'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Photo or video'));
+        await tester.pumpAndSettle();
+      }
+
+      await openPreview();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Caption'),
+        'first time',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      await openPreview();
+      expect(find.text('first time'), findsNothing);
     });
 
     testWidgets('the preview reads only what it can decode', (tester) async {

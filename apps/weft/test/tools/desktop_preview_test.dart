@@ -43,7 +43,8 @@ void main() {
   setUpAll(loadGoldenFonts);
   setUp(clearMessageDocumentCache);
 
-  const out = '/tmp/braid'
+  const out =
+      '/tmp/braid'
       '/fe50cf4a-2741-4781-85cc-71325a1d67dd/scratchpad/ui';
 
   /// A homeserver with bridges on it — the state this screen is actually in
@@ -142,12 +143,20 @@ void main() {
   });
 
   testWidgets('01_inbox_light', (tester) async {
-    await shot(tester, '01_inbox_light', const InboxShell(),
-        mode: WeftThemeMode.light);
+    await shot(
+      tester,
+      '01_inbox_light',
+      const InboxShell(),
+      mode: WeftThemeMode.light,
+    );
   });
 
   testWidgets('04_settings_light', (tester) async {
-    await shot(tester, '04_settings_light', const SettingsScreen(),
-        mode: WeftThemeMode.light);
+    await shot(
+      tester,
+      '04_settings_light',
+      const SettingsScreen(),
+      mode: WeftThemeMode.light,
+    );
   });
 }

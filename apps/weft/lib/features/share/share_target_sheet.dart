@@ -12,6 +12,7 @@ import 'package:weft_share/weft_share.dart';
 
 import '../../app/a11y.dart';
 import '../../app/intents.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
 import '../../services/attachments/send_attachments.dart';
@@ -138,6 +139,10 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     if (_sending || resolved == null || targets.isEmpty) return;
     setState(() => _sending = true);
 
+    // Read before the awaits below: this method outlives the sheet — it pops
+    // itself at the end — so `context` is not safe to look anything up on once
+    // the first send has started.
+    final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final repository = ref.read(chatRepositoryProvider);
@@ -161,12 +166,18 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
           await repository.send(chat.id, text, via: via);
         } on Object catch (error) {
           debugPrint('weft: shared text failed to send: $error');
-          failures.add('The message could not be sent.');
+          failures.add(l10n.shareTextFailed);
         }
       }
 
       failures.addAll(
-        await sendAttachments(repository, chat.id, resolved.sources, via: via),
+        await sendAttachments(
+          l10n,
+          repository,
+          chat.id,
+          resolved.sources,
+          via: via,
+        ),
       );
 
       final attempted = (text.isNotEmpty ? 1 : 0) + resolved.sources.length;
@@ -183,18 +194,23 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
       problems.addAll(
         targets.length == 1
             ? failures
-            : failures.map((problem) => '${chat.title}: $problem'),
+            : failures.map(
+                (problem) => l10n.shareProblemInChat(chat.title, problem),
+              ),
       );
     }
 
     final headline = switch (targets.length) {
-      1 => 'Sent to ${targets.single.title}',
-      _ when delivered == targets.length => 'Sent to ${targets.length} chats',
-      _ => 'Sent to $delivered of ${targets.length} chats',
+      1 => l10n.shareSentToOne(targets.single.title),
+      _ when delivered == targets.length => l10n.shareSentToAll(targets.length),
+      _ => l10n.shareSentToSome(delivered, targets.length),
     };
     final report = problems.isEmpty
         ? headline
-        : [if (delivered > 0) '$headline.', ...problems].join('\n');
+        : [
+            if (delivered > 0) l10n.shareReportHeadline(headline),
+            ...problems,
+          ].join('\n');
     messenger.showSnackBar(SnackBar(content: Text(report)));
     // Announced from here rather than through `showWeftMessage`, because the
     // sheet is about to pop and take its `ScaffoldMessenger` with it — the
@@ -421,7 +437,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                 WeftSpace.sm,
               ),
               child: WeftLabelledField(
-                label: 'Search chats',
+                label: context.l10n.shareSearchChats,
                 child: TextField(
                   controller: _search,
                   onChanged: (value) =>
@@ -429,12 +445,12 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: 'Search chats',
+                    hintText: context.l10n.shareSearchChats,
                     prefixIcon: const Icon(Icons.search_rounded, size: 20),
                     suffixIcon: _query.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: 'Clear search',
+                            tooltip: context.l10n.shareClearSearch,
                             icon: const Icon(Icons.close_rounded, size: 18),
                             onPressed: () {
                               _search.clear();
@@ -561,8 +577,8 @@ class _TargetList extends ConsumerWidget {
           padding: const EdgeInsets.all(WeftSpace.xl),
           child: Text(
             query.isEmpty
-                ? 'No conversations to share to yet.'
-                : 'No conversations match that search.',
+                ? context.l10n.shareNoChats
+                : context.l10n.shareNoMatches,
             textAlign: TextAlign.center,
             style: context.text.bodyMedium?.copyWith(
               color: context.colors.onSurfaceVariant,
@@ -599,7 +615,7 @@ class _TargetList extends ConsumerWidget {
             child: Semantics(
               header: true,
               child: Text(
-                'Cannot carry this share',
+                context.l10n.shareCannotCarry,
                 style: context.text.labelMedium?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -710,8 +726,8 @@ class _TargetTile extends ConsumerWidget {
           // both. It is the *unlabelled* pair of them that was the bug.
           : NamedButton(
               label: selected
-                  ? 'Remove ${chat.title} from this share'
-                  : 'Also send to ${chat.title}',
+                  ? context.l10n.shareRemoveTarget(chat.title)
+                  : context.l10n.shareAddTarget(chat.title),
               onPressed: enabled ? onToggle : null,
               child: Checkbox(
                 value: selected,
@@ -761,15 +777,18 @@ class _MultiSelectBar extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                count == 1 ? '1 chat selected' : '$count chats selected',
+                context.l10n.shareChatsSelected(count),
                 style: context.text.labelLarge,
               ),
             ),
-            TextButton(onPressed: onClear, child: const Text('Clear')),
+            TextButton(
+              onPressed: onClear,
+              child: Text(context.l10n.commonClear),
+            ),
             const SizedBox(width: WeftSpace.sm),
             FilledButton(
               onPressed: enabled ? onContinue : null,
-              child: const Text('Continue'),
+              child: Text(context.l10n.commonContinue),
             ),
           ],
         ),
@@ -840,10 +859,12 @@ class _ConfirmStep extends StatelessWidget {
                 maxLines: 4,
                 decoration: InputDecoration(
                   isDense: true,
-                  labelText: textOnly ? 'Message' : 'Caption',
+                  labelText: textOnly
+                      ? context.l10n.chatComposerMessage
+                      : context.l10n.shareCaptionField,
                   hintText: textOnly
-                      ? 'Message'
-                      : 'Say something about this (optional)',
+                      ? context.l10n.chatComposerMessage
+                      : context.l10n.shareCaptionHint,
                 ),
               ),
               const SizedBox(height: WeftSpace.sm),
@@ -879,8 +900,8 @@ class _ConfirmStep extends StatelessWidget {
                     icon: const Icon(Icons.send),
                     label: Text(
                       targets.length == 1
-                          ? 'Send to ${targets.single.title}'
-                          : 'Send to ${targets.length} chats',
+                          ? context.l10n.shareSendToOne(targets.single.title)
+                          : context.l10n.shareSendToMany(targets.length),
                     ),
                   ),
                 ),
@@ -888,8 +909,8 @@ class _ConfirmStep extends StatelessWidget {
                   onPressed: onChooseAnother,
                   child: Text(
                     targets.length == 1
-                        ? 'Choose another chat'
-                        : 'Change selection',
+                        ? context.l10n.shareChooseAnother
+                        : context.l10n.shareChangeSelection,
                   ),
                 ),
               ],

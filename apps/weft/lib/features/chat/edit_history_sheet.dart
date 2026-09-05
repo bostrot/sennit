@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import '../../app/localisation.dart';
 
 import 'rich_text_view.dart';
 
@@ -56,13 +57,16 @@ class _EditHistorySheet extends StatelessWidget {
           children: [
             Semantics(
               header: true,
-              child: Text('Edit history', style: context.text.titleMedium),
+              child: Text(
+                context.l10n.editHistoryTitle,
+                style: context.text.titleMedium,
+              ),
             ),
             const SizedBox(height: WeftSpace.xs),
             Text(
               history.isEmpty
-                  ? 'No earlier versions were kept for this message.'
-                  : '${history.length} versions, oldest first.',
+                  ? context.l10n.editHistoryEmpty
+                  : context.l10n.editHistoryCount(history.length),
               style: context.text.bodySmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
@@ -77,9 +81,10 @@ class _EditHistorySheet extends StatelessWidget {
                   // is what was originally sent. Both are worth labelling, or
                   // the reader has to count rows to work out which is which.
                   label: switch (i) {
-                    0 => 'Original',
-                    _ when i == history.length - 1 => 'Current',
-                    _ => 'Edit $i',
+                    0 => context.l10n.editHistoryOriginal,
+                    _ when i == history.length - 1 =>
+                      context.l10n.editHistoryCurrent,
+                    _ => context.l10n.editHistoryNth(i),
                   },
                   ink: ink,
                 ),
@@ -114,9 +119,10 @@ class _Version extends StatelessWidget {
           header: true,
           container: true,
           excludeSemantics: true,
-          label:
-              '$label, '
-              '${DateFormat.yMMMd().add_Hm().format(record.timestamp)}',
+          label: context.l10n.editHistoryVersionSemantics(
+            label,
+            DateFormat.yMMMd().add_Hm().format(record.timestamp),
+          ),
           child: Row(
             children: [
               Text(

@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:weft_design/weft_design.dart';
 
+import '../../app/localisation.dart';
+
 /// Builds the widget that plays [file].
 ///
 /// A factory behind a provider rather than a widget used directly, because
@@ -118,7 +120,7 @@ class _VideoSurfaceState extends State<VideoSurface> {
             const Icon(Icons.videocam_off_rounded, color: Colors.white70),
             const SizedBox(height: WeftSpace.sm),
             Text(
-              'This video cannot be played here.',
+              context.l10n.videoCannotPlay,
               style: context.text.bodySmall?.copyWith(color: Colors.white70),
             ),
           ],
@@ -147,7 +149,7 @@ class _VideoSurfaceState extends State<VideoSurface> {
               // an unlabelled thing at the bottom of the picture, and dragging
               // it seeks the video.
               child: Semantics(
-                label: 'Video position',
+                label: context.l10n.videoPosition,
                 slider: true,
                 value: _positionLabel(controller.value),
                 child: VideoProgressIndicator(controller, allowScrubbing: true),

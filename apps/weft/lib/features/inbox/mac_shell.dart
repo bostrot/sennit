@@ -7,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/labels.dart';
+import '../../app/localisation.dart';
 import '../../app/menus.dart';
 import '../../app/providers.dart';
 import '../../services/contacts/device_contacts.dart';
@@ -19,7 +20,51 @@ import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
 import 'inbox_shell.dart';
+import 'requests_screen.dart';
 import 'new_chat_sheet.dart';
+
+/// The sidebar and list widths to actually draw in a window [available] wide.
+///
+/// The dragged widths are what the reader asked for; these are what fits. The
+/// conversation is the `Expanded` pane, so it absorbs every point the other two
+/// take — and nothing used to stop them taking all of it. At the 720pt minimum
+/// window `macos/Runner/MainFlutterWindow.swift` enforces, the default sidebar
+/// and list left the thread 192 points: narrower than the conversation *list*
+/// beside it is allowed to shrink to, and too narrow for a bubble to hold a
+/// sentence. Found by the Phase 10 walkthrough's `desk-narrow` pass, which
+/// photographs the window at exactly that minimum.
+///
+/// The sidebar gives way first and the list second, each down to its own
+/// minimum and no further. That order is the order the panes lose their value:
+/// the sidebar is a set of labelled destinations whose current selection the
+/// list's own header already names, the list is how you move between
+/// conversations, and the conversation is what the window is for. If even the
+/// two minimums cannot leave [MacMetrics.detailMinWidth] — a window narrower
+/// than macOS will give this app — the thread takes whatever is left rather
+/// than a pane collapsing to a sliver.
+///
+/// Pure, and takes the dragged widths rather than reading them, so the squeeze
+/// is a function of the window and not a mutation of the reader's choice:
+/// widening the window again restores the widths they dragged to instead of the
+/// ones the narrow moment left behind.
+///
+/// [sidebar] is 0 when it is hidden — View ▸ Hide Sidebar — in which case there
+/// is nothing to take from it and the list absorbs the whole squeeze.
+(double, double) macPaneWidths({
+  required double available,
+  required double sidebar,
+  required double list,
+}) {
+  var excess = sidebar + list + MacMetrics.detailMinWidth - available;
+  if (excess <= 0) return (sidebar, list);
+
+  final fromSidebar = sidebar == 0
+      ? 0.0
+      : excess.clamp(0.0, sidebar - MacMetrics.sidebarMinWidth);
+  excess -= fromSidebar;
+  final fromList = excess.clamp(0.0, list - MacMetrics.listMinWidth);
+  return (sidebar - fromSidebar, list - fromList);
+}
 
 /// Braid as a Mac window.
 ///
@@ -87,6 +132,12 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     // Sidebar is above the shell and has to reach it.
     final sidebarVisible = ref.watch(macSidebarVisibleProvider);
 
+    final (sidebarWidth, listWidth) = macPaneWidths(
+      available: MediaQuery.sizeOf(context).width,
+      sidebar: sidebarVisible ? _sidebarWidth : 0,
+      list: _listWidth,
+    );
+
     return Scaffold(
       // The window's own background is painted by the panes, and the sidebar
       // deliberately does not paint one — that is what lets the desktop show
@@ -100,7 +151,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             if (sidebarVisible) ...[
               FocusTraversalOrder(
                 order: const NumericFocusOrder(1),
-                child: FocusTraversalGroup(child: _sidebar()),
+                child: FocusTraversalGroup(child: _sidebar(sidebarWidth)),
               ),
               _Splitter(
                 onDrag: (delta) => setState(() {
@@ -113,7 +164,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             ],
             FocusTraversalOrder(
               order: const NumericFocusOrder(2),
-              child: FocusTraversalGroup(child: _list()),
+              child: FocusTraversalGroup(child: _list(listWidth)),
             ),
             _Splitter(
               onDrag: (delta) => setState(() {
@@ -144,7 +195,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
 
   // ------------------------------------------------------------- the sidebar
 
-  Widget _sidebar() {
+  Widget _sidebar(double width) {
     final repository = ref.watch(chatRepositoryProvider);
     final filter = ref.watch(networkFilterProvider);
     final unread = ref.watch(unreadByNetworkProvider);
@@ -169,7 +220,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     }
 
     return MacSidebar(
-      width: _sidebarWidth,
+      width: width,
       top: MacToolbar(
         // The only pane that carries it: the traffic lights are at the
         // window's starting edge, and this is the pane that is there.
@@ -182,7 +233,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
           Builder(
             builder: (anchor) => MacToolbarButton(
               icon: Icons.palette_outlined,
-              tooltip: 'Appearance',
+              tooltip: context.l10n.commonAppearance,
               onPressed: () =>
                   showAppearanceSheet(context, anchorContext: anchor),
             ),
@@ -192,15 +243,27 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
       children: [
         MacSidebarRow(
           icon: Icons.all_inbox_rounded,
-          label: 'All conversations',
+          label: context.l10n.macSidebarAllConversations,
           selected: nothingNarrowed,
           badge: unread.values.fold<int>(0, (a, b) => a + b),
           onTap: clearAll,
         ),
-        for (final (value, label, icon) in const [
-          (InboxQuickFilter.unread, 'Unread', Icons.mark_email_unread_outlined),
-          (InboxQuickFilter.groups, 'Groups', Icons.groups_rounded),
-          (InboxQuickFilter.people, 'People', Icons.person_rounded),
+        for (final (value, label, icon) in [
+          (
+            InboxQuickFilter.unread,
+            context.l10n.inboxFilterUnread,
+            Icons.mark_email_unread_outlined,
+          ),
+          (
+            InboxQuickFilter.groups,
+            context.l10n.inboxFilterGroups,
+            Icons.groups_rounded,
+          ),
+          (
+            InboxQuickFilter.people,
+            context.l10n.inboxFilterPeople,
+            Icons.person_rounded,
+          ),
         ])
           MacSidebarRow(
             icon: icon,
@@ -213,12 +276,12 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
           ),
         MacSidebarRow(
           icon: Icons.archive_outlined,
-          label: 'Archived',
+          label: context.l10n.macSidebarArchived,
           selected: archived,
           onTap: () => ref.read(showArchivedProvider.notifier).toggle(),
         ),
         MacSidebarSection(
-          title: 'Networks',
+          title: context.l10n.macSidebarNetworks,
           expanded: _networksExpanded,
           onToggle: () =>
               setState(() => _networksExpanded = !_networksExpanded),
@@ -231,7 +294,10 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
                 badge: unread[network] ?? 0,
                 semanticsLabel: switch (unread[network] ?? 0) {
                   0 => network.label,
-                  final n => '${network.label}, $n unread',
+                  final n => context.l10n.macSidebarNetworkUnread(
+                    network.label,
+                    n,
+                  ),
                 },
                 onTap: () =>
                     ref.read(networkFilterProvider.notifier).toggle(network),
@@ -240,7 +306,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
         ),
         if (labels.isNotEmpty)
           MacSidebarSection(
-            title: 'Labels',
+            title: context.l10n.macSidebarLabels,
             children: [
               for (final label in labels)
                 MacSidebarRow(
@@ -257,21 +323,21 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
         // below the content the sidebar is actually for, not mixed into it.
         MacSidebarRow(
           icon: Icons.merge_rounded,
-          label: 'Merged chats',
+          label: context.l10n.commonMergedChats,
           onTap: () => Navigator.of(
             context,
           ).push(MaterialPageRoute<void>(builder: (_) => const MergeScreen())),
         ),
         MacSidebarRow(
           icon: Icons.hub_outlined,
-          label: 'Bridges',
+          label: context.l10n.commonBridges,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const BridgesScreen()),
           ),
         ),
         MacSidebarRow(
           icon: Icons.settings_outlined,
-          label: 'Settings',
+          label: context.l10n.commonSettings,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
           ),
@@ -282,7 +348,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
 
   // ---------------------------------------------------- the conversation list
 
-  Widget _list() {
+  Widget _list(double width) {
     final chats = ref.watch(visibleChatsProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
     final mediaHeaders = ref.watch(mediaHeadersProvider);
@@ -293,20 +359,20 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     final networks = ref.watch(networkFilterProvider);
 
     final title = switch ((archived, quick, networks.isEmpty)) {
-      (true, _, _) => 'Archived',
-      (_, InboxQuickFilter.unread, _) => 'Unread',
-      (_, InboxQuickFilter.groups, _) => 'Groups',
-      (_, InboxQuickFilter.people, _) => 'People',
+      (true, _, _) => context.l10n.macSidebarArchived,
+      (_, InboxQuickFilter.unread, _) => context.l10n.inboxFilterUnread,
+      (_, InboxQuickFilter.groups, _) => context.l10n.inboxFilterGroups,
+      (_, InboxQuickFilter.people, _) => context.l10n.inboxFilterPeople,
       (_, _, false) => networks.map((n) => n.label).join(' · '),
       // Short on purpose. The pane is 300pt wide and shares its toolbar with a
       // search field and two buttons; "All conversations" truncates to "All
       // convers…", which reads worse than the word it was truncating to. The
       // sidebar says the long version, and the sidebar is right beside it.
-      _ => 'All',
+      _ => context.l10n.macListTitleAll,
     };
 
     return SizedBox(
-      width: _listWidth,
+      width: width,
       child: ColoredBox(
         color: context.colors.surfaceContainerLowest,
         // Tahoe's scroll edge effect: the list runs *under* the toolbar and
@@ -346,7 +412,9 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
         final visible = ref.watch(macSidebarVisibleProvider);
         return MacToolbarButton(
           icon: visible ? Icons.menu_open_rounded : Icons.menu_rounded,
-          tooltip: visible ? 'Hide sidebar' : 'Show sidebar',
+          tooltip: visible
+              ? context.l10n.macHideSidebar
+              : context.l10n.macShowSidebar,
           onPressed: () =>
               ref.read(macSidebarVisibleProvider.notifier).toggle(),
         );
@@ -364,7 +432,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     actions: [
       MacSearchField(
         controller: _searchController,
-        hintText: 'Search',
+        hintText: context.l10n.macSearchHint,
         width: 120,
         focusedWidth: 180,
         // Search has a screen of its own — filters, provenance,
@@ -375,7 +443,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
       const SizedBox(width: WeftSpace.xs),
       MacToolbarButton(
         icon: Icons.edit_square,
-        tooltip: 'New conversation',
+        tooltip: context.l10n.macNewConversation,
         onPressed: () => showNewChatSheet(context, ref),
       ),
     ],
@@ -388,12 +456,27 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     Set<String> selection,
   ) => ListView.builder(
     padding: const EdgeInsets.symmetric(vertical: WeftSpace.xs),
-    itemCount: chats.length,
-    itemBuilder: (context, i) {
+    // The requests row rides at the top of the list rather than in the toolbar,
+    // for the same reason it does on the touch shell: the one thing it has to
+    // survive is being ignored, and a badge in the corner of a toolbar is
+    // exactly what someone scanning their conversations does not see. It draws
+    // nothing at all when nothing is waiting.
+    itemCount: chats.length + 1,
+    itemBuilder: (context, index) {
+      if (index == 0) return const RequestsEntry();
+      final i = index - 1;
       final chat = chats[i];
       final picked = selection.contains(chat.id);
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
+        // Silent to a screen reader. A `GestureDetector` that declares any tap
+        // recogniser exports a tappable node, and a right-click-only one
+        // exports it with nothing to say — an unnamed control the width of the
+        // row, sitting over the named one. The route walk found ten of them on
+        // the Mac inbox and nine more in a conversation. The menu itself loses
+        // nothing: every verb in it is reachable from the row's own actions,
+        // and a pointer is the only thing that can raise it.
+        excludeFromSemantics: true,
         onSecondaryTapUp: (details) => unawaited(
           showChatContextMenu(context, ref, chat, details.globalPosition),
         ),
@@ -416,6 +499,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
           timeLabel: formatInboxTime(
             chat.lastMessage?.timestamp,
             now: ref.watch(clockProvider)(),
+            justNow: context.l10n.inboxTimeNow,
           ),
           // Hold to look without spending the unread marker. The phone's
           // long-press enters selection, which is a thumb's idiom; a pointer
@@ -490,10 +574,13 @@ class _MacEmptyList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('No conversations', style: context.text.titleSmall),
+            Text(
+              context.l10n.macEmptyListTitle,
+              style: context.text.titleSmall,
+            ),
             const SizedBox(height: WeftSpace.xs),
             Text(
-              'Nothing matches what the sidebar is showing.',
+              context.l10n.macEmptyListBody,
               textAlign: TextAlign.center,
               style: context.text.labelSmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
@@ -530,14 +617,14 @@ class _MacEmptyDetail extends StatelessWidget {
             ),
             const SizedBox(height: WeftSpace.md),
             Text(
-              'No conversation selected',
+              context.l10n.macEmptyDetailTitle,
               style: context.text.titleSmall?.copyWith(
                 color: context.colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 2),
             Text(
-              'Every network, one thread.',
+              context.l10n.inboxEmptyDetailBody,
               style: context.text.labelSmall?.copyWith(
                 color: context.colors.onSurfaceVariant.withValues(alpha: 0.8),
               ),

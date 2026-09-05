@@ -11,6 +11,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/data/demo_repository.dart';
@@ -72,6 +73,8 @@ Future<int> _pumpCard(
         ),
       ],
       child: MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
+        supportedLocales: weftSupportedLocales,
         theme: WeftTheme.build(),
         home: Scaffold(
           body: LinkPreviewCard(message: message ?? _message(), own: false),
@@ -270,6 +273,8 @@ void main() {
     }) => tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: Scaffold(
             body: LinkPreviewCardBody(
@@ -369,6 +374,8 @@ void main() {
             chatRepositoryProvider.overrideWithValue(demo),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
             theme: WeftTheme.build(),
             home: const LinkPreviewsScreen(),
           ),

@@ -4,6 +4,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../bidi.dart';
 import '../focus.dart';
 import '../semantics.dart';
+import '../strings.dart';
 import '../surface.dart';
 import '../theme.dart';
 import '../tokens.dart';
@@ -97,6 +98,7 @@ class _ChatTileState extends State<ChatTile> {
         ? colors.onPrimary.withValues(alpha: 0.78)
         : colors.onSurfaceVariant;
 
+    final words = WeftDesignStringsScope.of(context);
     final radius = mac
         ? BorderRadius.circular(MacMetrics.listRowRadius)
         : WeftRadius.allLg;
@@ -119,8 +121,8 @@ class _ChatTileState extends State<ChatTile> {
       checked: widget.checked,
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
-      onLongPressHint: 'select',
-      label: _semanticsLabel(),
+      onLongPressHint: words.selectHint,
+      label: _semanticsLabel(words),
       borderRadius: radius,
       // Flush with the row's own box rather than 2dp outside it: the inbox
       // list clips its viewport, and a ring that overhangs is a ring with its
@@ -128,16 +130,20 @@ class _ChatTileState extends State<ChatTile> {
       ringInset: 0,
       onHoverChanged: (value) => setState(() => _hovered = value),
       child: Padding(
-        padding: mac
-            ? const EdgeInsets.symmetric(horizontal: WeftSpace.sm, vertical: 1)
-            : const EdgeInsets.symmetric(horizontal: WeftSpace.sm, vertical: 2),
+        // The gap between one row's selection capsule and the next. Half a
+        // step on the Mac, where the list is denser and the capsules are
+        // meant to read as a stack rather than as cards.
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.sm,
+          vertical: WeftSpace.xxs,
+        ),
         child: AnimatedContainer(
           duration: mac ? context.motion.instant : context.motion.fast,
           curve: context.motion.standard,
           padding: mac
               ? const EdgeInsets.symmetric(
                   horizontal: WeftSpace.sm,
-                  vertical: 6,
+                  vertical: WeftSpace.dense,
                 )
               : const EdgeInsets.symmetric(
                   horizontal: WeftSpace.md,
@@ -166,7 +172,15 @@ class _ChatTileState extends State<ChatTile> {
                     size: mac ? 32 : 46,
                   ),
               SizedBox(width: mac ? WeftSpace.sm : WeftSpace.md),
-              Expanded(child: _body(context, ink: ink, quiet: quiet, mac: mac)),
+              Expanded(
+                child: _body(
+                  context,
+                  words: words,
+                  ink: ink,
+                  quiet: quiet,
+                  mac: mac,
+                ),
+              ),
               const SizedBox(width: WeftSpace.sm),
               _trailing(context, quiet: quiet, mac: mac, inverted: inverted),
             ],
@@ -184,29 +198,35 @@ class _ChatTileState extends State<ChatTile> {
   /// whether the row is worth opening at all — the preview, the time and the
   /// delivery state — and the network *names*, since "merged across 3 networks"
   /// never said which three.
-  String _semanticsLabel() {
+  String _semanticsLabel(WeftDesignStrings words) {
     final chat = widget.chat;
     final last = chat.lastMessage;
     return semanticsSentence([
       chat.title,
       if (chat.isMerged)
-        'merged across ${chat.networks.length} networks: '
-            '${chat.networks.map((n) => n.label).join(', ')}'
+        words.mergedAcross(
+          chat.networks.length,
+          chat.networks.map((n) => n.label).join(', '),
+        )
       else
         chat.networks.firstOrNull?.label,
-      if (chat.pinned) 'pinned',
-      if (chat.muted) 'muted',
-      if (last != null && last.isOwn) deliveryStateLabel(last.deliveryState),
-      if (widget.typing) 'typing' else _preview(last),
-      if (widget.online) 'online',
+      if (chat.pinned) words.pinned,
+      if (chat.muted) words.muted,
+      if (last != null && last.isOwn) words.deliveryState(last.deliveryState),
+      // The glyph's meaning, as a clause. A screen reader gets "…, reply, see
+      // you at six, …" where a sighted reader gets an arrow in front of the
+      // same words — and neither gets the mxid that used to be there instead.
+      if (!widget.typing && _isReply(last)) words.reply,
+      if (widget.typing) words.typing else _preview(words, last),
+      if (widget.online) words.online,
       widget.timeLabel,
-      if (chat.unreadCount > 0)
-        chat.unreadCount == 1 ? '1 unread' : '${chat.unreadCount} unread',
+      if (chat.unreadCount > 0) words.unreadCount(chat.unreadCount),
     ]);
   }
 
   Widget _body(
     BuildContext context, {
+    required WeftDesignStrings words,
     required Color ink,
     required Color quiet,
     required bool mac,
@@ -245,14 +265,14 @@ class _ChatTileState extends State<ChatTile> {
             if (chat.pinned) ...[
               const SizedBox(width: WeftSpace.xs),
               Tooltip(
-                message: 'Pinned',
+                message: words.pinned,
                 child: Icon(Icons.push_pin_rounded, size: 13, color: quiet),
               ),
             ],
             if (chat.muted) ...[
               const SizedBox(width: WeftSpace.xs),
               Tooltip(
-                message: 'Muted',
+                message: words.muted,
                 child: Icon(
                   Icons.notifications_off_rounded,
                   size: 13,
@@ -272,7 +292,10 @@ class _ChatTileState extends State<ChatTile> {
             ],
           ],
         ),
-        SizedBox(height: mac ? 1 : 3),
+        // The gap between a row's title line and its preview line. One step on
+        // both surfaces — the Mac's density comes from the row's own insets,
+        // not from crushing two lines of type together.
+        const SizedBox(height: WeftSpace.xxs),
         Row(
           children: [
             // `read` and `delivered` are the same double tick and differ only
@@ -283,7 +306,7 @@ class _ChatTileState extends State<ChatTile> {
             // that belongs to whoever owns the design, not to a semantics pass.
             if (last != null && last.isOwn && !widget.typing) ...[
               Tooltip(
-                message: deliveryStateLabel(last.deliveryState),
+                message: words.deliveryState(last.deliveryState),
                 child: Icon(
                   _deliveryIcon(last.deliveryState),
                   size: 14,
@@ -291,12 +314,31 @@ class _ChatTileState extends State<ChatTile> {
                     // Inside a selected, accent-filled row the blue would sit
                     // on a purple fill; the row's own ink is what stays
                     // readable there.
-                    DeliveryState.read
-                        when ink == context.colors.onPrimary =>
+                    DeliveryState.read when ink == context.colors.onPrimary =>
                       ink,
-                    DeliveryState.read => context.palette.readReceipt,
+                    DeliveryState.read => context.palette.readReceiptOn(
+                      context.colors.surface,
+                    ),
                     _ => quiet,
                   },
+                ),
+              ),
+              const SizedBox(width: WeftSpace.xs),
+            ],
+            // The reply marker. A glyph rather than a quoted line, because the
+            // preview has one line and spending it on what somebody else said
+            // is what the fallback was already doing wrong — the reader wants
+            // the answer, and that it is an answer.
+            //
+            // Excluded from semantics here and named in the row's own sentence
+            // instead: the row is one merged node, so a `Semantics` label on
+            // this icon would be swallowed by it, and the tooltip is what
+            // explains the pictogram to a sighted reader who does not know it.
+            if (_isReply(last) && !widget.typing) ...[
+              Tooltip(
+                message: words.reply,
+                child: ExcludeSemantics(
+                  child: Icon(Icons.reply_rounded, size: 13, color: quiet),
                 ),
               ),
               const SizedBox(width: WeftSpace.xs),
@@ -304,7 +346,7 @@ class _ChatTileState extends State<ChatTile> {
             Expanded(
               child: widget.typing
                   ? Text(
-                      'typing…',
+                      '${words.typing}…',
                       maxLines: 1,
                       style:
                           (mac
@@ -321,13 +363,13 @@ class _ChatTileState extends State<ChatTile> {
                               ),
                     )
                   : Text(
-                      _preview(last),
+                      _preview(words, last),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       // Same rule as the title: the preview is somebody's
                       // words, and its direction is theirs rather than the
                       // reader's locale.
-                      textDirection: textDirectionOf(_preview(last)),
+                      textDirection: textDirectionOf(_preview(words, last)),
                       style:
                           (mac
                                   ? context.text.labelSmall
@@ -409,23 +451,60 @@ class _ChatTileState extends State<ChatTile> {
     );
   }
 
-  static String _preview(WeftMessage? last) {
-    if (last == null) return 'No messages yet';
-    if (last.redacted) return 'Message deleted';
+  /// The emoji stay here and the words come from [words]: a picture of a
+  /// camera means the same in every language, and putting it in the ARB would
+  /// give a translator a chance to drop it.
+  ///
+  /// The text cases go through [stripReplyFallback] because [WeftMessage.body]
+  /// is the event as sent, and a Matrix rich reply's body *opens with the
+  /// message it answers* — `> <@signal_1234:beeper.local> see you at six`,
+  /// then a blank line, then the actual reply. The bubble has always stripped
+  /// it, through `parseMessageBody`; this line did not, so the inbox showed the
+  /// quoted mxid where the answer belonged, and never showed the answer at all
+  /// because the fallback is what fits in one line.
+  ///
+  /// An edit needs no special handling and gets none: `applyEdits` has already
+  /// replaced [WeftMessage.body] with the replacement's, and a replacement
+  /// carries its own fallback in the same shape.
+  static String _preview(WeftDesignStrings words, WeftMessage? last) {
+    if (last == null) return words.noMessagesYet;
+    if (last.redacted) return words.messageDeleted;
+    String kind(String emoji) => '$emoji ${words.messageKind(last.kind)}';
     return switch (last.kind) {
-      MessageKind.image => '📷 Photo',
-      MessageKind.video => '🎥 Video',
+      MessageKind.image => kind('📷'),
+      MessageKind.video => kind('🎥'),
       MessageKind.voice =>
-        last.transcript != null ? '🎙 ${last.transcript}' : '🎙 Voice message',
-      MessageKind.audio => '🎵 Audio',
-      MessageKind.file => '📎 File',
-      MessageKind.location => '📍 Location',
-      MessageKind.sticker => 'Sticker',
-      MessageKind.poll => '📊 Poll',
-      MessageKind.event => last.body,
-      MessageKind.text => last.body,
+        last.transcript != null ? '🎙 ${last.transcript}' : kind('🎙'),
+      MessageKind.audio => kind('🎵'),
+      MessageKind.file => kind('📎'),
+      MessageKind.location => kind('📍'),
+      MessageKind.sticker => words.messageKind(last.kind),
+      MessageKind.poll => kind('📊'),
+      MessageKind.event => _ownWords(words, last),
+      MessageKind.text => _ownWords(words, last),
     };
   }
+
+  /// [last]'s own text, with any quoted context removed.
+  ///
+  /// Falls back to the word for a reply when there is nothing left. That is a
+  /// real case and not a defensive branch: a reply whose entire body is the
+  /// fallback arrives from bridges that quote and say nothing — and an empty
+  /// preview line reads as a conversation with no messages in it, which is the
+  /// one thing it is not.
+  static String _ownWords(WeftDesignStrings words, WeftMessage last) {
+    final own = stripReplyFallback(last.body).trim();
+    if (own.isNotEmpty) return own;
+    return last.replyToEventId != null ? words.reply : '';
+  }
+
+  /// Whether the row should carry the small reply glyph.
+  ///
+  /// The relation decides, not the body: a reply to a photo has no text to
+  /// strip and is still a reply, and a message that merely opens with a
+  /// quotation is not one. `m.in_reply_to` is the only thing that knows.
+  static bool _isReply(WeftMessage? last) =>
+      last != null && !last.redacted && last.replyToEventId != null;
 
   /// One tick sent, two ticks arrived, two blue ticks read.
   static IconData _deliveryIcon(DeliveryState? state) => switch (state) {
@@ -457,9 +536,9 @@ class _MergedStrip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.merge_rounded, size: 11, color: palette.mergedAccent),
-              const SizedBox(width: 3),
+              const SizedBox(width: WeftSpace.xxs),
               Text(
-                'Merged',
+                WeftDesignStringsScope.of(context).merged,
                 style: context.text.labelSmall?.copyWith(
                   color: palette.mergedAccent,
                   fontWeight: FontWeight.w700,

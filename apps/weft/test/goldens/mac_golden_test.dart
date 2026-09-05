@@ -1,8 +1,10 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 
 import 'package:weft/features/chat/chat_view.dart';
+import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft/features/inbox/inbox_shell.dart';
 
 import '../support/golden_harness.dart';
@@ -22,16 +24,14 @@ void main() {
 
   const window = Size(1280, 800);
 
-  Future<void> shell(
-    WidgetTester tester, {
-    required WeftThemeMode mode,
-  }) => pumpWeft(
-    tester,
-    const InboxShell(),
-    size: window,
-    mode: mode,
-    surface: WeftSurface.mac,
-  );
+  Future<void> shell(WidgetTester tester, {required WeftThemeMode mode}) =>
+      pumpWeft(
+        tester,
+        const InboxShell(),
+        size: window,
+        mode: mode,
+        surface: WeftSurface.mac,
+      );
 
   group('macOS goldens', () {
     testWidgets('the window, dark', (tester) async {
@@ -76,6 +76,52 @@ void main() {
         matchesGoldenFile('mac_chat_light.png'),
       );
     });
+
+    // A live selection across two bubbles, which is the one state on this
+    // screen that nothing else can hold anyone to.
+    //
+    // The selection highlight is painted by the framework in
+    // `ColorScheme.primary` and lands on two different fills — the own
+    // bubble's primary tint and the peer bubble's neutral one — so "is the
+    // selected text still readable" has two answers per theme and four in
+    // total. That is precisely the kind of thing a picture catches and an
+    // assertion does not.
+    for (final (mode, suffix) in const [
+      (WeftThemeMode.dark, 'dark'),
+      (WeftThemeMode.light, 'light'),
+    ]) {
+      testWidgets('a selection across two messages, $suffix', (tester) async {
+        await pumpWeft(
+          tester,
+          const ChatView(chatId: 'merged:anna'),
+          size: window,
+          mode: mode,
+          surface: WeftSurface.mac,
+        );
+
+        // Two bubbles' worth, dragged the way a reader drags: from inside the
+        // older message to inside the newer one.
+        final bodies = find.byType(RichTextView);
+        final from = tester.getTopLeft(bodies.at(1)) + const Offset(2, 6);
+        final to = tester.getBottomRight(bodies.first) - const Offset(2, 6);
+        final mouse = await tester.startGesture(
+          from,
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pump();
+        for (var i = 1; i <= 4; i++) {
+          await mouse.moveTo(Offset.lerp(from, to, i / 4)!);
+          await tester.pump();
+        }
+        await mouse.up();
+        await tester.pumpAndSettle();
+
+        await expectLater(
+          find.byType(ChatView),
+          matchesGoldenFile('mac_chat_selection_$suffix.png'),
+        );
+      });
+    }
 
     // The glass has an opaque fallback, and it is the one case where a
     // translucent bar could put unreadable text over a photograph. Pinning it

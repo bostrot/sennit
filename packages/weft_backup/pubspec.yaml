@@ -1,0 +1,33 @@
+name: weft_backup
+description: >-
+  The `.braid` archive: one encrypted, versioned container holding a user's
+  cross-network history, written and read without a homeserver, a cloud account
+  or a device. Pure Dart — the format, the crypto and the merge rules are
+  decided in one test file rather than on a phone, and the package deliberately
+  knows nothing about SQL or Flutter so that the thing under test is the format
+  itself. The store adapters live in `weft_store`, which already owns the
+  schema; the screens live in `apps/weft`.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  # Argon2id and XChaCha20-Poly1305, both pure Dart. Neither exists in the
+  # workspace already — the Matrix SDK does its crypto in Rust through
+  # `flutter_vodozemac`, which is a Flutter plugin and so unavailable to a
+  # package that must run under plain `dart test`. The alternative was hand
+  # writing a memory-hard KDF and an AEAD, which is not a thing to do to hold
+  # someone's entire message history.
+  cryptography: ^2.7.0
+  # `AccumulatorSink`, for hashing a file in chunks rather than whole.
+  convert: ^3.1.2
+  # SHA-256 for content-addressed media dedup. Already in the lock.
+  crypto: ^3.0.7
+  meta: ^1.17.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0

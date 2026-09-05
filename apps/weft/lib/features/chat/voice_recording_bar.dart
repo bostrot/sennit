@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../services/audio/voice_recorder.dart';
 
 /// The composer row while a voice note is being recorded.
@@ -55,10 +56,7 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
       return;
     }
     if (!ok) {
-      showWeftMessage(
-        context,
-        'Braid needs the microphone to record a voice message.',
-      );
+      showWeftMessage(context, context.l10n.voiceNeedsMicrophone);
       widget.onCancel();
       return;
     }
@@ -87,7 +85,7 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
     final recording = await _recorder.stop();
     if (!mounted) return;
     if (recording == null) {
-      showWeftMessage(context, 'That was too short to send.');
+      showWeftMessage(context, context.l10n.voiceTooShort);
       widget.onCancel();
       return;
     }
@@ -129,16 +127,18 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
         child: Semantics(
           container: true,
           liveRegion: true,
-          label: _started ? 'Recording voice message, $_clock' : 'Starting…',
+          label: _started
+              ? context.l10n.voiceRecordingSemantics(_clock)
+              : context.l10n.voiceStarting,
           child: Row(
             children: [
               NamedButton(
-                label: 'Discard recording',
+                label: context.l10n.voiceDiscardLabel,
                 onPressed: _cancel,
                 child: IconButton(
                   icon: const Icon(Icons.delete_outline_rounded),
                   color: context.colors.error,
-                  tooltip: 'Discard',
+                  tooltip: context.l10n.commonDiscard,
                   onPressed: _cancel,
                 ),
               ),
@@ -167,11 +167,11 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
               ),
               const SizedBox(width: WeftSpace.md),
               NamedButton(
-                label: 'Send voice message',
+                label: context.l10n.voiceSendLabel,
                 onPressed: _finish,
                 child: IconButton.filled(
                   icon: const Icon(Icons.send_rounded, size: 18),
-                  tooltip: 'Send',
+                  tooltip: context.l10n.commonSend,
                   onPressed: _finish,
                 ),
               ),

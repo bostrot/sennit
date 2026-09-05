@@ -101,6 +101,8 @@ dependencies:
   flutter_onnxruntime: ^1.8.3
 
   weft_attachments: ^0.1.0
+  # The auto-reply rule engine, for the settings screen and the service.
+  weft_autoreply: ^0.1.0
   weft_bridges: ^0.1.0
   weft_call: ^0.1.0
   weft_design: ^0.1.0
@@ -113,6 +115,8 @@ dependencies:
   weft_search: ^0.1.0
   weft_share: ^0.1.0
   weft_sms: ^0.1.0
+  # The `.braid` archive format, for the backup screen.
+  weft_backup: ^0.1.0
   weft_snapshot: ^0.1.0
   weft_store: ^0.1.0
   weft_transcribe: ^0.1.0
@@ -141,6 +145,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Turns on `flutter gen-l10n` as part of `flutter pub get` and every build, so
+  # `lib/l10n/gen/app_l10n.dart` exists without anyone having to remember to
+  # regenerate it. Configured by `l10n.yaml` next to this file; the output is
+  # gitignored. Note the `generate: true` further down belongs to
+  # `flutter_launcher_icons` and is a different setting entirely.
+  generate: true
   # CocoaPods, never Swift Package Manager: the SPM path loses
   # flutter_vodozemac's Versions/Current symlink inside its framework and
   # every code-signing step downstream breaks on the "ambiguous" bundle. The

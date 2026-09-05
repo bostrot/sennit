@@ -11,6 +11,7 @@ import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_store/weft_store.dart';
 
+import 'auto_reply_transport.dart';
 import 'chat_repository.dart';
 import 'sms_chat_repository.dart';
 
@@ -38,7 +39,7 @@ Future<Uint8List> readAttachmentFile(AttachmentSource source) =>
 /// Rooms become chats; the identity graph decides which of those chats are the
 /// same person and get folded into one merged conversation. The UI above this
 /// is identical to the demo path — that is the point of the interface.
-class MatrixChatRepository implements ChatRepository {
+class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   MatrixChatRepository(
     this._session, {
     IdentityStore? store,
@@ -397,6 +398,89 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
+  Future<String?> sendAutoReply(
+    String chatId,
+    String body, {
+    ChatNetwork? via,
+  }) async {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) {
+      throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
+    }
+    // Beneath the engine's own guard, not instead of it. A machine-written
+    // answer to a stranger tells them the handle is live, is read, and is worth
+    // trying again — and this is the last place that can still be refused.
+    if (chat.isPendingRequest) {
+      throw StateError('Auto-reply refuses to answer a pending request');
+    }
+
+    // Which legs were unread *before* the send. Recorded rather than assumed,
+    // because auto-reply must not invent a badge: a conversation the user has
+    // open and caught up on stays caught up. `_unreadCountFor` is the same
+    // function the inbox row reads, so this cannot disagree with what is on
+    // screen.
+    final unreadBefore = <String, bool>{};
+    for (final source in chat.sources) {
+      if (source.network == ChatNetwork.sms) continue;
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      unreadBefore[room.id] = _unreadCountFor(room, room.lastEvent) > 0;
+    }
+
+    final target = _sendSource(chatId, via: via);
+    String? eventId;
+    if (target.network == ChatNetwork.sms) {
+      // No custom keys on a text message, and none needed: `_ingest` leaves an
+      // existing thread's unread count alone for an outgoing message, so the
+      // SMS leg keeps its badge without anything being re-asserted.
+      await _requireSms().send(target.roomId, body);
+    } else {
+      eventId = await _roomFor(target).sendEvent({
+        'msgtype': sdk.MessageTypes.Text,
+        'body': body,
+        kAutoReplyKey: true,
+      });
+    }
+
+    await _restoreUnread(unreadBefore);
+    _scheduleRebuild();
+    return eventId;
+  }
+
+  /// Puts back the unread flag on every leg that had one before an auto-reply.
+  ///
+  /// This is the crux of the feature, and it is not about receipts. Nothing in
+  /// [sendAutoReply] writes one — the problem is that `isReadLocally` treats
+  /// *the user's own newest event* as proof they have read the room, which is
+  /// right for a message they typed and wrong for one their model sent. The
+  /// MSC2867 flag is checked before that clause in [_unreadCountFor], so
+  /// setting it is what survives the send.
+  ///
+  /// It is also the multi-device half. `markUnread` writes room account data,
+  /// which syncs, so a reply sent from the phone leaves the laptop's badge
+  /// standing too — a purely local variable could not do that.
+  ///
+  /// Per leg and non-fatal: one room refusing the flag must not abandon the
+  /// others, and a failure here is a badge that cleared, not a message lost.
+  Future<void> _restoreUnread(Map<String, bool> unreadBefore) async {
+    for (final entry in unreadBefore.entries) {
+      if (!entry.value) continue;
+      final room = _client.getRoomById(entry.key);
+      if (room == null) continue;
+      // The optimistic marker from an earlier visit would zero the badge back
+      // out on the next rebuild. `markUnread` does the same for the same
+      // reason.
+      _readUpTo.remove(room.id);
+      if (room.markedUnread) continue;
+      try {
+        await room.markUnread(true);
+      } on Object catch (error) {
+        debugPrint('weft: auto-reply could not keep ${room.id} unread: $error');
+      }
+    }
+  }
+
+  @override
   Future<void> sendCalendarInvite(
     String chatId, {
     required String title,
@@ -620,6 +704,13 @@ class MatrixChatRepository implements ChatRepository {
 
   @override
   Future<void> setTyping(String chatId, {required bool typing}) async {
+    // The other half of the receipt rule. A typing notification is a stronger
+    // signal than a read receipt — it says a person is at the keyboard, right
+    // now, because of your message — and a user drafting a reply to a stranger
+    // and thinking better of it would have told them everything.
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat?.isPendingRequest ?? false) return;
+
     final source = _sendSource(chatId);
     if (source.network == ChatNetwork.sms) return;
     final room = _client.getRoomById(source.roomId);
@@ -657,31 +748,61 @@ class MatrixChatRepository implements ChatRepository {
   }
 
   @override
-  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  peerReadUpTo(String chatId) {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    if (chat == null) return const [];
+
+    final bots = <String>{};
+    final markers =
+        <({String roomId, String userId, String eventId, DateTime at})>[];
+    for (final source in chat.sources) {
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+      final bot = _bridgeBotOf(room);
+      if (bot != null) bots.add(bot);
+
+      // One entry per reader, not one per room. Bridge ghosts' receipts are
+      // the real ones: mautrix forwards the remote network's read state as the
+      // ghost user reading the room, so a WhatsApp contact's blue tick arrives
+      // here as `@whatsapp_49151…` having read the event.
+      //
+      // The bridge *bot* is skipped. It is a member of every bridged room and
+      // its receipt is plumbing rather than a person having looked at
+      // anything — counted, it would satisfy a two-person group on its own.
+      for (final entry in room.receiptState.global.otherUsers.entries) {
+        if (entry.key == bot) continue;
+        markers.add((
+          roomId: source.roomId,
+          userId: entry.key,
+          eventId: entry.value.eventId,
+          at: DateTime.fromMillisecondsSinceEpoch(entry.value.ts),
+        ));
+      }
+    }
+    return markers;
+  }
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
   ) {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return const [];
+
     final markers = <({String roomId, String eventId, DateTime at})>[];
     for (final source in chat.sources) {
       final room = _client.getRoomById(source.roomId);
-      if (room == null) continue;
-      // Bridge ghosts' receipts are the real ones: mautrix forwards the
-      // remote network's read state as the ghost user reading the room.
-      ({String eventId, DateTime at})? newest;
-      for (final entry in room.receiptState.global.otherUsers.entries) {
-        final at = DateTime.fromMillisecondsSinceEpoch(entry.value.ts);
-        if (newest == null || at.isAfter(newest.at)) {
-          newest = (eventId: entry.value.eventId, at: at);
-        }
-      }
-      if (newest != null) {
-        markers.add((
-          roomId: source.roomId,
-          eventId: newest.eventId,
-          at: newest.at,
-        ));
-      }
+      // `receiptState.global.latestOwnReceipt` is this account's `m.read` in
+      // this room, wherever it was last moved from — including from another
+      // device, which is the case that makes it worth reading at all.
+      final own = room?.receiptState.global.latestOwnReceipt;
+      if (own == null) continue;
+      markers.add((
+        roomId: source.roomId,
+        eventId: own.eventId,
+        at: DateTime.fromMillisecondsSinceEpoch(own.ts),
+      ));
     }
     return markers;
   }
@@ -823,6 +944,94 @@ class MatrixChatRepository implements ChatRepository {
     // fallback into the event, so every client that does not render rich
     // replies still shows what this answers.
     await target.room.sendTextEvent(body, inReplyTo: target.event);
+  }
+
+  @override
+  Future<void> sendThreadReply(
+    String chatId,
+    String body, {
+    required String threadRootId,
+    String? replyToEventId,
+    String? threadLatestEventId,
+  }) async {
+    final root = await _findEvent(chatId, threadRootId);
+    if (root == null) {
+      throw StateError(
+        'Cannot reply in thread $threadRootId: it is not in $chatId',
+      );
+    }
+
+    // Passed apart, because `is_falling_back` is the difference and the SDK
+    // derives it from which of the two is given. An explicit `inReplyTo` marks
+    // the relation as a real reply — the user picked a message in the thread and
+    // answered it. `threadLastEventId` marks it as the spec's *fallback*, which
+    // is what a plain message typed into a thread is: it points at the newest
+    // event so a client with no thread support renders the exchange as a chain,
+    // while a client that does render threads knows to ignore the quote.
+    //
+    // Getting this backwards shows every thread message quoting the one before
+    // it, in a view where they are already one under the other.
+    final explicit = replyToEventId == null
+        ? null
+        : await _findEvent(chatId, replyToEventId);
+
+    await root.room.sendTextEvent(
+      body,
+      threadRootEventId: threadRootId,
+      threadLastEventId: threadLatestEventId ?? threadRootId,
+      inReplyTo: explicit?.event,
+    );
+  }
+
+  @override
+  Future<ChatRequestState?> answerChatRequest(
+    String chatId,
+    ChatRequestAction action,
+  ) async {
+    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final current = chat?.request;
+    if (chat == null || !isPendingRequest(current)) return current;
+
+    final next = applyChatRequestAction(current!, action);
+    // Recorded before the awaits, not after. The buttons disappear on the next
+    // rebuild, and a rebuild can land while a `leave` is still on the wire —
+    // leaving the row back in the requests section with its buttons live, which
+    // reads as the tap having done nothing.
+    for (final source in chat.sources) {
+      _answeredRequests[source.roomId] = next;
+    }
+    _rebuild();
+
+    // Per leg: a merged request is one conversation to the user and several
+    // rooms underneath, and accepting it has to answer all of them or the
+    // unanswered legs come straight back as a second request.
+    for (final source in chat.sources) {
+      final plan = planChatRequest(action: action, network: source.network);
+      final room = _client.getRoomById(source.roomId);
+      if (room == null) continue;
+
+      // Deliberately no `markRead` anywhere in this method, and no
+      // `setTyping`. The whole promise of holding a stranger's message is that
+      // they learn nothing — not that it was delivered, not that it was
+      // opened, and not that it was refused.
+      if (plan.ignoreSender) {
+        final peer = _peerOf(room);
+        if (peer != null) {
+          await _client.ignoreUser(peer).catchError((Object error) {
+            debugPrint('weft: could not ignore $peer: $error');
+          });
+        }
+      }
+      if (plan.join) {
+        await room.join();
+      }
+      if (plan.leave) {
+        await room.leave();
+      }
+    }
+
+    _rebuild();
+    return next;
   }
 
   @override
@@ -1155,6 +1364,7 @@ class MatrixChatRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   }) async {
     final target = _sendSource(chatId, via: via);
     // Refused rather than silently rerouted to another leg. Sending an MMS
@@ -1175,6 +1385,7 @@ class MatrixChatRepository implements ChatRepository {
       maxUploadBytes: await _transport.maxUploadBytes(),
       isVoiceNote: isVoiceNote,
       durationMs: durationMs,
+      caption: caption,
     );
     if (decision is UploadRejection) {
       throw AttachmentRejectedException(decision);
@@ -1384,6 +1595,17 @@ class MatrixChatRepository implements ChatRepository {
   Future<void> markRead(String chatId) async {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) return;
+
+    // A request the user has not answered stays unread on the wire, however
+    // long they look at it. Reading a stranger's message must tell the stranger
+    // nothing — and the private receipt is not enough, because it is the
+    // *public* one bridges relay as WhatsApp's blue ticks and `_readUpTo`
+    // below is what a later `markRead` would flush. Skipping the whole method
+    // is the only version of this that cannot leak by accident.
+    //
+    // The local badge is not lost by this: the request lives in its own section
+    // with its own affordances, and clearing it is what accepting does.
+    if (chat.isPendingRequest) return;
 
     // A merged chat marks every leg read: the user has seen the conversation,
     // regardless of which network each message arrived on.
@@ -1824,12 +2046,11 @@ class MatrixChatRepository implements ChatRepository {
   ///
   /// Lifted out so a room's own leg and the chat built from it cannot disagree
   /// — the rail reads the first and the inbox row the second.
-  int _unreadCountFor(sdk.Room room, sdk.Event? lastEvent) {
-    if (room.markedUnread) {
-      return room.notificationCount > 0 ? room.notificationCount : 1;
-    }
-    return _isReadLocally(room, lastEvent) ? 0 : room.notificationCount;
-  }
+  int _unreadCountFor(sdk.Room room, sdk.Event? lastEvent) => roomUnreadCount(
+    markedUnread: room.markedUnread,
+    notificationCount: room.notificationCount,
+    readLocally: _isReadLocally(room, lastEvent),
+  );
 
   /// Whether the user has read [room] up to (at least) [lastEvent].
   ///
@@ -1903,9 +2124,110 @@ class MatrixChatRepository implements ChatRepository {
       pinned: room.isFavourite,
       archived: room.membership == sdk.Membership.leave,
       muted: room.pushRuleState != sdk.PushRuleState.notify,
+      request: _requestStateOf(room),
+      participantCount: _peerCountOf(room),
       preferredSendNetwork: _sendNetworks[room.id],
     );
   }
+
+  /// How many people are in [room] besides the user, or null when the server
+  /// has not said.
+  ///
+  /// The bridge bot is subtracted where there is one: it is a member of every
+  /// bridged room, it will never send a read receipt, and counting it would make
+  /// the blue ticks structurally unreachable on every bridged conversation.
+  ///
+  /// Null rather than a guess for a summary that has not arrived — which is
+  /// ordinary during first sync — because the group read rule reads this as
+  /// "everyone", and a wrong number there is a blue tick on a message half the
+  /// room has not opened. Zero is returned as null for the same reason: a room
+  /// the user is apparently alone in is a room whose membership is not known
+  /// yet, not one where everybody has read everything.
+  int? _peerCountOf(sdk.Room room) {
+    final joined = room.summary.mJoinedMemberCount;
+    if (joined == null) return null;
+    final peers = joined - 1 - (_bridgeBotOf(room) == null ? 0 : 1);
+    return peers > 0 ? peers : null;
+  }
+
+  /// Whether this room is a chat request, and what the user has said about it.
+  ///
+  /// An answered request is *not* remembered here. Accepting one leaves an
+  /// ordinary joined room and declining leaves the room outright, so the
+  /// membership the next sync reports is already the answer — a second record
+  /// of it would only be something to keep in step, and would resurrect a
+  /// declined request if it ever fell out of step.
+  ///
+  /// A room the user is still deciding about is held in [_answeredRequests] for
+  /// the seconds between the tap and the membership change arriving. Without it
+  /// the row springs back into the requests section on the next sync tick,
+  /// which reads as the button not having worked.
+  ChatRequestState? _requestStateOf(sdk.Room room) {
+    final answered = _answeredRequests[room.id];
+    if (answered != null) return answered;
+    if (room.membership == sdk.Membership.leave) return null;
+
+    final peer = _peerOf(room);
+    return isChatRequest(
+          invited: room.membership == sdk.Membership.invite,
+          everSentByUser: _hasOwnMessage(room),
+          // A merged contact is a contact: the user has recorded that this
+          // handle is someone they know, which is a stronger statement than
+          // having replied to them.
+          knownContact: peer != null && _isKnownContact(peer),
+          isGroup: peer == null,
+        )
+        ? ChatRequestState.pending
+        : null;
+  }
+
+  /// Whether the local user has ever spoken in [room], as far as this client
+  /// can see.
+  ///
+  /// Deliberately cheap and deliberately one-sided. The honest question is
+  /// "have they ever replied here", and answering it properly would mean
+  /// paginating every room in the account on every rebuild. What is available
+  /// for nothing is the room's own read/send state: `lastEvent` being the
+  /// user's, and the fact that Braid records where the user has read up to.
+  ///
+  /// It errs towards **not** a request. A conversation wrongly held out of the
+  /// inbox is a message the user never sees; a conversation wrongly left in it
+  /// is the behaviour they have today.
+  bool _hasOwnMessage(sdk.Room room) {
+    final ownId = _client.userID;
+    if (ownId == null) return true;
+    if (room.lastEvent?.senderId == ownId) return true;
+    // A read marker the user's own client wrote is a room they have opened and
+    // read, which is not a request whatever else is true.
+    if (_readUpTo.containsKey(room.id)) return true;
+    return room.receiptState.global.latestOwnReceipt != null;
+  }
+
+  /// Whether [userId] is somebody the user has recorded knowing.
+  ///
+  /// A handle existing is not enough — the graph builds one from every direct
+  /// chat, so every stranger has one the moment their room appears. What counts
+  /// is a *merge*: the user looking at two handles and saying they are the same
+  /// person is a deliberate act, and the only durable record in Braid that they
+  /// know who this is.
+  ///
+  /// A phone number in the address book counts too, via the contact-name
+  /// overrides the user opted into — the same source the inbox already titles
+  /// rows from.
+  bool _isKnownContact(String userId) {
+    final handle = _graph.handleFor(userId);
+    if (handle == null) return false;
+
+    final contactId = _graph.contactIdOf(handle.id);
+    if (contactId != null && _graph.handlesInContact(contactId).length > 1) {
+      return true;
+    }
+    final digits = handle.phoneE164?.replaceAll(RegExp(r'\D'), '');
+    return digits != null && _contactNames.containsKey(digits);
+  }
+
+  /// Requests answered this session, held until the membership change lands.
+  final Map<String, ChatRequestState> _answeredRequests = {};
 
   /// Folds each merged contact's DM rooms into a single [Chat].
   List<Chat> _applyMerges(Map<String, Chat> byRoom) {
@@ -1959,6 +2281,33 @@ class MatrixChatRepository implements ChatRepository {
     }
     return out;
   }
+}
+
+/// A room's badge, from the three facts that decide it.
+///
+/// Lifted out for the same reason [isReadLocally] was — it is reachable only
+/// through a live sync otherwise — and for one more: the order of these two
+/// clauses is the whole of the auto-reply unread guarantee.
+///
+/// [markedUnread] is checked **first**, and that is what survives a send.
+/// Writing a message moves the room's newest event past every receipt it holds,
+/// so [readLocally] becomes true the moment anything is sent from this account
+/// — right for a message the user typed, wrong for one their model sent on
+/// their behalf. The MSC2867 flag sits above that clause, which is why
+/// re-asserting it after an auto-reply keeps the conversation waiting. It is
+/// also room *account data*, so it syncs: the badge stays on the laptop too.
+///
+/// The `> 0 ? … : 1` is not padding. A room flagged unread whose server-side
+/// notification count is zero — every conversation the user marked unread by
+/// hand — still has to show something, and one is the honest number when the
+/// only thing known is "not finished with this".
+int roomUnreadCount({
+  required bool markedUnread,
+  required int notificationCount,
+  required bool readLocally,
+}) {
+  if (markedUnread) return notificationCount > 0 ? notificationCount : 1;
+  return readLocally ? 0 : notificationCount;
 }
 
 /// Whether a room's newest event has already been read, from facts alone.

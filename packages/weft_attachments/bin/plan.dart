@@ -127,6 +127,7 @@ Future<int> _run(List<String> argv) async {
     maxUploadBytes: args.maxBytes,
     isVoiceNote: args.voice,
     durationMs: args.durationMs,
+    caption: args.caption,
   );
 
   switch (decision) {
@@ -136,7 +137,7 @@ Future<int> _run(List<String> argv) async {
       stderr.writeln('Rejected (${reason.name}): $message');
       return 2;
     case UploadPlan():
-      final content = _contentFor(decision, caption: args.caption);
+      final content = _contentFor(decision);
       if (!args.jsonOnly) _report(source, decision);
       stdout.writeln(const JsonEncoder.withIndent('  ').convert(content));
       return 0;
@@ -167,12 +168,11 @@ Future<AttachmentSource> _read(String path, {String? declaredMimeType}) async {
 /// The thumbnail block is filled in whenever the plan asks for one so that the
 /// `thumbnail_url` / `thumbnail_file` split — the half of the shape that leaks
 /// an unencrypted preview when it is wrong — is visible in the output.
-Map<String, Object?> _contentFor(UploadPlan plan, {String? caption}) {
+Map<String, Object?> _contentFor(UploadPlan plan) {
   final thumbnail = plan.thumbnail;
   return plan.toEventContent(
     uri: _placeholderUri,
     file: plan.encrypted ? _placeholderFile : null,
-    caption: caption,
     thumbnailUri: thumbnail.shouldGenerate ? _placeholderThumbnailUri : null,
     thumbnailFile: thumbnail.shouldGenerate && plan.encrypted
         ? _placeholderThumbnailFile
@@ -198,6 +198,7 @@ void _report(AttachmentSource source, UploadPlan plan) {
       'Dimensions    ${plan.dimensions ?? '(not readable from header)'}',
     )
     ..writeln('Duration      ${_duration(plan.durationMs)}')
+    ..writeln('Caption       ${plan.caption ?? '(none)'}')
     ..writeln('Thumbnail     ${_thumbnail(thumbnail)}')
     ..writeln('Room          ${plan.encrypted ? 'encrypted' : 'plain'}')
     ..writeln(

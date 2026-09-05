@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../surface.dart';
-import '../theme.dart';
 import 'mac_glass.dart';
 
 /// Opens a panel in whatever form this surface uses.

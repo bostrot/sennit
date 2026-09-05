@@ -35,6 +35,22 @@ void main() {
       'android.permission.SEND_SMS',
       'android.permission.RECEIVE_SMS',
       'android.permission.RECEIVE_MMS',
+      // The fifth, and the one that fails silently. Not needed to *receive* a
+      // WAP push — that is RECEIVE_MMS — but required for the app to be
+      // allowed to hold the role at all: AOSP's `SmsApplication` assigns
+      // OP_RECEIVE_WAP_PUSH when the role is granted, cannot assign an app-op
+      // for an undeclared permission, and then disqualifies the app for having
+      // "lost" it. RoleManager reports the role granted and
+      // `Telephony.Sms.getDefaultSmsPackage()` keeps naming the old holder, so
+      // the app tells the user nothing changed. One logcat line from a system
+      // class is the entire evidence.
+      'android.permission.RECEIVE_WAP_PUSH',
+      // The sixth, and the next one `SmsApplication` stopped on once
+      // RECEIVE_WAP_PUSH was added. The op set is all-or-nothing: Braid never
+      // reads a cell broadcast, but an app that cannot hold every op the role
+      // assigns is not named by `getDefaultSmsPackage()`, whatever RoleManager
+      // says.
+      'android.permission.READ_CELL_BROADCASTS',
     ]) {
       expect(
         manifest,

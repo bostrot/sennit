@@ -48,7 +48,26 @@ const double kWeftMinPointerTarget = 28;
 /// both what a screen reader's touch exploration uses and what
 /// [MinimumTapTargetGuideline] measures.
 class WeftTapTarget extends SingleChildRenderObjectWidget {
-  const WeftTapTarget({super.key, this.minSize, required Widget super.child});
+  const WeftTapTarget({
+    super.key,
+    this.minSize,
+    this.alignment = Alignment.center,
+    required Widget super.child,
+  });
+
+  /// Where the control sits inside the box this grows it to.
+  ///
+  /// Centre is right almost everywhere: the padding is symmetrical, so the
+  /// control looks untouched and the extra is spread evenly around it.
+  ///
+  /// It is wrong in one shape, and the reaction bar is it. A 24pt pill grown to
+  /// a 48pt thumb target carries twelve points of transparent padding *above*
+  /// it, and that padding is what pushed the reactions away from the bubble
+  /// they belong to — a gap nobody wrote, in a place a reader reads as
+  /// distance. [Alignment.topCenter] keeps the pill where it was drawn and
+  /// spends the whole difference downwards, into the margin before the next
+  /// message, where there was already nothing.
+  final AlignmentGeometry alignment;
 
   /// Both axes, because the guidelines are square. Give a control a smaller
   /// height only where the taller box would push a running line apart.
@@ -65,15 +84,23 @@ class WeftTapTarget extends SingleChildRenderObjectWidget {
         context.isDesktop ? kWeftMinPointerTarget : kWeftMinTapTarget,
       );
 
+  /// Resolved here rather than in the render object, which is where the text
+  /// direction is not: [Alignment.topCenter] is the same in both, but a call
+  /// site that ever asks for a directional alignment must get the reader's.
+  Alignment _alignment(BuildContext context) =>
+      alignment.resolve(Directionality.maybeOf(context));
+
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderTapTarget(_resolve(context));
+      _RenderTapTarget(_resolve(context), _alignment(context));
 
   @override
   void updateRenderObject(BuildContext context, RenderObject renderObject) {
     // Declared against `RenderObject` rather than the private render class,
     // which would put a private type in a public signature.
-    (renderObject as _RenderTapTarget).minSize = _resolve(context);
+    (renderObject as _RenderTapTarget)
+      ..minSize = _resolve(context)
+      ..alignment = _alignment(context);
   }
 }
 
@@ -85,13 +112,21 @@ class WeftTapTarget extends SingleChildRenderObjectWidget {
 /// live rather than dead space around a control that still only responds to
 /// its own pixels.
 class _RenderTapTarget extends RenderShiftedBox {
-  _RenderTapTarget(this._minSize) : super(null);
+  _RenderTapTarget(this._minSize, this._alignment) : super(null);
 
   Size get minSize => _minSize;
   Size _minSize;
   set minSize(Size value) {
     if (_minSize == value) return;
     _minSize = value;
+    markNeedsLayout();
+  }
+
+  Alignment get alignment => _alignment;
+  Alignment _alignment;
+  set alignment(Alignment value) {
+    if (_alignment == value) return;
+    _alignment = value;
     markNeedsLayout();
   }
 
@@ -143,9 +178,7 @@ class _RenderTapTarget extends RenderShiftedBox {
     child.layout(constraints, parentUsesSize: true);
     size = constraints.constrain(_sizeFor(child.size));
     final parentData = child.parentData! as BoxParentData;
-    parentData.offset = Alignment.center.alongOffset(
-      size - child.size as Offset,
-    );
+    parentData.offset = alignment.alongOffset(size - child.size as Offset);
   }
 
   @override

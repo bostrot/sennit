@@ -3,6 +3,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
 import 'rules.dart';
+import 'strings.dart';
 
 /// Longest body a notification carries.
 ///
@@ -113,13 +114,18 @@ class NotificationContent {
     DeliveredDecision decision = const NotifyDecision(),
     String? senderAvatarUrl,
     bool? disambiguateSender,
+    WeftNotifyStrings words = WeftNotifyStrings.english,
   }) {
     return NotificationContent(
       eventId: message.eventId,
       roomId: message.roomId,
       groupKey: notificationGroupKey(chat),
       title: chat.title,
-      body: renderNotificationBody(message, showPreview: policy.showPreviews),
+      body: renderNotificationBody(
+        message,
+        showPreview: policy.showPreviews,
+        words: words,
+      ),
       senderName: disambiguatedSenderName(
         message,
         withNetwork: disambiguateSender ?? chat.isMerged,
@@ -468,12 +474,13 @@ String renderNotificationBody(
   WeftMessage message, {
   bool showPreview = true,
   int maxLength = kMaxNotificationBodyLength,
+  WeftNotifyStrings words = WeftNotifyStrings.english,
 }) {
-  if (!showPreview) return kHiddenPreviewBody;
-  return _truncate(_bodyForKind(message), maxLength);
+  if (!showPreview) return words.hiddenPreview;
+  return _truncate(_bodyForKind(words, message), maxLength);
 }
 
-String _bodyForKind(WeftMessage message) {
+String _bodyForKind(WeftNotifyStrings words, WeftMessage message) {
   // The projected body, not the raw one. A formatted message must reach the
   // shade as what it says — `<b>fire</b>` notifies as "fire", never as its
   // tags, which is also what stops a `<script>` the reader was never shown from
@@ -489,25 +496,27 @@ String _bodyForKind(WeftMessage message) {
     // ones that follow MSC2530. Either way it is the text the sender attached
     // to the file, and either way it belongs after the label — which is why
     // this does not try to tell the two apart.
-    MessageKind.image => _labelled('Photo', body),
-    MessageKind.video => _labelled('Video', body),
-    MessageKind.file => _labelled('File', body),
-    MessageKind.audio => _labelled('Audio', body),
-    MessageKind.voice => _voice(message),
-    MessageKind.sticker => _labelled('Sticker', body),
-    MessageKind.location => 'Location',
-    MessageKind.poll => _labelled('Poll', body),
+    MessageKind.image ||
+    MessageKind.video ||
+    MessageKind.file ||
+    MessageKind.audio ||
+    MessageKind.sticker ||
+    MessageKind.poll => _labelled(words.messageKind(message.kind), body),
+    MessageKind.voice => _voice(words, message),
+    MessageKind.location => words.messageKind(message.kind),
     // Suppressed by `evaluateNotification` before it ever reaches here; handled
     // anyway so a caller rendering a decision it made itself cannot produce an
     // empty notification.
     MessageKind.text ||
-    MessageKind.event => body.isEmpty ? kHiddenPreviewBody : body,
+    MessageKind.event => body.isEmpty ? words.hiddenPreview : body,
   };
 }
 
-String _voice(WeftMessage message) {
+String _voice(WeftNotifyStrings words, WeftMessage message) {
   final transcript = message.transcript?.trim();
-  if (transcript == null || transcript.isEmpty) return 'Voice message';
+  if (transcript == null || transcript.isEmpty) {
+    return words.messageKind(MessageKind.voice);
+  }
   return transcript;
 }
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../surface.dart';
 import '../theme.dart';
@@ -84,7 +83,9 @@ class _MacToolbarButtonState extends State<MacToolbarButton> {
           onExit: (_) => setState(() => _hovered = false),
           child: GestureDetector(
             onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-            onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+            onTapCancel: enabled
+                ? () => setState(() => _pressed = false)
+                : null,
             onTap: enabled
                 ? () {
                     setState(() => _pressed = false);
@@ -196,7 +197,10 @@ class _MacSearchFieldState extends State<MacSearchField> {
       curve: context.motion.standard,
       width: _focused ? widget.focusedWidth : widget.width,
       height: MacMetrics.fieldHeight,
-      padding: const EdgeInsetsDirectional.only(start: 6, end: 4),
+      padding: const EdgeInsetsDirectional.only(
+        start: WeftSpace.dense,
+        end: WeftSpace.xs,
+      ),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: _focused ? 0.10 : 0.07),
         borderRadius: BorderRadius.circular(MacMetrics.controlRadius - 1),
@@ -207,11 +211,7 @@ class _MacSearchFieldState extends State<MacSearchField> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.search_rounded,
-            size: 13,
-            color: colors.onSurfaceVariant,
-          ),
+          Icon(Icons.search_rounded, size: 13, color: colors.onSurfaceVariant),
           const SizedBox(width: 4),
           Expanded(
             child: TextField(
@@ -306,9 +306,10 @@ class _MacPushButtonState extends State<MacPushButton> {
 
     final background = switch ((enabled, widget.prominent)) {
       (false, true) => colors.primary.withValues(alpha: 0.35),
-      (_, true) => _hovered
-          ? Color.lerp(colors.primary, Colors.white, 0.10)!
-          : colors.primary,
+      (_, true) =>
+        _hovered
+            ? Color.lerp(colors.primary, Colors.white, 0.10)!
+            : colors.primary,
       (false, false) => colors.onSurface.withValues(alpha: 0.05),
       _ => colors.onSurface.withValues(alpha: _hovered ? 0.14 : 0.09),
     };

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
+import '../app/localisation.dart';
 
 import '../features/bridges/bridges_screen.dart';
 import '../features/inbox/new_chat_sheet.dart';
@@ -79,15 +80,45 @@ class WeftMenuBar extends ConsumerWidget {
     Actions.maybeInvoke(context, intent);
   }
 
+  /// Edit ▸ Copy, which means two different things and has to try both.
+  ///
+  /// In a conversation the answer is [CopyMessageIntent] — copy the selection
+  /// across the thread, or the focused bubble if there is none. Everywhere else
+  /// — the composer, a search field, a settings text box — it is the
+  /// framework's own copy against the caret. The chat's intent is asked for
+  /// first and only handled if something in the tree above the focus actually
+  /// registered it, so a caret in the composer falls straight through to the
+  /// second case.
+  ///
+  /// `Actions.maybeInvoke` cannot tell "nobody handled it" from "handled, and
+  /// the action returns void", so the action is looked up and its enabled state
+  /// read before invoking rather than after.
+  void _copy() {
+    final context = primaryFocus?.context;
+    if (context == null) return;
+    const intent = CopyMessageIntent();
+    final action = Actions.maybeFind<CopyMessageIntent>(
+      context,
+      intent: intent,
+    );
+    if (action != null && action.isEnabled(intent)) {
+      Actions.of(context).invokeAction(action, intent, context);
+      return;
+    }
+    _editing(CopySelectionTextIntent.copy);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!context.isMac) return child;
 
+    final l10n = context.l10n;
     return PlatformMenuBar(
       menus: [
         PlatformMenu(
           // The application menu, whatever it is labelled — macOS replaces the
           // label with the app's name and always draws it first.
+          // l10n-ignore: macOS replaces this with the app's own name.
           label: 'Braid',
           menus: [
             const PlatformProvidedMenuItem(
@@ -96,7 +127,7 @@ class WeftMenuBar extends ConsumerWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Settings…',
+                  label: l10n.menuSettings,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.comma,
                     meta: true,
@@ -135,10 +166,10 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'File',
+          label: l10n.menuFile,
           menus: [
             PlatformMenuItem(
-              label: 'New Conversation…',
+              label: l10n.menuNewConversation,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyN,
                 meta: true,
@@ -151,7 +182,7 @@ class WeftMenuBar extends ConsumerWidget {
               },
             ),
             PlatformMenuItem(
-              label: 'Search…',
+              label: l10n.menuSearch,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyF,
                 meta: true,
@@ -161,12 +192,12 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Edit',
+          label: l10n.menuEdit,
           menus: [
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Cut',
+                  label: l10n.menuCut,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyX,
                     meta: true,
@@ -178,15 +209,15 @@ class WeftMenuBar extends ConsumerWidget {
                   ),
                 ),
                 PlatformMenuItem(
-                  label: 'Copy',
+                  label: l10n.menuCopy,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyC,
                     meta: true,
                   ),
-                  onSelected: () => _editing(CopySelectionTextIntent.copy),
+                  onSelected: _copy,
                 ),
                 PlatformMenuItem(
-                  label: 'Paste',
+                  label: l10n.menuPaste,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyV,
                     meta: true,
@@ -196,7 +227,7 @@ class WeftMenuBar extends ConsumerWidget {
                   ),
                 ),
                 PlatformMenuItem(
-                  label: 'Select All',
+                  label: l10n.menuSelectAll,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.keyA,
                     meta: true,
@@ -210,12 +241,12 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'View',
+          label: l10n.menuView,
           menus: [
             PlatformMenuItem(
               label: ref.watch(macSidebarVisibleProvider)
-                  ? 'Hide Sidebar'
-                  : 'Show Sidebar',
+                  ? l10n.menuHideSidebar
+                  : l10n.menuShowSidebar,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 meta: true,
@@ -228,8 +259,8 @@ class WeftMenuBar extends ConsumerWidget {
               members: [
                 PlatformMenuItem(
                   label: ref.watch(showArchivedProvider)
-                      ? 'Show Active Conversations'
-                      : 'Show Archived',
+                      ? l10n.menuShowActive
+                      : l10n.menuShowArchived,
                   onSelected: () =>
                       ref.read(showArchivedProvider.notifier).toggle(),
                 ),
@@ -245,12 +276,12 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Conversation',
+          label: l10n.menuConversation,
           menus: [
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Next Conversation',
+                  label: l10n.menuNextConversation,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.arrowDown,
                     alt: true,
@@ -258,7 +289,7 @@ class WeftMenuBar extends ConsumerWidget {
                   onSelected: () => _invoke(const NextChatIntent()),
                 ),
                 PlatformMenuItem(
-                  label: 'Previous Conversation',
+                  label: l10n.menuPreviousConversation,
                   shortcut: const SingleActivator(
                     LogicalKeyboardKey.arrowUp,
                     alt: true,
@@ -270,7 +301,7 @@ class WeftMenuBar extends ConsumerWidget {
             PlatformMenuItemGroup(
               members: [
                 PlatformMenuItem(
-                  label: 'Mark All as Read',
+                  label: l10n.menuMarkAllRead,
                   onSelected: () {
                     final repository = ref.read(chatRepositoryProvider);
                     for (final chat in ref.read(visibleChatsProvider)) {
@@ -279,11 +310,11 @@ class WeftMenuBar extends ConsumerWidget {
                   },
                 ),
                 PlatformMenuItem(
-                  label: 'Merged Chats…',
+                  label: l10n.menuMergedChats,
                   onSelected: () => _push(const MergeScreen()),
                 ),
                 PlatformMenuItem(
-                  label: 'Bridges…',
+                  label: l10n.menuBridges,
                   onSelected: () => _push(const BridgesScreen()),
                 ),
               ],
@@ -291,7 +322,7 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Window',
+          label: l10n.menuWindow,
           menus: const [
             PlatformProvidedMenuItem(
               type: PlatformProvidedMenuItemType.minimizeWindow,
@@ -309,10 +340,10 @@ class WeftMenuBar extends ConsumerWidget {
           ],
         ),
         PlatformMenu(
-          label: 'Help',
+          label: l10n.menuHelp,
           menus: [
             PlatformMenuItem(
-              label: 'Keyboard Shortcuts',
+              label: l10n.menuKeyboardShortcuts,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.slash,
                 meta: true,

@@ -17,6 +17,7 @@ import 'package:weft_call/weft_call.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Everything the four app-level call suites share.
 ///
@@ -589,6 +590,7 @@ Future<void> pumpCallSurface(WidgetTester tester, Widget child) {
   return tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(body: child),
       ),
@@ -606,6 +608,7 @@ Future<void> pumpCallScreen(
   return tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: CallScreenBody(
           state: state,
@@ -641,6 +644,7 @@ Future<void> pumpCallOverlay(
           ),
       ],
       child: MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         builder: (context, child) =>
             CallOverlay(child: child ?? const SizedBox.shrink()),

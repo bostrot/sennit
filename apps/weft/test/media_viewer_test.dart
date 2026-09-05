@@ -22,6 +22,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import 'support/attachment_fixtures.dart';
 import 'support/semantics_probe.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Records what it was asked to fetch and writes fixture bytes at the target.
 class _FakeTransport implements ModelDownloadTransport {
@@ -432,6 +433,7 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: MediaViewer(items: items, initialIndex: initialIndex),
           ),
@@ -755,7 +757,11 @@ void main() {
             (context, file) => const SizedBox.shrink(),
           ),
         ],
-        child: MaterialApp(theme: WeftTheme.build(), home: home),
+        child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          theme: WeftTheme.build(),
+          home: home,
+        ),
       );
 
       // Sent before the thread is opened, and deliberately: demo mode's

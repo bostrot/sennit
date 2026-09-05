@@ -5,6 +5,7 @@ import 'package:weft/app/providers.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/merge/merge_screen.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft/app/localisation.dart';
 
 void main() {
   Future<DemoChatRepository> pump(WidgetTester tester) async {
@@ -12,7 +13,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
-        child: MaterialApp(theme: WeftTheme.build(), home: const MergeScreen()),
+        child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          theme: WeftTheme.build(),
+          home: const MergeScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();

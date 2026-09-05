@@ -11,6 +11,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Wraps the demo repository but reports every chat as having no reachable
 /// rooms, standing in for a room the account has since left.
@@ -56,9 +57,19 @@ class _NoRoomsRepository implements ChatRepository {
   }) async {}
 
   @override
-  List<({String roomId, String eventId, DateTime at})> peerReadUpTo(
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  peerReadUpTo(String chatId) => const [];
+
+  @override
+  List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
   ) => const [];
+
+  @override
+  Future<ChatRequestState?> answerChatRequest(
+    String chatId,
+    ChatRequestAction action,
+  ) => _inner.answerChatRequest(chatId, action);
 
   @override
   void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
@@ -175,8 +186,14 @@ class _NoRoomsRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
-  }) =>
-      _inner.sendAttachment(chatId, source, via: via, isVoiceNote: isVoiceNote);
+    String? caption,
+  }) => _inner.sendAttachment(
+    chatId,
+    source,
+    via: via,
+    isVoiceNote: isVoiceNote,
+    caption: caption,
+  );
   @override
   Stream<List<UploadTask>> watchUploads(String chatId) =>
       _inner.watchUploads(chatId);
@@ -192,6 +209,20 @@ class _NoRoomsRepository implements ChatRepository {
     ChatNetwork? via,
   }) =>
       _inner.sendReply(chatId, body, replyToEventId: replyToEventId, via: via);
+  @override
+  Future<void> sendThreadReply(
+    String chatId,
+    String body, {
+    required String threadRootId,
+    String? replyToEventId,
+    String? threadLatestEventId,
+  }) => _inner.sendThreadReply(
+    chatId,
+    body,
+    threadRootId: threadRootId,
+    replyToEventId: replyToEventId,
+    threadLatestEventId: threadLatestEventId,
+  );
   @override
   Future<void> react(String chatId, String eventId, String key) =>
       _inner.react(chatId, eventId, key);
@@ -212,6 +243,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: ChatView(chatId: id),
         ),

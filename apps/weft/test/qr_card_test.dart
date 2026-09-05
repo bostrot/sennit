@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:weft/features/components/qr_card.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft/app/localisation.dart';
 
 /// The one card two unrelated features render a code on.
 ///
@@ -17,6 +18,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Widget card) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: Scaffold(body: Center(child: card)),
       ),
@@ -70,6 +72,7 @@ void main() {
     // routinely unreadable, and a dark theme would invert it.
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(brightness: Brightness.dark),
         home: const Scaffold(body: Center(child: QrCard.data('weft'))),
       ),

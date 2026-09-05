@@ -1,5 +1,7 @@
 import 'package:weft_call/weft_call.dart';
 
+import '../../app/localisation.dart';
+
 import '../../services/call/call_audio.dart';
 import '../../services/call/call_service.dart';
 
@@ -17,32 +19,43 @@ import '../../services/call/call_service.dart';
 /// [now] is passed rather than read from the clock so a caller that is already
 /// ticking once a second does not read the clock twice per frame, and so a
 /// golden can pin a duration.
-String callStatusLabel(CallServiceState state, {required DateTime now}) {
+String callStatusLabel(
+  AppL10n l10n,
+  CallServiceState state, {
+  required DateTime now,
+}) {
   final session = state.session;
-  if (session == null) return 'Call ended';
+  if (session == null) return l10n.callStatusEnded;
 
   switch (session.state) {
     case CallState.idle:
       return '';
     case CallState.ringing:
-      return session.videoEnabled ? 'Incoming video call' : 'Incoming call';
+      return session.videoEnabled
+          ? l10n.callStatusIncomingVideo
+          : l10n.callStatusIncoming;
     case CallState.outgoingRinging:
-      return 'Calling…';
+      return l10n.callStatusCalling;
     case CallState.connecting:
-      return 'Connecting…';
+      return l10n.callStatusConnecting;
     case CallState.connected:
       // The reconnection grace is the one connection-quality signal a user can
       // act on, so it outranks the duration while it lasts. The timer keeps
       // running underneath: the call has not ended and charging the user a
       // reset would be a lie.
-      if (state.reconnecting) return 'Reconnecting…';
-      return formatCallDuration(session.durationAt(now)) ?? 'Connected';
+      if (state.reconnecting) return l10n.callStatusReconnecting;
+      return formatCallDuration(session.durationAt(now)) ??
+          l10n.callStatusConnected;
     case CallState.onHold:
-      return 'On hold';
+      return l10n.callStatusOnHold;
     case CallState.ending:
-      return 'Ending…';
+      return l10n.callStatusEnding;
     case CallState.ended:
-      return callEndLabel(session.endReason, isOutgoing: session.isOutgoing);
+      return callEndLabel(
+        l10n,
+        session.endReason,
+        isOutgoing: session.isOutgoing,
+      );
   }
 }
 
@@ -51,36 +64,38 @@ String callStatusLabel(CallServiceState state, {required DateTime now}) {
 /// The wire cannot tell these apart — a hangup and a reject both carry
 /// `user_hangup` — which is exactly why [CallEndReason] splits them and why
 /// this is the only place that turns them into words.
-String callEndLabel(CallEndReason? reason, {required bool isOutgoing}) {
+String callEndLabel(
+  AppL10n l10n,
+  CallEndReason? reason, {
+  required bool isOutgoing,
+}) {
   switch (reason) {
     case null:
     case CallEndReason.userHangup:
     case CallEndReason.remoteHangup:
-      return 'Call ended';
+      return l10n.callStatusEnded;
     case CallEndReason.localReject:
-      return 'Call declined';
+      return l10n.callEndDeclined;
     case CallEndReason.remoteReject:
-      return isOutgoing ? 'They declined' : 'Call declined';
+      return isOutgoing ? l10n.callEndTheyDeclined : l10n.callEndDeclined;
     case CallEndReason.userBusy:
-      return isOutgoing
-          ? 'They are on another call'
-          : 'Declined — you were busy';
+      return isOutgoing ? l10n.callEndTheyAreBusy : l10n.callEndYouWereBusy;
     case CallEndReason.inviteTimeout:
-      return isOutgoing ? 'No answer' : 'Missed call';
+      return isOutgoing ? l10n.callEndNoAnswer : l10n.callEndMissed;
     case CallEndReason.answeredElsewhere:
-      return 'Answered on another device';
+      return l10n.callEndAnsweredElsewhere;
     case CallEndReason.glareLost:
       // Both sides dialled at once and this one gave way. The other call is
       // still ringing, which is the only part the user needs to know.
-      return 'Your calls crossed';
+      return l10n.callEndGlare;
     case CallEndReason.iceFailed:
-      return 'Could not connect';
+      return l10n.callEndIceFailed;
     case CallEndReason.mediaFailed:
-      return 'Microphone or camera unavailable';
+      return l10n.callEndMediaFailed;
     case CallEndReason.replaced:
-      return 'Call transferred';
+      return l10n.callEndReplaced;
     case CallEndReason.unknownError:
-      return 'Call failed';
+      return l10n.callEndFailed;
   }
 }
 
@@ -98,17 +113,18 @@ String? formatCallDuration(Duration? duration) {
 }
 
 /// Why a call could not be placed, next to the button that was pressed.
-String callStartFailureLabel(CallStartFailure failure) => switch (failure) {
-  CallStartFailure.busy => 'You are already on a call.',
-  CallStartFailure.mediaUnavailable =>
-    'Braid could not open your microphone or camera.',
-  CallStartFailure.signallingFailed => 'The call could not be sent.',
-};
+String callStartFailureLabel(AppL10n l10n, CallStartFailure failure) =>
+    switch (failure) {
+      CallStartFailure.busy => l10n.callStartBusy,
+      CallStartFailure.mediaUnavailable => l10n.callStartMediaUnavailable,
+      CallStartFailure.signallingFailed => l10n.callStartSignallingFailed,
+    };
 
 /// What the audio-route button is currently doing.
-String callAudioRouteLabel(CallAudioRoute route) => switch (route) {
-  CallAudioRoute.earpiece => 'Receiver',
-  CallAudioRoute.speaker => 'Speaker',
-  CallAudioRoute.wiredHeadset => 'Headphones',
-  CallAudioRoute.bluetooth => 'Bluetooth',
-};
+String callAudioRouteLabel(AppL10n l10n, CallAudioRoute route) =>
+    switch (route) {
+      CallAudioRoute.earpiece => l10n.callAudioEarpiece,
+      CallAudioRoute.speaker => l10n.callAudioSpeaker,
+      CallAudioRoute.wiredHeadset => l10n.callAudioWiredHeadset,
+      CallAudioRoute.bluetooth => l10n.callAudioBluetooth,
+    };

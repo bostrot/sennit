@@ -11,6 +11,8 @@ environment:
 workspace:
   - apps/weft
   - packages/weft_attachments
+  - packages/weft_autoreply
+  - packages/weft_backup
   - packages/weft_bridges
   - packages/weft_call
   - packages/weft_design
@@ -26,3 +28,13 @@ workspace:
   - packages/weft_snapshot
   - packages/weft_store
   - packages/weft_transcribe
+
+# The workspace root's own dependencies, for the Dart programs under `tooling/`
+# that are run with `dart run tooling/scripts/<name>.dart` from here.
+#
+# `analyzer` is already in the lock at this version as a transitive dependency
+# of `build_runner`, so declaring it is a promotion rather than a new package —
+# it changes no other resolution, which matters in a workspace that resolves as
+# a single unit and has lost packages to analyzer conflicts before.
+dev_dependencies:
+  analyzer: ^12.1.0

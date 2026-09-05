@@ -12,6 +12,7 @@ import 'package:weft_richtext/weft_richtext.dart';
 
 import 'support/recording_repository.dart';
 import 'support/seeded_repository.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Reactions as the reader meets them: a long-press, a chip, and a second tap
 /// that takes it back.
@@ -47,6 +48,7 @@ void main() {
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: ChatView(chatId: chatId),
         ),
@@ -298,6 +300,7 @@ void main() {
         ProviderScope(
           overrides: [chatRepositoryProvider.overrideWithValue(seeded)],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: ChatView(chatId: seeded.chatId),
           ),

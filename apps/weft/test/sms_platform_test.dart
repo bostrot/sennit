@@ -87,24 +87,49 @@ void main() {
         expect(await absent.threads(), isEmpty);
         expect(await absent.messages('7'), isEmpty);
         expect(await absent.send(address: '+44', body: 'hi'), isNull);
-        expect(await absent.requestRole(), isFalse);
+        expect(await absent.requestRole(), SmsRoleOutcome.unavailable);
         expect(await absent.markThreadRead('7'), 0);
       },
     );
 
     test('a declined role is an answer, not an error', () async {
-      platform.roleGranted = false;
+      platform.roleOutcome = 'denied';
 
-      expect(await sms.requestRole(), isFalse);
+      expect(await sms.requestRole(), SmsRoleOutcome.denied);
       // And nothing else broke: the app goes on working with the SMS network
       // simply absent, which is the whole promise of the decline path.
       expect(await sms.threads(), isEmpty);
     });
 
-    test('an accepted role resolves true', () async {
-      platform.roleGranted = true;
+    test('an accepted role resolves granted', () async {
+      platform.roleOutcome = 'granted';
 
-      expect(await sms.requestRole(), isTrue);
+      expect(await sms.requestRole(), SmsRoleOutcome.granted);
+    });
+
+    test('a system refusal is not a decline', () async {
+      // No dialog was shown — no telephony, or a ROM with the role stripped
+      // out. The user was never asked, so reporting a refusal is the one thing
+      // the old boolean could not do.
+      platform.roleOutcome = 'unavailable';
+
+      expect(await sms.requestRole(), SmsRoleOutcome.unavailable);
+    });
+
+    test('an interrupted request is not a decline either', () async {
+      // The activity was destroyed while Android's dialog was up. The answer
+      // exists on the phone; it just did not come back through this call.
+      platform.roleOutcome = 'interrupted';
+
+      expect(await sms.requestRole(), SmsRoleOutcome.interrupted);
+    });
+
+    test('an outcome this build has never heard of reads as interrupted', () {
+      // A Kotlin side newer than this Dart, which a hot restart produces. The
+      // safe default is "go and ask the system", never "the user said no".
+      expect(SmsRoleOutcome.fromWire('teleported'), SmsRoleOutcome.interrupted);
+      expect(SmsRoleOutcome.fromWire(null), SmsRoleOutcome.interrupted);
+      expect(SmsRoleOutcome.fromWire(true), SmsRoleOutcome.interrupted);
     });
   });
 

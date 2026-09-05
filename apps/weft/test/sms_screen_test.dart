@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/data/sms_chat_repository.dart';
 import 'package:weft/features/settings/settings_section.dart';
@@ -42,6 +43,7 @@ void main() {
         'supported': true,
         'isDefault': false,
         'canRequestRole': true,
+        'roleAvailable': true,
         'hasPermissions': false,
         'defaultPackage': holder,
       };
@@ -52,6 +54,7 @@ void main() {
     'supported': true,
     'isDefault': true,
     'canRequestRole': false,
+    'roleAvailable': true,
     'hasPermissions': true,
     'defaultPackage': 'com.bostrot.weft',
   };
@@ -79,7 +82,12 @@ void main() {
         overrides: [
           smsRepositoryProvider.overrideWithValue(present ? repository : null),
         ],
-        child: MaterialApp(theme: WeftTheme.build(), home: const SmsScreen()),
+        child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
+          theme: WeftTheme.build(),
+          home: const SmsScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -115,7 +123,7 @@ void main() {
     tester,
   ) async {
     channel.status = notDefault();
-    channel.roleGranted = false;
+    channel.roleOutcome = 'denied';
     await repository.start();
     await pump(tester);
 
@@ -141,7 +149,7 @@ void main() {
 
     // The dialog's answer and the role are read separately on the Kotlin side,
     // so the fake flips both the way the phone does.
-    channel.roleGranted = true;
+    channel.roleOutcome = 'granted';
     channel.status = isDefault;
     channel.threads = [smsThreadRow()];
     await tap(tester, 'Make Braid the SMS app');
@@ -316,6 +324,114 @@ void main() {
       await pump(tester);
 
       expect(find.text('RCS'), findsNothing);
+    });
+  });
+
+  /// The three answers that are not a grant, which used to be one answer.
+  ///
+  /// `requestRole` returned a boolean, so a decline, a system refusal and an
+  /// activity destroyed under Android's dialog all arrived as `false` and were
+  /// rendered with the decline copy. The third of those is the reported bug:
+  /// the user tapped "Braid", the system made Braid the default SMS app, the
+  /// activity was recreated while the dialog was up, and the screen said
+  /// *"Nothing changed. Braid is not your SMS app."* It was not a wording
+  /// problem — the screen had no way to know.
+  group('outcomes', () {
+    testWidgets('a system refusal does not read as a decline', (tester) async {
+      channel.status = notDefault();
+      // No dialog could be shown: this ROM has no ROLE_SMS, or the build is
+      // missing a component the role requires. The user was never asked.
+      channel.roleOutcome = 'unavailable';
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+
+      expect(find.textContaining('did not offer the choice'), findsOneWidget);
+      expect(
+        find.textContaining('Nothing changed'),
+        findsNothing,
+        reason: 'nobody declined anything; there was no dialog',
+      );
+    });
+
+    testWidgets('an interrupted request re-reads the role and reports it', (
+      tester,
+    ) async {
+      channel.status = notDefault();
+      await repository.start();
+      await pump(tester);
+
+      // The bug, exactly: the role *was* granted, and the answer never came
+      // back through the call because the activity died holding it.
+      channel.roleOutcome = 'interrupted';
+      channel.status = isDefault;
+      channel.threads = [smsThreadRow()];
+      await tap(tester, 'Make Braid the SMS app');
+
+      expect(find.text('On'), findsOneWidget);
+      expect(
+        find.textContaining('Nothing changed'),
+        findsNothing,
+        reason: 'the screen must not deny a role the phone says Braid holds',
+      );
+      // And the inbox actually gained the network, rather than merely
+      // relabelling the status row.
+      expect(repository.chats, hasLength(1));
+    });
+
+    testWidgets('an interrupted request that really was not granted says so', (
+      tester,
+    ) async {
+      channel.status = notDefault();
+      channel.roleOutcome = 'interrupted';
+      await repository.start();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+
+      // Not the decline copy either — nobody knows whether they declined. What
+      // the screen can honestly say is that the state above was re-read.
+      expect(find.textContaining('lost track of that answer'), findsOneWidget);
+      expect(find.textContaining('Nothing changed'), findsNothing);
+      expect(repository.isReady, isFalse);
+    });
+
+    testWidgets('every outcome re-reads the platform, not just a grant', (
+      tester,
+    ) async {
+      channel.status = notDefault();
+      channel.roleOutcome = 'denied';
+      await repository.start();
+      channel.calls.clear();
+      await pump(tester);
+
+      await tap(tester, 'Make Braid the SMS app');
+
+      // The old code refreshed only on a grant, which left the status row, the
+      // RCS section and the offer rendering pre-dialog state after every other
+      // answer.
+      expect(channel.calls, containsAllInOrder(['requestRole', 'getStatus']));
+    });
+
+    testWidgets('a phone with no role to give says so before anybody taps', (
+      tester,
+    ) async {
+      // Nothing to offer, so an explanation that waited for a request would
+      // never be read: there is no button to make one with.
+      channel.status = {
+        'supported': true,
+        'isDefault': false,
+        'canRequestRole': false,
+        'roleAvailable': false,
+        'hasPermissions': false,
+        'defaultPackage': 'com.android.messaging',
+      };
+      await repository.start();
+      await pump(tester);
+
+      expect(find.text('Make Braid the SMS app'), findsNothing);
+      expect(find.textContaining('did not offer the choice'), findsOneWidget);
     });
   });
 

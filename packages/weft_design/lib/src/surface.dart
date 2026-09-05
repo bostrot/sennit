@@ -37,18 +37,50 @@ WeftSurface get weftSurface =>
     ? WeftSurface.mac
     : WeftSurface.touch;
 
-/// Which surface the theme was built for.
+/// Whether this machine drives Braid with a pointer and a hardware keyboard.
+///
+/// Deliberately *not* the same question as [weftSurface]. Windows and Linux
+/// answer the two differently: they keep the touch layout, because the desktop
+/// one is macOS down to its 13pt type and its vibrancy sidebar, but they have a
+/// mouse with a right button, a scroll wheel, and a Ctrl key — and every
+/// behaviour that follows from *that* is theirs too. Right-click opens the
+/// context menu, hovering reveals the quick actions, swipe-to-reply stays out
+/// of the way, and message text selects by dragging across it.
+///
+/// Read once at the app root and folded into the theme, like [weftSurface] and
+/// for the same reason: three widgets had grown a private copy of this switch,
+/// and none of them could be tested in the case they were written for.
+bool get weftHasPointer =>
+    !kIsWeb &&
+    switch (defaultTargetPlatform) {
+      TargetPlatform.macOS ||
+      TargetPlatform.windows ||
+      TargetPlatform.linux => true,
+      _ => false,
+    };
+
+/// Which surface the theme was built for, and what it is driven with.
 @immutable
 class WeftSurfaceTokens extends ThemeExtension<WeftSurfaceTokens> {
-  const WeftSurfaceTokens({this.surface = WeftSurface.touch});
+  /// [pointer] defaults to what [surface] implies — a Mac has one — so a theme
+  /// built for the desktop is never accidentally built without it. Windows and
+  /// Linux are the case that has to pass it: touch layout, pointer input.
+  const WeftSurfaceTokens({this.surface = WeftSurface.touch, bool? pointer})
+    : pointer = pointer ?? surface == WeftSurface.mac;
 
   final WeftSurface surface;
+
+  /// Whether a pointer and a hardware keyboard are what arrive.
+  final bool pointer;
 
   bool get isMac => surface == WeftSurface.mac;
 
   @override
-  WeftSurfaceTokens copyWith({WeftSurface? surface}) =>
-      WeftSurfaceTokens(surface: surface ?? this.surface);
+  WeftSurfaceTokens copyWith({WeftSurface? surface, bool? pointer}) =>
+      WeftSurfaceTokens(
+        surface: surface ?? this.surface,
+        pointer: pointer ?? this.pointer,
+      );
 
   /// A surface has no midpoint — half a Mac is not a thing to draw — so this
   /// snaps rather than interpolating.
@@ -85,6 +117,32 @@ abstract final class MacMetrics {
   static const double listWidth = 300;
   static const double listMinWidth = 240;
   static const double listMaxWidth = 420;
+
+  /// The narrowest a thread can be and still be a thread.
+  ///
+  /// The other two panes are fixed widths and the conversation is the
+  /// `Expanded` one, so it is the pane that pays for the window being small —
+  /// and nothing used to stop it paying everything. At the 720pt minimum
+  /// `MainFlutterWindow.swift` enforces, a default sidebar and list left the
+  /// conversation 192pt: narrower than the conversation *list* is allowed to
+  /// be, and too narrow for a bubble to hold a sentence.
+  ///
+  /// 240 rather than the 300 the arithmetic allows, and the difference is a
+  /// deliberate stopping point. `macPaneWidths` takes from the sidebar first
+  /// and the list second; 240 is exactly what the sidebar alone can give up
+  /// (220 → [sidebarMinWidth]) at the 720pt minimum window, so the list is
+  /// never squeezed at all.
+  ///
+  /// Asking for 300 would have been within the arithmetic — 720 − 180 − 240 —
+  /// and it drove the list to [listMinWidth], where its *own* toolbar does not
+  /// fit: a focused search field grows from 120 to 180 and put that row 36
+  /// points over the edge. That is a real and separate bug, reachable today by
+  /// dragging the splitter to its minimum, and it is not this constant's to
+  /// fix. Taking the thread from 192 to 240 without walking into it is the
+  /// better trade; see `docs/quality/manual-walkthrough.md`, MW-09.
+  ///
+  /// Read by `macPaneWidths`.
+  static const double detailMinWidth = 240;
 
   /// One row in the source list, and its selected capsule's radius.
   static const double sidebarRowHeight = 28;
@@ -129,18 +187,29 @@ abstract final class MacMetrics {
 
 /// Reads the surface the theme was built for.
 extension WeftSurfaceContext on BuildContext {
-  WeftSurface get surface =>
-      Theme.of(this).extension<WeftSurfaceTokens>()?.surface ??
-      WeftSurface.touch;
+  WeftSurfaceTokens get _surfaceTokens =>
+      Theme.of(this).extension<WeftSurfaceTokens>() ??
+      const WeftSurfaceTokens();
+
+  WeftSurface get surface => _surfaceTokens.surface;
 
   /// Whether this is the desktop layout. Read it rather than the platform.
   bool get isMac => surface == WeftSurface.mac;
 
-  /// Whether a pointer is what arrives, rather than a thumb.
+  /// Whether this is the desktop *layout* — the metrics question.
   ///
   /// Separate from [isMac] because most of what the desktop changes is not
   /// macOS-specific — a mouse lands within a pixel or two whichever system it
   /// is plugged into — and this is the question Windows and Linux will answer
-  /// the same way.
+  /// the same way once they have layouts of their own.
   bool get isDesktop => surface != WeftSurface.touch;
+
+  /// Whether a pointer and a hardware keyboard are what arrive — the *input*
+  /// question, which Windows and Linux already answer yes to.
+  ///
+  /// Ask this, not [isDesktop], for anything about how the user reaches the
+  /// interface rather than how wide it is drawn: right-click menus, hover
+  /// affordances, gestures that only a finger makes, and whether text is
+  /// selectable by dragging across it. See [weftHasPointer].
+  bool get hasPointer => _surfaceTokens.pointer;
 }

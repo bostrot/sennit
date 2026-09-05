@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/data/chat_repository.dart';
@@ -65,6 +66,13 @@ Future<ProviderContainer> pumpScreen(
       container: container,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
+        // The app's own delegates, because the screens under test read their
+        // words from `context.l10n` and `AppL10n` is only in the tree if its
+        // delegate put it there. Without these, a settings screen throws in
+        // `build` and the suite reports an accessibility failure for what is
+        // really a harness that is not the app.
+        localizationsDelegates: weftLocalizationsDelegates,
+        supportedLocales: weftSupportedLocales,
         theme: WeftTheme.build(brightness: brightness),
         // The scaler goes in the app's `builder`, not in a `MediaQuery` above
         // `MaterialApp`: `MediaQuery.fromView` rebuilds the data from the view

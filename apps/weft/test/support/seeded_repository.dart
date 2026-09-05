@@ -210,7 +210,6 @@ WeftMessage seededMessage({
     // no delivery receipts — so that is the honest default for one, and what a
     // test varies when it is asking about ticks.
     deliveryState:
-        deliveryState ??
-        (isOwn ? DeliveryState.delivered : DeliveryState.sent),
+        deliveryState ?? (isOwn ? DeliveryState.delivered : DeliveryState.sent),
   );
 }

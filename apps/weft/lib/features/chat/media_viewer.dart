@@ -19,6 +19,8 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/attachments/media_exporter.dart';
 import '../../services/attachments/media_store.dart';
@@ -169,7 +171,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
         // disk — into the same unreportable sentence.
         setState(
           () => _failures[message.eventId] =
-              'This attachment could not be downloaded.\n$error',
+              '${context.l10n.mediaDownloadFailed}\n$error',
         );
       }
       return null;
@@ -181,6 +183,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
   }
 
   Future<void> _save() async {
+    final l10n = context.l10n;
     final message = _current;
     final file = await _stage(message);
     if (file == null || !mounted) return;
@@ -196,14 +199,15 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
       );
       // Null is the user cancelling the dialog, which is not an outcome worth
       // reporting back to them.
-      if (path != null) _report('Saved to $path');
+      if (path != null) _report(l10n.mediaSavedTo(path));
     } on Object catch (error) {
       debugPrint('weft: saving ${message.eventId} failed: $error');
-      _report('Could not save this file.');
+      _report(l10n.mediaSaveFailed);
     }
   }
 
   Future<void> _share(Rect? origin) async {
+    final l10n = context.l10n;
     final message = _current;
     final file = await _stage(message);
     if (file == null || !mounted) return;
@@ -214,7 +218,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
           .share(file, mimeType: stagedMimeType(file), origin: origin);
     } on Object catch (error) {
       debugPrint('weft: sharing ${message.eventId} failed: $error');
-      _report('Could not share this file.');
+      _report(l10n.mediaShareFailed);
     }
   }
 
@@ -254,7 +258,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
                   // Save is waiting on a download rather than ignoring the tap.
                   child: Semantics(
                     liveRegion: true,
-                    label: 'Downloading this attachment',
+                    label: context.l10n.mediaDownloadingLabel,
                     child: const CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
@@ -265,7 +269,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
             ),
           if (exporter.canSave)
             IconButton(
-              tooltip: 'Save',
+              tooltip: context.l10n.commonSave,
               icon: const Icon(Icons.download_rounded),
               onPressed: _save,
             ),
@@ -274,7 +278,7 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
           // rect puts it in the middle with nothing to point at.
           Builder(
             builder: (context) => IconButton(
-              tooltip: 'Share',
+              tooltip: context.l10n.commonShare,
               icon: const Icon(Icons.ios_share_rounded),
               onPressed: () => _share(_originOf(context)),
             ),
@@ -299,8 +303,8 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
               announce(
                 context,
                 semanticsSentence([
-                  '${index + 1} of ${widget.items.length}',
-                  mediaLabel(widget.items[index]),
+                  context.l10n.mediaPosition(index + 1, widget.items.length),
+                  mediaLabel(context.l10n, widget.items[index]),
                 ]),
               );
               unawaited(_stage(widget.items[index]));
@@ -342,9 +346,9 @@ class _MediaViewerState extends ConsumerState<MediaViewer> {
 /// Kind, sender and caption in that order: on a black screen holding one
 /// picture, "Photo" is the first thing there is to say and the caption is the
 /// only thing that describes *this* photo rather than any photo.
-String mediaLabel(WeftMessage message) => semanticsSentence([
-  messageKindLabel(message.kind),
-  message.isOwn ? 'from you' : 'from ${message.senderName}',
+String mediaLabel(AppL10n l10n, WeftMessage message) => semanticsSentence([
+  l10n.messageKind(message.kind),
+  message.isOwn ? l10n.mediaFromYou : l10n.mediaFromSender(message.senderName),
   attachmentCaption(message),
 ]);
 
@@ -364,7 +368,7 @@ class _ViewerTitle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            message.isOwn ? 'You' : message.senderName,
+            message.isOwn ? context.l10n.commonYou : message.senderName,
             style: context.text.titleSmall?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w700,
@@ -482,7 +486,7 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
       if (file == null) {
         return Center(
           child: Semantics(
-            label: 'Document loading',
+            label: context.l10n.mediaDocumentLoading,
             child: const CircularProgressIndicator(color: Colors.white),
           ),
         );
@@ -496,7 +500,9 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
     if (!kViewableMediaKinds.contains(message.kind)) {
       return _Message(
         icon: Icons.insert_drive_file_rounded,
-        text: message.body.isEmpty ? 'File' : message.body,
+        text: message.body.isEmpty
+            ? context.l10n.messageKindFile
+            : message.body,
         detail: message.mediaSizeBytes == null
             ? null
             : formatAttachmentSize(message.mediaSizeBytes!),
@@ -512,7 +518,9 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
     if (image == null) {
       return Center(
         child: Semantics(
-          label: '${messageKindLabel(message.kind)} loading',
+          label: context.l10n.mediaKindLoading(
+            context.l10n.messageKind(message.kind),
+          ),
           child: const CircularProgressIndicator(color: Colors.white),
         ),
       );
@@ -524,7 +532,7 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
       // The caption is drawn as an overlay by the viewer above; it belongs to
       // this picture, so it is said as part of it rather than as a second node
       // floating over a picture that had nothing to say for itself.
-      label: mediaLabel(message),
+      label: mediaLabel(context.l10n, message),
       child: Hero(
         tag: mediaHeroTag(message),
         child: InteractiveViewer(

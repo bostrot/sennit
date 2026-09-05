@@ -27,6 +27,7 @@ class FakeSmsChannel {
     'supported': true,
     'isDefault': true,
     'canRequestRole': false,
+    'roleAvailable': true,
     'hasPermissions': true,
     'defaultPackage': 'com.bostrot.weft',
   };
@@ -53,8 +54,14 @@ class FakeSmsChannel {
   /// What `sendMessage` writes back, or null for a platform that refused.
   Map<String, Object?>? sentRow;
 
-  /// The user's answer to the role dialog.
-  bool roleGranted = false;
+  /// How the role dialog ended, as `SmsRole.Outcome` spells it on the wire.
+  ///
+  /// A string rather than a bool, because the platform side stopped answering
+  /// with a bool: 'granted', 'denied', 'unavailable', 'superseded' and
+  /// 'interrupted' lead to five different screens and only one of them is a
+  /// decline. A fake that could only say yes or no could not exercise the bug
+  /// this replaced — a granted role reported as "nothing changed".
+  String roleOutcome = 'denied';
 
   /// Whether Android had a default-apps screen to open.
   bool settingsOpen = true;
@@ -86,7 +93,7 @@ class FakeSmsChannel {
       case 'getStatus':
         return status;
       case 'requestRole':
-        return roleGranted;
+        return roleOutcome;
       case 'openDefaultAppSettings':
         return settingsOpen;
       case 'getThreads':

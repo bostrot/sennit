@@ -151,6 +151,27 @@ class WeftPalette extends ThemeExtension<WeftPalette> {
     alpha: alpha,
   );
 
+  /// The read tick, corrected for the surface it is actually drawn on.
+  ///
+  /// [readReceipt] is one colour and it is drawn on two surfaces that could
+  /// hardly be further apart: the inbox row's page background, and the own
+  /// bubble's fill. In a dark theme those are a near-black and a pale lavender,
+  /// and **no single blue clears 3:1 against both** — so the token, corrected
+  /// against the page, came out a pale cyan that was very nearly invisible on
+  /// the bubble. Which is the worst possible place for it to fail: the read
+  /// mark is the one thing anyone looks at the ticks for, and it was the least
+  /// legible of the five.
+  ///
+  /// Correcting per surface is the only way both call sites can be right. The
+  /// hue is preserved wherever it can be — this is the one colour in the app
+  /// that is learned rather than derived, and a read tick that stopped being
+  /// blue would stop being recognisable.
+  Color readReceiptOn(Color background) => WeftContrast.ensure(
+    readReceipt,
+    background,
+    minRatio: WeftContrast.uiComponent,
+  );
+
   @override
   WeftPalette copyWith({
     Color? ownBubble,
@@ -245,6 +266,11 @@ abstract final class WeftTheme {
   /// and a phone's is 15, a Mac's controls are 22pt tall and a phone's are 48,
   /// a Mac has no ripple, and a Mac's corners are 7pt where a phone's are 14.
   /// Widgets that need more than metrics read [WeftSurfaceContext.isMac].
+  ///
+  /// [pointer] is the input half of the same idea and defaults to what
+  /// [surface] implies; Windows and Linux pass it explicitly, because they
+  /// have a mouse without having the Mac's layout. Widgets read it as
+  /// [WeftSurfaceContext.hasPointer].
   static ThemeData build({
     Color seed = defaultSeed,
     Brightness brightness = Brightness.dark,
@@ -253,6 +279,7 @@ abstract final class WeftTheme {
     bool highContrast = false,
     bool reduceMotion = false,
     WeftSurface surface = WeftSurface.touch,
+    bool? pointer,
   }) {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
@@ -301,7 +328,10 @@ abstract final class WeftTheme {
     // so the user's density preference rides on top of it rather than
     // replacing it.
     final density = mac
-        ? VisualDensity(horizontal: -2 + densityScale, vertical: -2 + densityScale)
+        ? VisualDensity(
+            horizontal: -2 + densityScale,
+            vertical: -2 + densityScale,
+          )
         : VisualDensity(horizontal: densityScale, vertical: densityScale);
 
     final base = ThemeData(
@@ -386,7 +416,7 @@ abstract final class WeftTheme {
       extensions: [
         palette,
         WeftMotionTokens(reduced: reduceMotion),
-        WeftSurfaceTokens(surface: surface),
+        WeftSurfaceTokens(surface: surface, pointer: pointer),
       ],
     );
 
@@ -441,7 +471,10 @@ abstract final class WeftTheme {
           borderRadius: BorderRadius.circular(5),
           border: Border.all(color: palette.border, width: 0.5),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(
+          horizontal: WeftSpace.dense,
+          vertical: WeftSpace.xxs,
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: scheme.surfaceContainerHigh,
@@ -539,7 +572,7 @@ abstract final class WeftTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: WeftSpace.sm,
-          vertical: 6,
+          vertical: WeftSpace.dense,
         ),
         isDense: true,
       ),

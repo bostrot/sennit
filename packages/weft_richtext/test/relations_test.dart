@@ -33,7 +33,10 @@ WeftMessage _message({
   ChatNetwork network = ChatNetwork.whatsapp,
   MessageKind kind = MessageKind.text,
   bool redacted = false,
+  bool isOwn = false,
   int at = 0,
+  String? threadRootId,
+  String? threadName,
 }) => WeftMessage(
   eventId: eventId,
   roomId: roomId,
@@ -42,9 +45,11 @@ WeftMessage _message({
   senderName: senderName,
   timestamp: _at(at),
   kind: kind,
-  isOwn: false,
+  isOwn: isOwn,
   body: body,
   redacted: redacted,
+  threadRootId: threadRootId,
+  threadName: threadName,
 );
 
 EditEvent _edit({
@@ -839,6 +844,317 @@ void main() {
       expect(
         replyPreviewText(_message(body: 'x' * kReplyPreviewLength)),
         'x' * kReplyPreviewLength,
+      );
+    });
+  });
+
+  group('groupThreads', () {
+    /// A room-level message, and two replies hanging off it.
+    ///
+    /// Newest first, which is the order a `MergedTimelineView` hands over and
+    /// therefore the order every assertion below is written against.
+    List<WeftMessage> forum() => [
+      _message(
+        eventId: r'$reply2',
+        body: 'and the second',
+        at: 300,
+        threadRootId: r'$root',
+      ),
+      _message(
+        eventId: r'$reply1',
+        body: 'first answer',
+        at: 200,
+        threadRootId: r'$root',
+      ),
+      _message(eventId: r'$other', body: 'unrelated', at: 150),
+      _message(eventId: r'$root', body: 'the topic itself', at: 100),
+    ];
+
+    test('replies come out of the flat list and onto their root', () {
+      final grouped = groupThreads(messages: forum());
+
+      expect(
+        grouped.messages.map((m) => m.eventId),
+        [r'$other', r'$root'],
+        reason: 'the replies belong under the root, not beside it',
+      );
+      expect(grouped.threads.keys, [r'$root']);
+      expect(grouped.threads[r'$root']!.replyCount, 2);
+      expect(grouped.threads[r'$root']!.latestReply?.eventId, r'$reply2');
+    });
+
+    test('the flat list keeps the order it arrived in', () {
+      // Nothing here sorts. Re-sorting would disagree with the merge's own
+      // watermark ordering, which is the only ordering that is safe across
+      // sources — and it is the merge's, not this function's, to decide.
+      final grouped = groupThreads(messages: forum());
+      expect(grouped.messages.first.eventId, r'$other');
+      expect(grouped.messages.last.eventId, r'$root');
+    });
+
+    test('a timeline with no threads is returned untouched', () {
+      final flat = [
+        _message(eventId: r'$a', at: 10),
+        _message(eventId: r'$b', at: 20),
+      ];
+      final grouped = groupThreads(messages: flat);
+
+      expect(grouped.messages, flat);
+      expect(grouped.threads, isEmpty);
+    });
+
+    test('a reply whose root is not loaded stays where it is', () {
+      // The case that decides whether the feature loses messages. Scrolling
+      // back through a forum group reaches replies long before it reaches the
+      // roots they hang off; taking them out on the strength of a relation to
+      // an event nobody can see hides them behind an indicator that does not
+      // exist.
+      final grouped = groupThreads(
+        messages: [
+          _message(eventId: r'$orphan', at: 300, threadRootId: r'$unloaded'),
+          _message(eventId: r'$here', at: 100),
+        ],
+      );
+
+      expect(grouped.threads, isEmpty);
+      expect(grouped.messages.map((m) => m.eventId), [r'$orphan', r'$here']);
+    });
+
+    test('a loaded thread and an orphan can coexist', () {
+      final grouped = groupThreads(
+        messages: [
+          _message(eventId: r'$orphan', at: 400, threadRootId: r'$gone'),
+          _message(eventId: r'$reply1', at: 300, threadRootId: r'$root'),
+          _message(eventId: r'$root', at: 100),
+        ],
+      );
+
+      expect(grouped.threads.keys, [r'$root']);
+      // The orphan is back in place and the grouped reply is not — and both
+      // are decided by the same walk, so the count under the root cannot
+      // disagree with the list beside it.
+      expect(grouped.messages.map((m) => m.eventId), [r'$orphan', r'$root']);
+    });
+
+    test('unread counts only what arrived after the read marker', () {
+      final grouped = groupThreads(messages: forum(), readUpTo: _at(250));
+
+      expect(grouped.threads[r'$root']!.unreadCount, 1);
+      expect(grouped.threads[r'$root']!.hasUnread, isTrue);
+    });
+
+    test('no read marker means nothing unread, not everything', () {
+      // A freshly-synced account whose receipt has not arrived would otherwise
+      // light up every topic in the room at once, which is indistinguishable
+      // from noise.
+      expect(groupThreads(messages: forum()).threads[r'$root']!.unreadCount, 0);
+    });
+
+    test("the user's own replies are never unread to them", () {
+      final grouped = groupThreads(
+        messages: [
+          _message(
+            eventId: r'$mine',
+            at: 300,
+            isOwn: true,
+            threadRootId: r'$root',
+          ),
+          _message(eventId: r'$theirs', at: 200, threadRootId: r'$root'),
+          _message(eventId: r'$root', at: 100),
+        ],
+        readUpTo: _at(150),
+      );
+
+      expect(grouped.threads[r'$root']!.replyCount, 2);
+      expect(grouped.threads[r'$root']!.unreadCount, 1);
+    });
+
+    test('unreadThreads is newest-activity first', () {
+      final grouped = groupThreads(
+        messages: [
+          _message(eventId: r'$rb1', at: 500, threadRootId: r'$rootB'),
+          _message(eventId: r'$ra1', at: 400, threadRootId: r'$rootA'),
+          _message(eventId: r'$rootB', at: 200),
+          _message(eventId: r'$rootA', at: 100),
+        ],
+        readUpTo: _at(300),
+      );
+
+      expect(grouped.unreadThreads.map((t) => t.rootEventId), [
+        r'$rootB',
+        r'$rootA',
+      ]);
+    });
+
+    test('a bridged topic name beats the root message body', () {
+      final named = groupThreads(
+        messages: [
+          _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+          _message(
+            eventId: r'$root',
+            body: 'anyone else seeing this?',
+            threadName: 'Bugs',
+            at: 100,
+          ),
+        ],
+      );
+
+      expect(named.threads[r'$root']!.title, 'Bugs');
+    });
+
+    test('a name announced on a reply names the thread too', () {
+      // The bridges disagree about which event carries a forum topic's name;
+      // mautrix-telegram stamps some builds' onto every message in the topic
+      // rather than onto the one that opened it.
+      final named = groupThreads(
+        messages: [
+          _message(
+            eventId: r'$reply1',
+            at: 200,
+            threadRootId: r'$root',
+            threadName: 'Off-topic',
+          ),
+          _message(eventId: r'$root', body: 'first post', at: 100),
+        ],
+      );
+
+      expect(named.threads[r'$root']!.title, 'Off-topic');
+    });
+
+    test('an unnamed thread falls back to the root, collapsed to one line', () {
+      final grouped = groupThreads(
+        messages: [
+          _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+          _message(eventId: r'$root', body: 'two\nlines here', at: 100),
+        ],
+      );
+
+      expect(grouped.threads[r'$root']!.title, 'two lines here');
+    });
+
+    test('a root that is all attachment gets no title rather than a blank', () {
+      final grouped = groupThreads(
+        messages: [
+          _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+          _message(
+            eventId: r'$root',
+            body: '',
+            kind: MessageKind.image,
+            at: 100,
+          ),
+        ],
+      );
+
+      expect(grouped.threads[r'$root']!.title, isNull);
+    });
+
+    test('an empty relation target is not a thread', () {
+      // `rel_type: m.thread` with no event id relates to nothing; gathering
+      // every such event under a root of "" would invent one phantom thread
+      // holding all of them.
+      final grouped = groupThreads(
+        messages: [_message(eventId: r'$a', threadRootId: '')],
+      );
+
+      expect(grouped.threads, isEmpty);
+      expect(grouped.messages, hasLength(1));
+    });
+  });
+
+  group('ThreadGrouping.flatten', () {
+    test('it keeps every message, threaded or not', () {
+      // What a network with no thread concept gets. A Signal chat can carry
+      // `m.thread` relations — a Matrix user in the room threaded a reply —
+      // and hiding those replies behind an indicator nobody on Signal can open
+      // is losing messages.
+      final messages = [
+        _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+        _message(eventId: r'$root', at: 100),
+      ];
+      final flat = ThreadGrouping.flatten(messages);
+
+      expect(flat.messages, messages);
+      expect(flat.threads, isEmpty);
+      expect(flat.threadFor(messages.last), isNull);
+    });
+  });
+
+  group('networkSupportsThreads', () {
+    test('only the networks that have somewhere to map a thread onto', () {
+      expect(networkSupportsThreads(ChatNetwork.telegram), isTrue);
+      expect(networkSupportsThreads(ChatNetwork.matrix), isTrue);
+      expect(networkSupportsThreads(ChatNetwork.slack), isTrue);
+      // Signal and WhatsApp have no equivalent, so a thread there is a Matrix
+      // construct the remote network never sees.
+      expect(networkSupportsThreads(ChatNetwork.signal), isFalse);
+      expect(networkSupportsThreads(ChatNetwork.whatsapp), isFalse);
+      expect(networkSupportsThreads(ChatNetwork.sms), isFalse);
+    });
+  });
+
+  group('threadMessages', () {
+    test('the root leads, then the replies oldest first', () {
+      final all = [
+        _message(eventId: r'$reply2', at: 300, threadRootId: r'$root'),
+        _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+        _message(eventId: r'$elsewhere', at: 250),
+        _message(eventId: r'$root', at: 100),
+      ];
+
+      expect(
+        threadMessages(
+          messages: all,
+          rootEventId: r'$root',
+        ).map((m) => m.eventId),
+        [r'$root', r'$reply1', r'$reply2'],
+      );
+    });
+
+    test('the root leads even when a reply is stamped before it', () {
+      // A bridge backfilling a forum topic can stamp the first reply at or
+      // before the root's own origin time, and a thread that opens on an
+      // answer reads as though the question is missing.
+      final all = [
+        _message(eventId: r'$reply1', at: 50, threadRootId: r'$root'),
+        _message(eventId: r'$root', at: 100),
+      ];
+
+      expect(
+        threadMessages(
+          messages: all,
+          rootEventId: r'$root',
+        ).map((m) => m.eventId),
+        [r'$root', r'$reply1'],
+      );
+    });
+
+    test('another thread in the same room is not included', () {
+      final all = [
+        _message(eventId: r'$mine', at: 200, threadRootId: r'$root'),
+        _message(eventId: r'$theirs', at: 300, threadRootId: r'$otherRoot'),
+        _message(eventId: r'$root', at: 100),
+      ];
+
+      expect(
+        threadMessages(
+          messages: all,
+          rootEventId: r'$root',
+        ).map((m) => m.eventId),
+        [r'$root', r'$mine'],
+      );
+    });
+
+    test('an unloaded root gives the replies alone rather than throwing', () {
+      final all = [
+        _message(eventId: r'$reply1', at: 200, threadRootId: r'$root'),
+      ];
+
+      expect(
+        threadMessages(
+          messages: all,
+          rootEventId: r'$root',
+        ).map((m) => m.eventId),
+        [r'$reply1'],
       );
     });
   });

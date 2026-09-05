@@ -7,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../components/qr_card.dart';
 
 /// Connecting an account, as one guided flow.
@@ -95,10 +96,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   }
 
   void _choose(BridgeLoginFlow flow) {
-    final session = BridgeLoginSession(
-      client: widget.client,
-      flowId: flow.id,
-    );
+    final session = BridgeLoginSession(client: widget.client, flowId: flow.id);
     _updates = session.updates.listen((_) {
       if (!mounted) return;
       setState(() => _syncInputsToStep());
@@ -182,8 +180,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
     if (flow != null) _choose(flow);
   }
 
-  String get _title =>
-      'Connect ${widget.bridgeLabel ?? widget.network.label}';
+  String get _title => 'Connect ${widget.bridgeLabel ?? widget.network.label}';
 
   @override
   Widget build(BuildContext context) {
@@ -280,10 +277,8 @@ class _ChooseFlow extends StatelessWidget {
       children: [
         _Header(
           network: network,
-          title: 'How do you want to sign in?',
-          subtitle:
-              '${network.label} offers more than one way. Any of them '
-              'connects the same account.',
+          title: context.l10n.bridgeFlowChooseTitle,
+          subtitle: context.l10n.bridgeFlowChooseSubtitle(network.label),
         ),
         const SizedBox(height: WeftSpace.lg),
         for (final flow in flows) ...[
@@ -417,11 +412,7 @@ class _InputStep extends StatelessWidget {
     return ListView(
       shrinkWrap: true,
       children: [
-        _Header(
-          network: network,
-          title: _heading,
-          subtitle: step.instructions,
-        ),
+        _Header(network: network, title: _heading, subtitle: step.instructions),
         const SizedBox(height: WeftSpace.lg),
         for (final field in step.fields) ...[
           _LoginField(
@@ -440,7 +431,7 @@ class _InputStep extends StatelessWidget {
           // nothing, and pressing this one is what puts the reason under the
           // field that is wrong.
           onPressed: onSubmit,
-          child: Text(canSubmit ? 'Continue' : 'Continue'),
+          child: Text(context.l10n.commonContinue),
         ),
       ],
     );
@@ -516,7 +507,9 @@ class _LoginFieldState extends State<_LoginField> {
         prefixText: field.type == 'phone_number' ? '+' : null,
         suffixIcon: field.isSecret
             ? IconButton(
-                tooltip: _revealed ? 'Hide' : 'Show',
+                tooltip: _revealed
+                    ? context.l10n.commonHide
+                    : context.l10n.commonShow,
                 icon: Icon(
                   _revealed
                       ? Icons.visibility_off_outlined
@@ -596,7 +589,7 @@ class _WaitStepState extends State<_WaitStep> {
       shrinkWrap: true,
       children: [
         Text(
-          step.instructions ?? 'Confirm on your other device',
+          step.instructions ?? context.l10n.bridgeFlowConfirmOnOther,
           textAlign: TextAlign.center,
           style: context.text.titleSmall,
         ),
@@ -605,10 +598,9 @@ class _WaitStepState extends State<_WaitStep> {
           Center(
             child: QrCard.data(
               step.displayData!,
-              semanticsLabel:
-                  'QR code for ${widget.flowName}. Scan it with the other '
-                  'device, or use the pairing code just below, which can be '
-                  'copied.',
+              semanticsLabel: context.l10n.bridgeFlowQrSemantics(
+                widget.flowName,
+              ),
             ),
           ),
           const SizedBox(height: WeftSpace.md),
@@ -634,10 +626,10 @@ class _WaitStepState extends State<_WaitStep> {
             child: TextButton.icon(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: step.displayData!));
-                showWeftMessage(context, 'Pairing code copied.');
+                showWeftMessage(context, context.l10n.bridgeFlowCodeCopied);
               },
               icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy code'),
+              label: Text(context.l10n.bridgeFlowCopyCode),
             ),
           ),
           const SizedBox(height: WeftSpace.lg),
@@ -649,7 +641,7 @@ class _WaitStepState extends State<_WaitStep> {
         Semantics(
           liveRegion: true,
           container: true,
-          label: 'Waiting for the other side to confirm',
+          label: context.l10n.bridgeFlowWaitingSemantics,
           excludeSemantics: true,
           child: Column(
             children: [
@@ -660,7 +652,7 @@ class _WaitStepState extends State<_WaitStep> {
               ),
               const SizedBox(height: WeftSpace.md),
               Text(
-                'Waiting for the other side…',
+                context.l10n.bridgeFlowWaiting,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -671,8 +663,10 @@ class _WaitStepState extends State<_WaitStep> {
               // that has been turning for two minutes says neither.
               Text(
                 _left == Duration.zero
-                    ? 'The code has expired.'
-                    : 'Expires in $minutes:${seconds.toString().padLeft(2, '0')}',
+                    ? context.l10n.bridgeFlowExpired
+                    : context.l10n.bridgeFlowExpiresIn(
+                        '$minutes:${seconds.toString().padLeft(2, '0')}',
+                      ),
                 style: context.text.labelSmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -684,7 +678,7 @@ class _WaitStepState extends State<_WaitStep> {
         Center(
           child: TextButton(
             onPressed: widget.onCancel,
-            child: const Text('Cancel'),
+            child: Text(context.l10n.commonCancel),
           ),
         ),
       ],
@@ -712,16 +706,13 @@ class _CookiesUnsupported extends StatelessWidget {
         ),
         const SizedBox(height: WeftSpace.lg),
         Text(
-          'This sign-in needs a browser',
+          context.l10n.bridgeFlowCookiesTitle,
           style: context.text.titleSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: WeftSpace.sm),
         Text(
-          'The bridge wants to read the cookies from a signed-in web session, '
-          'which means logging in inside a browser window. Braid does not '
-          'embed one — the bridge\'s own management chat can do this step, and '
-          'the account it connects is the same either way.',
+          context.l10n.bridgeFlowCookiesBody,
           textAlign: TextAlign.center,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurfaceVariant,
@@ -732,11 +723,11 @@ class _CookiesUnsupported extends StatelessWidget {
           FilledButton.icon(
             onPressed: onUseAdminRoom,
             icon: const Icon(Icons.chat_rounded, size: 16),
-            label: const Text('Open the management chat'),
+            label: Text(context.l10n.bridgeFlowOpenManagementChat),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Back'),
+          child: Text(context.l10n.commonBack),
         ),
       ],
     );
@@ -767,22 +758,23 @@ class _Done extends StatelessWidget {
           ),
           const SizedBox(height: WeftSpace.lg),
           Text(
-            '${network.label} is connected',
+            context.l10n.bridgeFlowConnected(network.label),
             style: context.text.titleSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: WeftSpace.sm),
           Text(
-            'The bridge is pulling your conversations across now. They arrive '
-            'in the inbox as they sync — a large account can take a few '
-            'minutes, and nothing needs to stay open while it does.',
+            context.l10n.bridgeFlowConnectedBody,
             textAlign: TextAlign.center,
             style: context.text.bodySmall?.copyWith(
               color: context.colors.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: WeftSpace.lg),
-          FilledButton(onPressed: onClose, child: const Text('Done')),
+          FilledButton(
+            onPressed: onClose,
+            child: Text(context.l10n.commonDone),
+          ),
         ],
       ),
     );
@@ -816,7 +808,7 @@ class _Failed extends StatelessWidget {
           ),
           const SizedBox(height: WeftSpace.lg),
           Text(
-            'Could not sign in',
+            context.l10n.bridgeFlowFailed,
             style: context.text.titleSmall,
             textAlign: TextAlign.center,
           ),
@@ -831,8 +823,11 @@ class _Failed extends StatelessWidget {
           const SizedBox(height: WeftSpace.lg),
           // Retry first, because most of what lands here is recoverable: an
           // expired QR, a mistyped code, a bridge that was restarting.
-          FilledButton(onPressed: onRetry, child: const Text('Try again')),
-          TextButton(onPressed: onClose, child: const Text('Close')),
+          FilledButton(
+            onPressed: onRetry,
+            child: Text(context.l10n.settingsTryAgain),
+          ),
+          TextButton(onPressed: onClose, child: Text(context.l10n.commonClose)),
         ],
       ),
     );
@@ -854,11 +849,7 @@ class _Working extends StatelessWidget {
 
 /// The network's mark over a heading and a line of explanation.
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.network,
-    required this.title,
-    this.subtitle,
-  });
+  const _Header({required this.network, required this.title, this.subtitle});
 
   final ChatNetwork network;
   final String title;

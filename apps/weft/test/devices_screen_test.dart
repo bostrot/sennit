@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/session_providers.dart';
 import 'package:weft/features/settings/devices_screen.dart';
 import 'package:weft_design/weft_design.dart';
@@ -43,6 +44,8 @@ void main() {
       ProviderScope(
         overrides: [deviceManagerProvider.overrideWithValue(devices)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: const DevicesScreen(),
         ),
@@ -258,46 +261,55 @@ void main() {
 
   group('describeLastSeen', () {
     final now = DateTime.utc(2026, 8, 18, 12);
+    final en = lookupAppL10n(const Locale('en'));
 
     test('a missing timestamp is named, not rendered as a blank', () {
-      expect(describeLastSeen(null, now: now), 'Last seen unknown');
+      expect(describeLastSeen(en, null, now: now), 'Last seen unknown');
     });
 
     test('rounds off inside the window the server itself is vague about', () {
       // The homeserver's own timestamp is allowed to be minutes stale, so a
       // to-the-minute rendering would be precision the number does not have.
       expect(
-        describeLastSeen(now.subtract(const Duration(minutes: 2)), now: now),
+        describeLastSeen(
+          en,
+          now.subtract(const Duration(minutes: 2)),
+          now: now,
+        ),
         'Active now',
       );
       expect(
-        describeLastSeen(now.subtract(const Duration(minutes: 40)), now: now),
+        describeLastSeen(
+          en,
+          now.subtract(const Duration(minutes: 40)),
+          now: now,
+        ),
         '40 minutes ago',
       );
       expect(
-        describeLastSeen(now.subtract(const Duration(hours: 1)), now: now),
+        describeLastSeen(en, now.subtract(const Duration(hours: 1)), now: now),
         '1 hour ago',
       );
       expect(
-        describeLastSeen(now.subtract(const Duration(days: 1)), now: now),
+        describeLastSeen(en, now.subtract(const Duration(days: 1)), now: now),
         'Yesterday',
       );
       expect(
-        describeLastSeen(now.subtract(const Duration(days: 3)), now: now),
+        describeLastSeen(en, now.subtract(const Duration(days: 3)), now: now),
         '3 days ago',
       );
     });
 
     test('a clock ahead of the server reads as now, not as the future', () {
       expect(
-        describeLastSeen(now.add(const Duration(minutes: 5)), now: now),
+        describeLastSeen(en, now.add(const Duration(minutes: 5)), now: now),
         'Active now',
       );
     });
 
     test('past a week it becomes a date', () {
       expect(
-        describeLastSeen(DateTime.utc(2026, 1, 9), now: now),
+        describeLastSeen(en, DateTime.utc(2026, 1, 9), now: now),
         contains('2026'),
       );
     });

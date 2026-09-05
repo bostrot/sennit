@@ -4,6 +4,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/notification_providers.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
@@ -67,6 +68,8 @@ void main() {
       }),
     ],
     child: MaterialApp(
+      localizationsDelegates: weftLocalizationsDelegates,
+      supportedLocales: weftSupportedLocales,
       theme: WeftTheme.build(),
       // 24-hour time throughout, so the rendered window is "22:00" rather than
       // a locale's "10:00 PM" and the time picker takes a 24-hour entry.
@@ -640,6 +643,8 @@ void main() {
             }),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
             theme: WeftTheme.build(),
             home: const NotificationsScreen(),
           ),

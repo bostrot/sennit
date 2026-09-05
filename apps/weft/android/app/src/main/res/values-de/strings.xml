@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml` — the base file carries the reasoning
+     behind each string, and this one only the words. A key here that is not
+     there (or missing from here) fails `l10n_test.dart`. -->
+<resources>
+    <string name="weft_widget_unread_name">Braid ungelesen</string>
+    <string name="weft_widget_unread_description">Wie viele ungelesene Nachrichten du hast, über alle Unterhaltungen hinweg.</string>
+    <string name="weft_widget_inbox_name">Braid-Unterhaltungen</string>
+    <string name="weft_widget_inbox_description">Deine letzten Unterhaltungen. Tippe eine an, um sie zu öffnen.</string>
+    <string name="weft_widget_inbox_heading">Zuletzt</string>
+    <string name="weft_widget_unread_label">ungelesen</string>
+    <string name="weft_widget_merged">Zusammengeführte Unterhaltung</string>
+    <string name="weft_widget_signed_out_title">Bei Braid anmelden</string>
+    <string name="weft_widget_signed_out_body">Öffne Braid und melde dich an, um deine Unterhaltungen hier zu sehen.</string>
+    <string name="weft_widget_disabled_title">Widgets sind aus</string>
+    <string name="weft_widget_disabled_body">Öffne Braid und schalte Startbildschirm-Widgets unter Widgets &amp; Uhr ein.</string>
+    <string name="weft_widget_stale_title">Öffne Braid auf deinem Telefon</string>
+    <string name="weft_widget_stale_body">Das ist nicht mehr aktuell. Öffne Braid, um es zu aktualisieren.</string>
+    <string name="weft_widget_empty_title">Keine Unterhaltungen</string>
+    <string name="weft_widget_empty_body">Noch nichts zu zeigen. Unterhaltungen in ausgeschlossenen Netzwerken erscheinen hier nie.</string>
+    <string name="call_channel_name">Anrufe</string>
+    <string name="call_channel_description">Eingehende Anrufe.</string>
+    <string name="call_incoming">Eingehender Anruf</string>
+    <string name="call_incoming_video">Eingehender Videoanruf</string>
+    <string name="call_in_progress">Anruf läuft</string>
+    <string name="call_in_progress_video">Videoanruf läuft</string>
+    <string name="call_phone_account">Braid-Anrufe</string>
+    <string name="connection_channel_name">Verbindung</string>
+    <string name="connection_channel_description">Hält Braid verbunden, damit Nachrichten ankommen, während es geschlossen ist.</string>
+    <string name="connection_title">Wartet auf Nachrichten</string>
+    <string name="connection_body">Braid bleibt im Hintergrund verbunden.</string>
+
+    <plurals name="weft_widget_unread_count">
+        <item quantity="one">%1$d ungelesene Nachricht</item>
+        <item quantity="other">%1$d ungelesene Nachrichten</item>
+    </plurals>
+</resources>

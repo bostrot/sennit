@@ -40,6 +40,7 @@ class WeftAppearance {
     bool highContrast = false,
     bool reduceMotion = false,
     WeftSurface surface = WeftSurface.touch,
+    bool? pointer,
   }) {
     final brightness = switch (mode) {
       WeftThemeMode.light => Brightness.light,
@@ -54,6 +55,7 @@ class WeftAppearance {
       highContrast: highContrast,
       reduceMotion: reduceMotion,
       surface: surface,
+      pointer: pointer,
     );
   }
 }

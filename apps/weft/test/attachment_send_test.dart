@@ -253,6 +253,71 @@ void main() {
       expect(sent, ['three.jpg', 'two.jpg', 'one.jpg']);
     });
 
+    test('a caption rides on the attachment, not beside it', () async {
+      final repository = demo();
+      addTearDown(repository.dispose);
+
+      await repository.sendAttachment(
+        '!design_room:example.org',
+        photo(),
+        caption: 'at the beach',
+      );
+      await pumpEventQueue();
+
+      final timeline = await repository.timelineFor('!design_room:example.org');
+      await timeline.loadMore();
+      final history = timeline.view().messages;
+
+      expect(history.first.kind, MessageKind.image);
+      expect(history.first.body, 'at the beach');
+      expect(history.first.attachmentName, 'holiday.jpg');
+      // One event, not two. A caption sent as its own text event arrives on
+      // WhatsApp and Signal as a separate message that races the upload for
+      // which lands first — so the words must appear in the room exactly once,
+      // and on the photo.
+      expect(
+        history.where((m) => m.body == 'at the beach'),
+        hasLength(1),
+        reason: 'the caption must not also go out as a text message',
+      );
+    });
+
+    test('no caption leaves the filename in the body, as before', () async {
+      final repository = demo();
+      addTearDown(repository.dispose);
+
+      await repository.sendAttachment('!design_room:example.org', photo());
+      await pumpEventQueue();
+
+      final chats = await repository.watchChats().first;
+      final sent = chats
+          .firstWhere((c) => c.id == '!design_room:example.org')
+          .lastMessage!;
+
+      expect(sent.body, 'holiday.jpg');
+      expect(sent.attachmentName, isNull);
+    });
+
+    test('a blank caption is no caption', () async {
+      final repository = demo();
+      addTearDown(repository.dispose);
+
+      await repository.sendAttachment(
+        '!design_room:example.org',
+        photo(),
+        caption: '   ',
+      );
+      await pumpEventQueue();
+
+      final chats = await repository.watchChats().first;
+      final sent = chats
+          .firstWhere((c) => c.id == '!design_room:example.org')
+          .lastMessage!;
+
+      expect(sent.body, 'holiday.jpg');
+      expect(sent.attachmentName, isNull);
+    });
+
     test('an unknown chat is an error, not a silently dropped file', () {
       final repository = demo();
       addTearDown(repository.dispose);

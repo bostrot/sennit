@@ -68,7 +68,10 @@ void main() {
   group('messagingAppName', () {
     test('names the apps a phone is likely to be holding', () {
       expect(messagingAppName(kGoogleMessagesPackage), 'Google Messages');
-      expect(messagingAppName('com.samsung.android.messaging'), 'Samsung Messages');
+      expect(
+        messagingAppName('com.samsung.android.messaging'),
+        'Samsung Messages',
+      );
     });
 
     test('an app nobody here has heard of keeps its package id', () {

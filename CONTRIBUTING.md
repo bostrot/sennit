@@ -49,6 +49,17 @@ bridges required.
 - Translations and accessibility improvements.
 - Performance work backed by measurements.
 
+## Translating
+
+Braid ships six languages, five of them machine-seeded and waiting to be read
+by someone who speaks them. You need no Dart and no checkout: Weblate is set up
+against this repository, and a pull request works too.
+
+**[docs/TRANSLATING.md](docs/TRANSLATING.md)** has how to claim a language, the
+conventions (informal register everywhere, ICU plurals, French non-breaking
+spaces, Simplified-only Chinese), and how to run the lint locally before
+opening anything.
+
 For large features, open an issue first so we can agree on the shape before
 you invest the time.
 

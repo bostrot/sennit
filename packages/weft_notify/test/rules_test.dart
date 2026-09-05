@@ -198,6 +198,93 @@ void main() {
         NotificationSuppression.duplicate,
       );
     });
+
+    test('a second message from a pending request is silence', () {
+      expect(
+        reasonFor(
+          decide(
+            forChat: chat(request: ChatRequestState.pending),
+            isFirstFromSender: false,
+          ),
+        ),
+        NotificationSuppression.pendingRequest,
+      );
+    });
+  });
+
+  group('chat requests', () {
+    Chat request() => chat(request: ChatRequestState.pending);
+
+    test('the first message from a stranger arrives silently', () {
+      // Silent rather than suppressed: a request the user is never told about
+      // is a request they never answer — it sits in a section they have no
+      // reason to open, and the message may be the one they were waiting for.
+      final decision = decide(forChat: request());
+
+      expect(decision, const SilentDecision());
+      expect(decision.delivers, isTrue);
+    });
+
+    test('and nothing after it', () {
+      // Anyone who can find the user's handle could otherwise put forty rows
+      // in their shade by sending forty messages.
+      expect(
+        decide(forChat: request(), isFirstFromSender: false).delivers,
+        isFalse,
+      );
+    });
+
+    test('a mention does not get a stranger past the hold', () {
+      // A mention breaks through a *mute* because the user chose to mute a
+      // conversation they are in. Writing the user's name is free, and is
+      // exactly what someone trying to get past this would do.
+      final decision = decide(
+        forChat: request(),
+        message: msg(body: 'hey @ada:example.org are you there'),
+      );
+
+      expect(decision, const SilentDecision());
+      expect(decision.mentioned, isFalse, reason: 'a silent request is silent');
+      expect(
+        decide(
+          forChat: request(),
+          message: msg(body: 'hey @ada:example.org are you there'),
+          isFirstFromSender: false,
+        ).delivers,
+        isFalse,
+      );
+    });
+
+    test('an accepted request notifies like any other conversation', () {
+      // Accepting clears the flag outright, which is what makes the transition
+      // a real one rather than a state everything has to keep checking.
+      expect(decide(forChat: chat()), const NotifyDecision());
+    });
+
+    test('a muted request reads as muted, not as a request', () {
+      // The reason a rule reports is the setting the user would go and change,
+      // and "muted" is a switch they set. Ordering this rule last is what makes
+      // that true.
+      expect(
+        reasonFor(
+          decide(forChat: chat(muted: true, request: ChatRequestState.pending)),
+        ),
+        NotificationSuppression.chatMuted,
+      );
+    });
+
+    test('a request read on another device does not notify at all', () {
+      expect(
+        reasonFor(
+          decide(
+            forChat: request(),
+            message: msg(timestamp: now.subtract(const Duration(minutes: 5))),
+            lastReadAt: now,
+          ),
+        ),
+        NotificationSuppression.alreadyRead,
+      );
+    });
   });
 
   group('mention detection', () {

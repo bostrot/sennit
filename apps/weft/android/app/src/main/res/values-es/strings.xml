@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml` — the base file carries the reasoning
+     behind each string, and this one only the words. A key here that is not
+     there (or missing from here) fails `l10n_test.dart`. -->
+<resources>
+    <string name="weft_widget_unread_name">Braid sin leer</string>
+    <string name="weft_widget_unread_description">Cuántos mensajes sin leer tienes, en todas las conversaciones.</string>
+    <string name="weft_widget_inbox_name">Conversaciones de Braid</string>
+    <string name="weft_widget_inbox_description">Tus conversaciones más recientes. Toca una para abrirla.</string>
+    <string name="weft_widget_inbox_heading">Recientes</string>
+    <string name="weft_widget_unread_label">sin leer</string>
+    <string name="weft_widget_merged">Conversación combinada</string>
+    <string name="weft_widget_signed_out_title">Inicia sesión en Braid</string>
+    <string name="weft_widget_signed_out_body">Abre Braid e inicia sesión para ver aquí tus conversaciones.</string>
+    <string name="weft_widget_disabled_title">Los widgets están desactivados</string>
+    <string name="weft_widget_disabled_body">Abre Braid y activa Widgets de la pantalla de inicio en Widgets y reloj.</string>
+    <string name="weft_widget_stale_title">Abre Braid en tu teléfono</string>
+    <string name="weft_widget_stale_body">Esto está desactualizado. Abre Braid para actualizarlo.</string>
+    <string name="weft_widget_empty_title">Sin conversaciones</string>
+    <string name="weft_widget_empty_body">Todavía no hay nada que mostrar. Las conversaciones en redes excluidas nunca se muestran aquí.</string>
+    <string name="call_channel_name">Llamadas</string>
+    <string name="call_channel_description">Llamadas entrantes.</string>
+    <string name="call_incoming">Llamada entrante</string>
+    <string name="call_incoming_video">Videollamada entrante</string>
+    <string name="call_in_progress">Llamada en curso</string>
+    <string name="call_in_progress_video">Videollamada en curso</string>
+    <string name="call_phone_account">Llamadas de Braid</string>
+    <string name="connection_channel_name">Conexión</string>
+    <string name="connection_channel_description">Mantiene Braid conectado para que los mensajes lleguen mientras está cerrado.</string>
+    <string name="connection_title">Escuchando mensajes</string>
+    <string name="connection_body">Braid sigue conectado en segundo plano.</string>
+
+    <plurals name="weft_widget_unread_count">
+        <item quantity="one">%1$d mensaje sin leer</item>
+        <item quantity="other">%1$d mensajes sin leer</item>
+    </plurals>
+</resources>

@@ -1,0 +1,29 @@
+# How `flutter gen-l10n` turns `lib/l10n/*.arb` into `AppL10n`.
+#
+# `output-dir` puts the generated Dart in the app's own `lib/` rather than in a
+# synthetic package under `.dart_tool/`: it is then importable by a normal
+# relative path, visible to `dart analyze`, and — the reason it matters here —
+# reachable from `test/` without a package alias. It is gitignored, not
+# committed; `flutter pub get` regenerates it.
+#
+# There is deliberately no `synthetic-package:` key. Flutter 3.44 removed the
+# synthetic-package path altogether and warns on every `gen-l10n` run if the
+# key is present, even set to the value that is now the only behaviour.
+#
+# See `docs/architecture/l10n-pipeline.md`.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_l10n.dart
+output-class: AppL10n
+output-dir: lib/l10n/gen
+# `AppL10n.of(context)` returns non-null. Every place that reads a string is
+# under the app's `Localizations`, so a nullable getter would be a `!` at every
+# call site.
+nullable-getter: false
+# `'` and `{` in a message mean themselves unless doubled, which is what lets
+# copy like "Don't" and a literal brace survive ICU parsing.
+use-escaping: true
+# Every key must carry an `@key` block with a description. A translator who
+# cannot see the screen has nothing else to go on, and this makes the omission a
+# build error rather than a bad translation six weeks later.
+required-resource-attributes: true

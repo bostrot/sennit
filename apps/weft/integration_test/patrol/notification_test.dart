@@ -238,4 +238,69 @@ void main() {
     config: kWeftPatrolConfig,
     timeout: kScenarioTimeout,
   );
+
+  patrolTest(
+    'opening the conversation takes its notifications out of the shade',
+    ($) async {
+      if (!shadeIsReachable) {
+        markTestSkipped(
+          'There is no shade this platform lets a test drive; see skip reason '
+          '① in docs/quality/e2e-matrix.md.',
+        );
+        return;
+      }
+
+      // The one surface `flutter test` cannot draw, which is why this scenario
+      // is here rather than in `chat_open_read_test.dart`. That test asserts
+      // that opening a chat *calls* the dismisser; whether the row actually
+      // leaves the system's notification service is a question only the
+      // platform automator can answer, and the failure it catches — a cancel
+      // aimed at an id or a tag the row was never posted under — looks
+      // identical from inside the app.
+      final scenario = await ChatScenario.start(
+        $,
+        title: 'Notification clearing',
+        notifying: true,
+      );
+
+      // Two messages, so the assertion is about the *conversation* being
+      // cleared rather than about one row happening to go: Weft groups a
+      // chat's notifications under one key, and a dismissal that took only the
+      // summary down would leave the individual rows behind on Android.
+      await backgroundApp($);
+      final first = await scenario.peerSays('the first one');
+      final second = await scenario.peerSays('and the second');
+      await awaitNotification($, second.body);
+      expect(
+        await shadeShows($, first.body),
+        isTrue,
+        reason:
+            'both messages are in the shade before the conversation is opened. '
+            'The shade holds: ${await describeShade($)}',
+      );
+
+      // Through the app rather than through the notification's own tap: a tap
+      // routes to the deep-link handler, which is one door of several, and the
+      // door being tested here is the ordinary one. Opening from the inbox is
+      // what a user does when they saw the badge rather than the banner.
+      await closeShade($);
+      await foregroundApp($);
+      await openChat($, scenario.room.title);
+      await awaitBubble($, second.body);
+
+      await backgroundApp($);
+      await openShade($);
+      await pollUntilAsync(
+        () async =>
+            !await shadeShows($, first.body) &&
+            !await shadeShows($, second.body),
+        reason:
+            'every notification for the conversation to be taken down once it '
+            'has been read',
+        within: kNotificationDeadline,
+      );
+    },
+    config: kWeftPatrolConfig,
+    timeout: kScenarioTimeout,
+  );
 }

@@ -14,9 +14,13 @@ import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
     show NotificationDismisser;
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
+import '../services/notifications/conversation_clearer.dart';
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/push_registration.dart';
+import 'l10n_labels.dart';
+import 'localisation.dart';
 import 'providers.dart';
+import 'snapshot_providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
 
@@ -113,6 +117,31 @@ final notificationDismisserProvider =
       NotificationDismisserNotifier.new,
     );
 
+/// Everything a read conversation has left outside the app, in one call.
+///
+/// Assembled here rather than at each call site because the three surfaces do
+/// not clear the same way — the shade is cancelled, the watch and the widget are
+/// *republished* — and four call sites each remembering both halves is four
+/// places for one of them to be forgotten. See [ConversationClearer].
+///
+/// Reads rather than watches its two dependencies: the dismisser is filled in
+/// once by `main` and the writer is a singleton by design, so a `watch` would
+/// only make this rebuild for no gain.
+final conversationClearerProvider = Provider<ConversationClearer>((ref) {
+  return ConversationClearer(
+    dismissChat: ref.watch(notificationDismisserProvider),
+    republish: () async {
+      // The list as it is *now*, deliberately re-read at call time. A snapshot
+      // captured earlier is one taken before the read was recorded, and
+      // republishing it would put back the unread count this was meant to
+      // remove.
+      final chats = ref.read(chatsProvider).value;
+      if (chats == null) return;
+      await ref.read(snapshotWriterProvider).refresh(chats);
+    },
+  );
+});
+
 /// The push gateway the user configured, or null.
 final pushGatewayProvider = Provider<Uri?>((ref) {
   ref.watch(settingsRevisionProvider);
@@ -181,6 +210,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   }
 
   final pipeline = MatrixNotificationPipeline(
+    words: () => weftNotifyStringsFrom(weftPlatformL10n()),
     session: MatrixNotificationSession.forClient(session.client),
     // Injected, never derived: the merge fold lives in the repository and a
     // second answer here would split a merged contact into two threads.

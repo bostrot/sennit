@@ -10,6 +10,7 @@ import 'package:flutter/semantics.dart';
 
 import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/call/call_service.dart';
 import 'call_controls.dart';
@@ -239,9 +240,10 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
         // was the way back into the call.
         child: Semantics(
           button: true,
-          label:
-              'Open the call with ${session.peer.label}, '
-              '${callStatusLabel(widget.state, now: clock.now())}',
+          label: context.l10n.callOverlayOpen(
+            session.peer.label,
+            callStatusLabel(context.l10n, widget.state, now: clock.now()),
+          ),
           child: InkWell(
             onTap: widget.onOpen,
             child: Padding(
@@ -259,8 +261,14 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
                   const SizedBox(width: WeftSpace.md),
                   Expanded(
                     child: Text(
-                      '${session.peer.label} · '
-                      '${callStatusLabel(widget.state, now: clock.now())}',
+                      context.l10n.callOverlayLine(
+                        session.peer.label,
+                        callStatusLabel(
+                          context.l10n,
+                          widget.state,
+                          now: clock.now(),
+                        ),
+                      ),
                       style: context.text.labelLarge?.copyWith(
                         color: foreground,
                         fontWeight: FontWeight.w600,
@@ -275,7 +283,7 @@ class _MinimisedCallBarState extends State<MinimisedCallBar> {
                   // appear in.
                   Semantics(
                     button: true,
-                    label: 'Hang up',
+                    label: context.l10n.callHangUp,
                     // 28dp, and the one control in the app where a miss is
                     // expensive twice over: the neighbouring target is the bar
                     // itself, so a thumb that falls short of hanging up opens

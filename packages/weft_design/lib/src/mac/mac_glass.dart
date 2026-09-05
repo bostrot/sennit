@@ -176,7 +176,11 @@ class MacGlass extends StatelessWidget {
   /// Opaque enough that 13pt text on it clears its contrast bar against a
   /// worst-case backdrop, which is the constraint that sets these numbers —
   /// a prettier, thinner glass fails on a white photograph.
-  Color _tint(BuildContext context, {required bool isDark, required bool flat}) {
+  Color _tint(
+    BuildContext context, {
+    required bool isDark,
+    required bool flat,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     if (flat) {
       return switch (kind) {
@@ -203,10 +207,8 @@ class MacGlass extends StatelessWidget {
     return base.withValues(alpha: alpha);
   }
 
-  Border _hairline(Color color) => Border.all(
-    color: color.withValues(alpha: 0.55),
-    width: 0.5,
-  );
+  Border _hairline(Color color) =>
+      Border.all(color: color.withValues(alpha: 0.55), width: 0.5);
 
   /// A saturation matrix, as the vibrancy filter uses it.
   static ui.ColorFilter _saturate(double amount) {

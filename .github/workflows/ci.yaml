@@ -32,6 +32,25 @@ jobs:
       - name: Check formatting
         run: git ls-files '*.dart' -z | xargs -0 dart format --output=none --set-exit-if-changed
       - run: flutter analyze
+      # Localisation, in the cheapest order. `gen-l10n` fails on a malformed
+      # ARB, a placeholder with no metadata or an `@key` block somebody forgot,
+      # and it catches more than the other two for a fraction of the time —
+      # `flutter analyze` above then fails on a key the generator did not
+      # produce. The audit is last because it is the one that reads the whole
+      # app, and it exits non-zero on a single user-facing literal that has not
+      # been extracted: see `docs/architecture/l10n-pipeline.md`.
+      - name: Generate localisations
+        run: cd apps/weft && flutter gen-l10n
+      - name: Audit for unextracted strings
+        run: dart run tooling/scripts/l10n_audit.dart
+      # The audit above asks whether a string reached a catalogue. This asks
+      # whether what reached it is usable in the locale it landed in: the
+      # placeholders the call site passes still present, the ICU parsing, the
+      # string actually translated, and short enough for the space the widget
+      # has. All four are invisible to a reviewer who does not read the
+      # language, which is what makes them a CI step rather than a review note.
+      - name: Lint the translations
+        run: dart run tooling/scripts/l10n_lint.dart
 
   unit:
     name: Unit tests (pure Dart)
@@ -52,10 +71,10 @@ jobs:
       # widget or a watch is allowed to say about a conversation — and need no
       # device. A package absent from this list is silently untested, so adding
       # one to the workspace means adding it here too.
-      - name: Test weft_domain, weft_merge, weft_search, weft_bridges, weft_transcribe, weft_mcp, weft_attachments, weft_notify, weft_share, weft_snapshot, weft_richtext, weft_sms, weft_call
+      - name: Test the pure-Dart packages
         run: |
           set -e
-          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share weft_snapshot weft_richtext weft_sms weft_call; do
+          for pkg in weft_domain weft_merge weft_search weft_bridges weft_transcribe weft_mcp weft_attachments weft_notify weft_share weft_snapshot weft_richtext weft_sms weft_call weft_backup weft_autoreply; do
             if [ -d "packages/$pkg/test" ]; then
               echo "::group::$pkg"
               (cd "packages/$pkg" && dart test --reporter expanded)
@@ -154,6 +173,60 @@ jobs:
           path: apps/weft/test/**/failures/**
           if-no-files-found: ignore
 
+  route-walk:
+    name: Route walk & UI audit
+    # ubuntu-latest, and it needs no homeserver: the walk boots the app in demo
+    # mode and every assertion it makes is inside the view. That is also why it
+    # is here rather than in `e2e.yaml` — see `integration_test/patrol/README.md`
+    # for the rule it is on the other side of.
+    #
+    # Linux draws the touch shell (`weft_design/src/surface.dart`), so this row
+    # is the *phone* layout. The Mac window's layout is walked by running the
+    # same file with `-d macos`, which needs a Mac and is a local and release
+    # step rather than a per-push one; `docs/quality/ui-audit.md` records both.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # A real engine on a real desktop target, which is what `integration_test`
+      # requires — `flutter test` refuses to run a file under `integration_test/`
+      # without a device.
+      - name: Install Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
+            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev
+      - run: flutter config --enable-linux-desktop
+      - run: flutter pub get
+      - name: Walk every route
+        working-directory: apps/weft
+        env:
+          WEFT_SHOT_DIR: ${{ github.workspace }}/route-walk
+        run: |
+          export "$(dbus-launch)"
+          echo -n "" | gnome-keyring-daemon --unlock --replace --components=secrets || true
+          pulseaudio --start --exit-idle-time=-1 || true
+          xvfb-run -a flutter test integration_test/route_walk_test.dart \
+            -d linux --dart-define=WEFT_DEMO=true \
+            --dart-define=WEFT_SHOT_DIR="$WEFT_SHOT_DIR"
+      # The screenshots and the findings file, on failure *and* on success. A
+      # walk that fails is diagnosed from the image of the screen it failed on
+      # and from nothing else — the log has a finder in it, not a picture — and
+      # a walk that passes still produced the audit's work list, which is the
+      # other half of what this job is for.
+      - name: Upload the walk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-walk
+          path: route-walk/**
+          if-no-files-found: warn
+
   integration:
     name: Integration tests (against Synapse)
     runs-on: ubuntu-latest
@@ -207,6 +280,12 @@ jobs:
       # homeserver tests build their own session and never read it, so one run
       # covers both.
       #
+      # `route_walk_test.dart` is deliberately skipped here and has a job of its
+      # own above: it needs no homeserver, so running it inside this one would
+      # spend a Synapse on it and report its failures under a name that says
+      # "against Synapse". Every *other* top-level integration test is picked up
+      # by the glob without touching this line.
+      #
       # `integration_test/*_test.dart` and not `integration_test`: the glob is
       # what keeps `integration_test/patrol/` out. Those are Patrol tests, and
       # `patrolTest` calls `PatrolBinding.ensureInitialized` while the file is
@@ -234,6 +313,7 @@ jobs:
           # stderr — which the harness swallows — lands in the log.
           fail=0
           for f in integration_test/*_test.dart; do
+            [ "$f" = "integration_test/route_walk_test.dart" ] && continue
             echo "::group::$f"
             pkill -f 'bundle/weft' 2>/dev/null || true
             scratch="$(mktemp -d)"

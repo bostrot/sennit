@@ -143,6 +143,20 @@ void main() {
           'for a homeserver and this test is about the UI over the pipeline.',
     );
 
+    // English, whatever the machine is set to.
+    //
+    // Every finder below names a control by the English word on it, and since
+    // Phase 02 those words come from an ARB file — so on a German laptop the
+    // app draws "Anhängen" and `find.byTooltip('Attach')` matches nothing. The
+    // failure reads like a missing button rather than a missing translation,
+    // and CI never sees it because a `ubuntu-latest` runner is `en_US`.
+    //
+    // Pinned before the first pump, the same way `route_walk_test.dart` does
+    // it and for the same reason. What the other locales do to this screen is
+    // `test/l10n_overflow_test.dart`'s question, not this file's.
+    tester.platformDispatcher.localesTestValue = const [Locale('en')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+
     final picker = _StagedPicker(photo);
     await tester.pumpWidget(
       ProviderScope(

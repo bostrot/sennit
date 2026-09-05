@@ -48,6 +48,7 @@ Chat chat({
   bool sourceMuted = false,
   bool isGroup = false,
   String? avatarUrl,
+  ChatRequestState? request,
 }) {
   return Chat(
     id: id,
@@ -55,6 +56,7 @@ Chat chat({
     muted: muted,
     isGroup: isGroup,
     avatarUrl: avatarUrl,
+    request: request,
     sources: [ChatSource(roomId: id, network: network, muted: sourceMuted)],
   );
 }
@@ -111,6 +113,7 @@ NotificationDecision decide({
   DateTime? at,
   DateTime? lastReadAt,
   NotificationDedupe? dedupe,
+  bool isFirstFromSender = true,
 }) {
   return evaluateNotification(
     message: message ?? msg(),
@@ -121,6 +124,7 @@ NotificationDecision decide({
     ownUserIds: ownUserIds,
     ownDisplayNames: ownDisplayNames,
     dedupe: dedupe,
+    isFirstFromSender: isFirstFromSender,
   );
 }
 

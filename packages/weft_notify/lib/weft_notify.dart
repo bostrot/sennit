@@ -18,3 +18,4 @@ library;
 // Consumers import this barrel, never src/.
 export 'src/content.dart';
 export 'src/rules.dart';
+export 'src/strings.dart';

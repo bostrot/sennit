@@ -4,6 +4,7 @@ import 'package:weft_call/weft_call.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/call_providers.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import 'call_controls.dart';
 import 'call_labels.dart';
@@ -68,7 +69,9 @@ class IncomingCallSheet extends StatelessWidget {
               ),
               const SizedBox(height: WeftSpace.xs),
               Text(
-                session.videoEnabled ? 'Incoming video call' : 'Incoming call',
+                session.videoEnabled
+                    ? context.l10n.callStatusIncomingVideo
+                    : context.l10n.callStatusIncoming,
                 style: context.text.bodyMedium?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
@@ -78,7 +81,7 @@ class IncomingCallSheet extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _Answer(
-                    label: 'Decline',
+                    label: context.l10n.commonDecline,
                     icon: Icons.call_end_rounded,
                     colour: context.palette.callDecline,
                     ink: context.palette.onCallDecline,
@@ -90,14 +93,16 @@ class IncomingCallSheet extends StatelessWidget {
                   // the alternative is declining.
                   if (session.videoEnabled)
                     _Answer(
-                      label: 'Voice only',
+                      label: context.l10n.callVoiceOnly,
                       icon: Icons.phone_rounded,
                       colour: context.palette.callAccept,
                       ink: context.palette.onCallAccept,
                       onPressed: () => controls.accept(video: false),
                     ),
                   _Answer(
-                    label: session.videoEnabled ? 'Video' : 'Accept',
+                    label: session.videoEnabled
+                        ? context.l10n.callAnswerVideo
+                        : context.l10n.commonAccept,
                     icon: session.videoEnabled
                         ? Icons.videocam_rounded
                         : Icons.call_rounded,
@@ -214,8 +219,8 @@ class IncomingCallBanner extends StatelessWidget {
                     ),
                     Text(
                       session.videoEnabled
-                          ? 'Incoming video call'
-                          : 'Incoming call',
+                          ? context.l10n.callStatusIncomingVideo
+                          : context.l10n.callStatusIncoming,
                       style: context.text.bodySmall?.copyWith(
                         color: context.colors.onSurfaceVariant,
                       ),
@@ -225,7 +230,7 @@ class IncomingCallBanner extends StatelessWidget {
               ),
               const SizedBox(width: WeftSpace.md),
               CallActionButton(
-                tooltip: 'Decline',
+                tooltip: context.l10n.commonDecline,
                 icon: Icons.call_end_rounded,
                 background: context.palette.callDecline,
                 foreground: context.palette.onCallDecline,
@@ -234,7 +239,7 @@ class IncomingCallBanner extends StatelessWidget {
               ),
               const SizedBox(width: WeftSpace.sm),
               CallActionButton(
-                tooltip: 'Accept',
+                tooltip: context.l10n.commonAccept,
                 icon: session.videoEnabled
                     ? Icons.videocam_rounded
                     : Icons.call_rounded,
@@ -272,6 +277,7 @@ class IncomingCallScreen extends ConsumerWidget {
         body: Center(
           child: Text(
             callEndLabel(
+              context.l10n,
               session?.endReason,
               isOutgoing: session?.isOutgoing ?? false,
             ),

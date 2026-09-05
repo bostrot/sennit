@@ -52,12 +52,22 @@ object SmsBridge {
 
     /// Drops the engine references. The queue survives — the activity going
     /// away does not stop messages arriving.
+    ///
+    /// A pending role request is answered *before* the activity reference goes,
+    /// and answered with the truth. The old code sent `false` here, which is how
+    /// a granted role came back as "Nothing changed": the role dialog is a
+    /// system activity on top of ours, and an activity destroyed underneath it —
+    /// "don't keep activities", a low-memory device — reached this line while
+    /// the user was still deciding. [SmsRole.outcomeFor] asks the system who
+    /// holds the role instead, and falls back to `interrupted` rather than to a
+    /// decline the user never made.
     fun detach() {
         channel?.setMethodCallHandler(null)
         channel = null
-        activity = null
-        roleRequest?.success(false)
+        val waiting = roleRequest
         roleRequest = null
+        waiting?.success(SmsRole.outcomeFor(activity, SmsRole.Outcome.INTERRUPTED))
+        activity = null
     }
 
     /// Forwards a received message, or queues it when Dart is not listening.
@@ -101,16 +111,18 @@ object SmsBridge {
     ///
     /// Called from `MainActivity.onActivityResult`. Returns whether the result
     /// belonged to this bridge, so the activity can pass on anything else.
+    ///
+    /// The dialog's own result code is not consulted. It reports whether the
+    /// *dialog* completed, not what the system did with it, and the two
+    /// disagree often enough to matter — a user who was already the default
+    /// gets a cancelled result. The only honest answer is to ask the system who
+    /// holds the role now, which is what [SmsRole.outcomeFor] does; a "no" that
+    /// got this far is a decline, because the dialog was shown.
     fun onRoleResult(requestCode: Int): Boolean {
         if (requestCode != SmsRole.REQUEST_CODE) return false
         val waiting = roleRequest ?: return true
         roleRequest = null
-        // The dialog's own result code is not consulted. It reports whether the
-        // *dialog* completed, not what the system did with it, and the two
-        // disagree often enough to matter — a user who was already the default
-        // gets a cancelled result. The only honest answer is to ask the system
-        // who holds the role now.
-        waiting.success(activity?.let { SmsRole.isDefault(it) } ?: false)
+        waiting.success(SmsRole.outcomeFor(activity, SmsRole.Outcome.DENIED))
         return true
     }
 
@@ -124,24 +136,31 @@ object SmsBridge {
         when (method) {
             "getStatus" -> result.success(SmsRole.status(context))
 
+            // Answers with an [SmsRole.Outcome] string rather than a boolean.
+            // Which of the four "not granted" answers this is decides what the
+            // screen says, and a boolean could only ever say the one wrong
+            // thing — see the phase-05 diagnosis note.
             "requestRole" -> {
                 val host = activity
                 if (host == null) {
-                    result.success(false)
+                    // No activity to raise a dialog from. The user was not
+                    // asked, so this is not a decline.
+                    result.success(SmsRole.Outcome.UNAVAILABLE)
                     return
                 }
                 if (SmsRole.isDefault(host)) {
-                    result.success(true)
+                    result.success(SmsRole.Outcome.GRANTED)
                     return
                 }
                 // A second request while a dialog is already up is answered
                 // rather than left hanging: two futures waiting on one
-                // activity result is a deadlock for whichever loses.
-                roleRequest?.success(false)
+                // activity result is a deadlock for whichever loses. The loser
+                // is told it was superseded, not that it was refused.
+                roleRequest?.success(SmsRole.Outcome.SUPERSEDED)
                 roleRequest = result
                 if (!SmsRole.request(host)) {
                     roleRequest = null
-                    result.success(false)
+                    result.success(SmsRole.Outcome.UNAVAILABLE)
                 }
             }
 

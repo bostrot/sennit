@@ -63,15 +63,22 @@ final class CallReady extends CallAvailability {
   @override
   final CallTarget target;
 
+  /// English, and a fallback: the app words [CallAvailability] itself from
+  /// [target] and [CallBlocked.reason] — see
+  /// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
   @override
   String get message => 'Call ${target.peer.label}';
 }
 
 /// The conversation cannot carry a call, and [message] says why.
 final class CallBlocked extends CallAvailability {
-  const CallBlocked(this.reason, this.message);
+  const CallBlocked(this.reason, this.message, {this.networks = const []});
 
   final CallBlocker reason;
+
+  /// The messengers named in the sentence, for the app to write its own.
+  /// Empty for every reason but [CallBlocker.bridged].
+  final List<ChatNetwork> networks;
 
   @override
   final String message;
@@ -107,13 +114,13 @@ enum CallBlocker {
 /// [Chat] carries rooms, not people.
 ///
 /// The order of the checks is the order the reasons matter in: a bridged group
-/// is refused as a group, because "Weft calls one person at a time" stays true
+/// is refused as a group, because "Braid calls one person at a time" stays true
 /// however the room got there.
 CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
   if (chat.isGroup) {
     return const CallBlocked(
       CallBlocker.group,
-      'Weft calls one person at a time.',
+      'Braid calls one person at a time.',
     );
   }
 
@@ -126,7 +133,8 @@ CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
     return CallBlocked(
       CallBlocker.bridged,
       '${_networkNames(chat.networks)} '
-      "can't carry calls — Weft calls over Matrix.",
+      "can't carry calls — Braid calls over Matrix.",
+      networks: chat.networks,
     );
   }
 
@@ -134,7 +142,7 @@ CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
   if (peer == null) {
     return const CallBlocked(
       CallBlocker.unknownPeer,
-      "Weft doesn't know a Matrix address for this conversation yet.",
+      "Braid doesn't know a Matrix address for this conversation yet.",
     );
   }
 

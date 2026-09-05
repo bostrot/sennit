@@ -7,6 +7,8 @@ import '../features/settings/models_screen.dart';
 import '../services/models/model_catalog.dart';
 import '../services/search/local_embedding_provider.dart';
 import '../services/transcription/local_whisper_provider.dart';
+import 'l10n_labels.dart';
+import 'localisation.dart';
 import 'stores.dart';
 
 /// The embedding provider described by settings, or null when semantic search
@@ -168,8 +170,9 @@ class EmbeddingBackfill {
       } on EmbeddingException catch (e) {
         // Attributed per row so a poison message sinks in the queue instead of
         // blocking everything behind it.
+        final reason = weftPlatformL10n().embeddingFailure(e) ?? e.message;
         for (final item in batch) {
-          store.recordEmbeddingFailure(item.rowId, e.message);
+          store.recordEmbeddingFailure(item.rowId, reason);
         }
         return 0;
       }

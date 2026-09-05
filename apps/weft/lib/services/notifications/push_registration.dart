@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
+import '../../app/localisation.dart';
+
 /// Which platforms this build can do what on.
 ///
 /// One place, rather than a `Platform.isAndroid` at every call site, because
@@ -250,21 +252,17 @@ class WeftPushRegistration {
 
     final gateway = _gatewayUrl;
     if (gateway == null) {
-      return const PushRegistrationOutcome(
+      return PushRegistrationOutcome(
         PushRegistrationStatus.notConfigured,
-        message:
-            'No push gateway is set, so this device will only be notified '
-            'while Braid is running. Add one in Notification settings.',
+        message: weftPlatformL10n().pushNoGatewayDetail,
       );
     }
 
     final token = await tokens.token();
     if (token == null || token.isEmpty) {
-      return const PushRegistrationOutcome(
+      return PushRegistrationOutcome(
         PushRegistrationStatus.noToken,
-        message:
-            'The system has not issued a push token yet. Braid will register '
-            'as soon as it does.',
+        message: weftPlatformL10n().pushNoTokenDetail,
       );
     }
 

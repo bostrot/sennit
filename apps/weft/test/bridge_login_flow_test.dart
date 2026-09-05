@@ -9,6 +9,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'package:weft/features/bridges/bridge_login_flow.dart';
+import 'package:weft/app/localisation.dart';
 
 /// Signing in to a bridge, end to end.
 ///
@@ -44,10 +45,7 @@ class _ScriptedBridge {
       paths.add(request.url.path);
       bodies.add(request.body.isEmpty ? null : jsonDecode(request.body));
       if (failure != null) {
-        return http.Response(
-          jsonEncode({'error': failure}),
-          502,
-        );
+        return http.Response(jsonEncode({'error': failure}), 502);
       }
       final index = calls < responses.length ? calls : responses.length - 1;
       calls++;
@@ -125,6 +123,7 @@ void main() {
   }) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: weftLocalizationsDelegates,
         theme: WeftTheme.build(),
         home: BridgeLoginFlowScreen(
           client: bridge.client,
@@ -269,9 +268,7 @@ void main() {
     );
   });
 
-  testWidgets('a QR step shows the code and offers to copy it', (
-    tester,
-  ) async {
+  testWidgets('a QR step shows the code and offers to copy it', (tester) async {
     final bridge = _ScriptedBridge([_qrStep()]);
     await pump(tester, bridge, offered: [flows.first]);
     // Not pumpAndSettle: the expiry clock ticks once a second for as long as

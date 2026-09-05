@@ -1,6 +1,8 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/localisation.dart';
+
 /// The Android channel group every conversation channel sits under.
 ///
 /// A group rather than a flat list because there is one channel *per network*,
@@ -105,43 +107,49 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 /// notification standing rather than vanishing into a message that never went.
 List<AndroidNotificationAction> weftAndroidMessageActions({
   List<String> aiReplies = const [],
-}) => [
-  AndroidNotificationAction(
-    WeftNotificationActions.reply,
-    'Reply',
-    // The AI answers ride the reply input as *choices*: Android renders
-    // them as tappable chips above the action row — the smart-reply look —
-    // and a tapped chip arrives as ordinary reply text through the same
-    // handler typed replies use. Chips instead of extra actions, because
-    // three actions is all Android shows and Mark read is worth keeping.
-    inputs: [
-      AndroidNotificationActionInput(label: 'Message', choices: aiReplies),
-    ],
-    // What tells Android Auto, Wear and the launcher's bubble that this is
-    // *the* reply action rather than a button that happens to be first.
-    semanticAction: SemanticAction.reply,
-    // Deliberately left at its default of false. Generated replies are the
-    // system reading the message body to propose an answer to it, and Braid
-    // has spent this whole phase keeping that body off every surface it does
-    // not have to be on.
-    showsUserInterface: true,
-    cancelNotification: false,
-  ),
-  const AndroidNotificationAction(
-    WeftNotificationActions.markRead,
-    'Mark read',
-    semanticAction: SemanticAction.markAsRead,
-    showsUserInterface: true,
-    cancelNotification: false,
-  ),
-  const AndroidNotificationAction(
-    WeftNotificationActions.muteForAnHour,
-    'Mute for 1 hour',
-    semanticAction: SemanticAction.mute,
-    showsUserInterface: true,
-    cancelNotification: false,
-  ),
-];
+}) {
+  final l10n = weftPlatformL10n();
+  return [
+    AndroidNotificationAction(
+      WeftNotificationActions.reply,
+      l10n.notificationActionReply,
+      // The AI answers ride the reply input as *choices*: Android renders
+      // them as tappable chips above the action row — the smart-reply look —
+      // and a tapped chip arrives as ordinary reply text through the same
+      // handler typed replies use. Chips instead of extra actions, because
+      // three actions is all Android shows and Mark read is worth keeping.
+      inputs: [
+        AndroidNotificationActionInput(
+          label: l10n.chatComposerMessage,
+          choices: aiReplies,
+        ),
+      ],
+      // What tells Android Auto, Wear and the launcher's bubble that this is
+      // *the* reply action rather than a button that happens to be first.
+      semanticAction: SemanticAction.reply,
+      // Deliberately left at its default of false. Generated replies are the
+      // system reading the message body to propose an answer to it, and Braid
+      // has spent this whole phase keeping that body off every surface it does
+      // not have to be on.
+      showsUserInterface: true,
+      cancelNotification: false,
+    ),
+    AndroidNotificationAction(
+      WeftNotificationActions.markRead,
+      l10n.notificationActionMarkRead,
+      semanticAction: SemanticAction.markAsRead,
+      showsUserInterface: true,
+      cancelNotification: false,
+    ),
+    AndroidNotificationAction(
+      WeftNotificationActions.muteForAnHour,
+      l10n.notificationActionMuteHour,
+      semanticAction: SemanticAction.mute,
+      showsUserInterface: true,
+      cancelNotification: false,
+    ),
+  ];
+}
 
 /// The Android channel a message on [network] is posted to.
 ///
@@ -161,7 +169,7 @@ AndroidNotificationChannel messageChannelFor(
 ) => AndroidNotificationChannel(
   '$kMessageChannelPrefix${network.id}',
   network.label,
-  description: 'Messages that arrive over ${network.label}.',
+  description: weftPlatformL10n().notificationChannelNetwork(network.label),
   groupId: kMessagesChannelGroupId,
   // High rather than max: max is a heads-up notification that takes over the
   // screen, which is a phone call, not a text message.
@@ -174,31 +182,36 @@ AndroidNotificationChannel messageChannelFor(
 /// *name and description* and leaves the user's own importance and sound
 /// choices alone, so this is also how a renamed network or a translated string
 /// reaches a device that has been installed for a year.
-List<AndroidNotificationChannel> weftNotificationChannels() => [
-  for (final network in ChatNetwork.values) messageChannelFor(network),
-  const AndroidNotificationChannel(
-    kCallsChannelId,
-    'Calls',
-    description: 'Incoming calls.',
-    importance: Importance.max,
-  ),
-  const AndroidNotificationChannel(
-    kBackgroundChannelId,
-    'Background activity',
-    description: 'Syncing, bridge reconnections and finished uploads.',
-    importance: Importance.low,
-    showBadge: false,
-    playSound: false,
-    enableVibration: false,
-  ),
-];
+List<AndroidNotificationChannel> weftNotificationChannels() {
+  final l10n = weftPlatformL10n();
+  return [
+    for (final network in ChatNetwork.values) messageChannelFor(network),
+    AndroidNotificationChannel(
+      kCallsChannelId,
+      l10n.notificationChannelCalls,
+      description: l10n.notificationChannelCallsDescription,
+      importance: Importance.max,
+    ),
+    AndroidNotificationChannel(
+      kBackgroundChannelId,
+      l10n.notificationChannelBackground,
+      description: l10n.notificationChannelBackgroundDescription,
+      importance: Importance.low,
+      showBadge: false,
+      playSound: false,
+      enableVibration: false,
+    ),
+  ];
+}
 
-const AndroidNotificationChannelGroup weftMessagesChannelGroup =
-    AndroidNotificationChannelGroup(
-      kMessagesChannelGroupId,
-      'Messages',
-      description: 'One channel per network, so each can be tuned separately.',
-    );
+AndroidNotificationChannelGroup weftMessagesChannelGroup() {
+  final l10n = weftPlatformL10n();
+  return AndroidNotificationChannelGroup(
+    kMessagesChannelGroupId,
+    l10n.notificationChannelGroupMessages,
+    description: l10n.notificationChannelGroupDescription,
+  );
+}
 
 /// The Darwin categories registered at initialisation.
 ///
@@ -207,30 +220,33 @@ const AndroidNotificationChannelGroup weftMessagesChannelGroup =
 /// actions deliberately do not launch the app: marking read and muting for an
 /// hour are things a user does *instead* of opening a conversation, and an
 /// action that opens the app to do them has failed at the only thing it was for.
-List<DarwinNotificationCategory> weftDarwinCategories() => [
-  DarwinNotificationCategory(
-    kMessageCategoryId,
-    actions: [
-      DarwinNotificationAction.text(
-        WeftNotificationActions.reply,
-        'Reply',
-        buttonTitle: 'Send',
-        placeholder: 'Message',
-      ),
-      DarwinNotificationAction.plain(
-        WeftNotificationActions.markRead,
-        'Mark read',
-      ),
-      DarwinNotificationAction.plain(
-        WeftNotificationActions.muteForAnHour,
-        'Mute for 1 hour',
-      ),
-    ],
-    options: {
-      // Without this iOS shows the app name where the conversation title
-      // should be, and a merged contact's two legs read as two apps.
-      DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
-      DarwinNotificationCategoryOption.hiddenPreviewShowSubtitle,
-    },
-  ),
-];
+List<DarwinNotificationCategory> weftDarwinCategories() {
+  final l10n = weftPlatformL10n();
+  return [
+    DarwinNotificationCategory(
+      kMessageCategoryId,
+      actions: [
+        DarwinNotificationAction.text(
+          WeftNotificationActions.reply,
+          l10n.notificationActionReply,
+          buttonTitle: l10n.commonSend,
+          placeholder: l10n.chatComposerMessage,
+        ),
+        DarwinNotificationAction.plain(
+          WeftNotificationActions.markRead,
+          l10n.notificationActionMarkRead,
+        ),
+        DarwinNotificationAction.plain(
+          WeftNotificationActions.muteForAnHour,
+          l10n.notificationActionMuteHour,
+        ),
+      ],
+      options: {
+        // Without this iOS shows the app name where the conversation title
+        // should be, and a merged contact's two legs read as two apps.
+        DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
+        DarwinNotificationCategoryOption.hiddenPreviewShowSubtitle,
+      },
+    ),
+  ];
+}

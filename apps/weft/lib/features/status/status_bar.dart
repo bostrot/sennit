@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../services/status/status_feed.dart';
@@ -42,10 +43,10 @@ class StatusBar extends ConsumerWidget {
                 builder: (context) => SafeArea(
                   child: ListTile(
                     leading: const Icon(Icons.visibility_off_outlined),
-                    title: Text('Hide ${entry.senderName}\'s statuses'),
-                    subtitle: const Text(
-                      'Bring everyone back under Settings → Statuses.',
+                    title: Text(
+                      context.l10n.statusHideSender(entry.senderName),
                     ),
+                    subtitle: Text(context.l10n.statusHideSubtitle),
                     onTap: () => Navigator.of(context).pop(true),
                   ),
                 ),

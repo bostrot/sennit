@@ -1,0 +1,50 @@
+# Weblate, for the `wlc` command-line client and as the record of how the
+# components are set up.
+#
+# Weblate itself keeps component configuration server-side — there is no file
+# it reads out of a repository — so this is two things at once: the config
+# `wlc` needs to talk to the server, and the documentation a maintainer
+# recreating the project would otherwise have to reconstruct from screenshots.
+# The `# component:` comments under each section are that second half.
+#
+# Weblate rather than a hosted proprietary service because it is AGPL and
+# self-hostable, which is the same answer Braid gives about its own homeserver.
+#
+# See docs/TRANSLATING.md.
+
+[weblate]
+url = https://hosted.weblate.org/api/
+
+# The Flutter strings: apps/weft/lib/l10n/app_*.arb.
+#
+# `app_en.arb` is the template and the only file with `@key` blocks; Weblate
+# reads the descriptions out of them and shows each as the translator's note,
+# which is the whole reason those blocks are mandatory.
+[component "braid/app"]
+# file_format = arb
+# filemask = apps/weft/lib/l10n/app_*.arb
+# template = apps/weft/lib/l10n/app_en.arb
+# new_base = apps/weft/lib/l10n/app_en.arb
+# language_regex = ^(?!en$).+$
+# push_branch = weblate
+# check_flags = icu-message-format
+# addons = weblate.cleanup.generic, weblate.flags.same_edit
+
+# The Android resources: notification channel names, the home-screen widget and
+# the watch. Drawn by Android with no Flutter engine anywhere near them, so they
+# cannot come from an ARB file and are a separate component.
+#
+# Note Android's own spelling of a region: `values-pt-rBR`, not `values-pt-BR`.
+[component "braid/android"]
+# file_format = aresource
+# filemask = apps/weft/android/app/src/main/res/values-*/strings.xml
+# template = apps/weft/android/app/src/main/res/values/strings.xml
+# new_base = apps/weft/android/app/src/main/res/values/strings.xml
+# push_branch = weblate
+# addons = weblate.cleanup.generic
+
+# `push_branch` on both, deliberately. A translation then arrives as a pull
+# request and gets the same CI run as any other change — including
+# `tooling/scripts/l10n_lint.dart`, which is the check that a placeholder
+# survived, that the ICU still parses and that the string fits the space.
+# Committing straight to `main` would route around all of it.

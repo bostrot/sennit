@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
+import '../../app/localisation.dart';
 
 import 'notification_channels.dart';
 import 'notification_presentation.dart';
@@ -181,7 +182,7 @@ class LocalNotificationSink implements NotificationSink {
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android != null) {
-      await android.createNotificationChannelGroup(weftMessagesChannelGroup);
+      await android.createNotificationChannelGroup(weftMessagesChannelGroup());
       for (final channel in weftNotificationChannels()) {
         await android.createNotificationChannel(channel);
       }
@@ -518,6 +519,7 @@ class WeftNotificationService {
     DateTime? now,
   }) {
     final stamp = now ?? DateTime.now();
+    final l10n = weftPlatformL10n();
     return _pipeline.handleSynthetic(
       message: WeftMessage(
         // Unique per press: two tests should stack into a thread the way two
@@ -527,15 +529,15 @@ class WeftNotificationService {
         roomId: kTestNotificationRoomId,
         network: network,
         senderId: '@weft-test:weft.invalid',
-        senderName: 'Braid',
+        senderName: l10n.notificationTestSender,
         timestamp: stamp,
         kind: MessageKind.text,
         isOwn: false,
-        body: 'This is what a notification from Braid looks like.',
+        body: l10n.notificationTestBody,
       ),
       chat: Chat(
         id: kTestNotificationChatId,
-        title: 'Notification test',
+        title: l10n.notificationTestTitle,
         sources: [
           ChatSource(roomId: kTestNotificationRoomId, network: network),
         ],

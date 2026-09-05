@@ -8,6 +8,7 @@ import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/call/call_audio.dart';
 import '../../services/call/call_service.dart';
@@ -162,26 +163,42 @@ class _CallScreenBodyState extends State<CallScreenBody> {
   void _announceChanges(CallServiceState old, CallServiceState now) {
     final before = old.session;
     final after = now.session;
-    final peer = after?.peer.label ?? 'the call';
+    final l10n = context.l10n;
+    final peer = after?.peer.label ?? l10n.callThe;
 
     if (after != null && before?.state != after.state) {
-      announce(context, '$peer: ${callStatusLabel(now, now: clock.now())}');
+      announce(
+        context,
+        l10n.callAnnounceStatus(
+          peer,
+          callStatusLabel(l10n, now, now: clock.now()),
+        ),
+      );
     }
     if (after != null && (before?.muted ?? false) != after.muted) {
-      announce(context, after.muted ? 'Microphone muted' : 'Microphone on');
+      announce(
+        context,
+        after.muted ? l10n.callAnnounceMuted : l10n.callAnnounceUnmuted,
+      );
     }
     if (after != null && (before?.cameraOn ?? false) != after.cameraOn) {
-      announce(context, after.cameraOn ? 'Camera on' : 'Camera off');
+      announce(
+        context,
+        after.cameraOn ? l10n.callAnnounceCameraOn : l10n.callAnnounceCameraOff,
+      );
     }
     if (old.audio.route != now.audio.route) {
-      announce(context, 'Audio on ${callAudioRouteLabel(now.audio.route)}');
+      announce(
+        context,
+        l10n.callAnnounceAudioRoute(callAudioRouteLabel(l10n, now.audio.route)),
+      );
     }
     if (old.reconnecting != now.reconnecting) {
       announce(
         context,
         now.reconnecting
-            ? 'Weak connection — trying to recover'
-            : 'Connection recovered',
+            ? l10n.callAnnounceReconnecting
+            : l10n.callAnnounceRecovered,
       );
     }
   }
@@ -345,7 +362,7 @@ class _CallHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           IconButton(
-            tooltip: 'Minimise call',
+            tooltip: context.l10n.callMinimise,
             onPressed: onMinimise,
             icon: Icon(Icons.expand_more_rounded, color: titleColour),
           ),
@@ -354,7 +371,7 @@ class _CallHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  session?.peer.label ?? 'Call',
+                  session?.peer.label ?? context.l10n.callFallbackTitle,
                   style: context.text.titleLarge?.copyWith(
                     color: titleColour,
                     fontWeight: FontWeight.w700,
@@ -363,7 +380,7 @@ class _CallHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  callStatusLabel(state, now: clock.now()),
+                  callStatusLabel(context.l10n, state, now: clock.now()),
                   style: context.text.bodyMedium?.copyWith(
                     color: subtitleColour,
                   ),
@@ -559,14 +576,14 @@ class _VideoRequestPrompt extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$peer turned on video',
+                  context.l10n.callPeerTurnedOnVideo(peer),
                   style: context.text.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: WeftSpace.xs),
                 Text(
-                  'Your camera is on as well.',
+                  context.l10n.callYourCameraOnToo,
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
                   ),
@@ -577,12 +594,12 @@ class _VideoRequestPrompt extends StatelessWidget {
                   children: [
                     TextButton(
                       onPressed: onRefuse,
-                      child: const Text('Turn mine off'),
+                      child: Text(context.l10n.callTurnMineOff),
                     ),
                     const SizedBox(width: WeftSpace.sm),
                     FilledButton(
                       onPressed: onKeep,
-                      child: const Text('Keep it'),
+                      child: Text(context.l10n.callKeepIt),
                     ),
                   ],
                 ),
@@ -629,7 +646,9 @@ class _CallControlBar extends StatelessWidget {
         runSpacing: WeftSpace.md,
         children: [
           CallActionButton(
-            tooltip: (session?.muted ?? false) ? 'Unmute' : 'Mute',
+            tooltip: (session?.muted ?? false)
+                ? context.l10n.commonUnmute
+                : context.l10n.commonMute,
             icon: (session?.muted ?? false)
                 ? Icons.mic_off_rounded
                 : Icons.mic_rounded,
@@ -642,8 +661,8 @@ class _CallControlBar extends StatelessWidget {
           if (video)
             CallActionButton(
               tooltip: (session?.cameraOn ?? false)
-                  ? 'Turn camera off'
-                  : 'Turn camera on',
+                  ? context.l10n.callTurnCameraOff
+                  : context.l10n.callTurnCameraOn,
               icon: (session?.cameraOn ?? false)
                   ? Icons.videocam_rounded
                   : Icons.videocam_off_rounded,
@@ -656,7 +675,7 @@ class _CallControlBar extends StatelessWidget {
             )
           else
             CallActionButton(
-              tooltip: 'Add video',
+              tooltip: context.l10n.callAddVideo,
               icon: Icons.video_call_rounded,
               // Only once media is flowing: an upgrade is a renegotiation, and
               // there is nothing to renegotiate until there is a session.
@@ -664,12 +683,12 @@ class _CallControlBar extends StatelessWidget {
             ),
           if (video && (session?.cameraOn ?? false))
             CallActionButton(
-              tooltip: 'Switch camera',
+              tooltip: context.l10n.callSwitchCamera,
               icon: Icons.cameraswitch_rounded,
               onPressed: live ? controls.switchCamera : null,
             ),
           CallActionButton(
-            tooltip: 'Hang up',
+            tooltip: context.l10n.callHangUp,
             icon: Icons.call_end_rounded,
             background: context.palette.callDecline,
             foreground: context.palette.onCallDecline,
@@ -716,7 +735,9 @@ class _AudioRouteButton extends StatelessWidget {
     if (routes.length > 2) {
       return PopupMenuButton<CallAudioRoute>(
         enabled: enabled,
-        tooltip: 'Audio output — ${callAudioRouteLabel(audio.route)}',
+        tooltip: context.l10n.callAudioOutput(
+          callAudioRouteLabel(context.l10n, audio.route),
+        ),
         onSelected: controls.setAudioRoute,
         itemBuilder: (_) => [
           for (final route in routes)
@@ -726,7 +747,7 @@ class _AudioRouteButton extends StatelessWidget {
                 children: [
                   Icon(iconFor(route), size: 18),
                   const SizedBox(width: WeftSpace.md),
-                  Text(callAudioRouteLabel(route)),
+                  Text(callAudioRouteLabel(context.l10n, route)),
                 ],
               ),
             ),
@@ -736,7 +757,9 @@ class _AudioRouteButton extends StatelessWidget {
           // and `null` here produced `Semantics(button: true, label: null)` —
           // an unlabelled control in a bar where every other one is named.
           // `absorbing: false` means the popup still takes the tap.
-          tooltip: 'Audio output — ${callAudioRouteLabel(audio.route)}',
+          tooltip: context.l10n.callAudioOutput(
+            callAudioRouteLabel(context.l10n, audio.route),
+          ),
           icon: iconFor(audio.route),
           active: audio.isSpeakerOn,
           onPressed: null,
@@ -746,7 +769,9 @@ class _AudioRouteButton extends StatelessWidget {
     }
 
     return CallActionButton(
-      tooltip: audio.isSpeakerOn ? 'Speaker off' : 'Speaker',
+      tooltip: audio.isSpeakerOn
+          ? context.l10n.callSpeakerOff
+          : context.l10n.callAudioSpeaker,
       icon: iconFor(audio.route),
       active: audio.isSpeakerOn,
       onPressed: enabled

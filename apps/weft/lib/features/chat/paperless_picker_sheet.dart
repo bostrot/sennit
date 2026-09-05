@@ -6,6 +6,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../services/integrations/paperless.dart';
 import '../settings/integrations_screen.dart';
 
@@ -84,7 +85,7 @@ class _PaperlessPickerState extends State<_PaperlessPicker> {
     } on Object catch (error) {
       if (mounted) {
         setState(() => _staging = false);
-        showWeftMessage(context, 'Could not fetch the document: $error');
+        showWeftMessage(context, context.l10n.paperlessFetchFailed('$error'));
       }
     }
   }
@@ -102,14 +103,14 @@ class _PaperlessPickerState extends State<_PaperlessPicker> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Share a Paperless document',
+                  context.l10n.paperlessSheetTitle,
                   style: context.text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: WeftSpace.sm),
                 WeftLabelledField(
-                  label: 'Search the archive',
+                  label: context.l10n.paperlessSearchLabel,
                   child: TextField(
                     controller: _query,
                     autofocus: true,
@@ -120,9 +121,9 @@ class _PaperlessPickerState extends State<_PaperlessPicker> {
                         _search,
                       );
                     },
-                    decoration: const InputDecoration(
-                      hintText: 'Search by content, title, correspondent…',
-                      prefixIcon: Icon(Icons.search_rounded, size: 20),
+                    decoration: InputDecoration(
+                      hintText: context.l10n.paperlessSearchHint,
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
                       isDense: true,
                     ),
                   ),

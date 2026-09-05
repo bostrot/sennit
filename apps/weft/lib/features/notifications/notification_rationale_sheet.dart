@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 
+import '../../app/localisation.dart';
+
 /// Asks whether the user wants notifications, *before* the OS asks.
 ///
 /// The reason this exists rather than the permission dialog being shown
@@ -49,16 +51,13 @@ class _NotificationRationaleSheet extends StatelessWidget {
             ),
             const SizedBox(height: WeftSpace.lg),
             Text(
-              'Get told when someone writes',
+              context.l10n.notificationRationaleTitle,
               style: theme.textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: WeftSpace.md),
             Text(
-              'Braid can notify you when a message arrives on any of your '
-              'networks. A merged contact is one notification, not one per '
-              'network, and anything you have already read elsewhere stays '
-              'quiet.',
+              context.l10n.notificationRationaleBody,
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -66,9 +65,7 @@ class _NotificationRationaleSheet extends StatelessWidget {
             Text(
               // The one thing worth saying about the mechanism, because it is
               // the thing a self-hoster actually wants to know before granting.
-              'Message text is never sent to a push service — Braid is told only '
-              'that something happened, then fetches and decrypts it on this '
-              'device.',
+              context.l10n.notificationRationaleMechanism,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -77,12 +74,12 @@ class _NotificationRationaleSheet extends StatelessWidget {
             const SizedBox(height: WeftSpace.xl),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Turn on notifications'),
+              child: Text(context.l10n.notificationRationaleAccept),
             ),
             const SizedBox(height: WeftSpace.sm),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Not now'),
+              child: Text(context.l10n.commonNotNow),
             ),
           ],
         ),

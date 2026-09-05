@@ -334,6 +334,11 @@ WeftMessage? mapEvent(
         ? MessageKind.sticker
         : messageKindFromMsgtype(msgtype, isVoice: voice),
     isOwn: event.senderId == ownUserId,
+    // `== true` rather than a truthiness test: the key is a bool on the wire,
+    // and a sender that put a string there meant something this build does not
+    // understand. Reading that as "machine-written" would suppress a real
+    // person's reply.
+    isAutoReply: content[kAutoReplyKey] == true,
     // The event as sent. Edits are applied below, from the replacement chain,
     // rather than trusted from here: the body is the *original* text until
     // someone asks the timeline for the display event.
@@ -348,12 +353,15 @@ WeftMessage? mapEvent(
         : (event.text.isNotEmpty ? event.text : _fallbackBody(content)),
     formattedBody: event.redacted ? null : formattedBodyOf(content),
     replyToEventId: replyTargetEventId(content),
+    threadRootId: threadRootEventId(content),
+    threadName: threadNameFromContent(content),
     redacted: event.redacted,
     deliveryState: _deliveryFor(event),
     // Marks the message as carrying a file. The value is not a fetchable URL
     // for encrypted rooms, so the UI asks the repository for bytes instead —
     // this only records that something is there to load.
     attachmentUrl: _hasAttachment(content) ? event.eventId : null,
+    attachmentName: _attachmentName(content),
     geoUri: content['geo_uri'] is String ? content['geo_uri'] as String : null,
     durationMs: _durationMs(content),
     mediaWidth: _positiveInfoInt(content, 'w'),
@@ -407,6 +415,63 @@ String? replyTargetEventId(Map<String, Object?> content) {
 
   final eventId = inReplyTo['event_id'];
   return eventId is String && eventId.isNotEmpty ? eventId : null;
+}
+
+/// The thread this event hangs off, or null when it is a room-level message.
+///
+/// Read from `rel_type` and pointedly **not** from the nested `m.in_reply_to`
+/// beside it, which is where [replyTargetEventId] looks. Nearly every thread
+/// reply carries both: the spec has the sender add a reply fallback so that a
+/// client with no thread support renders the exchange as a chain rather than
+/// losing it. Reading the fallback as a thread relation would put every ordinary
+/// reply in a room into a thread of its own, and a group chat would come apart
+/// into one thread per answer.
+///
+/// The event id is required to be a non-empty string. A `rel_type` of `m.thread`
+/// with no `event_id` is a relation to nothing, and treating it as a thread root
+/// of `""` would gather every such event into one phantom thread.
+String? threadRootEventId(Map<String, Object?> content) {
+  final relatesTo = content['m.relates_to'];
+  if (relatesTo is! Map) return null;
+  if (relatesTo['rel_type'] != 'm.thread') return null;
+
+  final eventId = relatesTo['event_id'];
+  return eventId is String && eventId.isNotEmpty ? eventId : null;
+}
+
+/// Vendor keys a bridge writes a forum topic's name into, in preference order.
+///
+/// Telegram forum topics have real names — "Bugs", "Off-topic" — and there is no
+/// spec key for one: a Matrix thread has no name at all, only the message it
+/// hangs off. The bridges that relay topics therefore invent a key, and the
+/// spellings differ between mautrix-telegram and the Beeper fork, so both are
+/// read. An unknown bridge simply matches nothing and the thread falls back to
+/// its root's own words, which is the Matrix answer.
+const List<String> kThreadNameKeys = [
+  'com.beeper.thread.name',
+  'xyz.maubot.telegram.topic_name',
+  'fi.mau.telegram.topic_name',
+];
+
+/// A bridged thread's name, when the bridge announced one.
+///
+/// Trimmed, and empty is treated as absent: a bridge that writes the key with no
+/// value has told us nothing, and an indicator captioned with the empty string
+/// reads as a rendering bug rather than as a topic with no name.
+String? threadNameFromContent(Map<String, Object?> content) {
+  for (final key in kThreadNameKeys) {
+    final value = content[key];
+    if (value is String) {
+      final name = value.trim();
+      if (name.isNotEmpty) return name;
+    }
+    // Beeper nests it under an object rather than writing a bare string.
+    if (value is Map) {
+      final name = value['name'];
+      if (name is String && name.trim().isNotEmpty) return name.trim();
+    }
+  }
+  return null;
 }
 
 /// The event an `m.replace` replaces, or null when this is not a replacement.
@@ -537,6 +602,25 @@ DeliveryState? _deliveryFor(sdk.Event event) {
 /// Whether the event carries a file, plain (`url`) or encrypted (`file`).
 bool _hasAttachment(Map<String, Object?> content) =>
     content['url'] is String || content['file'] is Map;
+
+/// The MSC2530 `filename`, which is present only when `body` is a caption.
+///
+/// Guarded on there actually being an attachment, because `filename` beside no
+/// file names nothing — and because the one thing this field is read for
+/// downstream is "trust `body` as a caption verbatim". A text message carrying a
+/// stray `filename` key would otherwise silence the filename heuristic for a
+/// bubble that has no file in it at all.
+///
+/// A `filename` equal to `body` is treated as absent: several bridges write the
+/// name into both keys for an uncaptioned photo, and taking that at face value
+/// makes `IMG_4021.jpg` a caption and prints it under the picture — the exact
+/// thing the key exists to prevent.
+String? _attachmentName(Map<String, Object?> content) {
+  if (!_hasAttachment(content)) return null;
+  final name = content['filename'];
+  if (name is! String || name.isEmpty) return null;
+  return name == content['body'] ? null : name;
+}
 
 /// What to say for a message with no text and no top-level file.
 ///
@@ -727,6 +811,27 @@ const String kCalendarInviteKey = 'com.bostrot.weft.calendar';
 
 /// The relation type its answers use.
 const String kCalendarResponseType = 'com.bostrot.weft.calendar.response';
+
+/// The content key that marks a message as machine-written.
+///
+/// Sent on an auto-reply's own `m.room.message` content alongside the ordinary
+/// `body`, exactly the way [kCalendarInviteKey] rides an invitation: every
+/// other client shows the text and ignores the key, and a client that
+/// understands it can say more. Read back into [WeftMessage.isAutoReply].
+///
+/// It buys two things, and it is worth being precise about which. In the
+/// transcript it draws the "sent automatically" chip, so a person scrolling
+/// back can tell what they wrote from what their model wrote for them. In
+/// `weft_autoreply` it is the echo guard: two Braid users who have both
+/// switched auto-reply on would otherwise answer each other until one of their
+/// caps ran out.
+///
+/// **It does not survive a bridge.** A reply relayed to WhatsApp arrives there
+/// as plain text with no custom keys and comes back the same way. That is not a
+/// defect to be fixed with a cleverer marker — no network but Matrix has
+/// anywhere to put one — and it is why the loop guard that actually holds is
+/// the hard cap per conversation, which needs no cooperation from the far side.
+const String kAutoReplyKey = 'com.bostrot.weft.auto_reply';
 
 /// The human-readable line [sendCalendarInvite] writes into the body — and
 /// the only part of an invitation that survives a trip through a bridge.

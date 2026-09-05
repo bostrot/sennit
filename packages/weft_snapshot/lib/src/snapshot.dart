@@ -47,6 +47,9 @@ const int kMaxSnapshotPreviewLength = 80;
 /// user asked not to have their conversations readable over their shoulder, not
 /// to stop being told they have any. The unread count is still there, and that
 /// is the fact the surface exists to show.
+/// English, and a fallback rather than the answer: [buildSnapshotRow] takes
+/// the reader's own word for it. See
+/// `docs/architecture/l10n-pipeline.md`, "Packages and their words".
 const String kRedactedRowTitle = 'Conversation';
 
 /// What a preview says when the last message was redacted.
@@ -395,6 +398,9 @@ InboxSnapshot buildSnapshot({
   required List<Chat> chats,
   required SnapshotPolicy policy,
   required DateTime now,
+  WeftNotifyStrings words = WeftNotifyStrings.english,
+  String redactedTitle = kRedactedRowTitle,
+  String deletedPreview = kDeletedPreview,
 }) {
   if (!policy.enabled) return InboxSnapshot.disabled(now);
 
@@ -413,7 +419,16 @@ InboxSnapshot buildSnapshot({
 
   return InboxSnapshot(
     generatedAt: now.toUtc(),
-    rows: [for (final chat in capped) buildSnapshotRow(chat, policy)],
+    rows: [
+      for (final chat in capped)
+        buildSnapshotRow(
+          chat,
+          policy,
+          words: words,
+          redactedTitle: redactedTitle,
+          deletedPreview: deletedPreview,
+        ),
+    ],
     totalUnread: totalUnread,
   );
 }
@@ -424,15 +439,27 @@ InboxSnapshot buildSnapshot({
 /// what a widget row would say, and that preview has to be built the real way:
 /// a hand-made mock-up of a row is a second answer to what the policy does, and
 /// it is the answer nobody re-checks after the policy changes.
-SnapshotRow buildSnapshotRow(Chat chat, SnapshotPolicy policy) {
+SnapshotRow buildSnapshotRow(
+  Chat chat,
+  SnapshotPolicy policy, {
+  WeftNotifyStrings words = WeftNotifyStrings.english,
+  String redactedTitle = kRedactedRowTitle,
+  String deletedPreview = kDeletedPreview,
+}) {
   final last = chat.lastMessage;
   return SnapshotRow(
     chatId: chat.id,
-    title: policy.includeSenderNames ? chat.title : kRedactedRowTitle,
+    title: policy.includeSenderNames ? chat.title : redactedTitle,
     link: chatDeepLink(chat.id),
     unreadCount: chat.unreadCount > 0 ? chat.unreadCount : 0,
     networks: orderedNetworks(chat.networks.toSet()),
-    preview: policy.includePreviews ? renderSnapshotPreview(last) : null,
+    preview: policy.includePreviews
+        ? renderSnapshotPreview(
+            last,
+            words: words,
+            deletedPreview: deletedPreview,
+          )
+        : null,
     senderName: policy.includeSenderNames && last != null
         ? snapshotSenderName(last, chat: chat)
         : null,
@@ -457,12 +484,16 @@ SnapshotRow buildSnapshotRow(Chat chat, SnapshotPolicy policy) {
 /// Two things are this package's own. Newlines are collapsed, because a Glance
 /// `Text` handed a three-line paste renders three lines into a box sized for
 /// two. And the cut is at a grapheme boundary — see [truncatePreview].
-String? renderSnapshotPreview(WeftMessage? message) {
+String? renderSnapshotPreview(
+  WeftMessage? message, {
+  WeftNotifyStrings words = WeftNotifyStrings.english,
+  String deletedPreview = kDeletedPreview,
+}) {
   if (message == null) return null;
-  if (message.redacted) return kDeletedPreview;
+  if (message.redacted) return deletedPreview;
   // `maxLength: 0` disables `weft_notify`'s own UTF-16 truncation, so the
   // grapheme-aware cut below is the only one that happens.
-  final body = renderNotificationBody(message, maxLength: 0);
+  final body = renderNotificationBody(message, maxLength: 0, words: words);
   return truncatePreview(_collapseWhitespace(body));
 }
 

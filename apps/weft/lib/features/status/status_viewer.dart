@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../services/attachments/media_store.dart';
@@ -137,8 +138,10 @@ class _StatusViewerState extends ConsumerState<StatusViewer> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${widget.entry.senderName} · '
-                          '${DateFormat.Hm().format(messages[_index].timestamp)}',
+                          context.l10n.statusViewerCaption(
+                            widget.entry.senderName,
+                            DateFormat.Hm().format(messages[_index].timestamp),
+                          ),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -146,7 +149,7 @@ class _StatusViewerState extends ConsumerState<StatusViewer> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Close',
+                        tooltip: context.l10n.commonClose,
                         icon: const Icon(
                           Icons.close_rounded,
                           color: Colors.white,
@@ -248,10 +251,10 @@ class _StatusPageState extends ConsumerState<_StatusPage> {
     }
 
     if (_failed) {
-      return const Center(
+      return Center(
         child: Text(
-          'This status could not be loaded.',
-          style: TextStyle(color: Colors.white70),
+          context.l10n.statusLoadFailed,
+          style: const TextStyle(color: Colors.white70),
         ),
       );
     }

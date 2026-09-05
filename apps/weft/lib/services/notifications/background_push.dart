@@ -10,6 +10,8 @@ import 'package:weft_domain/weft_domain.dart' show Chat;
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
 
 import '../../app/stores.dart';
 import '../../data/matrix_chat_repository.dart';
@@ -105,6 +107,7 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
     }
 
     final pipeline = MatrixNotificationPipeline(
+      words: () => weftNotifyStringsFrom(weftPlatformL10n()),
       session: MatrixNotificationSession.forClient(session.client),
       chatForRoom: chatForRoom,
       policy: () => NotificationPolicy.fromJson(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/stores.dart';
 import '../../services/links/link_preview_service.dart';
@@ -24,34 +25,20 @@ class LinkPreviewsScreen extends ConsumerWidget {
     final networks = ref.watch(chatRepositoryProvider).availableNetworks;
 
     return Scaffold(
-      appBar: WeftAppBar(title: const Text('Link previews')),
+      appBar: WeftAppBar(title: Text(context.l10n.linkPreviewsTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.all(WeftSpace.lg),
           children: [
-            const PrivacyNotice(
-              message:
-                  'A preview is fetched by your homeserver, not by this device, '
-                  'so the site is never told your IP address or when you read '
-                  'the message. The cost is on the other side: your homeserver '
-                  'learns every link you are sent and when, including links '
-                  'inside end-to-end encrypted chats it can otherwise never '
-                  'read. Leave this off unless you run the homeserver yourself '
-                  'or trust whoever does.',
-            ),
+            PrivacyNotice(message: context.l10n.linkPreviewsNotice),
             const SizedBox(height: WeftSpace.lg),
 
             SwitchListTile(
-              title: const PrivacyGatedTitle(
-                title: 'Show link previews',
-                warning:
-                    'Turning this on tells your homeserver every link you are '
-                    'sent, including links inside encrypted chats.',
+              title: PrivacyGatedTitle(
+                title: context.l10n.linkPreviewsShowTitle,
+                warning: context.l10n.linkPreviewsShowWarning,
               ),
-              subtitle: const Text(
-                'Off means no link in any message is ever looked up. Nothing is '
-                'requested until you switch this on.',
-              ),
+              subtitle: Text(context.l10n.linkPreviewsShowSubtitle),
               value: settings.enabled,
               onChanged: (v) =>
                   _write(ref, settings.copyWith(enabled: v), clearCache: !v),
@@ -60,12 +47,9 @@ class LinkPreviewsScreen extends ConsumerWidget {
 
             if (settings.enabled) ...[
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Networks',
-                subtitle:
-                    'Excluded networks are never previewed, whatever the switch '
-                    'above says. Use this for the conversations that must leave '
-                    'nothing on the homeserver beyond their ciphertext.',
+              SettingsSectionHeader(
+                title: context.l10n.settingsNetworksSectionTitle,
+                subtitle: context.l10n.linkPreviewsNetworksSubtitle,
               ),
               for (final network in networks)
                 NetworkToggleRow(
@@ -85,26 +69,22 @@ class LinkPreviewsScreen extends ConsumerWidget {
                 ),
               if (networks.isEmpty)
                 Text(
-                  'No bridges are configured yet, so there is nothing to '
-                  'exclude. Networks appear here as they connect.',
+                  context.l10n.settingsNoBridgesToExclude,
                   style: context.text.bodySmall?.copyWith(
                     color: context.colors.onSurfaceVariant,
                   ),
                 ),
 
               const Divider(height: WeftSpace.xl),
-              const SettingsSectionHeader(
-                title: 'Cached previews',
-                subtitle:
-                    'Answers already given are kept so the same link is not '
-                    'asked about twice. Clearing them costs a fresh request the '
-                    'next time one of those links is on screen.',
+              SettingsSectionHeader(
+                title: context.l10n.linkPreviewsCacheTitle,
+                subtitle: context.l10n.linkPreviewsCacheSubtitle,
               ),
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  label: const Text('Clear cached previews'),
+                  label: Text(context.l10n.linkPreviewsClearCache),
                   onPressed: () => _clearCache(context, ref),
                 ),
               ),
@@ -138,9 +118,6 @@ class LinkPreviewsScreen extends ConsumerWidget {
     // The count is the entire confirmation that anything happened — the button
     // looks identical before and after — and a bare snackbar said it to nobody
     // who was not watching.
-    showWeftMessage(
-      context,
-      removed == 1 ? 'Forgot 1 preview.' : 'Forgot $removed previews.',
-    );
+    showWeftMessage(context, context.l10n.linkPreviewsForgot(removed));
   }
 }

@@ -6,6 +6,7 @@ import 'package:weft/features/bridges/bridges_screen.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft/app/localisation.dart';
 
 void main() {
   // Regression hunt for the on-device crash: popping the bridges screen threw
@@ -20,6 +21,7 @@ void main() {
       ProviderScope(
         overrides: [storesProvider.overrideWithValue(stores)],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: Builder(
             builder: (context) => Scaffold(
@@ -73,6 +75,7 @@ void main() {
             ]),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: const BridgesScreen(),
           ),

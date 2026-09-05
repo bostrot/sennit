@@ -23,6 +23,10 @@ dependencies:
   # hand-written SQL regardless, and dropping drift_dev removes a heavyweight
   # codegen step from every build.
   sqlite3: ^3.0.0
+  # The `.braid` archive format. The dependency points this way — store knows
+  # about backup, not the other way round — so that `weft_backup` stays pure
+  # Dart and testable without SQL, and the SQL lives here where the schema is.
+  weft_backup: ^0.1.0
   weft_domain: ^0.1.0
   # For the plain-text projection of formatted bodies. The index stores what a
   # message says, and only `weft_richtext` knows how to answer that.

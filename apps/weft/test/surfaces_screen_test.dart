@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/snapshot_providers.dart';
 import 'package:weft/app/stores.dart';
@@ -33,6 +34,8 @@ import 'support/semantics_probe.dart';
 import 'support/snapshot_fixtures.dart';
 
 void main() {
+  final en = lookupAppL10n(const Locale('en'));
+
   /// Pumps the screen over a real in-memory store, and hands back everything a
   /// test needs to ask what actually happened: the store the next launch would
   /// read, the container the widgets read, and the writer between them.
@@ -78,6 +81,8 @@ void main() {
           snapshotGatewayProvider.overrideWithValue(gateway),
         ],
         child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
           theme: WeftTheme.build(),
           home: const SurfacesScreen(),
         ),
@@ -155,6 +160,8 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
             theme: WeftTheme.build(),
             home: Builder(
               builder: (context) => Scaffold(
@@ -507,7 +514,7 @@ void main() {
       );
 
       expect(find.textContaining('An example'), findsOneWidget);
-      expect(find.text('Weekend plans'), findsOneWidget);
+      expect(find.text(en.surfacesExampleChatTitle), findsOneWidget);
       expect(find.text('Grace'), findsNothing);
     });
 

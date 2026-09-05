@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
+import '../../app/localisation.dart';
 
 import '../../app/shortcuts.dart';
 
@@ -28,7 +29,7 @@ class _ShortcutsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bindings = weftKeyBindings();
+    final bindings = weftKeyBindings(context.l10n);
 
     return SafeArea(
       child: Padding(
@@ -43,7 +44,7 @@ class _ShortcutsSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Keyboard shortcuts',
+              context.l10n.shortcutsTitle,
               style: context.text.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -73,6 +74,7 @@ class _BindingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keys = binding.activators.map(describeShortcut).toList();
+    final or = context.l10n.shortcutsOr;
 
     // One node, not one per key cap. "Next conversation, Alt + Arrow Down or
     // ⌘ + Page Down" is the sentence; the caps are a picture of it, and read
@@ -80,7 +82,10 @@ class _BindingRow extends StatelessWidget {
     return Semantics(
       container: true,
       excludeSemantics: true,
-      label: '${binding.description}, ${keys.join(' or ')}',
+      label: context.l10n.shortcutsBindingSemantics(
+        binding.description,
+        keys.join(' $or '),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -96,7 +101,7 @@ class _BindingRow extends StatelessWidget {
               for (var i = 0; i < keys.length; i++) ...[
                 if (i > 0)
                   Text(
-                    'or',
+                    or,
                     style: context.text.labelSmall?.copyWith(
                       color: context.colors.onSurfaceVariant,
                     ),
@@ -120,7 +125,10 @@ class _KeyCap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: WeftSpace.sm,
+        vertical: WeftSpace.xxs,
+      ),
       decoration: BoxDecoration(
         color: context.colors.surfaceContainerHigh,
         borderRadius: WeftRadius.allSm,

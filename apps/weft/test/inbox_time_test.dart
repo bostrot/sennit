@@ -16,32 +16,46 @@ void main() {
   final now = DateTime(2026, 8, 26, 16, 42);
 
   test('nothing to show for a conversation with no messages', () {
-    expect(formatInboxTime(null, now: now), isNull);
+    expect(formatInboxTime(null, now: now, justNow: 'Now'), isNull);
   });
 
   test('a message from this minute is now', () {
     expect(
-      formatInboxTime(now.subtract(const Duration(seconds: 20)), now: now),
+      formatInboxTime(
+        now.subtract(const Duration(seconds: 20)),
+        now: now,
+        justNow: 'Now',
+      ),
       'Now',
     );
   });
 
   test('a message from earlier today shows the clock', () {
     expect(
-      formatInboxTime(now.subtract(const Duration(hours: 2)), now: now),
+      formatInboxTime(
+        now.subtract(const Duration(hours: 2)),
+        now: now,
+        justNow: 'Now',
+      ),
       isNot('Now'),
       reason: 'the bug: two hours ago read as "Now"',
     );
-    expect(formatInboxTime(DateTime(2026, 8, 26, 9, 5), now: now), '09:05');
+    expect(
+      formatInboxTime(DateTime(2026, 8, 26, 9, 5), now: now, justNow: 'Now'),
+      '09:05',
+    );
   });
 
   test('a message from this week shows the weekday', () {
-    expect(formatInboxTime(DateTime(2026, 8, 24, 9, 5), now: now), 'Mon');
+    expect(
+      formatInboxTime(DateTime(2026, 8, 24, 9, 5), now: now, justNow: 'Now'),
+      'Mon',
+    );
   });
 
   test('anything older shows a date', () {
     expect(
-      formatInboxTime(DateTime(2026, 7, 1, 9, 5), now: now),
+      formatInboxTime(DateTime(2026, 7, 1, 9, 5), now: now, justNow: 'Now'),
       contains('2026'),
     );
   });
@@ -50,7 +64,11 @@ void main() {
     // Bridges stamp `origin_server_ts` from the remote network, and a remote
     // clock running fast is common enough to be worth being explicit about.
     expect(
-      formatInboxTime(now.add(const Duration(minutes: 5)), now: now),
+      formatInboxTime(
+        now.add(const Duration(minutes: 5)),
+        now: now,
+        justNow: 'Now',
+      ),
       'Now',
     );
   });

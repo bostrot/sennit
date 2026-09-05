@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'mac/mac_toolbar.dart';
 import 'surface.dart';
 
 /// An [AppBar] that knows where the window's own controls are.
@@ -72,7 +71,8 @@ class WeftAppBar extends StatelessWidget implements PreferredSizeWidget {
     // Resolved here rather than left to `automaticallyImplyLeading`, because
     // the padding has to wrap the button and the AppBar only wraps what it is
     // given.
-    final implied = leading ??
+    final implied =
+        leading ??
         (automaticallyImplyLeading && Navigator.of(context).canPop()
             ? const BackButton()
             : null);

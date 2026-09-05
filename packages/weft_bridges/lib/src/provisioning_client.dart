@@ -188,23 +188,33 @@ class BridgeProvisioningClient {
     final errcode = json?['errcode'] as String?;
     final error = json?['error'] as String?;
 
+    final failure = error == null ? _failureFor(response.statusCode) : null;
     throw BridgeException(
       error ?? _describeStatus(response.statusCode),
       statusCode: response.statusCode,
       errorCode: errcode,
+      failure: failure,
     );
   }
 
-  static String _describeStatus(int status) => switch (status) {
-    401 || 403 =>
+  static BridgeFailure _failureFor(int status) => switch (status) {
+    401 || 403 => BridgeFailure.rejected,
+    404 => BridgeFailure.notFound,
+    502 || 503 || 504 => BridgeFailure.unavailable,
+    _ => BridgeFailure.other,
+  };
+
+  /// The English fallback, kept for logs and for a caller with no translations
+  /// of its own. The app words [BridgeFailure] itself.
+  static String _describeStatus(int status) => switch (_failureFor(status)) {
+    BridgeFailure.rejected =>
       'The bridge rejected your Matrix account. Check that it is configured '
           'to serve your homeserver and that your user is permitted.',
-    404 =>
+    BridgeFailure.notFound =>
       'No provisioning API at that URL. It usually ends in /_matrix/provision.',
-    502 ||
-    503 ||
-    504 => 'The bridge is not responding. It may be starting up or offline.',
-    _ => 'The bridge returned an error ($status).',
+    BridgeFailure.unavailable =>
+      'The bridge is not responding. It may be starting up or offline.',
+    BridgeFailure.other => 'The bridge returned an error ($status).',
   };
 
   void dispose() {

@@ -14,6 +14,7 @@ import 'package:weft/services/attachments/attachment_picker.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft/app/localisation.dart';
 
 /// A stand-in for `MainActivity`.
 ///
@@ -441,6 +442,7 @@ void main() {
             ),
           ],
           child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
             theme: WeftTheme.build(),
             home: Builder(
               builder: (context) => Scaffold(
@@ -792,13 +794,18 @@ class _RecordingRepository implements ChatRepository {
     ChatNetwork? via,
     bool isVoiceNote = false,
     int? durationMs,
+    String? caption,
   }) {
-    sent.add('file: ${source.basename}');
+    // The caption is recorded beside the name rather than in a second list:
+    // "which file carried the words" is the whole assertion, and two parallel
+    // lists cannot answer it.
+    sent.add('file: ${source.basename}${caption == null ? '' : ' [$caption]'}');
     return inner.sendAttachment(
       chatId,
       source,
       via: via,
       isVoiceNote: isVoiceNote,
+      caption: caption,
     );
   }
 
