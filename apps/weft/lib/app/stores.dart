@@ -64,25 +64,45 @@ class WeftStores {
     );
   }
 
-  static Future<WeftStores> open({String? directoryOverride}) async {
+  /// [secretStore] exists for tests: the real one talks to the platform
+  /// keychain over a method channel, which never answers under `flutter_test`.
+  static Future<WeftStores> open({
+    String? directoryOverride,
+    SecretStore? secretStore,
+  }) async {
     final db = directoryOverride != null
         ? WeftDatabase.openAt(directoryOverride)
         : await WeftDatabase.open();
-    final secrets = SecretStore();
+    final secrets = secretStore ?? SecretStore();
 
-    String? embeddingKey;
-    String? transcriptionKey;
-    String? haToken;
-    String? paperlessKey;
-    String? llmKey;
-    if (!kDemoMode) {
-      // Secure storage prompts on some platforms; demo mode skips it entirely.
-      embeddingKey = await secrets.read(SecretStore.embeddingApiKey);
-      transcriptionKey = await secrets.read(SecretStore.transcriptionApiKey);
-      haToken = await secrets.read(SecretStore.homeAssistantToken);
-      paperlessKey = await secrets.read(SecretStore.paperlessToken);
-      llmKey = await secrets.read(SecretStore.llmApiKey);
-    }
+    // Secure storage prompts on some platforms; demo mode skips it entirely.
+    //
+    // Issued together rather than one after another. None of them depends on
+    // another's answer, and the auth gate holds its splash on this future — so
+    // awaited in a row they put five channel round trips end to end in front of
+    // the first frame of every cold start, for five values the inbox does not
+    // even use.
+    //
+    // What this buys is the round trips overlapping, not the keychain work: the
+    // Android plugin posts every call to one worker `HandlerThread`, so the
+    // decryptions still happen in a row on the far side. That also makes this
+    // safe — the platform serialises, and the map it reads is synchronised.
+    //
+    // `Future.wait` rather than five bare futures awaited in turn, because it
+    // subscribes to all five at once: a keychain that refuses then fails the
+    // bootstrap exactly as it does today, instead of failing it once and
+    // leaving four unhandled errors behind it.
+    final secretValues = kDemoMode
+        ? const <String?>[null, null, null, null, null]
+        : await Future.wait<String?>([
+            secrets.read(SecretStore.embeddingApiKey),
+            secrets.read(SecretStore.transcriptionApiKey),
+            secrets.read(SecretStore.homeAssistantToken),
+            secrets.read(SecretStore.paperlessToken),
+            secrets.read(SecretStore.llmApiKey),
+          ]);
+    final [embeddingKey, transcriptionKey, haToken, paperlessKey, llmKey] =
+        secretValues;
 
     return WeftStores._(
       db: db,

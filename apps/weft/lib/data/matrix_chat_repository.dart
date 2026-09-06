@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:collection/collection.dart' show MapEquality;
@@ -56,6 +57,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
        _sms = sms {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
+    final storedHandles = _store?.loadHandles() ?? const <NetworkHandle>[];
     _graph = IdentityGraph(
       // The scorer reads its two knobs from settings: the country code that
       // makes national numbers comparable, and whether same-name pairs merge
@@ -76,7 +78,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
           ),
         ),
       ),
-      handles: _store?.loadHandles() ?? const [],
+      handles: storedHandles,
       decisions: [
         for (final d in _store?.loadDecisions() ?? const <StoredDecision>[])
           MergeDecision(
@@ -92,6 +94,17 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       ],
       idFactory: _idFactory(),
     );
+    // What the database already says, so the first rebuild does not say it
+    // again. `_handleFingerprints` starts empty on every launch while the rows
+    // it describes do not, and the refresh below reads an empty map as "none of
+    // these handles has ever been written" — so every launch rewrote every
+    // handle, plus the `unified_contact` row each merged one points at, one
+    // synchronous SQLite statement at a time on the UI thread, before the inbox
+    // had drawn. Seeded from the same rows the graph was just rehydrated from,
+    // a handle that has not moved since the last run costs nothing.
+    for (final handle in storedHandles) {
+      _handleFingerprints[handle.id] = handleFingerprint(_asPersisted(handle));
+    }
     _sendNetworks.addAll(_store?.loadSendNetworks() ?? const {});
     _resolveMediaSupport();
     _rebuild();
@@ -170,6 +183,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   /// What was last written to the identity store per handle, so an unchanged
   /// handle is not rewritten on every sync-driven refresh.
+  ///
+  /// Seeded in the constructor from the rows already in the database, because
+  /// an empty map at launch means every one of them gets written back
+  /// unchanged. See [handleFingerprint] for why comparing these strings is the
+  /// same question as comparing the rows.
   final Map<String, String> _handleFingerprints = {};
 
   /// The newest event each room was receipted up to, from this session.
@@ -1761,7 +1779,14 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// scorer only runs then. It walks every pair with a string-similarity
   /// metric — running that on each of the initial sync storm's rebuilds was
   /// most of a thirty-second stutter after launch.
-  bool _handlesDirty = false;
+  ///
+  /// True to begin with, so the first rebuild of a run always evaluates the
+  /// auto-merge once. Before the fingerprints were seeded that was implicit —
+  /// every handle looked new at launch — and losing it would mean an
+  /// auto-merge the user *switched on while the app was closed* never ran:
+  /// the setting had changed, but no handle had, so nothing was dirty and the
+  /// fold waited for an unrelated rename.
+  bool _handlesDirty = true;
 
   /// Runs the narrow auto-merge after a handle refresh and persists what it
   /// did, so the fold survives a restart exactly like a tapped merge — and
@@ -1814,16 +1839,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       // refresh runs on every (debounced) sync, and re-writing several dozen
       // identical rows each pass was a solid slice of the first minute's
       // scroll jank.
-      final fingerprint =
-          '${handle.displayName}|${handle.avatarUrl}|${handle.phoneE164}|'
-          '${_graph.contactIdOf(handle.id)}';
-      if (_handleFingerprints[handle.id] != fingerprint) {
-        _handleFingerprints[handle.id] = fingerprint;
-        _handlesDirty = true;
-        _store?.upsertHandle(
-          handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
-        );
-      }
+      if (_persistHandle(handle)) _handlesDirty = true;
     }
 
     // SMS contributes handles in exactly the same shape, which is the whole
@@ -1833,10 +1849,27 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // existing merge screen, with the existing "Same phone number" evidence.
     for (final handle in _sms?.handles ?? const <NetworkHandle>[]) {
       _graph.upsertHandle(handle);
-      _store?.upsertHandle(
-        handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id)),
-      );
+      // Through the same guard as the rooms above, which it was not before: an
+      // SMS thread is rewritten on every rebuild, and the rebuilds come every
+      // 300ms once the inbox is live.
+      _persistHandle(handle);
     }
+  }
+
+  /// The handle as [IdentityStore.upsertHandle] would store it — which is the
+  /// handle plus whichever contact the graph currently puts it in.
+  NetworkHandle _asPersisted(NetworkHandle handle) =>
+      handle.copyWith(unifiedContactId: _graph.contactIdOf(handle.id));
+
+  /// Writes [handle] to the identity store unless the row already says exactly
+  /// this, and reports whether it wrote.
+  bool _persistHandle(NetworkHandle handle) {
+    final persisted = _asPersisted(handle);
+    final fingerprint = handleFingerprint(persisted);
+    if (_handleFingerprints[handle.id] == fingerprint) return false;
+    _handleFingerprints[handle.id] = fingerprint;
+    _store?.upsertHandle(persisted);
+    return true;
   }
 
   /// Bridge ghosts encode the remote identifier in their localpart.
@@ -2282,6 +2315,38 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     return out;
   }
 }
+
+/// Everything [IdentityStore.upsertHandle] would put in the row, as one string.
+///
+/// The point of it is the skip: two handles with the same fingerprint write the
+/// same row, so the second write can be dropped. That only holds while this
+/// covers **every** persisted column — a field left out is a field that can
+/// change without anybody writing it, and the row then disagrees with the app
+/// until something unrelated about the handle moves. `roomId` is the one that
+/// makes this concrete: it was outside the older, four-field fingerprint and
+/// got away with it only because the map was empty at launch and every row was
+/// rewritten anyway. Seeding the map takes that cover away.
+///
+/// `unifiedContactId` is read off the handle rather than the graph, so callers
+/// pass the handle **as it will be stored** — see `_asPersisted`.
+///
+/// Encoded rather than joined with a separator, because the values are display
+/// names and URLs the app does not choose: any character picked as a separator
+/// is one somebody can put in their name, and a name holding it reads as the
+/// two fields either side of it. JSON also keeps an absent field apart from the
+/// four-letter name of it — `null` and `"null"` are different rows.
+String handleFingerprint(NetworkHandle handle) => jsonEncode([
+  handle.network.id,
+  handle.remoteId,
+  handle.matrixUserId,
+  handle.roomId,
+  handle.displayName,
+  handle.avatarUrl,
+  handle.phoneE164,
+  handle.email,
+  handle.avatarDHash,
+  handle.unifiedContactId,
+]);
 
 /// A room's badge, from the three facts that decide it.
 ///
