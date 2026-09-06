@@ -43,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
       - uses: actions/checkout@v4
@@ -107,6 +108,35 @@ jobs:
           mkdir -p dist
           cp apps/weft/build/app/outputs/flutter-apk/app-release.apk "dist/Braid-$VERSION-android.apk"
           cp apps/weft/build/app/outputs/bundle/release/app-release.aab "dist/Braid-$VERSION-android.aab"
+      - name: Publish to the Play internal track
+        # Internal testing is the one track Play accepts a build on while the
+        # store listing is still incomplete, so this runs from the first tag
+        # rather than waiting on a finished entry.
+        #
+        # Three gates, and each one covers a build that must not reach the
+        # store: a workflow_dispatch run is documented above as a dry run, an
+        # AAB built without the keystore is debug-signed and Play would reject
+        # it, and a fork has no service account at all. A missing secret skips
+        # the step rather than failing it — the GitHub release still goes out.
+        #
+        # `status: completed` is what makes this an actual test release rather
+        # than a draft somebody finishes by hand in the Console. The single
+        # exception is an app Play still considers a draft — nothing published
+        # on any track yet, which is where com.bostrot.weft sits until this
+        # runs for the first time; that first upload has to be `draft` and be
+        # promoted once in the Console. Set the `PLAY_RELEASE_STATUS`
+        # repository variable to `draft` for that run, then delete it.
+        if: >-
+          startsWith(github.ref, 'refs/tags/')
+          && env.HAS_SIGNING == 'true'
+          && env.HAS_PLAY == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bostrot.weft
+          releaseFiles: dist/Braid-${{ needs.verify.outputs.version }}-android.aab
+          track: internal
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
       - uses: actions/upload-artifact@v4
         with:
           name: android
