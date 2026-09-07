@@ -474,6 +474,20 @@ from a bubble or from the launcher's long-press menu arrives through the
 *existing* intent replay. One router, two front doors, both of them the
 platform's.
 
+What the replay lands on, though, is a chat screen in a process that is seconds
+old, and the inbox it looks the conversation up in is still being folded
+together — the room list comes back from the database, the merge pass runs over
+it, and the rebuild is debounced to 1.5s while the first sync storm lands. So
+`ChatView` does not take the first look as the verdict: an id the inbox has not
+produced *yet* waits for it, drawing the same spinner an unsynced chat already
+draws, and opens as soon as it turns up. The wait is bounded (`_chatArrivalGrace`)
+and matches on the chat's room ids as well as its id, because the link carries
+the id the chat had when the notification was posted and a merge since then has
+moved it. Without that wait, every tap that cold-started Braid landed on "That
+conversation is not in your inbox" for a conversation that was about to be
+there — the one failure a router cannot be blamed for, since it had already done
+its job.
+
 `WeftLink.parse` decodes exactly once. It used to decode twice —
 `Uri.pathSegments` is already percent-decoded and the code called
 `Uri.decodeComponent` on the result — which cancelled out for every id Weft

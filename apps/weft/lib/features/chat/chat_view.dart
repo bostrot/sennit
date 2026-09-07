@@ -318,6 +318,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // so an unconditional release here would clear the registration the
     // incoming screen has already made.
     _composerHandle.release(this);
+    // A conversation left before it arrived.
+    _stopWaitingForChat();
     _composerFocus.dispose();
     _composer.dispose();
     _scroll.dispose();
@@ -334,9 +336,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // newest message of the chat they just *opened* would be announced as one
     // that had arrived.
     _announcedEventId = null;
+    final chatId = _chatId;
+    _timelineChatId = chatId;
     try {
-      final chatId = _chatId;
-      _timelineChatId = chatId;
       // Before the timeline is built, not after: a self-deleting chat that
       // came due while the app was closed would otherwise draw the messages
       // first and blink them away a frame later. The sweeper returns
@@ -361,11 +363,112 @@ class _ChatViewState extends ConsumerState<ChatView> {
       await _reachThreadRoot();
     } on ArgumentError {
       if (!mounted) return;
+      // Not gone — not *yet*. This is the cold-start case, and a notification
+      // tap is how it is reached: the link routes straight here while the
+      // inbox is still being folded together, so the conversation the link
+      // names turns up a moment *after* the screen has asked for it. Giving
+      // the verdict on the first look is what put "not in your inbox" over a
+      // chat that was about to be there, on every tap of a notification that
+      // had cold-started Braid.
+      //
+      // Waiting draws as the same spinner an unsynced chat already shows, and
+      // the wait is bounded: a link that is genuinely stale still says so, a
+      // couple of seconds later.
+      final arrived = await _awaitChatArrival(chatId);
+      // A conversation opened *over* this one while the wait ran — a merge
+      // re-pointing the view, the desktop's second pane moving on — owns the
+      // screen now, and this attempt has nothing left to say about it.
+      if (!mounted || _timelineChatId != chatId) return;
+      if (arrived) {
+        await _open();
+        return;
+      }
       setState(() => _unavailable = context.l10n.chatUnavailableNotInInbox);
     } on StateError catch (e) {
       if (!mounted) return;
       setState(() => _unavailable = e.message);
     }
+  }
+
+  /// How long a conversation has to appear before the screen calls it missing.
+  ///
+  /// Long enough to cover a cold start — the inbox rebuild is debounced to
+  /// 1.5s while the first sync storm lands — and short enough that a link to a
+  /// room the account really has left is answered rather than spun on.
+  static const _chatArrivalGrace = Duration(seconds: 8);
+
+  /// The conversation [_awaitChatArrival] has already waited for.
+  ///
+  /// One wait per id: once the inbox has produced it, a later failure to open
+  /// it is a real absence and not a slow start, and a second wait would only
+  /// put the spinner back over an answer the user already has.
+  String? _awaitedChatId;
+
+  StreamSubscription<List<Chat>>? _arrivalSub;
+  Timer? _arrivalTimer;
+  Completer<bool>? _arrival;
+
+  /// Ends a wait in progress, answering "not there" to whoever is holding it.
+  ///
+  /// Called on dispose as well as on every outcome: a wait that outlived its
+  /// screen would keep a chat-list subscription open for an answer nothing is
+  /// going to read, and leave [_open] suspended forever on a completer no one
+  /// completes.
+  void _stopWaitingForChat({bool arrived = false}) {
+    _arrivalTimer?.cancel();
+    _arrivalTimer = null;
+    unawaited(_arrivalSub?.cancel());
+    _arrivalSub = null;
+    final arrival = _arrival;
+    _arrival = null;
+    if (arrival != null && !arrival.isCompleted) arrival.complete(arrived);
+  }
+
+  /// Whether [chatId] turned up in the inbox within [_chatArrivalGrace].
+  ///
+  /// Matched on the room ids too, not only on [Chat.id]: a deep link carries
+  /// the id the chat had when the link was made, and a merge since then —
+  /// or one that lands as part of the very sync being waited for — folds that
+  /// room into a `merged:` conversation under a different id. [_chatId]
+  /// re-resolves it on the retry; this only has to notice it is there.
+  Future<bool> _awaitChatArrival(String chatId) {
+    // Two opens of the same conversation can race — the chat-list heartbeat
+    // reopens, and so does a rebuilt route — and they wait on one answer
+    // rather than one of them being told "not there" while the other is still
+    // looking.
+    final pending = _arrival;
+    if (_awaitedChatId == chatId) {
+      return pending?.future ?? Future.value(false);
+    }
+    // The inbox already holds it, so its absence is not what the open
+    // stumbled on and waiting would wait for something that is here. Answer
+    // rather than retry.
+    final known = ref.read(chatsProvider).value ?? const <Chat>[];
+    if (known.any((c) => c.id == chatId || c.roomIds.contains(chatId))) {
+      return Future.value(false);
+    }
+    _stopWaitingForChat();
+    _awaitedChatId = chatId;
+
+    final arrival = _arrival = Completer<bool>();
+    _arrivalSub = ref
+        .read(chatRepositoryProvider)
+        .watchChats()
+        .listen(
+          (chats) {
+            final held = chats.any(
+              (c) => c.id == chatId || c.roomIds.contains(chatId),
+            );
+            if (held) _stopWaitingForChat(arrived: true);
+          },
+          // A chat list that ends or fails is never going to produce it, and
+          // sitting out the grace period for a stream that has stopped
+          // talking only delays the same answer.
+          onDone: _stopWaitingForChat,
+          onError: (Object _) => _stopWaitingForChat(),
+        );
+    _arrivalTimer = Timer(_chatArrivalGrace, _stopWaitingForChat);
+    return arrival.future;
   }
 
   /// Pages back until the open thread's root is loaded, or gives up and says so.
@@ -1268,7 +1371,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (chat == null) {
       // Still syncing, or genuinely gone; either way there is nothing to draw
       // yet and the timeline load will settle it.
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      //
+      // With a bar, because this is where a deep link waits: a conversation
+      // that has not arrived holds this screen for as long as
+      // [_chatArrivalGrace], and a full-screen spinner with no way off it is
+      // not somewhere to leave someone who tapped the wrong notification.
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     // Read once for the whole list rather than per bubble: it is a settings

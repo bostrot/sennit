@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft/app/localisation.dart';
+
+import 'support/recording_repository.dart';
 
 /// Wraps the demo repository but reports every chat as having no reachable
 /// rooms, standing in for a room the account has since left.
@@ -240,6 +243,45 @@ class _NoRoomsRepository implements ChatRepository {
       _inner.redact(chatId, eventId);
 }
 
+/// The cold-start shape: an inbox that has not been folded together yet, and
+/// then is.
+///
+/// This is what a notification tap lands in. The deep link routes to the chat
+/// screen the moment the app is up, which is before the chat list exists — so
+/// the conversation the link names is briefly absent, and [timelineFor]
+/// answers exactly as the real repositories do for an id it has never heard
+/// of.
+class _SyncingRepository extends RecordingChatRepository {
+  _SyncingRepository(DemoChatRepository super.inner);
+
+  final _chats = StreamController<List<Chat>>.broadcast();
+  var _synced = false;
+
+  @override
+  Stream<List<Chat>> watchChats() async* {
+    yield _synced ? await inner.watchChats().first : const [];
+    yield* _chats.stream;
+  }
+
+  @override
+  Chat? chatForRoom(String roomId) =>
+      _synced ? inner.chatForRoom(roomId) : null;
+
+  @override
+  Future<MergedTimeline> timelineFor(String chatId) async {
+    if (!_synced) throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
+    return inner.timelineFor(chatId);
+  }
+
+  /// The first sync landing.
+  Future<void> sync() async {
+    _synced = true;
+    _chats.add(await inner.watchChats().first);
+  }
+
+  Future<void> dispose() => _chats.close();
+}
+
 void main() {
   Future<void> pump(WidgetTester tester, ChatRepository repository, String id) {
     return tester.pumpWidget(
@@ -284,5 +326,83 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Anna Maven'), findsWidgets);
+  });
+
+  // Regression: tapping a notification that cold-started Braid landed on
+  // "not in your inbox" for a conversation that was perfectly present — the
+  // deep link routes here before the chat list has been folded together, and
+  // the screen took the first look as the verdict.
+  testWidgets('a chat the inbox has not folded together yet is waited for', (
+    tester,
+  ) async {
+    final repository = _SyncingRepository(DemoChatRepository());
+    addTearDown(repository.dispose);
+
+    await pump(tester, repository, 'merged:anna');
+    // Not `pumpAndSettle`: the waiting screen is a spinner, which never
+    // settles — which is the point of it.
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('That conversation is not in your inbox.'),
+      findsNothing,
+      reason: 'a chat still syncing is not a chat that is gone',
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // Under a bar, which is what carries the way back once this screen is a
+    // pushed route: the wait can last seconds, and a bare spinner is a dead
+    // end for anyone who tapped the wrong notification.
+    expect(find.byType(AppBar), findsOneWidget);
+
+    await repository.sync();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Anna Maven'), findsWidgets);
+  });
+
+  // The link a notification actually carries is the chat's id *at the time it
+  // was posted* — which for a chat merged since then names a room rather than
+  // the conversation the inbox now holds.
+  testWidgets('a room id that arrives inside a merged chat opens it', (
+    tester,
+  ) async {
+    final repository = _SyncingRepository(DemoChatRepository());
+    addTearDown(repository.dispose);
+
+    await pump(tester, repository, '!anna_wa_room:example.org');
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('That conversation is not in your inbox.'), findsNothing);
+
+    await repository.sync();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Anna Maven'), findsWidgets);
+  });
+
+  testWidgets('a chat that never arrives is called missing in the end', (
+    tester,
+  ) async {
+    final repository = _SyncingRepository(DemoChatRepository());
+    addTearDown(repository.dispose);
+
+    await pump(tester, repository, 'merged:anna');
+    await tester.pump();
+    expect(find.text('That conversation is not in your inbox.'), findsNothing);
+
+    // Past the grace period with nothing having turned up: the wait is
+    // bounded, so a genuinely stale link still gets an answer.
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.text('That conversation is not in your inbox.'),
+      findsOneWidget,
+    );
   });
 }
