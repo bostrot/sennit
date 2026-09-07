@@ -386,6 +386,25 @@ void main() {
 
       expect(find.byType(Image), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
+
+      // Contained, not covered: a sticker is a transparent cutout, and a box
+      // whose height came from a default rather than from the sender would
+      // otherwise crop it.
+      expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.contain);
+    });
+
+    testWidgets('a photo still fills its box', (tester) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, body: ''),
+          own: false,
+        ),
+        bytes: kPixel,
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.cover);
     });
 
     testWidgets('a video is marked as one over the poster', (tester) async {
@@ -399,6 +418,43 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    });
+
+    // The other half of the sticker fix. A sticker the timeline declined to
+    // fetch — an animated one carrying WebM, which `attachmentServesAsThumbnail`
+    // refuses — must not draw the broken-image glyph that the whole change
+    // exists to get rid of.
+    testWidgets('a sticker with no bytes is not reported as broken', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.sticker, body: ''),
+          own: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.broken_image_outlined), findsNothing);
+      expect(find.byIcon(Icons.emoji_emotions_outlined), findsOneWidget);
+    });
+
+    // The rule it must not swallow: a photo that genuinely failed still says so.
+    testWidgets('a photo with no bytes is still reported as broken', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(kind: MessageKind.image, body: ''),
+          own: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.emoji_emotions_outlined), findsNothing);
     });
 
     testWidgets('a file shows its name, its size and a matching icon', (

@@ -133,6 +133,93 @@ void main() {
     });
   });
 
+  group('attachmentServesAsThumbnail', () {
+    // The rule this started as, kept because a photo with no thumbnail block is
+    // the ordinary case on several bridges and the picture is its own preview.
+    test('a picture is its own preview', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Image,
+          mimetype: 'image/jpeg',
+        ),
+        isTrue,
+      );
+    });
+
+    // The bug this was written for: WhatsApp stickers arrive as `m.sticker`
+    // with a WebP inline and no thumbnail beside it, and the old msgtype test
+    // refused the file — so every sticker drew a broken-image glyph.
+    test('a sticker with no thumbnail is its own preview', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Sticker,
+          mimetype: 'image/webp',
+        ),
+        isTrue,
+      );
+    });
+
+    // `info.mimetype` is optional on the wire and some bridges omit it. A
+    // sticker is small enough that guessing "picture" and being wrong is
+    // cheaper than showing nothing for every sticker that skipped the key.
+    test('a sticker that declares no mimetype is allowed through', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Sticker,
+          mimetype: '',
+        ),
+        isTrue,
+      );
+    });
+
+    // Telegram's animated stickers: an `m.sticker` carrying WebM, which is the
+    // film case wearing a sticker's msgtype. Downloading it would spend the
+    // bytes to arrive at the same broken glyph.
+    test('a video sticker is not, however it is labelled', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Sticker,
+          mimetype: 'video/webm',
+        ),
+        isFalse,
+      );
+    });
+
+    test('a video is not', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Video,
+          mimetype: 'video/mp4',
+        ),
+        isFalse,
+      );
+    });
+
+    // A PDF's first page is not a thumbnail, and an `m.file` that happens to be
+    // a picture is one the sender chose to send as a file.
+    test('a file is not, whatever it holds', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.File,
+          mimetype: 'image/png',
+        ),
+        isFalse,
+      );
+    });
+
+    // The SDK's `messageType` falls back to `m.text` for content with no
+    // msgtype at all, so this is the shape a malformed event arrives in.
+    test('a message with no msgtype is not', () {
+      expect(
+        attachmentServesAsThumbnail(
+          messageType: sdk.MessageTypes.Text,
+          mimetype: '',
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('mediaAuthHeaders', () {
     test('is a bearer header when there is a token', () {
       expect(

@@ -103,3 +103,36 @@ Map<String, String>? mediaAuthHeaders(sdk.Client client) {
   if (token == null || token.isEmpty) return null;
   return {'authorization': 'Bearer $token'};
 }
+
+/// Whether the attachment itself is a usable stand-in for a thumbnail the event
+/// never carried.
+///
+/// The SDK answers a thumbnail request for an event with no thumbnail by
+/// handing back the *attachment*. For a picture that is a sensible preview. For
+/// a video it means downloading the whole film to give to `Image.memory`, which
+/// cannot decode an MP4 — megabytes spent to arrive at a broken-image glyph, so
+/// nothing is the better answer and the caller draws a poster instead.
+///
+/// Stickers are why this is more than "is it an `m.image`". WhatsApp, Signal and
+/// Telegram all relay them as `m.sticker` with the picture inline and no
+/// `thumbnail_url` beside it — there is nothing to make a preview of a
+/// 512-pixel WebP *from*, and none of them bothers. Refusing the fallback for
+/// those drew a broken-image glyph over every sticker in the timeline.
+///
+/// It still reads the mimetype because Telegram's animated stickers arrive as
+/// `m.sticker` carrying `video/webm`, which is an MP4 by another name and fails
+/// in exactly the way the video rule exists to prevent. A sticker that declares
+/// no mimetype at all is allowed through: `info.mimetype` is optional on the
+/// wire, near enough every sticker is a still image, and one that is not costs
+/// a few hundred kilobytes to find out.
+bool attachmentServesAsThumbnail({
+  required String messageType,
+  required String mimetype,
+}) {
+  final mime = mimetype.toLowerCase();
+  return switch (messageType) {
+    sdk.MessageTypes.Image => true,
+    sdk.MessageTypes.Sticker => mime.isEmpty || mime.startsWith('image/'),
+    _ => false,
+  };
+}

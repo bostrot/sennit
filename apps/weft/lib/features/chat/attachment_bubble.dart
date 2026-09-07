@@ -340,6 +340,7 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   Widget build(BuildContext context) {
     final caption = attachmentCaption(widget.message);
     final isVideo = widget.message.kind == MessageKind.video;
+    final isSticker = widget.message.kind == MessageKind.sticker;
 
     // One node for the whole picture: what it is, what the sender wrote under
     // it, and whether there is anything there yet. A photo previously announced
@@ -394,7 +395,13 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                         height: _boxHeight,
                         child: Image.memory(
                           bytes,
-                          fit: BoxFit.cover,
+                          // A photo fills its box; a sticker is a transparent
+                          // cutout and has to fit inside one. Cropping a photo
+                          // to the bubble's shape is the intended look, but
+                          // doing it to a sticker slices the parrot's head off
+                          // whenever the bridge sent no dimensions and the box
+                          // fell back to a landscape default.
+                          fit: isSticker ? BoxFit.contain : BoxFit.cover,
                           cacheWidth:
                               (_boxWidth *
                                       MediaQuery.devicePixelRatioOf(context))
@@ -449,8 +456,16 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     // ordinary on several bridges. A broken-image glyph says the opposite —
     // that something failed — so a poster says what is actually true. The
     // play control is drawn over this by the caller either way.
+    //
+    // A sticker is the same story for a different reason. The timeline declines
+    // to fetch one whose file is not a picture — Telegram's animated stickers
+    // are WebM wearing an `m.sticker` msgtype, see [attachmentServesAsThumbnail]
+    // — and a decline is not a failure. Refusing the file and *then* drawing the
+    // broken-image glyph over it would leave the timeline looking exactly as
+    // broken as it did before any of this was fixed.
     final isVideo = widget.message.kind == MessageKind.video;
-    final missingByDesign = broken && isVideo;
+    final isSticker = widget.message.kind == MessageKind.sticker;
+    final missingByDesign = broken && (isVideo || isSticker);
 
     return Container(
       width: _boxWidth,
@@ -459,12 +474,19 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
           ? context.colors.surfaceContainerHigh
           : context.colors.surfaceContainerHighest,
       alignment: Alignment.center,
-      child: switch ((broken, missingByDesign)) {
+      child: switch ((broken, missingByDesign, isVideo)) {
         // Nothing at all: the caller draws a play control over this, dead
         // centre, and a film glyph behind it is two symbols stacked on the
         // same pixels saying the same thing.
-        (_, true) => const SizedBox.shrink(),
-        (true, _) => Icon(
+        (_, true, true) => const SizedBox.shrink(),
+        // A sticker gets no badge drawn over it, so the same empty box would be
+        // a mystery rather than a restraint. Its own glyph names what is
+        // missing without claiming the fetch went wrong.
+        (_, true, false) => Icon(
+          Icons.emoji_emotions_outlined,
+          color: context.colors.onSurfaceVariant,
+        ),
+        (true, _, _) => Icon(
           Icons.broken_image_outlined,
           color: context.colors.onSurfaceVariant,
         ),
