@@ -19,6 +19,17 @@ enum NotificationSuppression {
   /// A state/membership event rather than something a person said.
   nonMessageEvent,
 
+  /// A bridge bot narrating its own plumbing — "State update for example.org:
+  /// CONNECTED", and the disconnect that preceded it.
+  ///
+  /// Every reconnect is two of these, at whatever hour the remote network drops
+  /// the socket, and the management room is the one conversation where nobody
+  /// is talking to the user. Not a mute, because the user never chose it and
+  /// would have to discover the room to undo it; not `nonMessageEvent`, because
+  /// these really are messages and stay in the timeline where a bridge that has
+  /// been down since Tuesday can be seen.
+  bridgeNotice,
+
   /// Notifications are off globally.
   globallyDisabled,
 
@@ -747,6 +758,15 @@ NotificationDecision evaluateNotification({
   if (message.kind == MessageKind.event) {
     return const NotificationDecision.suppress(
       NotificationSuppression.nonMessageEvent,
+    );
+  }
+  // Before the policy switches and before the mention check, both of which it
+  // would otherwise have to argue with: a bridge saying `CONNECTED` is not
+  // addressed to anyone, so a homeserver named after the user must not turn it
+  // into a mention that breaks through a mute.
+  if (message.isBridgeNotice) {
+    return const NotificationDecision.suppress(
+      NotificationSuppression.bridgeNotice,
     );
   }
   if (!policy.enabled) {

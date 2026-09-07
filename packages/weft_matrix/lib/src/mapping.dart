@@ -55,22 +55,33 @@ ChatNetwork networkFromBridgeBotId(String userId) {
   return ChatNetwork.fromBridgeProtocol(localpart);
 }
 
-/// The bridge bot in [room], and the network it bridges, if one is a member.
+/// The network [userId] bridges, if that account is a bridge bot at all.
 ///
 /// A bridge bot's localpart names its network and ends in `bot`. Both halves
 /// are required: `@signalbot:hs` is a bridge, while a person who happens to be
 /// called `@signal:hs` is not, and one relay bot must not be able to rename
-/// somebody's account.
+/// somebody's account. [ChatNetwork.matrix] is rejected for the same reason —
+/// `@matrixbot:hs` is somebody's homeserver bot, not a bridge into Matrix.
+///
+/// Null rather than [ChatNetwork.unknown] for "not a bridge bot", so a caller
+/// can tell the two answers apart in a single check.
+ChatNetwork? bridgeBotNetworkOf(String userId) {
+  var localpart = userId.split(':').first;
+  if (localpart.startsWith('@')) localpart = localpart.substring(1);
+  if (!localpart.endsWith('bot')) return null;
+
+  final network = networkFromBridgeBotId(userId);
+  if (network == ChatNetwork.unknown || network == ChatNetwork.matrix) {
+    return null;
+  }
+  return network;
+}
+
+/// The bridge bot in [room], and the network it bridges, if one is a member.
 ({ChatNetwork network, String userId})? bridgeBotIn(sdk.Room room) {
   for (final participant in room.getParticipants()) {
-    var localpart = participant.id.split(':').first;
-    if (localpart.startsWith('@')) localpart = localpart.substring(1);
-    if (!localpart.endsWith('bot')) continue;
-
-    final network = networkFromBridgeBotId(participant.id);
-    if (network == ChatNetwork.unknown || network == ChatNetwork.matrix) {
-      continue;
-    }
+    final network = bridgeBotNetworkOf(participant.id);
+    if (network == null) continue;
     return (network: network, userId: participant.id);
   }
   return null;
@@ -339,6 +350,12 @@ WeftMessage? mapEvent(
     // understand. Reading that as "machine-written" would suppress a real
     // person's reply.
     isAutoReply: content[kAutoReplyKey] == true,
+    // The bridge narrating its own connection state. `m.notice` alone is not
+    // enough — some bridges relay a person's words as a notice — so the sender
+    // has to be the bridge bot account itself, never one of its ghosts.
+    isBridgeNotice:
+        msgtype == sdk.MessageTypes.Notice &&
+        bridgeBotNetworkOf(event.senderId) != null,
     // The event as sent. Edits are applied below, from the replacement chain,
     // rather than trusted from here: the body is the *original* text until
     // someone asks the timeline for the display event.

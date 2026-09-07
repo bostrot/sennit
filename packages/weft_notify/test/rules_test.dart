@@ -52,6 +52,43 @@ void main() {
       );
     });
 
+    test('a bridge bot narrating its own connection never notifies', () {
+      expect(
+        reasonFor(
+          decide(
+            message: msg(
+              isBridgeNotice: true,
+              network: ChatNetwork.mattermost,
+              senderId: '@mattermostbot:example.org',
+              body: 'State update for work.example.org: CONNECTED',
+            ),
+          ),
+        ),
+        NotificationSuppression.bridgeNotice,
+      );
+    });
+
+    test('a bridge notice that names the user is still not a mention', () {
+      // The management room is named after the homeserver, and the body
+      // repeats it on every line. Without this rule sitting before the mention
+      // check, a user whose display name matched would be paged through a
+      // mute by their own bridge reconnecting.
+      expect(
+        reasonFor(
+          decide(
+            message: msg(
+              isBridgeNotice: true,
+              network: ChatNetwork.mattermost,
+              senderId: '@mattermostbot:example.org',
+              body: 'State update for ada: UNKNOWN_ERROR (mm-disconnected)',
+            ),
+            forChat: chat(network: ChatNetwork.mattermost, muted: true),
+          ),
+        ),
+        NotificationSuppression.bridgeNotice,
+      );
+    });
+
     test('the global switch stops everything', () {
       expect(
         reasonFor(decide(policy: NotificationPolicy(enabled: false))),

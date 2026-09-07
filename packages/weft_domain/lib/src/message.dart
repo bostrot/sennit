@@ -162,6 +162,7 @@ class WeftMessage {
     required this.kind,
     required this.isOwn,
     this.isAutoReply = false,
+    this.isBridgeNotice = false,
     this.body = '',
     this.formattedBody,
     this.transcript,
@@ -212,6 +213,33 @@ class WeftMessage {
   /// guard that actually holds is a hard cap per conversation rather than this
   /// field.
   final bool isAutoReply;
+
+  /// Whether this is a bridge bot talking about itself rather than relaying
+  /// anybody.
+  ///
+  /// A mautrix bridge narrates its own plumbing into its management room —
+  /// "State update for example.org: CONNECTED", "UNKNOWN_ERROR
+  /// (mm-disconnected): WebSocket connection closed" — as an `m.notice` from
+  /// the bridge bot itself. Every reconnect is two of them, at whatever hour
+  /// the remote network drops the socket.
+  ///
+  /// It is a real message and stays in the timeline: when a bridge has been
+  /// down since Tuesday, that room is where you find out. What it is not is
+  /// somebody messaging the user, which is why it is flagged here rather than
+  /// dropped at mapping time — `evaluateNotification` reads it and stays
+  /// quiet.
+  ///
+  /// Narrow on the sender, broad on the body: only an `m.notice`, and only
+  /// from an account that is itself a bridge bot. A person relayed *through*
+  /// the bridge arrives from a ghost id and is unaffected, and so is anything
+  /// the bot sends as `m.text`.
+  ///
+  /// It does deliberately cover more than the connection chatter: a bridge
+  /// answers its own commands in notices too, so a "you are logged out" can be
+  /// caught along with the reconnects. That is the trade accepted here — the
+  /// management room is a control channel the user opens on purpose, and a
+  /// bridge that reconnects nightly otherwise buzzes twice at 02:00 forever.
+  final bool isBridgeNotice;
 
   /// Plain-text body, already stripped of formatting. Indexed for search.
   final String body;
@@ -411,6 +439,7 @@ class WeftMessage {
       kind: kind,
       isOwn: isOwn,
       isAutoReply: isAutoReply,
+      isBridgeNotice: isBridgeNotice,
       body: body ?? this.body,
       formattedBody: identical(formattedBody, _unchanged)
           ? this.formattedBody

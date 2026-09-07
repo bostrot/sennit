@@ -285,11 +285,26 @@ suppression that is unconditional *and* durable is pushed down.
   failure.
 
 Rule order inside `evaluateNotification` is first-match-wins and the match is
-reported as *the* reason: duplicate → own → redacted → state event → globally
-disabled → already read → network disabled → network muted → chat muted → source
-muted → mentions-only → quiet hours. So a muted chat during quiet hours reads as
-"That chat is muted" — the setting the user would actually go and change, which
-is what the settings screen's test button prints back at them.
+reported as *the* reason: duplicate → own → redacted → state event → bridge
+notice → globally disabled → already read → network disabled → network muted →
+chat muted → source muted → mentions-only → quiet hours. So a muted chat during
+quiet hours reads as "That chat is muted" — the setting the user would actually
+go and change, which is what the settings screen's test button prints back at
+them.
+
+`bridgeNotice` is the one rule in that list nobody chose. A mautrix bridge
+narrates its own plumbing into its management room — "State update for
+example.org: CONNECTED", and the `UNKNOWN_ERROR (mm-disconnected)` that preceded
+it — as an `m.notice` sent by the bridge bot account itself, two per reconnect,
+at whatever hour the remote network drops the socket. `mapEvent` flags those as
+`WeftMessage.isBridgeNotice`; the message still lands in the timeline, because
+that room is where a bridge which has been down since Tuesday is visible, but it
+does not buzz. It is deliberately checked *before* the mention test: the body
+repeats a server name on every line, and a user whose display name happened to
+match would otherwise be paged through their own mute by a reconnect. The
+sender, not the body, is what makes it chatter — a person relayed through the
+bridge arrives from a ghost id and notifies normally, and so does anything the
+bot sends as `m.text`.
 
 ## One event, two arrival paths, one decision
 

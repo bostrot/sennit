@@ -22,6 +22,7 @@ WeftMessage msg({
   String? formattedBody,
   String? transcript,
   bool redacted = false,
+  bool isBridgeNotice = false,
 }) {
   return WeftMessage(
     eventId: eventId,
@@ -36,6 +37,7 @@ WeftMessage msg({
     formattedBody: formattedBody,
     transcript: transcript,
     redacted: redacted,
+    isBridgeNotice: isBridgeNotice,
   );
 }
 

@@ -138,6 +138,37 @@ void main() {
     });
   });
 
+  group('bridgeBotNetworkOf', () {
+    test('names the network a bridge bot bridges', () {
+      expect(
+        bridgeBotNetworkOf('@mattermostbot:example.org'),
+        ChatNetwork.mattermost,
+      );
+      expect(
+        bridgeBotNetworkOf('@whatsappbot:example.org'),
+        ChatNetwork.whatsapp,
+      );
+      expect(
+        bridgeBotNetworkOf('@_signal_bot:example.org'),
+        ChatNetwork.signal,
+      );
+    });
+
+    test('rejects an account that only looks like one', () {
+      // A person called `@signal:hs` is not a bridge, a bot for something else
+      // is not a bridge, and `@matrixbot:hs` is somebody's homeserver bot.
+      expect(bridgeBotNetworkOf('@signal:example.org'), isNull);
+      expect(bridgeBotNetworkOf('@standupbot:example.org'), isNull);
+      expect(bridgeBotNetworkOf('@matrixbot:example.org'), isNull);
+    });
+
+    test('rejects a ghost of the bridge', () {
+      // Ghosts relay people. Only the bot account itself talks about the
+      // bridge.
+      expect(bridgeBotNetworkOf('@mattermost_alice:example.org'), isNull);
+    });
+  });
+
   group('messageKindFromMsgtype', () {
     test('maps the common types', () {
       expect(messageKindFromMsgtype('m.text'), MessageKind.text);
@@ -238,26 +269,36 @@ void main() {
       // Without a member event the SDK asks the (absent) homeserver for the
       // sender's profile on every mapped event, which fills the run with
       // stack traces for a lookup no assertion here depends on.
-      room.setState(
-        sdk.Event(
-          type: sdk.EventTypes.RoomMember,
-          stateKey: '@sam:example.org',
-          content: const {'membership': 'join', 'displayname': 'Sam'},
-          eventId: r'$member:example.org',
-          senderId: '@sam:example.org',
-          originServerTs: DateTime(2026, 8, 17, 9),
-          room: room,
-        ),
-      );
+      for (final member in const [
+        ('@sam:example.org', 'Sam'),
+        ('@mattermostbot:example.org', 'Mattermost bridge bot'),
+        ('@mattermost_alice:example.org', 'Alice'),
+      ]) {
+        room.setState(
+          sdk.Event(
+            type: sdk.EventTypes.RoomMember,
+            stateKey: member.$1,
+            content: {'membership': 'join', 'displayname': member.$2},
+            eventId: '\$member${member.$1}',
+            senderId: member.$1,
+            originServerTs: DateTime(2026, 8, 17, 9),
+            room: room,
+          ),
+        );
+      }
     });
 
-    WeftMessage? map(Map<String, Object?> content, {String? type}) {
+    WeftMessage? map(
+      Map<String, Object?> content, {
+      String? type,
+      String senderId = '@sam:example.org',
+    }) {
       return mapEvent(
         sdk.Event(
           type: type ?? sdk.EventTypes.Message,
           content: content,
           eventId: r'$event:example.org',
-          senderId: '@sam:example.org',
+          senderId: senderId,
           originServerTs: DateTime(2026, 8, 17, 9, 30),
           room: room,
         ),
@@ -265,6 +306,52 @@ void main() {
         ownUserId: '@me:example.org',
       );
     }
+
+    test('a bridge bot notice is flagged as bridge chatter', () {
+      // The exact shape mautrix writes into its management room, twice per
+      // reconnect.
+      final message = map({
+        'msgtype': 'm.notice',
+        'body': 'State update for work.example.org: CONNECTED',
+      }, senderId: '@mattermostbot:example.org')!;
+
+      expect(message.isBridgeNotice, isTrue);
+      // Still a message: the management room is where a bridge that has been
+      // down since Tuesday is visible.
+      expect(message.kind, MessageKind.text);
+      expect(message.body, 'State update for work.example.org: CONNECTED');
+    });
+
+    test('a bridge bot m.text is not bridge chatter', () {
+      // The flag turns on the msgtype as well as the sender, so a bridge that
+      // says something as a plain message still reaches the user.
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'Your Mattermost session expired. Send `login` to reconnect.',
+      }, senderId: '@mattermostbot:example.org')!;
+
+      expect(message.isBridgeNotice, isFalse);
+    });
+
+    test('a notice relayed from a ghost is not bridge chatter', () {
+      // Some bridges relay a person's words as m.notice. The sender is a ghost
+      // of the bridge, not the bridge bot, and a person must still notify.
+      final message = map({
+        'msgtype': 'm.notice',
+        'body': 'are you around?',
+      }, senderId: '@mattermost_alice:example.org')!;
+
+      expect(message.isBridgeNotice, isFalse);
+    });
+
+    test('a notice from a person is not bridge chatter', () {
+      final message = map({
+        'msgtype': 'm.notice',
+        'body': 'State update for work.example.org: CONNECTED',
+      })!;
+
+      expect(message.isBridgeNotice, isFalse);
+    });
 
     test('a native calendar invitation maps to an interactive card', () {
       final message = map({
