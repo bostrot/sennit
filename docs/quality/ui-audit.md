@@ -209,6 +209,17 @@ nobody runs twice — but it means "does this screen survive a keyboard" is
 unasked here and unasked anywhere else. It is the most concrete thing the
 desktop/composer pass could pick up.
 
+Asked since, in the one place it had already gone wrong: the bottom sheets kept
+their *fraction* of a screen the keyboard had taken 300 pixels of, so the
+attachment preview's caption field and its Send button were drawn under the
+keys. `WeftDraggableSheet` (`weft_design/src/components/draggable_sheet.dart`)
+insets the sheet by the keyboard and scales the fraction back up so the sheet
+keeps its height, and the four draggable sheets — attachment preview, share
+target, the Paperless picker and the merge handle picker — go through it.
+Measured in pixels at a 300-of-800 inset by
+`weft_design/test/draggable_sheet_test.dart` and
+`apps/weft/test/attachment_caption_keyboard_test.dart`.
+
 ### Off-scale gaps → tokens
 
 Thirteen call sites. Every one was a hand-written double the scan reported by

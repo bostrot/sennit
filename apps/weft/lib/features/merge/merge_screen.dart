@@ -502,9 +502,8 @@ class _HandlePickerSheetState extends State<_HandlePickerSheet> {
                 handle,
           ];
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
+    return WeftDraggableSheet(
+      initialSize: 0.7,
       builder: (context, controller) => Column(
         children: [
           Padding(

@@ -129,9 +129,8 @@ class _AttachmentPreviewSheetState
     final sendNetwork = chat.sendNetwork;
     final total = _kept.fold(0, (sum, s) => sum + s.sizeBytes);
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.6,
+    return WeftDraggableSheet(
+      initialSize: 0.6,
       builder: (context, controller) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

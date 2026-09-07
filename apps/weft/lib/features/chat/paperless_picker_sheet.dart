@@ -92,9 +92,8 @@ class _PaperlessPickerState extends State<_PaperlessPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.75,
+    return WeftDraggableSheet(
+      initialSize: 0.75,
       builder: (context, controller) => Column(
         children: [
           Padding(

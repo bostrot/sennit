@@ -344,9 +344,8 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     final confirming = chosen.isNotEmpty ? _composing : preselected != null;
     final confirmTargets = chosen.isNotEmpty ? chosen : [?preselected];
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
+    return WeftDraggableSheet(
+      initialSize: 0.7,
       builder: (context, controller) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -6,6 +6,7 @@ library;
 
 export 'src/bidi.dart';
 export 'src/components/chat_tile.dart';
+export 'src/components/draggable_sheet.dart';
 export 'src/components/network_glyph.dart';
 export 'src/components/network_rail.dart';
 export 'src/components/unread_badge.dart';
