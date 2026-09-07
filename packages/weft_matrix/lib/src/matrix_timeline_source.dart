@@ -18,10 +18,12 @@ class MatrixTimelineSource extends TimelineSource {
     required String? ownUserId,
     Duration clockOffset = Duration.zero,
     MergedIdentityResolver resolveSender = senderIsIdentity,
+    Set<String> purgedEventIds = const {},
   }) : _timeline = timeline,
        _ownUserId = ownUserId,
        _clockOffset = clockOffset,
-       _resolveSender = resolveSender;
+       _resolveSender = resolveSender,
+       _purgedEventIds = purgedEventIds;
 
   final sdk.Timeline _timeline;
   final String? _ownUserId;
@@ -30,6 +32,22 @@ class MatrixTimelineSource extends TimelineSource {
   /// Which annotation senders are the same person. Injected because the answer
   /// lives in the identity graph, which this package deliberately does not own.
   final MergedIdentityResolver _resolveSender;
+
+  /// Events this device has deleted and must never show again — a retention
+  /// sweep's tombstones, read once when the timeline is opened.
+  ///
+  /// Deleting an event from the SDK's own database is not enough on its own:
+  /// the homeserver still has it, and the next backfill of this room hands it
+  /// straight back. Filtering here is what makes the deletion hold, and it is
+  /// deliberately the *mapper* that filters rather than the renderer — an event
+  /// that never becomes a [WeftMessage] cannot be re-indexed, notified on, or
+  /// quoted in a reply preview either.
+  ///
+  /// A snapshot rather than a live query because this is read once per event
+  /// per rebuild, hundreds of times a frame while scrolling. A sweep that
+  /// purges something invalidates the open timelines, which rebuilds this
+  /// source with a fresh set.
+  final Set<String> _purgedEventIds;
 
   @override
   final ChatNetwork network;
@@ -62,6 +80,7 @@ class MatrixTimelineSource extends TimelineSource {
 
     final mapped = <WeftMessage>[];
     for (final event in events) {
+      if (_purgedEventIds.contains(event.eventId)) continue;
       final message = mapEvent(
         event,
         network: network,

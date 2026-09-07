@@ -16,6 +16,7 @@ class WeftStores {
     required this.settings,
     required this.search,
     required this.transcripts,
+    required this.retention,
     required this.linkPreviews,
     required this.secrets,
     required this.embeddingApiKey,
@@ -30,6 +31,9 @@ class WeftStores {
   final SettingsStore settings;
   final SearchStore search;
   final TranscriptStore transcripts;
+
+  /// Which chats erase themselves, and what has already been erased here.
+  final RetentionStore retention;
 
   /// Answers the homeserver has already given about links, so a scroll past
   /// the same bubble does not ask it again. See [LinkPreviewStore].
@@ -51,12 +55,14 @@ class WeftStores {
   @visibleForTesting
   factory WeftStores.inMemory() {
     final db = WeftDatabase.openAt(':memory:');
+    final settings = SettingsStore(db);
     return WeftStores._(
       db: db,
       identity: IdentityStore(db),
-      settings: SettingsStore(db),
+      settings: settings,
       search: SearchStore(db),
       transcripts: TranscriptStore(db),
+      retention: RetentionStore(db, settings),
       linkPreviews: LinkPreviewStore(db),
       secrets: SecretStore(),
       embeddingApiKey: null,
@@ -74,6 +80,7 @@ class WeftStores {
         ? WeftDatabase.openAt(directoryOverride)
         : await WeftDatabase.open();
     final secrets = secretStore ?? SecretStore();
+    final settings = SettingsStore(db);
 
     // Secure storage prompts on some platforms; demo mode skips it entirely.
     //
@@ -107,9 +114,10 @@ class WeftStores {
     return WeftStores._(
       db: db,
       identity: IdentityStore(db),
-      settings: SettingsStore(db),
+      settings: settings,
       search: SearchStore(db),
       transcripts: TranscriptStore(db),
+      retention: RetentionStore(db, settings),
       linkPreviews: LinkPreviewStore(db),
       secrets: secrets,
       embeddingApiKey: embeddingKey,

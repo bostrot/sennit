@@ -275,6 +275,22 @@ abstract final class WeftSettings {
   /// by the same kind of `fromStore`.
   static const String snapshotExcludedNetworks = 'privacy.snapshot_excluded';
 
+  /// Every chat that self-deletes its messages, as one JSON blob under a
+  /// `chats` key — see `RetentionSettings` in `weft_domain`.
+  ///
+  /// One key rather than a column on `chat_prefs`, and the reason is the
+  /// archive rather than the schema: `settings` already travels in a backup,
+  /// so a policy the user set survives a restore without the backup format
+  /// growing a record type for it. Losing it silently would be the worst
+  /// outcome available here — a user who believes a conversation still erases
+  /// itself and finds out otherwise.
+  ///
+  /// Absent means no chat deletes anything, which is what almost every install
+  /// says. There is deliberately no master switch beside it: a policy is set
+  /// per conversation, and a global "pause" would be a second place for a
+  /// conversation to quietly stop erasing itself.
+  static const String retentionPolicies = 'privacy.retention';
+
   static const String mcpEnabled = 'mcp.enabled';
   static const String mcpPort = 'mcp.port';
   static const String mcpTunnelEnabled = 'mcp.tunnel_enabled';

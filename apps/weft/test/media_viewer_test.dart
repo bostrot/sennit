@@ -84,6 +84,9 @@ class _FakeStore implements MediaFileStore {
   }
 
   @override
+  Future<void> purge(String eventId) async {}
+
+  @override
   void dispose() {}
 }
 

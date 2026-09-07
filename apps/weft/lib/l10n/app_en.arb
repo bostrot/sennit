@@ -1,12 +1,10 @@
 {
   "@@locale": "en",
-
   "settingsTitle": "Settings",
   "@settingsTitle": {
     "description": "App bar title of the main settings screen, reached from the inbox. One word if the language has one; keep under ~14 chars so it does not truncate on a narrow phone.",
     "maxLength": 28
   },
-
   "settingsSectionChats": "Chats",
   "@settingsSectionChats": {
     "description": "Section heading on the settings screen, above the rows about conversations and messenger networks. A short noun, not a sentence; keep under ~20 chars.",
@@ -30,7 +28,6 @@
     "description": "Section heading on the settings screen, above widgets, third-party integrations and the MCP server. Means 'links to other systems', not network connectivity. Keep under ~20 chars.",
     "maxLength": 40
   },
-
   "settingsMergedChatsTitle": "Merged chats",
   "@settingsMergedChatsTitle": {
     "description": "Title of a settings row that opens the merged-chats screen. 'Merged' = two conversations with the same person on different messengers shown as one thread. Keep under ~24 chars."
@@ -55,7 +52,6 @@
   "@settingsSmsSubtitle": {
     "description": "One-line subtitle under 'SMS'. Means the phone's own text messages appear alongside other conversations. Keep under ~60 chars."
   },
-
   "settingsAppearanceTitle": "Appearance",
   "@settingsAppearanceTitle": {
     "description": "Title of a settings row that opens the appearance sheet. Keep under ~20 chars.",
@@ -82,7 +78,6 @@
   "@settingsShortcutsSubtitle": {
     "description": "One-line subtitle under 'Keyboard shortcuts'. Keep under ~50 chars."
   },
-
   "settingsEndpointsTitle": "Search & transcription",
   "@settingsEndpointsTitle": {
     "description": "Title of a settings row that opens the remote-endpoints screen, where the server addresses for semantic search and voice transcription are configured. Keep under ~28 chars."
@@ -125,7 +120,6 @@
   "@settingsEncryptionSubtitle": {
     "description": "One-line subtitle under 'Encryption'. All three are Matrix end-to-end-encryption terms; use the wording the language's Matrix clients already use if there is one. Keep under ~50 chars."
   },
-
   "settingsSurfacesTitle": "Widgets & watch",
   "@settingsSurfacesTitle": {
     "description": "Title of a settings row that opens the surfaces screen. 'Widgets' = home screen widgets, 'watch' = the smartwatch companion app. Keep under ~24 chars.",
@@ -151,7 +145,6 @@
   "@settingsMcpSubtitle": {
     "description": "One-line subtitle under 'MCP server'. 'Agents' means the reader's own AI programs; 'Braid' is the app name and is never translated. Keep under ~60 chars."
   },
-
   "settingsReadReceiptsTitle": "Send read receipts",
   "@settingsReadReceiptsTitle": {
     "description": "Title of a switch row. A read receipt is the signal that tells a sender their message was read. Keep under ~30 chars."
@@ -172,7 +165,6 @@
   "@settingsContactsDenied": {
     "description": "Snackbar shown when the reader turns on 'Use address book names' and then denies the operating system's contacts permission. One short sentence. 'Braid' is the app name and stays."
   },
-
   "settingsSendOnEnterTitle": "Return sends the message",
   "@settingsSendOnEnterTitle": {
     "description": "Title of a switch row about what the Return/Enter key does in the message composer. Use the name the language's keyboards print on that key. Keep under ~34 chars."
@@ -185,7 +177,6 @@
   "@settingsSendOnEnterSubtitleOff": {
     "description": "Subtitle under the 'Return sends the message' switch when it is OFF. Cmd is the macOS modifier key, Ctrl the Windows and Linux one; keep both. Two short sentences."
   },
-
   "settingsAgendaTitle": "Detect appointments",
   "@settingsAgendaTitle": {
     "description": "Title of a switch row. When on, the app spots dates and times in messages and offers to add them to the calendar. Keep under ~30 chars."
@@ -194,7 +185,6 @@
   "@settingsAgendaSubtitle": {
     "description": "Two-line subtitle under the 'Detect appointments' switch. The quoted phrase is the label of the button that appears under such a message — translate it to match that button. The second sentence is the privacy reassurance. Use the language's own quotation marks."
   },
-
   "settingsHiddenNetworksTitle": "Hide networks from All",
   "@settingsHiddenNetworksTitle": {
     "description": "Title of an expandable settings row. 'All' is the name of the combined inbox tab that shows every messenger at once — translate it the same way it is translated in the inbox. Keep under ~30 chars.",
@@ -227,7 +217,6 @@
       }
     }
   },
-
   "settingsStatusesTitle": "Statuses",
   "@settingsStatusesTitle": {
     "description": "Title of the settings row about status updates — the disappearing photo-and-text posts WhatsApp calls Status and other apps call Stories. Keep under ~20 chars.",
@@ -272,7 +261,6 @@
       }
     }
   },
-
   "settingsSectionHeaderSemantics": "{title}. {subtitle}",
   "@settingsSectionHeaderSemantics": {
     "description": "Screen-reader-only label for a settings section heading, which shows a bold title and a grey explanatory line under it. Not visible on screen: the two lines are read as one heading so that heading-by-heading navigation announces both. Use the sentence separator and spacing the language actually uses — a full stop and a space in English, a full-width period and no space in Chinese.",
@@ -450,7 +438,7 @@
   "@inboxDeleteManyBody": {
     "description": "Body of the bulk-delete dialog. Three sentences: what happens, that it cannot be undone, and the gentler alternative. May wrap to four lines."
   },
-  "inboxCatchingUp": "Updating\u2026",
+  "inboxCatchingUp": "Updating…",
   "@inboxCatchingUp": {
     "description": "Small line under the inbox title while the first sync of this app start is still fetching news from the server. The chats on screen are from the last run until it finishes. Keep short, like a phone status line.",
     "maxLength": 24
@@ -6249,7 +6237,6 @@
       }
     }
   },
-
   "settingsBackupTitle": "Backup",
   "@settingsBackupTitle": {
     "description": "Row on the settings screen leading to the backup and restore screen. A noun, not a verb; keep under ~14 chars.",
@@ -6638,7 +6625,6 @@
   "@backupErrorUnknown": {
     "description": "Catch-all failure message for anything not covered by a typed archive failure — a disk that filled, a file that vanished. Reassures that the store is unchanged, which the transaction guarantees."
   },
-
   "settingsAutoReplyTitle": "Auto-reply",
   "@settingsAutoReplyTitle": {
     "description": "Title of the settings row that opens the auto-reply screen. One line, keep under ~20 chars."
@@ -6910,5 +6896,77 @@
   "chatAutoReplyLabel": "Sent automatically by a rule",
   "@chatAutoReplyLabel": {
     "description": "Screen-reader label of the same glyph. Slightly longer than the tooltip because a reader has no picture to go with it."
+  },
+  "retentionTitle": "Disappearing messages",
+  "@retentionTitle": {
+    "description": "Title of the per-chat setting that makes a conversation erase its own messages after a while, and of the sheet that picks the window. Keep under ~28 chars."
+  },
+  "retentionOff": "Keep everything",
+  "@retentionOff": {
+    "description": "The first option in the picker: this conversation deletes nothing. The default for every chat."
+  },
+  "retentionSummaryArrival": "Deleted {window} after arriving",
+  "@retentionSummaryArrival": {
+    "description": "Subtitle of the settings row when the clock runs from the moment a message arrived. {window} is a length of time already in words, e.g. '7 days'.",
+    "placeholders": {
+      "window": {
+        "type": "String",
+        "description": "A length of time already rendered in words.",
+        "example": "7 days"
+      }
+    }
+  },
+  "retentionSummaryRead": "Deleted {window} after being read",
+  "@retentionSummaryRead": {
+    "description": "Subtitle of the settings row when the clock runs from the moment the conversation was read. {window} is a length of time already in words, e.g. '1 hour'.",
+    "placeholders": {
+      "window": {
+        "type": "String",
+        "description": "A length of time already rendered in words.",
+        "example": "1 hour"
+      }
+    }
+  },
+  "retentionExplainer": "Your own messages are deleted for everyone. Messages other people sent are removed from this device only — nobody else''s copy is Braid''s to delete.",
+  "@retentionExplainer": {
+    "description": "Shown above the options, before anything can be chosen. Says plainly that the two halves of 'delete' are not equally strong, so nobody assumes the stronger one about their own privacy. Two sentences; length is not tight."
+  },
+  "retentionAnchorTitle": "Start counting",
+  "@retentionAnchorTitle": {
+    "description": "Heading over the pair of options that choose when a message's clock starts. Keep under ~24 chars."
+  },
+  "retentionAnchorArrival": "When the message arrives",
+  "@retentionAnchorArrival": {
+    "description": "First option under 'Start counting': the window runs from the message's own time, read or not."
+  },
+  "retentionAnchorRead": "When I read the chat",
+  "@retentionAnchorRead": {
+    "description": "Second option under 'Start counting': the window runs from the moment the user opened the conversation past that message."
+  },
+  "retentionAnchorReadNote": "A message nobody has read is never deleted.",
+  "@retentionAnchorReadNote": {
+    "description": "Explains the consequence of the read option, under it. Without this the option reads as a promise it does not make."
+  },
+  "retentionHours": "{count, plural, =1{1 hour} other{{count} hours}}",
+  "@retentionHours": {
+    "description": "One of the offered windows, below a day. Shown as a plain option label, e.g. '8 hours'.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Whole hours in the window.",
+        "example": "8"
+      }
+    }
+  },
+  "retentionDays": "{count, plural, =1{1 day} other{{count} days}}",
+  "@retentionDays": {
+    "description": "One of the offered windows, a day and above. Shown as a plain option label, e.g. '30 days'.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Whole days in the window.",
+        "example": "30"
+      }
+    }
   }
 }

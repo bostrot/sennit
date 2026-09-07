@@ -203,6 +203,48 @@ const List<String> weftMigrations = [
     PRIMARY KEY (event_id, room_id)
   );
   ''',
+
+  // ---------------------------------------------------------------- v6
+  '''
+  -- The two things a self-deleting chat has to remember. The *policy* is not
+  -- among them: it lives in `settings` under `privacy.retention`, as one blob
+  -- read and written whole, which is also what carries it into a backup.
+  --
+  -- When the user last read a conversation, and how far.
+  --
+  -- One row per read rather than a single moving stamp, because the question a
+  -- read-anchored policy asks is per message: "when was the conversation first
+  -- read past *this* one". A single latest stamp answers that wrongly for
+  -- everything below it — a message read a week ago would restart its hour
+  -- every time the chat is opened, and would never expire in an active chat.
+  --
+  -- Rows are pruned by the sweeper once nothing they cover can still be alive,
+  -- so an install that reads one chat every day does not accumulate a row a day
+  -- forever. See `RetentionStore.pruneReadMarks`.
+  CREATE TABLE chat_read_mark (
+    chat_id  TEXT NOT NULL,
+    read_at  INTEGER NOT NULL,
+    up_to_ms INTEGER NOT NULL,
+    PRIMARY KEY (chat_id, read_at)
+  );
+  CREATE INDEX idx_read_mark_chat ON chat_read_mark(chat_id, up_to_ms);
+
+  -- Events this device has deleted and must not show again.
+  --
+  -- A tombstone rather than trust in the deletion itself, because deleting a
+  -- message from the Matrix SDK's local database does not stop the homeserver
+  -- from serving it back on the next backfill — and Braid's own indexer would
+  -- then re-file a message the user was told had gone. Deliberately *not* in a
+  -- backup: it is a fact about one device's copy, and a restore onto a fresh
+  -- device re-syncs from the server regardless.
+  CREATE TABLE purged_event (
+    room_id   TEXT NOT NULL,
+    event_id  TEXT NOT NULL,
+    purged_at INTEGER NOT NULL,
+    PRIMARY KEY (room_id, event_id)
+  );
+  CREATE INDEX idx_purged_room ON purged_event(room_id);
+  ''',
 ];
 
 /// Applies any migrations the database has not seen yet.

@@ -57,6 +57,10 @@ message that ever touches infrastructure you don't own.
   llama.cpp, vLLM…), rendered as tappable chips on notifications.
 - 🔕 Read receipts, typing indicators and presence — sent and shown, with a
   privacy switch for each.
+- ⏳ **Disappearing messages**, per conversation: erase after an hour, a day or
+  ninety days, counted from when a message arrived or from when you read it.
+  Your own messages are redacted for everyone; the rest — text, photos and the
+  bytes staged on disk — go from this device.
 
 **Reliable in the real world**
 - 🔔 Background delivery without Google: a built-in connection service

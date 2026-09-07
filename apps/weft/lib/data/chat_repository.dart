@@ -314,6 +314,19 @@ abstract class ChatRepository {
   /// so there is nothing to redact — just the stuck bubble to let go of.
   Future<void> discardFailedSend(String roomId, String eventId) async {}
 
+  /// Removes an event from *this device* without asking the server to delete
+  /// it, and without telling anyone else.
+  ///
+  /// The other half of [redact], and deliberately a separate verb. A redaction
+  /// is a message the room hears: it deletes for everyone and only the sender
+  /// may ask for it. This deletes the local copy of something Braid has no
+  /// standing to redact — a message somebody else sent, whose self-deletion the
+  /// user asked for on their own device — and says nothing to anyone.
+  ///
+  /// A no-op by default: a repository with nothing but its own memory has
+  /// already forgotten whatever its caller dropped.
+  Future<void> forgetLocally(String roomId, String eventId) async {}
+
   /// Flags the conversation unread again (MSC2867), so it wears its badge
   /// until it is actually opened. Opening — [markRead] — clears it.
   Future<void> markUnread(String chatId) async {}

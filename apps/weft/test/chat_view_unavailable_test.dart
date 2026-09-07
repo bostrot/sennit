@@ -23,6 +23,9 @@ class _NoRoomsRepository implements ChatRepository {
   Future<void> discardFailedSend(String roomId, String eventId) async {}
 
   @override
+  Future<void> forgetLocally(String roomId, String eventId) async {}
+
+  @override
   Future<void> markUnread(String chatId) async {}
 
   @override

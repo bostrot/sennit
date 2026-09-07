@@ -2,29 +2,24 @@
   "@@locale": "zh",
   "@@x-variant": "Simplified Chinese. The only Chinese Braid ships, so it is the base `zh` file: a device set to zh-Hant gets this rather than English.",
   "@@x-review": "TRANSLATOR REVIEW PENDING — machine-seeded 2026-08-28, machine quality pass 2026-08-28 (register, terminology, typography, placeholders, budgets). Still unread by a speaker: delete this line when one has read the file end to end.",
-
   "settingsTitle": "设置",
-
   "settingsSectionChats": "聊天",
   "settingsSectionLookAndFeel": "外观与手感",
   "settingsSectionSearchAndIntelligence": "搜索与智能",
   "settingsSectionPrivacyAndSecurity": "隐私与安全",
   "settingsSectionConnections": "连接",
-
   "settingsMergedChatsTitle": "合并的聊天",
   "settingsMergedChatsSubtitle": "同一个人在多个通讯软件上的对话，合成一条会话",
   "settingsBridgesTitle": "桥接",
   "settingsBridgesSubtitle": "你的 Matrix 服务器上的通讯软件桥接",
   "settingsSmsTitle": "短信",
   "settingsSmsSubtitle": "把这台手机的短信收进收件箱",
-
   "settingsAppearanceTitle": "外观",
   "settingsAppearanceSubtitle": "主题、配色与密度",
   "settingsNotificationsTitle": "通知",
   "settingsNotificationsSubtitle": "什么可以打扰你，以及怎么打扰",
   "settingsShortcutsTitle": "键盘快捷键",
   "settingsShortcutsSubtitle": "这里键盘能做的一切",
-
   "settingsEndpointsTitle": "搜索与转写",
   "settingsEndpointsSubtitle": "语义搜索与语音转写的服务器地址",
   "settingsModelsTitle": "本地模型",
@@ -35,32 +30,26 @@
   "settingsDevicesSubtitle": "你的其他登录，以及退出它们",
   "settingsEncryptionTitle": "加密",
   "settingsEncryptionSubtitle": "交叉签名、密钥备份与恢复",
-
   "settingsSurfacesTitle": "小组件与手表",
   "settingsSurfacesSubtitle": "主屏幕小组件和手表配套应用",
   "settingsIntegrationsTitle": "集成",
   "settingsIntegrationsSubtitle": "Home Assistant 和 paperless-ngx，你自己的实例",
   "settingsMcpTitle": "MCP 服务器",
   "settingsMcpSubtitle": "让你自己的智能体通过 Braid 读取和发送消息",
-
   "settingsReadReceiptsTitle": "发送已读回执",
   "settingsReadReceiptsSubtitle": "关闭后，发送者不会知道你读过他们的消息——经由桥接，WhatsApp 等平台上也一样。你自己的设备之间仍会同步。",
   "settingsContactNamesTitle": "使用通讯录里的名字",
   "settingsContactNamesSubtitle": "当电话号码能对上时，按你的通讯录应用的方式称呼对方，而不用 WhatsApp 或 Signal 报告的名字。匹配只在这台设备上进行。",
   "settingsContactsDenied": "Braid 未获准读取你的通讯录。",
-
   "settingsSendOnEnterTitle": "回车键发送消息",
   "settingsSendOnEnterSubtitleOn": "Shift+回车换行。",
   "settingsSendOnEnterSubtitleOff": "回车换行。Cmd 或 Ctrl + 回车发送。",
-
   "settingsAgendaTitle": "识别约定时间",
   "settingsAgendaSubtitle": "在提到日期的消息下方提供“添加到日历”。完全在这台设备上运行。",
-
   "settingsHiddenNetworksTitle": "在“全部”中隐藏网络",
   "settingsHiddenNetworksNone": "每个网络都会出现在合并收件箱里",
   "settingsHiddenNetworksSome": "已隐藏：{networks} — 点按侧栏里的网络即可查看它的聊天",
   "settingsShowNetworkInAll": "在“全部”中显示 {network}",
-
   "settingsStatusesTitle": "状态",
   "settingsStatusesSubtitleRings": "以动态圆环显示在收件箱上方，广播群组保持隐藏。",
   "settingsStatusesSubtitleGroup": "以“Status Broadcast”群聊显示，和其他聊天一样。",
@@ -69,7 +58,6 @@
   "settingsStatusModeGroup": "群聊",
   "settingsStatusModeOff": "关闭",
   "settingsUnhideStatusSenders": "{count, plural, other{取消隐藏 {count} 位}}",
-
   "settingsSectionHeaderSemantics": "{title}。{subtitle}",
   "settingsPrivacyWarningSemantics": "隐私警告。{message}",
   "settingsTryAgain": "重试",
@@ -99,7 +87,7 @@
   "inboxLeaveAndDelete": "退出并删除",
   "inboxDeleteManyTitle": "{count, plural, other{删除 {count} 个对话？}}",
   "inboxDeleteManyBody": "此操作会退出并遗忘这些房间。历史记录将从此账号中消失，且无法在此恢复。归档可以隐藏聊天而不丢失任何内容。",
-  "inboxCatchingUp": "\u6b63\u5728\u66f4\u65b0\u2026",
+  "inboxCatchingUp": "正在更新…",
   "inboxTitleConversations": "对话",
   "inboxMenuSelect": "选择对话",
   "inboxMenuMarkAllRead": "全部标记为已读",
@@ -1073,7 +1061,6 @@
   "callBlockedUnknownPeer": "Braid 尚未获知此对话的 Matrix 地址。",
   "networkNamesTwo": "{first} 和 {second}",
   "networkNamesMany": "{rest} 和 {last}",
-
   "settingsBackupTitle": "备份",
   "settingsBackupSubtitle": "将聊天记录导出为加密文件，或从文件恢复",
   "backupTitle": "备份与恢复",
@@ -1139,7 +1126,6 @@
   "backupErrorTruncated": "该备份不完整——文件提前结束了。如果它来自云端文件夹，请确认已下载完成。",
   "backupErrorDamaged": "该备份已损坏。如果你还有其他副本，请改用那一份。",
   "backupErrorUnknown": "操作未能完成，未更改任何内容。",
-
   "settingsAutoReplyTitle": "自动回复",
   "settingsAutoReplySubtitle": "让你自己的模型代你回复，聊天仍保持未读",
   "autoReplyTitle": "自动回复",
@@ -1193,5 +1179,16 @@
   "autoReplyRefusalOutsideSchedule": "已暂缓——不在规则的时段内",
   "autoReplyRefusalOther": "已暂缓",
   "chatAutoReplyTooltip": "自动发送",
-  "chatAutoReplyLabel": "由规则自动发送"
+  "chatAutoReplyLabel": "由规则自动发送",
+  "retentionTitle": "自动删除消息",
+  "retentionOff": "全部保留",
+  "retentionSummaryArrival": "收到后 {window} 删除",
+  "retentionSummaryRead": "阅读后 {window} 删除",
+  "retentionExplainer": "你自己发送的消息会对所有人删除。别人发来的消息仅从本设备移除 — Braid 无法删除他人手上的副本。",
+  "retentionAnchorTitle": "从何时开始计时",
+  "retentionAnchorArrival": "消息送达时",
+  "retentionAnchorRead": "我阅读会话时",
+  "retentionAnchorReadNote": "未读的消息永不删除。",
+  "retentionHours": "{count, plural, other{{count} 小时}}",
+  "retentionDays": "{count, plural, other{{count} 天}}"
 }

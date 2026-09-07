@@ -197,6 +197,25 @@ class MediaFileStore {
     );
   }
 
+  /// Deletes everything staged for [eventId].
+  ///
+  /// The other half of a retention sweep: dropping the message's row deletes
+  /// what was *said*, and a photo, a voice note or a video is the message
+  /// itself — bytes sitting in application support, reachable by every file
+  /// browser and copied by every device backup, long after the bubble is gone.
+  ///
+  /// Silent when there is nothing staged, which is the normal case: an
+  /// attachment is only written here once somebody has opened or saved it.
+  Future<void> purge(String eventId) async {
+    final folder = Directory(
+      p.join((await _directory()).path, _sanitise(eventId)),
+    );
+    if (!folder.existsSync()) return;
+    // Recursive: the folder holds the file under its own name, and a `.part`
+    // beside it whenever a download was interrupted.
+    await folder.delete(recursive: true);
+  }
+
   void dispose() => _transport.dispose();
 }
 

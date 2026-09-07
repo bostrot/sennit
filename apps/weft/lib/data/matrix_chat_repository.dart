@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:collection/collection.dart' show MapEquality;
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as sdk;
@@ -45,6 +46,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     this._session, {
     IdentityStore? store,
     SearchStore? searchStore,
+    RetentionStore? retention,
     SettingsStore? settings,
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
@@ -52,6 +54,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }) : _store = store,
        _settings = settings,
        _searchStore = searchStore,
+       _retention = retention,
        _transportOverride = transport,
        _readBytes = readBytes,
        _sms = sms {
@@ -136,6 +139,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   final IdentityStore? _store;
   final SettingsStore? _settings;
   final SearchStore? _searchStore;
+
+  /// Self-deleting chats: which conversations erase themselves, and what has
+  /// already been erased here. Null wherever retention is not configured, and
+  /// every path below reads it as "nothing self-deletes".
+  final RetentionStore? _retention;
+
   final AttachmentBytesLoader _readBytes;
 
   /// SMS, when this device has it and Braid holds the role. Null everywhere
@@ -376,6 +385,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       network: source.network,
       ownUserId: _client.userID,
       resolveSender: _identityOf,
+      // What a retention sweep has already deleted here. Read at open rather
+      // than per event: the homeserver still holds these, so a backfill would
+      // otherwise walk them straight back into a conversation the user was
+      // told erases itself.
+      purgedEventIds: _retention?.purgedIn(source.roomId) ?? const {},
     );
   }
 
@@ -1095,6 +1109,18 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     await target.room.redactEvent(eventId, redactAllEdits: true);
   }
 
+  @override
+  Future<void> forgetLocally(String roomId, String eventId) async {
+    // The SDK's own store, not Braid's: this is the copy the timeline is read
+    // from, and the one a re-open would otherwise redraw the message out of.
+    // Braid's record of the message — the search index — is dropped by the
+    // sweeper, which is also what writes the tombstone that keeps a backfill
+    // from bringing it back.
+    await _client.database.removeEvent(eventId, roomId);
+    _invalidateTimelines();
+    _scheduleRebuild();
+  }
+
   /// Finds which of [chatId]'s rooms holds [eventId], and the event itself.
   ///
   /// The counterpart to [_sendSource], and deliberately not a variation of it:
@@ -1564,11 +1590,32 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     for (final m in messages.where((m) => m.redacted)) {
       store.removeMessage(eventId: m.eventId, roomId: m.roomId);
     }
+    // One query per room rather than one per message: a merged chat's legs are
+    // few and its messages are not.
+    final retention = _retention;
+    final purged = <String, Set<String>>{};
+    Set<String> purgedIn(String roomId) => purged.putIfAbsent(
+      roomId,
+      () => retention?.purgedIn(roomId) ?? const {},
+    );
+
     store.indexMessages(
       // Emptiness is asked of the projection, not of the raw body: a message
       // whose whole body was a dropped subtree says nothing to a reader and
       // would otherwise be indexed as a blank row.
-      messages.where((m) => !m.redacted && plainTextOf(m).isNotEmpty),
+      //
+      // A purged message is filtered here as well as in the timeline mapper,
+      // and the belt is worth the braces: the mapper's tombstone set is a
+      // snapshot taken when the timeline opened, so a message swept *while*
+      // the chat is on screen is still in the list this method was handed.
+      // Re-filing it would put a deleted message back into the one place the
+      // user would find it again.
+      messages.where(
+        (m) =>
+            !m.redacted &&
+            plainTextOf(m).isNotEmpty &&
+            !purgedIn(m.roomId).contains(m.eventId),
+      ),
       chatId: chatId,
       chatTitle: title,
     );
@@ -1624,6 +1671,19 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // The local badge is not lost by this: the request lives in its own section
     // with its own affordances, and clearing it is what accepting does.
     if (chat.isPendingRequest) return;
+
+    // What a read-anchored retention policy counts from. Recorded per *chat*
+    // and not per leg, because that is the granularity the user reads at: they
+    // opened the conversation, and every message already in it has now been
+    // seen whichever network carried it.
+    //
+    // `now` on both sides rather than the newest event's own timestamp: a
+    // bridge that stamps an event with the remote network's clock can put it
+    // slightly in the future, and a watermark taken from that would mark
+    // messages read before they arrive. Reading the conversation is what
+    // happened, and it happened now.
+    final readAt = clock.now().toUtc();
+    _retention?.recordRead(chatId: chatId, at: readAt, upTo: readAt);
 
     // A merged chat marks every leg read: the user has seen the conversation,
     // regardless of which network each message arrived on.

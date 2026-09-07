@@ -14,6 +14,7 @@ import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
+import 'app/retention_providers.dart';
 import 'app/session_providers.dart';
 import 'app/share_providers.dart';
 import 'app/shortcuts.dart';
@@ -450,6 +451,12 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         case WeftSessionState.ready:
           unawaited(_startNotifications());
           _startInboxSurfaces();
+          // Its own line rather than a step inside `_startNotifications`,
+          // which returns early on every platform and mode where there is no
+          // notification service to start — and a conversation set to erase
+          // itself must not quietly stop doing so because this device does not
+          // do notifications.
+          ref.read(retentionSweeperProvider)?.start();
         // Both signed-out states take the out-of-app copies away. `softLoggedOut`
         // is the server having invalidated the token, and until the user
         // re-auths this device is exactly as signed out as the other one —

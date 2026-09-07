@@ -25,6 +25,7 @@ import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
+import '../../app/retention_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
@@ -336,6 +337,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
     try {
       final chatId = _chatId;
       _timelineChatId = chatId;
+      // Before the timeline is built, not after: a self-deleting chat that
+      // came due while the app was closed would otherwise draw the messages
+      // first and blink them away a frame later. The sweeper returns
+      // immediately for a chat with no policy, which is nearly every chat.
+      await ref.read(retentionSweeperProvider)?.sweepChat(chatId);
+      if (!mounted) return;
       _timelineEpoch = ref.read(chatRepositoryProvider).timelineEpoch;
       final timeline = await ref
           .read(chatRepositoryProvider)

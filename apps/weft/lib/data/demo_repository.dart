@@ -186,6 +186,12 @@ class DemoChatRepository implements ChatRepository {
   final Map<String, List<EditEvent>> _edits = {};
   final Set<String> _redacted = {};
 
+  /// Events dropped from this device — what a retention sweep does to a
+  /// message it has no standing to redact. Filtered out of [historyFor]
+  /// entirely rather than folded in by [_withRelations]: a forgotten message is
+  /// not a message in a different state, it is a message that is not there.
+  final Set<String> _forgotten = {};
+
   /// The instant every demo fixture is dated against.
   ///
   /// Public so a golden can put the *clock* at the same instant: a timestamp
@@ -487,6 +493,12 @@ class DemoChatRepository implements ChatRepository {
   @override
   Future<void> redact(String chatId, String eventId) async {
     _redacted.add(eventId);
+    _controller.add(_chats);
+  }
+
+  @override
+  Future<void> forgetLocally(String roomId, String eventId) async {
+    _forgotten.add(eventId);
     _controller.add(_chats);
   }
 
@@ -1197,7 +1209,7 @@ class DemoChatRepository implements ChatRepository {
     final seed = source.roomId.hashCode.abs();
     final lines =
         _sampleLines[source.network] ?? _sampleLines[ChatNetwork.matrix]!;
-    return [
+    final history = [
       if (source.roomId == kThreadRoomId) ..._forumTopic(),
       // Anything sent this session comes first: the fixtures are a fixed past,
       // and an attachment the user just sent belongs on top of it.
@@ -1213,6 +1225,10 @@ class DemoChatRepository implements ChatRepository {
           delivery: i.isOdd ? DeliveryState.read : null,
         ),
     ];
+    if (_forgotten.isEmpty) return history;
+    return history
+        .where((m) => !_forgotten.contains(m.eventId))
+        .toList(growable: false);
   }
 
   static const Map<ChatNetwork, List<String>> _sampleLines = {

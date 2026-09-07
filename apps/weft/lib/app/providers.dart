@@ -31,6 +31,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
     ref.watch(matrixSessionProvider),
     store: stores.identity,
     searchStore: stores.search,
+    retention: stores.retention,
     settings: stores.settings,
     sms: ref.watch(smsRepositoryProvider),
   );

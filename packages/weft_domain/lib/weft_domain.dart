@@ -15,4 +15,5 @@ export 'src/poll.dart';
 export 'src/relations.dart';
 export 'src/reply_fallback.dart';
 export 'src/request.dart';
+export 'src/retention.dart';
 export 'src/thread.dart';

@@ -2,29 +2,24 @@
   "@@locale": "pt",
   "@@x-variant": "Brazilian Portuguese. The only Portuguese Braid ships, so it is the base `pt` file: a device set to pt-PT gets this rather than English.",
   "@@x-review": "TRANSLATOR REVIEW PENDING — machine-seeded 2026-08-28, machine quality pass 2026-08-28 (register, terminology, typography, placeholders, budgets). Still unread by a speaker: delete this line when one has read the file end to end.",
-
   "settingsTitle": "Configurações",
-
   "settingsSectionChats": "Conversas",
   "settingsSectionLookAndFeel": "Aparência",
   "settingsSectionSearchAndIntelligence": "Busca e inteligência",
   "settingsSectionPrivacyAndSecurity": "Privacidade e segurança",
   "settingsSectionConnections": "Conexões",
-
   "settingsMergedChatsTitle": "Conversas mescladas",
   "settingsMergedChatsSubtitle": "Uma pessoa em vários mensageiros, em uma só conversa",
   "settingsBridgesTitle": "Pontes",
   "settingsBridgesSubtitle": "As pontes de mensageiros no seu servidor Matrix",
   "settingsSmsTitle": "SMS",
   "settingsSmsSubtitle": "As mensagens de texto deste celular, na caixa de entrada",
-
   "settingsAppearanceTitle": "Aparência",
   "settingsAppearanceSubtitle": "Tema, cor e densidade",
   "settingsNotificationsTitle": "Notificações",
   "settingsNotificationsSubtitle": "O que pode interromper você, e como",
   "settingsShortcutsTitle": "Atalhos de teclado",
   "settingsShortcutsSubtitle": "Tudo o que o teclado faz por aqui",
-
   "settingsEndpointsTitle": "Busca e transcrição",
   "settingsEndpointsSubtitle": "Servidores de busca semântica e de transcrição de voz",
   "settingsModelsTitle": "Modelos locais",
@@ -35,32 +30,26 @@
   "settingsDevicesSubtitle": "Seus outros logins, e como encerrá-los",
   "settingsEncryptionTitle": "Criptografia",
   "settingsEncryptionSubtitle": "Assinatura cruzada, backup de chaves e recuperação",
-
   "settingsSurfacesTitle": "Widgets e relógio",
   "settingsSurfacesSubtitle": "Widgets da tela inicial e o app do relógio",
   "settingsIntegrationsTitle": "Integrações",
   "settingsIntegrationsSubtitle": "Home Assistant e paperless-ngx, suas próprias instâncias",
   "settingsMcpTitle": "Servidor MCP",
   "settingsMcpSubtitle": "Deixe seus próprios agentes lerem e enviarem pelo Braid",
-
   "settingsReadReceiptsTitle": "Enviar confirmações de leitura",
   "settingsReadReceiptsSubtitle": "Desligado, quem escreve não fica sabendo que você leu as mensagens — nem no WhatsApp e afins, pela ponte. Seus próprios dispositivos continuam sincronizando.",
   "settingsContactNamesTitle": "Usar nomes da agenda",
   "settingsContactNamesSubtitle": "Nomear as pessoas como o seu app de contatos faz quando um número de telefone coincide, em vez do nome que o WhatsApp ou o Signal informa. A comparação acontece só neste dispositivo.",
   "settingsContactsDenied": "O Braid não teve permissão para ler seus contatos.",
-
   "settingsSendOnEnterTitle": "Enter envia a mensagem",
   "settingsSendOnEnterSubtitleOn": "Shift+Enter começa uma nova linha.",
   "settingsSendOnEnterSubtitleOff": "Enter começa uma nova linha. Cmd ou Ctrl + Enter envia.",
-
   "settingsAgendaTitle": "Detectar compromissos",
   "settingsAgendaSubtitle": "Oferece “adicionar ao calendário” abaixo das mensagens que citam uma data. Roda inteiramente neste dispositivo.",
-
   "settingsHiddenNetworksTitle": "Ocultar redes de “Todas”",
   "settingsHiddenNetworksNone": "Toda rede aparece na caixa de entrada combinada",
   "settingsHiddenNetworksSome": "Ocultas: {networks} — toque na rede na barra lateral para ver as conversas dela",
   "settingsShowNetworkInAll": "Mostrar {network} em “Todas”",
-
   "settingsStatusesTitle": "Status",
   "settingsStatusesSubtitleRings": "Mostrados como anéis acima da caixa de entrada. O grupo de transmissão fica oculto.",
   "settingsStatusesSubtitleGroup": "Mostrados como o grupo “Status Broadcast”, como qualquer outro.",
@@ -69,7 +58,6 @@
   "settingsStatusModeGroup": "Grupo",
   "settingsStatusModeOff": "Nenhum",
   "settingsUnhideStatusSenders": "{count, plural, =1{Mostrar 1} other{Mostrar {count}}}",
-
   "settingsSectionHeaderSemantics": "{title}. {subtitle}",
   "settingsPrivacyWarningSemantics": "Aviso de privacidade. {message}",
   "settingsTryAgain": "Tentar de novo",
@@ -99,7 +87,7 @@
   "inboxLeaveAndDelete": "Sair e excluir",
   "inboxDeleteManyTitle": "{count, plural, =1{Excluir 1 conversa?} other{Excluir {count} conversas?}}",
   "inboxDeleteManyBody": "Isto sai das salas e as esquece. O histórico desaparece desta conta e não pode ser recuperado aqui. Arquivar oculta uma conversa sem perder nada.",
-  "inboxCatchingUp": "Atualizando\u2026",
+  "inboxCatchingUp": "Atualizando…",
   "inboxTitleConversations": "Conversas",
   "inboxMenuSelect": "Selecionar conversas",
   "inboxMenuMarkAllRead": "Marcar tudo como lido",
@@ -1073,7 +1061,6 @@
   "callBlockedUnknownPeer": "O Braid ainda não conhece um endereço Matrix para esta conversa.",
   "networkNamesTwo": "{first} e {second}",
   "networkNamesMany": "{rest} e {last}",
-
   "settingsBackupTitle": "Cópia de segurança",
   "settingsBackupSubtitle": "Exporte o seu histórico para um ficheiro cifrado, ou restaure um",
   "backupTitle": "Cópia e restauro",
@@ -1139,7 +1126,6 @@
   "backupErrorTruncated": "Esta cópia está incompleta — o ficheiro termina cedo demais. Se veio de uma pasta na nuvem, verifique se acabou de transferir.",
   "backupErrorDamaged": "Esta cópia está danificada. Se tiver outra, tente essa.",
   "backupErrorUnknown": "Não foi possível concluir a operação. Nada foi alterado.",
-
   "settingsAutoReplyTitle": "Resposta automática",
   "settingsAutoReplySubtitle": "Deixe o seu modelo responder por si; a conversa continua por ler",
   "autoReplyTitle": "Resposta automática",
@@ -1193,5 +1179,16 @@
   "autoReplyRefusalOutsideSchedule": "Retida — fora do horário da regra",
   "autoReplyRefusalOther": "Retida",
   "chatAutoReplyTooltip": "Enviado automaticamente",
-  "chatAutoReplyLabel": "Enviado automaticamente por uma regra"
+  "chatAutoReplyLabel": "Enviado automaticamente por uma regra",
+  "retentionTitle": "Mensagens temporárias",
+  "retentionOff": "Manter tudo",
+  "retentionSummaryArrival": "Apagadas {window} após a chegada",
+  "retentionSummaryRead": "Apagadas {window} após a leitura",
+  "retentionExplainer": "As suas mensagens são apagadas para todos. As mensagens de outras pessoas saem apenas deste dispositivo — o Braid não pode apagar a cópia de mais ninguém.",
+  "retentionAnchorTitle": "Início da contagem",
+  "retentionAnchorArrival": "Quando a mensagem chega",
+  "retentionAnchorRead": "Quando eu leio a conversa",
+  "retentionAnchorReadNote": "Uma mensagem por ler nunca é apagada.",
+  "retentionHours": "{count, plural, =1{1 hora} other{{count} horas}}",
+  "retentionDays": "{count, plural, =1{1 dia} other{{count} dias}}"
 }

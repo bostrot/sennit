@@ -6,6 +6,8 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../app/labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
+import '../../app/retention_providers.dart';
+import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
 
@@ -190,6 +192,18 @@ class ContactProfileScreen extends ConsumerWidget {
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => showLabelSheet(context, ref, {chat.id}),
+            ),
+            ListTile(
+              leading: const Icon(Icons.timer_outlined),
+              title: Text(context.l10n.retentionTitle),
+              subtitle: Text(
+                retentionSummary(
+                  context,
+                  ref.watch(retentionPoliciesProvider).forChat(chat.id),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => showRetentionSheet(context, chat.id),
             ),
             SwitchListTile(
               secondary: const Icon(Icons.notifications_off_outlined),
