@@ -40,15 +40,15 @@ jobs:
 
   android:
     needs: verify
-    # Stays on a GitHub-hosted x64 runner, and so stays blocked on
-    # billing, because it cannot run on the arm64 self-hosted box:
-    # Flutter's Android AOT host tooling (gen_snapshot) is published
-    # for linux-x64 only, and AGP resolves aapt2 as
-    # com.android.tools.build:aapt2:<ver>:linux, which is x86_64. A
-    # release build there fails twice over, before any of it is
-    # about this repository. Moving it needs an x64 or a macOS
-    # runner — Google does ship darwin-aarch64 build-tools.
-    runs-on: ubuntu-latest
+    # A self-hosted Mac, not the Linux box the other jobs use. An Android
+    # release build cannot happen on linux-arm64 — Flutter's AOT host tooling
+    # (gen_snapshot) is published for linux-x64 only, and AGP resolves aapt2
+    # as com.android.tools.build:aapt2:<ver>:linux, which is x86_64 — while
+    # Apple silicon has both: Flutter ships macos-arm64 and Google ships
+    # darwin-aarch64 build-tools. The GitHub-hosted-only steps below are
+    # gated on runner.os so the job still works on ubuntu-latest if it ever
+    # goes back there.
+    runs-on: [self-hosted, macOS, ARM64]
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       HAS_PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
@@ -56,6 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Free runner disk space
+        if: runner.os == 'Linux'
         # The fat APK carries every ABI's ONNX, whisper and vodozemac binaries;
         # with the NDK, Gradle caches and Rust artifacts on top, the stock
         # runner disk runs dry mid-link. None of this preinstalled tooling is
@@ -67,6 +68,7 @@ jobs:
           sudo docker image prune -af > /dev/null 2>&1 || true
           df -h / | tail -1
       - name: Keep the build inside the runner's memory
+        if: runner.os == 'Linux'
         # gradle.properties asks for an 8G heap and 4G metaspace, sized for a
         # development machine. With the Kotlin daemon, R8 and four Rust
         # cross-compiles alongside, that OOM-kills the 16G runner — twice now,
@@ -86,11 +88,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
+      - name: Locate the Android SDK
+        # A self-hosted runner only carries ANDROID_HOME if its .env says so;
+        # the Android Studio default on a Mac is the fallback.
+        run: echo "ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}" >> "$GITHUB_ENV"
       - name: Accept the Android SDK licenses
         # whisper_ggml pins an NDK the runner image does not preinstall, and
         # its download stops at the unaccepted license.
