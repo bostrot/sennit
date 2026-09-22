@@ -17,7 +17,7 @@ env:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -40,6 +40,14 @@ jobs:
 
   android:
     needs: verify
+    # Stays on a GitHub-hosted x64 runner, and so stays blocked on
+    # billing, because it cannot run on the arm64 self-hosted box:
+    # Flutter's Android AOT host tooling (gen_snapshot) is published
+    # for linux-x64 only, and AGP resolves aapt2 as
+    # com.android.tools.build:aapt2:<ver>:linux, which is x86_64. A
+    # release build there fails twice over, before any of it is
+    # about this repository. Moving it needs an x64 or a macOS
+    # runner — Google does ship darwin-aarch64 build-tools.
     runs-on: ubuntu-latest
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -144,7 +152,7 @@ jobs:
 
   linux:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     env:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
@@ -155,11 +163,9 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
             libsqlite3-dev
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - run: flutter pub get
         working-directory: apps/weft
       - run: flutter build linux --release
@@ -167,8 +173,13 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          tar -czf "dist/Braid-$VERSION-linux-x64.tar.gz" \
-            -C apps/weft/build/linux/x64/release/bundle .
+          # Flutter writes the bundle under the host architecture's directory,
+          # and this runner is arm64 — build/linux/x64 no longer exists. Name
+          # the tarball for what was actually built rather than shipping an
+          # arm64 bundle inside a file that claims to be x64.
+          bundle=$(ls -d apps/weft/build/linux/*/release/bundle | head -1)
+          arch=$(basename "$(dirname "$(dirname "$bundle")")")
+          tar -czf "dist/Braid-$VERSION-linux-$arch.tar.gz" -C "$bundle" .
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -383,7 +394,7 @@ jobs:
 
   publish:
     needs: [verify, android, linux, windows, macos, ios]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     permissions:
       contents: write
     steps:

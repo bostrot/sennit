@@ -1,0 +1,39 @@
+name: Set up Flutter
+description: >
+  Puts a pinned Flutter on PATH on a runner Google publishes no archive for.
+
+  Flutter ships Linux SDK tarballs for x64 only — releases_linux.json carries
+  no arm64 entry for any version, 3.44.0 included — so subosito/flutter-action
+  has nothing to download on the arm64 self-hosted box and fails there. A
+  shallow clone of the version tag is the supported way onto arm64; the tool
+  then fetches the Dart SDK and engine artifacts for the host it finds itself
+  on, and those *are* published for linux-arm64.
+
+  The clone is kept outside the workspace so it survives actions/checkout's
+  clean and is paid for once per runner rather than once per job.
+
+inputs:
+  flutter-version:
+    description: The Flutter tag to install, e.g. 3.44.0
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        root="$HOME/.cache/flutter-sdks/${{ inputs.flutter-version }}"
+        # A clone interrupted half way leaves a directory with no usable
+        # binary in it, and every later run would then reuse the wreck.
+        if [ ! -x "$root/bin/flutter" ]; then
+          rm -rf "$root"
+          git clone --depth 1 --branch "${{ inputs.flutter-version }}" \
+            https://github.com/flutter/flutter.git "$root"
+        fi
+        # The runner account rarely owns this clone on a self-hosted box, and
+        # git refuses to read a repository it does not own — which the Flutter
+        # tool reports as a version it cannot determine.
+        git config --global --add safe.directory "$root"
+        echo "$root/bin" >> "$GITHUB_PATH"
+        "$root/bin/flutter" --version

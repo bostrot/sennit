@@ -10,20 +10,33 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The Linux jobs run on the self-hosted `debian` runner rather than
+# ubuntu-latest. GitHub-hosted minutes are unavailable on this account — every
+# hosted job now ends in seconds with "the job was not started because recent
+# account payments have failed or your spending limit needs to be increased" —
+# and a self-hosted runner is not billed.
+#
+# That runner is arm64 (Apple Virtualization guest), which is why these jobs
+# install Flutter through .github/actions/setup-flutter instead of
+# subosito/flutter-action: there is no linux-arm64 Flutter archive to download.
+# See that action for the detail.
+#
+# The macOS jobs below keep subosito/flutter-action — Flutter does publish
+# macos-arm64 archives — and stay on GitHub-hosted runners, so they remain
+# blocked on billing until that is settled.
+
 env:
   FLUTTER_VERSION: "3.44.0"
 
 jobs:
   analyze:
     name: Analyze & format
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - run: flutter pub get
       # Tracked sources only. `dart format` has no exclude of its own, and a
       # macOS build leaves generated Dart inside build/ (vodozemac's build
@@ -54,14 +67,12 @@ jobs:
 
   unit:
     name: Unit tests (pure Dart)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - run: flutter pub get
       # These packages carry the algorithmic core — merge scoring, the merged
       # timeline watermark, hybrid search ranking, attachment planning, the
@@ -184,14 +195,12 @@ jobs:
     # is the *phone* layout. The Mac window's layout is walked by running the
     # same file with `-d macos`, which needs a Mac and is a local and release
     # step rather than a per-push one; `docs/quality/ui-audit.md` records both.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       # A real engine on a real desktop target, which is what `integration_test`
       # requires — `flutter test` refuses to run a file under `integration_test/`
       # without a device.
@@ -229,14 +238,12 @@ jobs:
 
   integration:
     name: Integration tests (against Synapse)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - name: Generate Synapse config
         run: |
           docker run --rm -v "$PWD/tooling/docker/synapse-data:/data" \
