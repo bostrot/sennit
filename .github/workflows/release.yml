@@ -177,7 +177,8 @@ jobs:
           # and this runner is arm64 — build/linux/x64 no longer exists. Name
           # the tarball for what was actually built rather than shipping an
           # arm64 bundle inside a file that claims to be x64.
-          bundle=$(ls -d apps/weft/build/linux/*/release/bundle | head -1)
+          set -- apps/weft/build/linux/*/release/bundle
+          bundle=$1
           arch=$(basename "$(dirname "$(dirname "$bundle")")")
           tar -czf "dist/Braid-$VERSION-linux-$arch.tar.gz" -C "$bundle" .
       - uses: actions/upload-artifact@v4
