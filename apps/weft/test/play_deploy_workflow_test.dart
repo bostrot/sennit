@@ -64,12 +64,13 @@ void main() {
     );
   });
 
-  test('every run gets a version code Play has not seen', () {
-    // Play refuses a repeated versionCode; the pubspec build number does not
-    // move on a manual run, the run number does.
+  test('every run gets a version code above every earlier one', () {
+    // Play refuses a versionCode at or below one the app has already had.
+    // The pubspec build number does not move on a manual run, and the run
+    // number starts far below the timestamp codes already on Play.
     expect(
       _input(_step(workflow, 'Build App Bundle'), 'run'),
-      contains(r'--build-number=${{ github.run_number }}'),
+      contains(r'--build-number=$(date +%s)'),
     );
   });
 
@@ -103,13 +104,23 @@ void main() {
     expect(
       workflow,
       contains(
-        r'git diff "${{ github.event.before }}" HEAD -- apps/weft/pubspec.yaml '
-        r'| grep -q "^\+version:"',
+        r'changes=$(git diff "${{ github.event.before }}" HEAD -- apps/weft/pubspec.yaml)',
       ),
     );
+    expect(workflow, contains(r'grep -q "^\+version:" <<<"$changes"'));
     // The skip branch must survive the manual branch in front of it, or every
     // push touching pubspec.yaml — a dependency bump — ships a build.
     expect(workflow, contains('changed=false'));
+  });
+
+  test('a git that cannot run fails the check instead of skipping', () {
+    // On a runner without the command line tools `git` exits non-zero; piped
+    // into grep, or tested inside an `if`, that read as "no bump" and the run
+    // went green without building. As a plain assignment, `bash -e` stops.
+    final check = _step(workflow, 'Check for version change');
+    expect(check, contains('\n          changes=\$(git diff'));
+    expect(check, isNot(contains('| grep')));
+    expect(check, isNot(contains('elif')));
   });
 
   test('a manual run builds without a version bump', () {

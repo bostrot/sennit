@@ -12,8 +12,8 @@ on:
       - main
     paths:
       - 'apps/weft/pubspec.yaml'
-  # The build number comes from the run number, so a manual run produces a
-  # version code Play accepts without a pubspec bump.
+  # The version code is the build time, so a manual run produces one Play
+  # accepts without a pubspec bump.
   workflow_dispatch:
 
 # Two uploads racing for the internal track would both build, and the slower
@@ -48,7 +48,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual run. Building."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff "${{ github.event.before }}" HEAD -- apps/weft/pubspec.yaml | grep -q "^\+version:"; then
+            exit 0
+          fi
+          # A statement of its own, so a git that cannot run fails the step.
+          # Piped into grep, or tested inside an `if`, its error read as "no
+          # bump" and the run went green without building — which is what a
+          # runner with no command line tools did.
+          changes=$(git diff "${{ github.event.before }}" HEAD -- apps/weft/pubspec.yaml)
+          if grep -q "^\+version:" <<<"$changes"; then
             echo "Version bump detected."
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
@@ -134,7 +141,12 @@ jobs:
 
       - name: Build App Bundle
         if: steps.check_version.outputs.changed == 'true'
-        run: flutter build appbundle --release --build-number=${{ github.run_number }}
+        # Seconds since the epoch: unique per run and always rising, which
+        # the run number is too, but Play compares against every code the app
+        # has ever had — papervault already sits at 1787693707, and Braid's
+        # first bundle went up from a workstation the same way. Stays below
+        # Play's 2100000000 ceiling until 2036.
+        run: flutter build appbundle --release --build-number="$(date +%s)"
         working-directory: apps/weft
 
       - name: Upload to Play Store
