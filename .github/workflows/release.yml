@@ -17,7 +17,10 @@ env:
 
 jobs:
   verify:
-    runs-on: [self-hosted, Linux, debian]
+    # On the Mac rather than the Linux runner: every other job waits on this
+    # one, and the Linux box has been offline since September, which held
+    # the android job in the queue for good. It only reads pubspec.yaml.
+    runs-on: [self-hosted, macOS, ARM64]
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -51,7 +54,6 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      HAS_PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
       - uses: actions/checkout@v4
@@ -95,6 +97,12 @@ jobs:
         # A self-hosted runner only carries ANDROID_HOME if its .env says so;
         # the Android Studio default on a Mac is the fallback.
         run: echo "ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}" >> "$GITHUB_ENV"
+      - name: Put rustup's Rust ahead of Homebrew's
+        # A Homebrew `rust` ships the std for the host only; when its rustc
+        # wins on PATH, cargokit's vodozemac build fails with "can't find
+        # crate for `core`" for every Android target rustup has installed.
+        if: runner.os == 'macOS'
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: Accept the Android SDK licenses
         # whisper_ggml pins an NDK the runner image does not preinstall, and
         # its download stops at the unaccepted license.
@@ -120,35 +128,6 @@ jobs:
           mkdir -p dist
           cp apps/weft/build/app/outputs/flutter-apk/app-release.apk "dist/Braid-$VERSION-android.apk"
           cp apps/weft/build/app/outputs/bundle/release/app-release.aab "dist/Braid-$VERSION-android.aab"
-      - name: Publish to the Play internal track
-        # Internal testing is the one track Play accepts a build on while the
-        # store listing is still incomplete, so this runs from the first tag
-        # rather than waiting on a finished entry.
-        #
-        # Three gates, and each one covers a build that must not reach the
-        # store: a workflow_dispatch run is documented above as a dry run, an
-        # AAB built without the keystore is debug-signed and Play would reject
-        # it, and a fork has no service account at all. A missing secret skips
-        # the step rather than failing it — the GitHub release still goes out.
-        #
-        # `status: completed` is what makes this an actual test release rather
-        # than a draft somebody finishes by hand in the Console. The single
-        # exception is an app Play still considers a draft — nothing published
-        # on any track yet, which is where com.bostrot.weft sits until this
-        # runs for the first time; that first upload has to be `draft` and be
-        # promoted once in the Console. Set the `PLAY_RELEASE_STATUS`
-        # repository variable to `draft` for that run, then delete it.
-        if: >-
-          startsWith(github.ref, 'refs/tags/')
-          && env.HAS_SIGNING == 'true'
-          && env.HAS_PLAY == 'true'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.bostrot.weft
-          releaseFiles: dist/Braid-${{ needs.verify.outputs.version }}-android.aab
-          track: internal
-          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -399,7 +378,7 @@ jobs:
 
   publish:
     needs: [verify, android, linux, windows, macos, ios]
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: [self-hosted, macOS, ARM64]
     permissions:
       contents: write
     steps:

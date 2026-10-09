@@ -1,0 +1,159 @@
+name: Publish to Play Store Internal
+
+# The Play upload, on its own and on the one runner that can build Android.
+# It used to be a step of release.yml's android job, where it waited on a tag
+# and on a `verify` job pinned to the Linux runner — which has been offline
+# since September, so no build ever got as far as the store. This is
+# papervault's deploy_internal.yml: a version bump on main ships to internal
+# testers, and a manual run ships whatever main is now.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/weft/pubspec.yaml'
+  # The build number comes from the run number, so a manual run produces a
+  # version code Play accepts without a pubspec bump.
+  workflow_dispatch:
+
+# Two uploads racing for the internal track would both build, and the slower
+# one would be refused for a version code Play has already seen.
+concurrency:
+  group: play-internal
+  cancel-in-progress: false
+
+# Bump together with release.yml — play_deploy_workflow_test.dart holds them
+# to the same toolchain.
+env:
+  FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  build:
+    name: Build and upload the App Bundle
+    # See release.yml's android job: linux-arm64 has no gen_snapshot or aapt2,
+    # Apple silicon has both.
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for version change
+        id: check_version
+        run: |
+          # A manual run is an explicit request for a build; there is no
+          # "before" commit to diff against, and asking for one would only
+          # make workflow_dispatch a no-op.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run. Building."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff "${{ github.event.before }}" HEAD -- apps/weft/pubspec.yaml | grep -q "^\+version:"; then
+            echo "Version bump detected."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No version bump detected. Skipping build."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: The signing key and the Play service account must exist
+        # Uploading is this workflow's only purpose, so a missing secret is a
+        # failure, not a skip: a green run that put nothing on the store is
+        # the outcome this job exists to rule out. A build without the
+        # keystore would also be debug-signed — build.gradle.kts falls back
+        # to the debug key — and Play refuses that bundle at the very end.
+        if: steps.check_version.outputs.changed == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=""
+          [ -n "$KEYSTORE" ] || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "$STORE_PASSWORD" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ] || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ] || missing="$missing ANDROID_KEY_PASSWORD"
+          [ -n "$PLAY" ] || missing="$missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets missing:$missing (see docs/RELEASING.md)"
+            exit 1
+          fi
+
+      - name: Setup Java
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        if: steps.check_version.outputs.changed == 'true'
+        uses: ./.github/actions/setup-flutter
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Locate the Android SDK and rustup's Rust
+        if: steps.check_version.outputs.changed == 'true'
+        # A self-hosted runner only carries ANDROID_HOME if its .env says so;
+        # the Android Studio default on a Mac is the fallback.
+        #
+        # ~/.cargo/bin goes in front of Homebrew: a Homebrew `rust` ships the
+        # std for the host only, and when its rustc wins on PATH cargokit's
+        # vodozemac build dies with "can't find crate for `core`" for every
+        # Android target, although rustup has them all installed.
+        run: |
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          [ -d "$sdk" ] || { echo "::error::No Android SDK at $sdk"; exit 1; }
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          [ -x "$HOME/.cargo/bin/rustup" ] || { echo "::error::No rustup in ~/.cargo/bin — flutter_vodozemac needs it"; exit 1; }
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Accept the Android SDK licenses
+        if: steps.check_version.outputs.changed == 'true'
+        # whisper_ggml pins an NDK the runner may not have yet, and its
+        # download stops at an unaccepted license.
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Install the release keystore
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > apps/weft/android/app/upload-keystore.jks
+          cat > apps/weft/android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Install Dependencies
+        if: steps.check_version.outputs.changed == 'true'
+        run: flutter pub get
+        working-directory: apps/weft
+
+      - name: Build App Bundle
+        if: steps.check_version.outputs.changed == 'true'
+        run: flutter build appbundle --release --build-number=${{ github.run_number }}
+        working-directory: apps/weft
+
+      - name: Upload to Play Store
+        if: steps.check_version.outputs.changed == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bostrot.weft
+          releaseFiles: apps/weft/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          # `completed` hands the build to internal testers straight away.
+          # Play only refuses it while the app has never been published on
+          # any track, which is where com.bostrot.weft sits until its first
+          # upload: that one run needs the `PLAY_RELEASE_STATUS` repository
+          # variable set to `draft` and a single promotion in the Console.
+          # Delete the variable afterwards.
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+
+      - name: Remove the keystore from the runner
+        # A self-hosted workspace outlives the job; the key must not.
+        if: always()
+        run: rm -f apps/weft/android/app/upload-keystore.jks apps/weft/android/key.properties
