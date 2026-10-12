@@ -57,6 +57,7 @@ class PlatformArchivePicker implements ArchivePicker {
   Future<File?> pickArchive() async {
     final file = await openFile(
       acceptedTypeGroups: const [
+        // l10n-ignore: the name of Braid's own file format, as the system file dialog lists it.
         XTypeGroup(label: 'Braid backup', extensions: [kBraidArchiveExtension]),
       ],
     );

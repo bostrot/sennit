@@ -100,6 +100,7 @@ class ThreadIndicator extends StatelessWidget {
                   const SizedBox(width: WeftSpace.xs),
                   Flexible(
                     child: Text(
+                      // l10n-ignore: an interpolation of a room name and a count already formatted.
                       title == null ? count : '$title · $count',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -171,6 +172,7 @@ class _UnreadDot extends StatelessWidget {
         borderRadius: WeftRadius.pill,
       ),
       child: Text(
+        // l10n-ignore: a bare number, not a sentence.
         '$count',
         textAlign: TextAlign.center,
         style: context.text.labelSmall?.copyWith(
