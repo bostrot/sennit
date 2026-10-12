@@ -1,0 +1,82 @@
+name: Publish a prebuilt bundle to Play Store Internal
+
+# The Play upload without the build. deploy_internal.yml builds the bundle and
+# needs the one runner that can — a Mac with the Android SDK, the NDK and
+# rustup — and while that runner is not there, a bundle built and signed on a
+# workstation has no way onto the store short of dragging it into the Console.
+#
+# This takes such a bundle from a *draft* release of this repository and hands
+# it to the same action with the same service account. Uploading is plain
+# Node, so it runs on the Linux runner.
+#
+#   gh release create play-1.0.1 --draft --title play-1.0.1 --notes "" \
+#     apps/weft/build/app/outputs/bundle/release/app-release.aab
+#   gh workflow run deploy_prebuilt.yml -f release_tag=play-1.0.1
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Tag of the draft release that holds app-release.aab
+        required: true
+
+# One group with deploy_internal.yml: two uploads racing for the internal
+# track is the same race whichever workflow started them.
+concurrency:
+  group: play-internal
+  cancel-in-progress: false
+
+# A draft release is only visible to a token that may write.
+permissions:
+  contents: write
+
+jobs:
+  upload:
+    name: Upload the App Bundle
+    runs-on: [self-hosted, Linux, debian]
+    steps:
+      - name: The Play service account must exist
+        env:
+          PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY" ]; then
+            echo "::error::Repository secret missing: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (see docs/RELEASING.md)"
+            exit 1
+          fi
+
+      - name: Fetch the bundle from the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        # By listing, not by tag: a draft has no tag yet, so the
+        # releases/tags/<tag> endpoint answers 404 for it.
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${{ github.repository }}"
+          asset=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" "$api/releases?per_page=100" \
+            | jq -r --arg tag "$RELEASE_TAG" \
+              '[.[] | select(.tag_name == $tag) | .assets[] | select(.name == "app-release.aab") | .id][0] // empty')
+          if [ -z "$asset" ]; then
+            echo "::error::No release tagged $RELEASE_TAG with an app-release.aab"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/bundle"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            -o "$RUNNER_TEMP/bundle/app-release.aab" "$api/releases/assets/$asset"
+          ls -l "$RUNNER_TEMP/bundle"
+
+      - name: Upload to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bostrot.weft
+          releaseFiles: ${{ runner.temp }}/bundle/app-release.aab
+          track: internal
+          # See deploy_internal.yml: `draft` until the app's first release has
+          # been promoted once in the Console, `completed` from then on.
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+
+      - name: Remove the bundle from the runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/bundle"
