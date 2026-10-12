@@ -264,20 +264,28 @@ Per reply, one POST to `<base>/chat/completions` carrying:
   advice. It is the whole feature, and a client that quietly edited it would be
   answering for something nobody wrote.
 - **the conversation's title**, so the model can address the right person.
-- **at most `kAutoReplyContextMessages` (8) recent messages**, each as
+- **at most `kAiContextMessages` (24) recent messages**, each as
   `Name: what they said`.
 
 What is **not** sent: any other conversation, the user's contacts, message ids,
 timestamps, the rule list, anything about the account, anything about the other
-networks. The context bound lives in the model layer rather than at the call
-site because it is a privacy quantity, not a tuning one — it is how much of the
-conversation leaves the device per reply — and `auto_reply_service_test.dart`
-asserts it.
+networks. The context bound lives in `services/ai/conversation_context.dart`
+rather than at the call site because it is a privacy quantity, not a tuning one
+— it is how much of the conversation leaves the device per reply — and
+`auto_reply_service_test.dart` asserts it.
+
+It is **one** number for every AI feature, and that is the point of its living
+there. The reply chips used to be handed whatever was still posted in the
+notification shade, which is capped at five rows and is emptied when the chat is
+read — so in the common case a chip was suggested from a single line, and the
+two features disclosed different amounts of different things. Both now read a
+`ConversationContext`, so raising or lowering the bound moves both.
 
 The buffer those messages come from is built from the incoming stream, not
 paginated out of the homeserver: what is sent is what the app has *seen arrive*
-this session. It is the same shape of disclosure `suggestReplies` already makes
-with the notification thread.
+this session. The chips' buffer is not cleared when the conversation is read —
+reading clears the rows in the shade, not the fact that the conversation
+happened — but it is bounded, in memory only, and dropped with the service.
 
 ## Failure
 

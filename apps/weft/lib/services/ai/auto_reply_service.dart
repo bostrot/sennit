@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:weft_autoreply/weft_autoreply.dart';
@@ -7,6 +6,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../data/auto_reply_transport.dart';
 import 'auto_reply_writer.dart';
+import 'conversation_context.dart';
 
 /// One attempt, kept so the user can see what happened.
 ///
@@ -129,14 +129,10 @@ class AutoReplyService {
   /// Built from the stream rather than fetched from a timeline, and that is a
   /// privacy decision as much as a cost one: what is sent to the model is what
   /// the app has *seen arrive* this session, never history paginated out of the
-  /// homeserver for the purpose. It is also what `suggestReplies` already does
-  /// with the notification thread, so the two features disclose the same shape
-  /// of thing.
-  final LinkedHashMap<String, List<WeftMessage>> _context = LinkedHashMap();
-
-  /// How many conversations keep a context buffer. An LRU, so a busy account
-  /// does not accumulate one per room for the life of the process.
-  static const int _maxTrackedConversations = 64;
+  /// homeserver for the purpose. The same buffer the reply chips are given, so
+  /// the two features disclose the same quantity of the same thing.
+  final ConversationContext<WeftMessage> _context =
+      ConversationContext<WeftMessage>();
 
   /// Starts watching. Idempotent.
   void start() {
@@ -150,6 +146,9 @@ class AutoReplyService {
   Future<void> dispose() async {
     await _sub?.cancel();
     _sub = null;
+    // The buffer goes with the service: a disposed service is a signed-out or
+    // reconfigured session, and nothing it had seen should outlive it.
+    _context.clear();
   }
 
   /// Decides and, when a rule wins, writes and sends.
@@ -270,11 +269,8 @@ class AutoReplyService {
   ///
   /// Exposed so the settings screen can say how much is disclosed and a test
   /// can assert the bound without reaching into the buffer.
-  List<String> transcriptFor(String chatId) => [
-    for (final message in _context[chatId] ?? const <WeftMessage>[])
-      '${message.isOwn ? 'You' : message.senderName}: '
-          '${message.searchableText}',
-  ];
+  List<String> transcriptFor(String chatId) =>
+      transcriptLinesFor(_context.of(chatId));
 
   AutoReplyChatState _stateFor(Chat chat) => AutoReplyChatState(
     chat: chat,
@@ -284,19 +280,8 @@ class AutoReplyService {
     recentReplies: _ledger.repliesIn(chat.id, now: _now()),
   );
 
-  void _remember(String chatId, WeftMessage message) {
-    // Re-inserted rather than updated in place, which is what makes the
-    // LinkedHashMap an LRU: the least recently touched conversation is first.
-    final existing = _context.remove(chatId) ?? <WeftMessage>[];
-    existing.add(message);
-    if (existing.length > kAutoReplyContextMessages) {
-      existing.removeRange(0, existing.length - kAutoReplyContextMessages);
-    }
-    _context[chatId] = existing;
-    while (_context.length > _maxTrackedConversations) {
-      _context.remove(_context.keys.first);
-    }
-  }
+  void _remember(String chatId, WeftMessage message) =>
+      _context.remember(chatId, message);
 
   /// Whether a refusal is one the user would want to see.
   ///

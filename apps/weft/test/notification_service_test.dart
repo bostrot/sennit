@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:weft/app/intents.dart';
 import 'package:weft/data/chat_repository.dart';
+import 'package:weft/services/ai/conversation_context.dart';
 import 'package:weft/services/notifications/notification_actions.dart';
 import 'package:weft/services/notifications/notification_channels.dart';
 import 'package:weft/services/notifications/notification_presentation.dart';
@@ -757,6 +758,180 @@ void main() {
             sink.shown.last.details.android!.styleInformation!
                 as MessagingStyleInformation;
         expect(style.messages, hasLength(kMaxNotificationsPerChat));
+      },
+    );
+  });
+
+  group('the conversation the reply chips are suggested from', () {
+    late RecordingNotificationSink sink;
+    late FakeNotificationSession session;
+    late MatrixNotificationPipeline pipeline;
+    late WeftNotificationService service;
+
+    /// Every thread the suggester was handed, in order.
+    late List<List<WeftMessage>> asked;
+
+    /// Read per message by the pipeline, so a test can change it after start.
+    late NotificationPolicy policy;
+
+    setUp(() {
+      sink = RecordingNotificationSink();
+      session = FakeNotificationSession();
+      policy = NotificationPolicy();
+      pipeline = MatrixNotificationPipeline(
+        session: session,
+        chatForRoom: _chatForRoom,
+        policy: () => policy,
+        now: () => _now,
+      );
+      service = WeftNotificationService(
+        sink: sink,
+        pipeline: pipeline,
+        chatForRoom: _chatForRoom,
+        // The real wiring: one stream feeds both the pipeline's decisions and
+        // the conversation buffer, which is what lets a suppressed message be
+        // in the buffer and not in the shade.
+        conversations: session.incomingMessages,
+      );
+      asked = [];
+      service.suggestReplies = (content, thread) async {
+        asked.add(thread);
+        return const ['On my way'];
+      };
+    });
+
+    /// Published on the sync path, the way a real message arrives.
+    ///
+    /// Through the stream rather than `pipeline.handleMessage`, unlike the
+    /// group above: the stream *is* the thing under test here.
+    Future<void> deliver(WeftMessage message) async {
+      session.deliver(message);
+      await pumpEventQueue();
+    }
+
+    tearDown(() async {
+      await service.dispose();
+      await pipeline.dispose();
+      await session.close();
+    });
+
+    test('is more than the one row in the shade can draw', () async {
+      // The bug this exists for: the suggester used to be handed the window
+      // the notification *draws*, which is five lines and a UI number. A model
+      // answering "which one?" needs the message that said what the choices
+      // were.
+      await service.start();
+      for (var i = 0; i < kMaxNotificationsPerChat + 4; i++) {
+        await deliver(_message(eventId: '\$e$i', body: 'm$i'));
+      }
+
+      expect(
+        asked.last,
+        hasLength(kMaxNotificationsPerChat + 4),
+        reason: 'the AI window is its own number, not the shade\'s',
+      );
+      expect(asked.last.map((c) => c.body).first, 'm0');
+      expect(asked.last.map((c) => c.body).last, 'm8');
+    });
+
+    test('is bounded at the shared AI constant', () async {
+      await service.start();
+      for (var i = 0; i < kAiContextMessages * 2; i++) {
+        await deliver(_message(eventId: '\$e$i', body: 'm$i'));
+      }
+
+      // The quantity that leaves the device is a privacy number, and this is
+      // the assertion that keeps it one — the same one
+      // `auto_reply_service_test.dart` makes about the other AI feature.
+      expect(
+        service.aiContextFor('merged:contact_1'),
+        hasLength(kAiContextMessages),
+      );
+      expect(asked.last, hasLength(kAiContextMessages));
+      expect(asked.last.last.body, 'm${kAiContextMessages * 2 - 1}');
+    });
+
+    test('survives the conversation being read', () async {
+      // The common case, and the one that made the feature look like it only
+      // ever saw the newest message: the user reads the chat — which clears
+      // the shade and, with it, everything the suggester used to be given —
+      // and one more message arrives.
+      await service.start();
+      await deliver(_message(eventId: r'$e1', body: 'pizza or ramen?'));
+      await deliver(_message(eventId: r'$e2', body: 'I can book either'));
+
+      await service.dismissChat('merged:contact_1');
+      expect(service.postedFor('merged:contact_1'), isEmpty);
+
+      await deliver(_message(eventId: r'$e3', body: 'well?'));
+
+      expect(asked.last.map((c) => c.body), [
+        'pizza or ramen?',
+        'I can book either',
+        'well?',
+      ]);
+    });
+
+    test('is remembered even while nothing is asked of the model', () async {
+      // The setting can be switched on between two messages, and the first
+      // suggestion after that should have the conversation behind it rather
+      // than starting from one line.
+      service.suggestReplies = null;
+      await service.start();
+      await deliver(_message(eventId: r'$e1', body: 'pizza or ramen?'));
+      await deliver(_message(eventId: r'$e2', body: 'I can book either'));
+
+      service.suggestReplies = (content, thread) async {
+        asked.add(thread);
+        return const [];
+      };
+      await deliver(_message(eventId: r'$e3', body: 'well?'));
+
+      expect(asked.single.map((c) => c.body), [
+        'pizza or ramen?',
+        'I can book either',
+        'well?',
+      ]);
+    });
+
+    test(
+      'is dropped with the service, not kept for the next session',
+      () async {
+        await service.start();
+        await deliver(_message(eventId: r'$e1', body: 'pizza or ramen?'));
+        expect(service.aiContextFor('merged:contact_1'), hasLength(1));
+
+        await service.dispose();
+
+        expect(service.aiContextFor('merged:contact_1'), isEmpty);
+      },
+    );
+
+    test(
+      'a silent notification joins it without spending a completion',
+      () async {
+        // Quiet hours post silently and must not ask someone's local model for
+        // chips nobody will see — but the message was still said, and the next
+        // audible one is answered better for knowing it. `_now` is 21:00 UTC,
+        // inside the window below.
+        policy = NotificationPolicy(
+          quietHours: const QuietHours(
+            startMinute: 20 * 60,
+            endMinute: 7 * 60,
+            offsetMinutes: 0,
+            deliverSilently: true,
+          ),
+        );
+        await service.start();
+        await deliver(_message(eventId: r'$e1', body: 'pizza or ramen?'));
+
+        expect(asked, isEmpty, reason: 'nothing to suggest into a silent row');
+        expect(service.aiContextFor('merged:contact_1'), hasLength(1));
+
+        policy = NotificationPolicy();
+        await deliver(_message(eventId: r'$e2', body: 'well?'));
+
+        expect(asked.single.map((c) => c.body), ['pizza or ramen?', 'well?']);
       },
     );
   });

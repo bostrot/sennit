@@ -10,6 +10,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../services/ai/conversation_context.dart';
 import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
     show NotificationDismisser;
@@ -209,9 +210,11 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     return chat;
   }
 
+  final matrixSession = MatrixNotificationSession.forClient(session.client);
+
   final pipeline = MatrixNotificationPipeline(
     words: () => weftNotifyStringsFrom(weftPlatformL10n()),
-    session: MatrixNotificationSession.forClient(session.client),
+    session: matrixSession,
     // Injected, never derived: the merge fold lives in the repository and a
     // second answer here would split a merged contact into two threads.
     chatForRoom: chatForRoom,
@@ -226,6 +229,12 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     chatForRoom: chatForRoom,
     avatarLoader: await ref.watch(avatarFileLoaderProvider.future),
     push: await ref.watch(pushTransportProvider.future),
+    // The conversation the reply chips are suggested from. The same stream the
+    // pipeline decides on and the auto-reply service writes from, and it is
+    // *every* message rather than the ones that buzzed: the user's own
+    // replies, and the ones a mute or a read on the laptop kept out of the
+    // shade, are the half of a conversation a suggestion needs most.
+    conversations: matrixSession.incomingMessages,
   );
 
   // AI answer chips on message notifications. Settings are read per message
@@ -257,11 +266,12 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       model: model,
       apiKey: stores.llmApiKey,
       chatTitle: content.title,
-      transcript: [
-        for (final message
-            in thread.length <= 6 ? thread : thread.sublist(thread.length - 6))
-          '${message.senderName}: ${message.body}',
-      ],
+      // Bounded by the service's own buffer, not trimmed again here: one place
+      // decides how much conversation leaves the device, and that place is
+      // `kAiContextMessages`. Projected by the same function the auto-reply
+      // transcript goes through, so the two features send the one endpoint the
+      // same shape of conversation.
+      transcript: transcriptLinesFor(thread),
     );
   };
 

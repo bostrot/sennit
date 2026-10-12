@@ -3,6 +3,7 @@ import 'package:weft_autoreply/weft_autoreply.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'package:weft/services/ai/auto_reply_writer.dart';
+import 'package:weft/services/ai/conversation_context.dart';
 
 import 'support/auto_reply_fakes.dart';
 
@@ -121,7 +122,7 @@ void main() {
   });
 
   group('the conversation context', () {
-    test('is bounded at the model layer constant', () async {
+    test('is bounded at the shared AI constant', () async {
       final h = buildAutoReplyService(
         chat: chat(),
         rules: const [away],
@@ -132,16 +133,22 @@ void main() {
       addTearDown(h.incoming.close);
       addTearDown(h.service.dispose);
 
-      for (var i = 0; i < kAutoReplyContextMessages * 3; i++) {
+      for (var i = 0; i < kAiContextMessages * 3; i++) {
         await h.service.handleMessage(msg(id: '\$in-$i', body: 'line $i'));
       }
 
       // The quantity that leaves the device per reply is a privacy number, not
-      // a tuning one, and this is the assertion that keeps it one.
-      expect(
-        h.service.transcriptFor(room).length,
-        lessThanOrEqualTo(kAutoReplyContextMessages),
-      );
+      // a tuning one, and this is the assertion that keeps it one. Equal, not
+      // merely under: a buffer that silently stopped at the newest message
+      // would satisfy an upper bound and is the bug this feature had.
+      final transcript = h.service.transcriptFor(room);
+      expect(transcript, hasLength(kAiContextMessages));
+      // And it is the *newest* window, oldest first — equal to the bound
+      // rather than merely under it, because a buffer that silently kept only
+      // the newest message would satisfy an upper bound and is the bug this
+      // whole constant exists to stop.
+      expect(transcript, contains('Grace: line ${kAiContextMessages * 3 - 1}'));
+      expect(transcript, isNot(contains('Grace: line 0')));
     });
 
     test('names the speakers, so the model can tell the sides apart', () async {

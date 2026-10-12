@@ -89,9 +89,24 @@ class MatrixPushPayload {
 /// A notification that should be posted, and how loudly.
 @immutable
 class MatrixNotification {
-  const MatrixNotification({required this.content, required this.decision});
+  const MatrixNotification({
+    required this.content,
+    required this.decision,
+    required this.message,
+  });
 
   final NotificationContent content;
+
+  /// The message it was decided about.
+  ///
+  /// Carried alongside [content] rather than being recoverable from it: a
+  /// `NotificationContent` is already rendered for the shade — the body is
+  /// degraded when previews are off, the sender has the network appended — and
+  /// a consumer that needs the message as the app understands it, rather than
+  /// as a row reads, cannot get back to it. The AI reply suggestions are that
+  /// consumer: they keep a conversation buffer of [WeftMessage]s, and the push
+  /// path is the one place where nothing else hands them the message.
+  final WeftMessage message;
 
   /// The verdict it came from. Carried whole rather than flattened to a bool so
   /// the platform layer can read [DeliveredDecision.mentioned] for priority as
@@ -345,7 +360,11 @@ class MatrixNotificationPipeline {
       );
       if (!_controller.isClosed) {
         _controller.add(
-          MatrixNotification(content: content, decision: delivered),
+          MatrixNotification(
+            content: content,
+            decision: delivered,
+            message: message,
+          ),
         );
       }
     }

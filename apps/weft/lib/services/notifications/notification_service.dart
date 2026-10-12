@@ -10,6 +10,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import '../../app/localisation.dart';
 
+import '../ai/conversation_context.dart';
 import 'notification_channels.dart';
 import 'notification_presentation.dart';
 import 'push_registration.dart';
@@ -390,17 +391,30 @@ class WeftNotificationService {
     ChatForRoom? chatForRoom,
     NotificationAvatarLoader? avatarLoader,
     PushTransport? push,
+    Stream<WeftMessage>? conversations,
   }) : _sink = sink,
        _pipeline = pipeline,
        _chatForRoom = chatForRoom,
        _avatarLoader = avatarLoader,
-       _push = push;
+       _push = push,
+       _conversations = conversations;
 
   final NotificationSink _sink;
   final MatrixNotificationPipeline _pipeline;
   final ChatForRoom? _chatForRoom;
   final NotificationAvatarLoader? _avatarLoader;
   final PushTransport? _push;
+
+  /// Every message the session sees, notified or not.
+  ///
+  /// Only ever read into [_aiContext] — nothing here decides or posts from it,
+  /// which is the invariant this class is built on. It is the same seam the
+  /// pipeline and the auto-reply service subscribe to, so the three agree about
+  /// what a message is.
+  ///
+  /// Null is "no conversation context", not an error: a build with no AI
+  /// features configured, and the tests that are about the shade.
+  final Stream<WeftMessage>? _conversations;
 
   /// What is currently on screen, per conversation, oldest first.
   ///
@@ -410,6 +424,28 @@ class WeftNotificationService {
   /// to redraw the thread.
   final Map<String, List<NotificationContent>> _posted = {};
 
+  /// The conversation as the AI features see it, which is neither what the
+  /// shade shows nor only what buzzed.
+  ///
+  /// Three things make it different from [_posted], and each of them was a way
+  /// the reply chips ended up being suggested from a single line:
+  ///
+  /// * It is **longer**. The shade is capped at [kMaxNotificationsPerChat] rows
+  ///   because that is what one notification can draw; inheriting that number
+  ///   left the model five lines at the very most.
+  /// * It survives [dismissChat]. Reading a conversation clears the rows, not
+  ///   the fact that the conversation happened.
+  /// * It holds [WeftMessage]s from the session's own stream, not the
+  ///   notifications that were posted — so it has the user's **own** messages
+  ///   in it, and the ones a mute or a read-on-another-device kept out of the
+  ///   shade. A model asked to answer "so which one?" in a mentions-only group
+  ///   needs the fifty lines that never buzzed.
+  ///
+  /// Bounded and in memory, the same class and the same bound the auto-reply
+  /// buffer uses.
+  final ConversationContext<WeftMessage> _aiContext =
+      ConversationContext<WeftMessage>();
+
   /// Avatar file paths by event id, for as long as their notification is up.
   final Map<String, String> _avatars = {};
 
@@ -418,6 +454,7 @@ class WeftNotificationService {
 
   StreamSubscription<MatrixNotification>? _notificationSub;
   StreamSubscription<Map<String, Object?>>? _pushSub;
+  StreamSubscription<WeftMessage>? _conversationSub;
 
   /// Where a tapped notification goes.
   ///
@@ -435,13 +472,18 @@ class WeftNotificationService {
   void Function(NotificationActivation activation)? onAction;
 
   /// Asks for AI answer suggestions for a message about to be posted, given
-  /// the whole visible thread (oldest first, the new message last). Unset, or
-  /// returning an empty list, means the notification goes out without them.
-  /// Failures are the callee's to swallow — a notification never waits on an
-  /// error message.
+  /// the conversation's recent messages (oldest first, the new message last).
+  /// Unset, or returning an empty list, means the notification goes out
+  /// without them. Failures are the callee's to swallow — a notification never
+  /// waits on an error message.
+  ///
+  /// What is passed is [aiContextFor], not the window drawn in the shade. The
+  /// two are different questions: the shade shows as much as a row can hold,
+  /// and a model answering "which one?" needs the message that said what the
+  /// choices were — which the user may well have already read.
   Future<List<String>> Function(
     NotificationContent content,
-    List<NotificationContent> thread,
+    List<WeftMessage> thread,
   )?
   suggestReplies;
 
@@ -449,6 +491,14 @@ class WeftNotificationService {
   @visibleForTesting
   List<NotificationContent> postedFor(String groupKey) =>
       List.unmodifiable(_posted[groupKey] ?? const []);
+
+  /// What [suggestReplies] would be given for [groupKey], oldest first.
+  ///
+  /// Exposed so a test can assert the bound on what leaves the device without
+  /// reaching into the buffer, the way the auto-reply service exposes its
+  /// transcript.
+  @visibleForTesting
+  List<WeftMessage> aiContextFor(String groupKey) => _aiContext.of(groupKey);
 
   /// Asks the OS for permission to post notifications.
   ///
@@ -467,6 +517,18 @@ class WeftNotificationService {
     await _sink.initialize(_onActivation);
 
     _notificationSub ??= _pipeline.notifications.listen(_enqueue);
+    // Before the pipeline starts, so the first message of a cold start is in
+    // the conversation buffer by the time it is decided on.
+    final conversations = _conversations;
+    if (conversations != null) {
+      _conversationSub ??= conversations.listen(
+        _rememberForAi,
+        // A buffer is not worth a crash, and this stream is also the
+        // pipeline's: its own listener reports its own failures.
+        onError: (Object error) =>
+            debugPrint('weft: conversation context stream failed: $error'),
+      );
+    }
     _pipeline.start();
 
     final push = _push;
@@ -598,8 +660,14 @@ class WeftNotificationService {
   Future<void> dispose() async {
     await _notificationSub?.cancel();
     await _pushSub?.cancel();
+    await _conversationSub?.cancel();
     _notificationSub = null;
     _pushSub = null;
+    _conversationSub = null;
+    // Survives a read, not a disposed service: this is where a sign-out or a
+    // reconfigured session comes through, and nothing it had seen should
+    // outlive it.
+    _aiContext.clear();
   }
 
   /// Posts one after another rather than all at once.
@@ -617,6 +685,25 @@ class WeftNotificationService {
     });
   }
 
+  /// Files one message under its conversation for the AI features to read.
+  ///
+  /// Idempotent per event, which is what lets both the stream and [_post] call
+  /// it: the same message reaches this twice whenever a push and the sync that
+  /// follows it are the same event, and a conversation with the newest line in
+  /// it twice reads to a model as someone repeating themselves.
+  ///
+  /// A message in a room the inbox has not folded into a chat yet is dropped
+  /// rather than filed under the room id — the same answer [_post] gives, and
+  /// for the same reason: a merged contact's two rooms are one conversation,
+  /// and keying on the room would split it.
+  void _rememberForAi(WeftMessage message) {
+    final chat = _chatForRoom?.call(message.roomId);
+    if (chat == null) return;
+    final held = _aiContext.of(chat.id);
+    if (held.any((held) => held.eventId == message.eventId)) return;
+    _aiContext.remember(chat.id, message);
+  }
+
   Future<void> _post(MatrixNotification notification) async {
     final content = notification.content;
     final group = content.groupKey;
@@ -628,6 +715,19 @@ class WeftNotificationService {
     }
 
     final thread = _posted.putIfAbsent(group, () => [])..add(content);
+
+    // Alongside the shade's own bookkeeping, before the awaits below: an
+    // avatar download or a launcher that throws must not be the reason the
+    // model forgets a message the shade remembers.
+    //
+    // Here as well as on the stream because the push path never reaches that
+    // stream: a backgrounded app is woken by FCM, the pipeline fetches the
+    // event by id, and the sync that would have published it lands seconds
+    // later — after the chips for it were asked for. [_rememberForAi] is
+    // idempotent per event, so whichever arrives first wins and the other is a
+    // no-op.
+    _rememberForAi(notification.message);
+    final aiThread = _aiContext.of(group);
 
     if (thread.length > kMaxTrackedNotificationsPerChat) {
       thread.removeRange(0, thread.length - kMaxTrackedNotificationsPerChat);
@@ -655,7 +755,7 @@ class WeftNotificationService {
       try {
         aiReplies = await suggest(
           content,
-          visible,
+          aiThread,
         ).timeout(const Duration(seconds: 10));
       } on Object catch (error) {
         debugPrint('weft: reply suggestions failed: $error');

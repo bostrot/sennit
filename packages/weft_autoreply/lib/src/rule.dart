@@ -26,13 +26,6 @@ const Duration kAutoReplyCapWindow = Duration(hours: 1);
 /// which reads to the other person as being talked at by a wall.
 const Duration kAutoReplyDefaultCooldown = Duration(minutes: 30);
 
-/// How much of the conversation is sent to the model with the prompt.
-///
-/// Bounded here rather than at the call site because it is a privacy quantity,
-/// not a tuning one: it is the number of messages that leave the device on
-/// every auto-reply. See `docs/architecture/auto-reply.md`.
-const int kAutoReplyContextMessages = 8;
-
 /// Which conversations a rule applies to.
 ///
 /// A sealed hierarchy rather than a bag of nullable fields because the four

@@ -78,8 +78,9 @@ const int kAutoReplyMaxChars = 600;
 ///
 /// [transcript] is a bounded slice of recent conversation, oldest first, each
 /// line already `Name: what they said`. Bounded by the caller, at
-/// `kAutoReplyContextMessages` — it is the quantity of conversation that leaves
-/// the device on every reply, so it is decided in the model layer and not here.
+/// `kAiContextMessages` — it is the quantity of conversation that leaves the
+/// device on every reply, so it is decided in one place for every AI feature
+/// and not here.
 Future<AutoReplyDraft> composeAutoReply({
   required String baseUrl,
   required String model,
