@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart'
-    show PointerDeviceKind, kLongPressTimeout, kPressTimeout;
+    show PointerDeviceKind, kLongPressTimeout, kPressTimeout, kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -707,9 +707,16 @@ final List<RouteStep> routeSteps = [
   RouteStep(
     label: '90-message-actions',
     surfaces: _touch,
+    // Touch is the *layout*, not the input: Linux and Windows draw this
+    // surface and are driven with a mouse, where a long press on a bubble is
+    // deliberately nothing and the same verbs sit behind the right button.
     open: (w) async {
       await w.openChat();
-      await w.longPress(w.visible(w.bubbles));
+      if (weftHasPointer) {
+        await w.secondaryTap(w.visible(w.bubbles));
+      } else {
+        await w.longPress(w.visible(w.bubbles));
+      }
     },
     arrival: () => find.text(_l10n.messageActionReply),
     close: (w) async => w.escape(),
@@ -1227,6 +1234,17 @@ class RouteWalker {
     // it.
     await settle();
     await gesture.up();
+    await settle();
+  }
+
+  /// A right-click, which is what raises a context menu on a machine with a
+  /// pointer.
+  Future<void> secondaryTap(Finder finder) async {
+    await tester.tapAt(
+      tester.getCenter(finder),
+      buttons: kSecondaryButton,
+      kind: PointerDeviceKind.mouse,
+    );
     await settle();
   }
 
