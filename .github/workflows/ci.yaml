@@ -329,7 +329,7 @@ jobs:
                 xvfb-run -a flutter test "$f" -d linux --dart-define=WEFT_DEMO=true; then
               fail=1
               echo "--- direct launch of the bundle for $f ---"
-              timeout 15 xvfb-run -a ./build/linux/x64/debug/bundle/weft 2>&1 | head -40 || true
+              timeout 15 xvfb-run -a ./build/linux/*/debug/bundle/weft 2>&1 | head -40 || true
             fi
             echo "::endgroup::"
           done
