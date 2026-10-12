@@ -376,6 +376,33 @@ void main() {
       expect(copied?.trim(), second);
     });
 
+    // The same, in a window that is in front. A region that loses focus while
+    // the app is resumed clears its selection, and the menu takes the focus —
+    // which the test binding, never resumed on its own, does not show.
+    testWidgets('and still does once the menu has taken the focus', (
+      tester,
+    ) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await pumpThread(tester, messages: exchange(), pointer: true);
+
+      await dragSelect(
+        tester,
+        tester.getTopLeft(bodyOf(second)) + const Offset(1, 4),
+        tester.getBottomRight(bodyOf(second)) - const Offset(1, 4),
+      );
+      await tester.tapAt(
+        tester.getCenter(bodyOf(first)),
+        buttons: kSecondaryButton,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy text'));
+      await tester.pumpAndSettle();
+
+      expect(copied?.trim(), second);
+    });
+
     testWidgets('the hover cluster and the reaction bar still answer a click', (
       tester,
     ) async {

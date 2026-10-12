@@ -786,6 +786,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   Future<void> _openActions(WeftMessage message, {Offset? at}) async {
+    // Read before the menu opens, not after it closes: the menu takes the
+    // focus, and a `SelectableRegion` that loses focus while the app is in
+    // the foreground clears its selection — so by the time Copy is chosen
+    // there is nothing left to read, and the whole bubble went out instead.
+    final selected = _selection?.plainText.trim() ?? '';
     final choice = context.hasPointer && at != null
         ? await showDesktopMessageMenu(
             context,
@@ -818,7 +823,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
         // have just dragged across and choosing Copy means that phrase; the
         // whole message is what Copy means when nothing is selected, which on
         // a phone is always.
-        await _copySelectionOr(message);
+        await _copySelectionOr(message, selected: selected);
       case MessageAction.selectText:
         await _selectText(message);
       case MessageAction.retrySend:
@@ -1011,8 +1016,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// carries what the renderer laid out, so a mention pill copies as "Anna" —
   /// its `Text` holds the display name and never the mxid — and a code block
   /// copies with its indentation intact.
-  Future<void> _copySelectionOr(WeftMessage? message) async {
-    final selected = _selection?.plainText.trim() ?? '';
+  ///
+  /// [selected] is for a caller that read the selection earlier and has since
+  /// done something that may have cleared it — see [_openActions].
+  Future<void> _copySelectionOr(
+    WeftMessage? message, {
+    String? selected,
+  }) async {
+    selected ??= _selection?.plainText.trim() ?? '';
     if (selected.isEmpty) {
       if (message != null) await _copy(message);
       return;
