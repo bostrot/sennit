@@ -186,6 +186,16 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       // and a share sheet with no conversations in it is not worth spending a
       // staged share on. This is where the inbox finally exists.
       if (_drainPending) unawaited(_drainStagedShares());
+      // And the same moment for a share that arrived through an intent rather
+      // than through the container. Replayed from inside this subscription
+      // rather than from a `ref.listen` in `build`, which would subscribe to
+      // `chatsProvider` on the first frame and so build the repository — and
+      // with it the session — above the auth gate, before either exists.
+      final pending = _pendingShare;
+      if (pending != null) {
+        _pendingShare = null;
+        _handleShare(pending);
+      }
     }, fireImmediately: true);
     unawaited(_drainStagedShares());
   }
@@ -434,15 +444,6 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // checking `MediaQuery` for itself and half of them forgetting to.
     final highContrast = MediaQuery.highContrastOf(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-
-    // The held share replays on the first chat-list emission — the same
-    // signal the sheet's guard was checking for.
-    ref.listen(chatsProvider, (_, next) {
-      final pending = _pendingShare;
-      if (next.value == null || pending == null) return;
-      _pendingShare = null;
-      _handleShare(pending);
-    });
 
     // Listened to rather than watched: this starts a service, it does not
     // decide what to draw, and a rebuild must not restart it.

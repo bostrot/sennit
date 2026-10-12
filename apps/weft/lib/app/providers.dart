@@ -22,9 +22,40 @@ import 'stores.dart';
 ///
 /// Demo mode short-circuits to fixtures; otherwise this is the live Matrix
 /// session. Reading it before the session is initialised is a programming
-/// error, and the auth gate guarantees it cannot happen.
+/// error — and one that used to be fatal for the whole run rather than for the
+/// read that made it.
+///
+/// [matrixSessionProvider] hands out the same object before and after
+/// `initialize()`, so nothing in this provider's dependencies changed when the
+/// session became usable. A read from above the auth gate — a share intent on
+/// a cold start, a push, anything that asks for the inbox during startup —
+/// therefore threw `initialize() has not been called`, Riverpod kept that
+/// failure as this provider's state, and every later read rethrew it: signing
+/// in led straight to a red `ProviderException` where the inbox should be, for
+/// as long as the process lived.
+///
+/// Watching the bootstrap is what makes the failure temporary. It is the thing
+/// that *does* change when the session comes up, so a premature read now fails
+/// only until then and the provider rebuilds itself into a working repository
+/// — the same shape [storesProvider] already has, and the same lesson
+/// [mediaHeadersProvider] carries: a mutable field on an object Riverpod has
+/// already handed out is not something Riverpod can recompute on.
+///
+/// The bootstrap rather than [sessionStateProvider], which is what the headers
+/// watch: that one re-emits on every reconnection and soft-logout refresh, and
+/// rebuilding the repository on each of those would throw away the identity
+/// graph and every open timeline for a token that changed. This resolves once.
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   if (kDemoMode) return DemoChatRepository();
+
+  // First, and before anything that can throw: a dependency only counts once
+  // `ref.watch` has run, and a build that threw before reaching this line
+  // would be exactly the un-healable failure this guards against.
+  if (ref.watch(sessionBootstrapProvider).isLoading) {
+    throw StateError(
+      'Chat repository read before the session finished starting',
+    );
+  }
 
   final stores = ref.watch(storesProvider);
   final repository = MatrixChatRepository(
