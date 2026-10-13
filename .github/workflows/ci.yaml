@@ -21,9 +21,11 @@ concurrency:
 # subosito/flutter-action: there is no linux-arm64 Flutter archive to download.
 # See that action for the detail.
 #
-# The macOS jobs below keep subosito/flutter-action — Flutter does publish
-# macos-arm64 archives — and stay on GitHub-hosted runners, so they remain
-# blocked on billing until that is settled.
+# The macOS jobs run on the self-hosted Mac for the same reason, and a
+# sharper one: a hosted macOS minute is billed as ten, so the two of them
+# cost about eighty minutes a push — a month's allowance in under forty
+# pushes. They only need Flutter, not Xcode. The `android` label picks the
+# Mac runner with room for an SDK; the other one has none.
 
 env:
   FLUTTER_VERSION: "3.44.0"
@@ -97,14 +99,12 @@ jobs:
     name: Widget & golden tests
     # macOS, not ubuntu: the golden files are rendered on macOS and font
     # rasterization differs per platform — Linux fails every golden on pixels.
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, android]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - run: flutter pub get
       # These three depend on the Flutter SDK — weft_matrix on `compute` and the
       # SDK's own Flutter-only bindings, weft_store on sqflite, weft_design on
@@ -140,14 +140,12 @@ jobs:
     name: Accessibility & RTL
     # Same macOS constraint as the widget job: the contrast sweep samples
     # rendered pixels, and Linux text rasterization shifts them.
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, android]
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
       - run: flutter pub get
       # A subset of what the `widget` job already runs, on purpose. Two reasons
       # it is worth the overlap, both about the report rather than the coverage:
