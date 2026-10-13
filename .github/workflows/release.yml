@@ -51,7 +51,9 @@ jobs:
     # darwin-aarch64 build-tools. The GitHub-hosted-only steps below are
     # gated on runner.os so the job still works on ubuntu-latest if it ever
     # goes back there.
-    runs-on: [self-hosted, macOS, ARM64]
+    #
+    # `android` picks the Mac with the toolchain — see deploy_internal.yml.
+    runs-on: [self-hosted, macOS, ARM64, android]
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       VERSION: ${{ needs.verify.outputs.version }}

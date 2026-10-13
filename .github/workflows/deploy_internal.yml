@@ -32,7 +32,12 @@ jobs:
     name: Build and upload the App Bundle
     # See release.yml's android job: linux-arm64 has no gen_snapshot or aapt2,
     # Apple silicon has both.
-    runs-on: [self-hosted, macOS, ARM64]
+    #
+    # `android` names the Mac that actually carries the SDK, the NDK and
+    # rustup. There are two Mac runners and only one of them does: on the
+    # other this job died at its first step, with nothing to build with and no
+    # room to put it.
+    runs-on: [self-hosted, macOS, ARM64, android]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

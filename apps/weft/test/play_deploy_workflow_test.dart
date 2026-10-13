@@ -157,7 +157,8 @@ void main() {
         r'^    runs-on: (.*)$',
         multiLine: true,
       ).allMatches(workflow).map((m) => m.group(1)).toSet(),
-      {'[self-hosted, macOS, ARM64]'},
+      // `android` and not just any Mac: the second Mac runner has no SDK.
+      {'[self-hosted, macOS, ARM64, android]'},
     );
   });
 
