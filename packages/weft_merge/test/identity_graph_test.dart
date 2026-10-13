@@ -24,6 +24,28 @@ void main() {
       expect(contacts.single.handles, hasLength(1));
     });
 
+    test('only contacts holding more than one handle count as merged', () {
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Anna Maven'),
+          handle('b', ChatNetwork.signal, displayName: 'Anna'),
+          handle('c', ChatNetwork.telegram, displayName: 'Ben'),
+        ],
+        idFactory: counterIds(),
+      );
+
+      expect(graph.mergedContactIds(), isEmpty);
+
+      graph.merge('a', 'b');
+
+      expect(graph.mergedContactIds(), {graph.contactIdOf('a')});
+      expect(graph.mergedContactIds(), isNot(contains(graph.contactIdOf('c'))));
+
+      graph.unmerge('b');
+
+      expect(graph.mergedContactIds(), isEmpty);
+    });
+
     test('merging two handles yields one contact spanning both networks', () {
       final graph = IdentityGraph(
         handles: [

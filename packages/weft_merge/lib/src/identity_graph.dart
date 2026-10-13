@@ -180,6 +180,20 @@ class IdentityGraph {
       .map((e) => _handles[e.key]!)
       .sorted((a, b) => a.network.index.compareTo(b.network.index));
 
+  /// The ids of every contact that holds more than one handle.
+  ///
+  /// One pass over the partition. [handlesInContact] answers the same question
+  /// for a single contact by walking all of it, which is the wrong tool for a
+  /// caller that asks about each conversation in turn.
+  Set<String> mergedContactIds() {
+    final seen = <String>{};
+    final merged = <String>{};
+    for (final contactId in _contactOf.values) {
+      if (!seen.add(contactId)) merged.add(contactId);
+    }
+    return merged;
+  }
+
   /// Materialises the current partition as contacts.
   List<UnifiedContact> contacts() {
     final grouped = <String, List<NetworkHandle>>{};

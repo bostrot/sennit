@@ -15,6 +15,7 @@ import 'package:weft_store/weft_store.dart';
 
 import 'auto_reply_transport.dart';
 import 'chat_repository.dart';
+import 'profile_lookups.dart';
 import 'sms_chat_repository.dart';
 
 /// Reads the whole of a picked file.
@@ -211,6 +212,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   final Map<String, sdk.Profile> _profiles = {};
   final Set<String> _profilesInFlight = {};
 
+  /// Profile lookups go out a few at a time. One rebuild of a large account
+  /// asks for a profile per conversation, and issuing them together was a
+  /// couple of thousand requests in one frame — see [LookupLane].
+  final LookupLane _profileLane = LookupLane();
+
   /// The room's member list is lazy-loaded, so a bridged contact's avatar is
   /// usually not in memory at all — which is why avatars stayed as initials
   /// however the URL was built. Ask the server once per peer, then rebuild.
@@ -260,8 +266,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       }
     }
 
-    lookup().then((result) {
-      final (profile, failed) = result;
+    _profileLane.add(() async {
+      final (profile, failed) = await lookup();
+      // What the inbox shows for this person right now. Read before the answer
+      // is filed, because afterwards it *is* the answer.
+      final shown = _graph.handleFor(userId);
       _profiles[userId] = profile;
       _profilesInFlight.remove(userId);
       // An answer that came out of a *network failure* is not an answer: a
@@ -273,7 +282,21 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       }
       // A name is as much a reason to redraw as a picture: chats waiting on a
       // lazy-loaded member are titled by their raw identifier until this lands.
-      if (profile.avatarUrl != null || profile.displayName != null) _rebuild();
+      //
+      // Only when it says something the inbox is not already showing, though,
+      // and never straight away. A rebuild scans every room and, when a handle
+      // moved, scores every pair of them for a merge; one per answer made a
+      // launch cost the square of the account — a thousand contacts, a
+      // thousand full rebuilds, back to back on the UI thread, every time the
+      // app was opened. Scheduled, the answers that land within one window
+      // share a single rebuild.
+      final name = profile.displayName?.trim();
+      final news =
+          _thumbnail(profile.avatarUrl?.toString()) != shown?.avatarUrl ||
+          (name != null &&
+              name.isNotEmpty &&
+              _stripNetworkTag(name) != shown?.displayName);
+      if (news) _scheduleRebuild();
     });
   }
 
@@ -1738,6 +1761,8 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     await _syncSub?.cancel();
     await _smsSub?.cancel();
     await _uploadSub?.cancel();
+    _profileLane.close();
+    _rebuildDebounce?.cancel();
     // Cancels everything outstanding: an upload with no repository left to send
     // its event would push bytes nobody will ever reference.
     await _queue?.dispose();
@@ -1789,6 +1814,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   void _rebuild() {
     _refreshIdentityGraph();
     _applyAutoMerges();
+    _mergedContactIds = null;
 
     final service = <String>{};
     final byRoom = <String, Chat>{};
@@ -1828,7 +1854,33 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     if (fetched != null && fetched.isNotEmpty) {
       return _stripNetworkTag(fetched);
     }
-    return null;
+    // Neither the room nor the server has said yet — which, with lazy-loaded
+    // members, is every conversation at the start of every run. What the last
+    // run learned is still true far more often than not, and using it is what
+    // keeps a relaunch from re-asking for, and re-titling, the whole inbox.
+    return _remembered(room, peerId).displayName;
+  }
+
+  /// The peer's name and picture as the identity store last had them, or
+  /// nothing once this run knows better.
+  ///
+  /// "Knows better" is a fetched profile or a loaded member event, including
+  /// one that says the person has no picture: a remembered avatar must not
+  /// outlive the contact taking theirs down.
+  ({String? displayName, String? avatarUrl}) _remembered(
+    sdk.Room room,
+    String peerId,
+  ) {
+    if (_profiles.containsKey(peerId) ||
+        room.getState(sdk.EventTypes.RoomMember, peerId) != null) {
+      return (displayName: null, avatarUrl: null);
+    }
+    return rememberedProfile(
+      _graph.handleFor(peerId),
+      fallbackName: room
+          .unsafeGetUserFromMemoryOrFallback(peerId)
+          .calcDisplayname(),
+    );
   }
 
   /// Rebuilds handles from direct chats so the scorer can suggest merges.
@@ -1889,7 +1941,13 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         displayName: _peerDisplayName(room, peerId) ?? peer.calcDisplayname(),
         avatarUrl:
             _thumbnail(peer.avatarUrl?.toString()) ??
-            _thumbnail(_profiles[peerId]?.avatarUrl?.toString()),
+            _thumbnail(_profiles[peerId]?.avatarUrl?.toString()) ??
+            // Kept rather than blanked while nobody has answered: writing
+            // null over a stored picture here made every handle look changed
+            // on the first rebuild of a run, and changed again when its
+            // profile landed — two SQLite writes and two merge passes per
+            // contact, per launch, for a row that ended where it began.
+            _remembered(room, peerId).avatarUrl,
         // The localpart of a bridged ghost is often the phone number. Storing
         // the normalised form means the strongest merge signal is actually
         // persisted, rather than left for the scorer to re-derive each pass —
@@ -2025,22 +2083,20 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     return null;
   }
 
+  /// Compiled once: this runs for every conversation on every rebuild.
+  static final RegExp _networkTag = RegExp(
+    r'\s*\((WA|WhatsApp|Signal|Telegram|TG|SMS|FB|'
+    r'Messenger|IG|Instagram|Discord|Slack|GChat|iMessage|LinkedIn|'
+    r'Meta|X|Twitter|MM|Mattermost)\)\s*$',
+  );
+
   /// A network-decorated ghost name, undecorated.
   ///
   /// Bridge display-name templates append the network — "Anna (WA)",
   /// "Anna (Signal)" — which is redundant in a UI that already labels every
   /// chat with its network glyph, and noise in a merged conversation.
   static String _stripNetworkTag(String name) {
-    final stripped = name
-        .replaceFirst(
-          RegExp(
-            r'\s*\((WA|WhatsApp|Signal|Telegram|TG|SMS|FB|'
-            r'Messenger|IG|Instagram|Discord|Slack|GChat|iMessage|LinkedIn|'
-            r'Meta|X|Twitter|MM|Mattermost)\)\s*$',
-          ),
-          '',
-        )
-        .trim();
+    final stripped = name.replaceFirst(_networkTag, '').trim();
     return stripped.isEmpty ? name : stripped;
   }
 
@@ -2113,6 +2169,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
     final cached = _profiles[peerId];
     if (cached != null) return _thumbnail(cached.avatarUrl?.toString());
+
+    // A picture the last run already resolved is drawn as it is, and nothing
+    // is asked: the member event arrives with the next sync that touches it
+    // and replaces this the ordinary way.
+    final remembered = _remembered(room, peerId).avatarUrl;
+    if (remembered != null) return remembered;
 
     _ensureProfile(peerId, room: room);
     return null;
@@ -2315,12 +2377,21 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     if (handle == null) return false;
 
     final contactId = _graph.contactIdOf(handle.id);
-    if (contactId != null && _graph.handlesInContact(contactId).length > 1) {
+    if (contactId != null &&
+        (_mergedContactIds ??= _graph.mergedContactIds()).contains(contactId)) {
       return true;
     }
     final digits = handle.phoneE164?.replaceAll(RegExp(r'\D'), '');
     return digits != null && _contactNames.containsKey(digits);
   }
+
+  /// Which contacts hold more than one handle, as of the current rebuild.
+  ///
+  /// [_isKnownContact] is asked once per conversation per rebuild, and asking
+  /// the graph for a contact's handles walks every handle there is — so the
+  /// question cost the square of the inbox, on the UI thread, on every sync.
+  /// One pass answers it for all of them; [_rebuild] drops it.
+  Set<String>? _mergedContactIds;
 
   /// Requests answered this session, held until the membership change lands.
   final Map<String, ChatRequestState> _answeredRequests = {};
