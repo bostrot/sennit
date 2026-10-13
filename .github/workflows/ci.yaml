@@ -244,6 +244,17 @@ jobs:
       - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      # A self-hosted runner outlives the job, and so did the homeserver: the
+      # container is `restart: unless-stopped`, `up --wait` is satisfied by one
+      # that is already running, and the next run then signed Alice and Bob in
+      # to every room the runs before it had made. A hosted runner hid this by
+      # being new each time. The tree is removed as root because Synapse writes
+      # its database and media store as a user that is nobody here.
+      - name: Start from a clean homeserver
+        run: |
+          docker compose -f tooling/docker/compose.yaml down --volumes --remove-orphans || true
+          sudo rm -rf tooling/docker/synapse-data
+          mkdir -p tooling/docker/synapse-data
       - name: Generate Synapse config
         run: |
           docker run --rm -v "$PWD/tooling/docker/synapse-data:/data" \
@@ -337,3 +348,8 @@ jobs:
       - name: Homeserver logs on failure
         if: failure()
         run: docker compose -f tooling/docker/compose.yaml logs synapse
+      - name: Stop the homeserver
+        if: always()
+        run: |
+          docker compose -f tooling/docker/compose.yaml down --volumes --remove-orphans || true
+          sudo rm -rf tooling/docker/synapse-data
