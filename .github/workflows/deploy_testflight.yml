@@ -4,20 +4,22 @@ name: Publish to TestFlight Internal
 # signed and handed to App Store Connect, where it becomes a TestFlight build
 # for internal testers.
 #
-# Manual only until it has gone green once. Nothing in the repository can
-# sign for iOS — no team, no certificate, no profile; see
-# docs/decisions/adr-002-ios-signing-handoff.md — so this leans on an App
-# Store Connect API key instead: with one, xcodebuild registers the App IDs,
-# creates the distribution certificate and writes the profiles for every
-# target itself (`-allowProvisioningUpdates`), which is seven targets' worth
-# of portal work nobody has to do by hand or keep in secrets.
+# Nothing in the repository can sign for iOS — no team, no certificate, no
+# profile; see docs/decisions/adr-002-ios-signing-handoff.md — so this leans
+# on an App Store Connect API key instead: with one, xcodebuild creates the
+# certificate and writes the profiles for every target itself
+# (`-allowProvisioningUpdates`), which is seven targets' worth of portal work
+# nobody has to do by hand or keep in secrets. What it does not do is put an
+# App Group on an App ID; that was done on the portal, once.
 #
-# When it has passed once, give it deploy_internal.yml's trigger:
-#
-#   push:
-#     branches: [main]
-#     paths: ['apps/weft/pubspec.yaml']
+# Same trigger as deploy_internal.yml: a version bump on main ships to
+# internal testers on both stores, and a manual run ships whatever main is.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/weft/pubspec.yaml'
   workflow_dispatch:
 
 # Two archives of one commit carry one build number, and App Store Connect
@@ -33,11 +35,12 @@ env:
 jobs:
   build:
     name: Archive and upload to TestFlight
-    # Needs Xcode, which neither self-hosted Mac has yet. A hosted macOS
-    # minute is billed as ten and an archive of this app takes a quarter of
-    # an hour, so once a runner of our own carries Xcode, point this at it by
-    # setting the repository variable TESTFLIGHT_RUNS_ON to its labels as
-    # JSON, e.g. ["self-hosted","macOS","ARM64","xcode"].
+    # Needs Xcode. A hosted macOS minute is billed as ten and an archive of
+    # this app takes a quarter of an hour, so the repository variable
+    # TESTFLIGHT_RUNS_ON points this at the self-hosted Mac that carries
+    # Xcode — its labels as JSON, e.g.
+    # ["self-hosted","macOS","ARM64","android"]. Without the variable it
+    # falls back to a hosted runner.
     runs-on: ${{ fromJSON(vars.TESTFLIGHT_RUNS_ON || '"macos-15"') }}
     steps:
       - name: Checkout code

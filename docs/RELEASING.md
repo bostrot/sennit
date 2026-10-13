@@ -128,8 +128,8 @@ Without these, the workflow produces an **unsigned** IPA for sideloading
 ### iOS — TestFlight
 
 `deploy_testflight.yml` archives `main` and uploads it to App Store Connect as
-an internal-only TestFlight build. It is manual (`workflow_dispatch`) until it
-has passed once. It signs with an **App Store Connect API key** rather than a
+an internal-only TestFlight build, on the same trigger as the Play upload: a
+version bump on `main`, or a manual run. It signs with an **App Store Connect API key** rather than a
 checked-in certificate and profiles: with the key, `xcodebuild` registers the
 App IDs and creates the certificate and the profiles for all seven targets
 itself.
@@ -153,10 +153,13 @@ Before the first run, once:
 
 The build number is the commit count, the same number the Play upload uses.
 
-It runs on a GitHub-hosted Mac by default, where a minute is billed as ten —
-roughly 150 to 200 billed minutes an upload. To run it on a Mac of our own
-that has Xcode, set the repository variable `TESTFLIGHT_RUNS_ON` to that
-runner's labels as JSON, e.g. `["self-hosted","macOS","ARM64","xcode"]`.
+It runs on the self-hosted Mac named by the repository variable
+`TESTFLIGHT_RUNS_ON` (the runner's labels as JSON). That Mac needs Xcode with
+the iOS and watchOS platforms, CocoaPods, rustup with the iOS targets, and a
+keychain `ci.keychain-db` set as the default with its password in
+`~/.ci-keychain-pass` — a runner started as a service cannot be asked for the
+login keychain's password. Without the variable the job falls back to a
+GitHub-hosted Mac, where a minute is billed as ten.
 
 ### Windows / Linux
 
