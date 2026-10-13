@@ -125,6 +125,39 @@ matching provisioning profile for `com.bostrot.weft`.
 Without these, the workflow produces an **unsigned** IPA for sideloading
 (AltStore, Sideloadly, TrollStore — the user signs it themselves).
 
+### iOS — TestFlight
+
+`deploy_testflight.yml` archives `main` and uploads it to App Store Connect as
+an internal-only TestFlight build. It is manual (`workflow_dispatch`) until it
+has passed once. It signs with an **App Store Connect API key** rather than a
+checked-in certificate and profiles: with the key, `xcodebuild` registers the
+App IDs and creates the certificate and the profiles for all seven targets
+itself.
+
+Before the first run, once:
+
+1. An app record for `com.bostrot.weft` in App Store Connect (My Apps → +).
+2. The App Group `group.com.bostrot.weft` on the developer portal — see
+   [[adr-002-ios-signing-handoff]].
+3. A team API key with the **App Manager** role (Users and Access →
+   Integrations → App Store Connect API).
+4. An internal tester group in TestFlight; builds reach it once Apple has
+   processed them.
+
+| Secret | Value |
+|---|---|
+| `APP_STORE_CONNECT_KEY_ID` | the key's 10-character id |
+| `APP_STORE_CONNECT_ISSUER_ID` | the issuer id shown above the key list |
+| `APP_STORE_CONNECT_KEY_P8_BASE64` | the downloaded `AuthKey_….p8`, base64 |
+| `APPLE_TEAM_ID` | 10-char team id |
+
+The build number is the commit count, the same number the Play upload uses.
+
+It runs on a GitHub-hosted Mac by default, where a minute is billed as ten —
+roughly 150 to 200 billed minutes an upload. To run it on a Mac of our own
+that has Xcode, set the repository variable `TESTFLIGHT_RUNS_ON` to that
+runner's labels as JSON, e.g. `["self-hosted","macOS","ARM64","xcode"]`.
+
 ### Windows / Linux
 
 Ship unsigned. Windows SmartScreen will warn until the binary earns

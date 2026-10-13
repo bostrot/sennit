@@ -1,0 +1,141 @@
+name: Publish to TestFlight Internal
+
+# The iOS half of deploy_internal.yml: an archive of whatever main is now,
+# signed and handed to App Store Connect, where it becomes a TestFlight build
+# for internal testers.
+#
+# Manual only until it has gone green once. Nothing in the repository can
+# sign for iOS — no team, no certificate, no profile; see
+# docs/decisions/adr-002-ios-signing-handoff.md — so this leans on an App
+# Store Connect API key instead: with one, xcodebuild registers the App IDs,
+# creates the distribution certificate and writes the profiles for every
+# target itself (`-allowProvisioningUpdates`), which is seven targets' worth
+# of portal work nobody has to do by hand or keep in secrets.
+#
+# When it has passed once, give it deploy_internal.yml's trigger:
+#
+#   push:
+#     branches: [main]
+#     paths: ['apps/weft/pubspec.yaml']
+on:
+  workflow_dispatch:
+
+# Two archives of one commit carry one build number, and App Store Connect
+# refuses the second.
+concurrency:
+  group: testflight-internal
+  cancel-in-progress: false
+
+# Bump together with release.yml and deploy_internal.yml.
+env:
+  FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  build:
+    name: Archive and upload to TestFlight
+    # Needs Xcode, which neither self-hosted Mac has yet. A hosted macOS
+    # minute is billed as ten and an archive of this app takes a quarter of
+    # an hour, so once a runner of our own carries Xcode, point this at it by
+    # setting the repository variable TESTFLIGHT_RUNS_ON to its labels as
+    # JSON, e.g. ["self-hosted","macOS","ARM64","xcode"].
+    runs-on: ${{ fromJSON(vars.TESTFLIGHT_RUNS_ON || '"macos-15"') }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: The App Store Connect key and the team must exist
+        # As in deploy_internal.yml: uploading is all this is for, so a
+        # missing secret is a failure and not a skip.
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          [ -n "$KEY_ID" ] || missing="$missing APP_STORE_CONNECT_KEY_ID"
+          [ -n "$ISSUER_ID" ] || missing="$missing APP_STORE_CONNECT_ISSUER_ID"
+          [ -n "$KEY_P8" ] || missing="$missing APP_STORE_CONNECT_KEY_P8_BASE64"
+          [ -n "$TEAM_ID" ] || missing="$missing APPLE_TEAM_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets missing:$missing (see docs/RELEASING.md)"
+            exit 1
+          fi
+
+      - name: Setup Flutter
+        uses: ./.github/actions/setup-flutter
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install the App Store Connect key
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}" | base64 -d \
+            > "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      - name: Install Dependencies
+        run: flutter pub get
+        working-directory: apps/weft
+
+      - name: Configure the build
+        # The commit count, as on Play: one number for the same commit on
+        # both stores, rising with every commit and needing no bump. The
+        # extensions and the watch app read it from Generated.xcconfig, and
+        # an appex whose version differs from its host is refused at upload.
+        run: |
+          flutter build ios --release --config-only --no-codesign \
+            --build-number="$(git rev-list --count HEAD)"
+        working-directory: apps/weft
+
+      - name: Archive
+        # xcodebuild and not `flutter build ipa`: the tool passes
+        # `-sdk iphoneos`, which forces the watch companion onto the iOS SDK
+        # — see release.yml's ios job. A generic iOS destination lets each
+        # target pick its own.
+        run: |
+          xcodebuild archive \
+            -workspace apps/weft/ios/Runner.xcworkspace \
+            -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+
+      - name: Upload to TestFlight
+        # `destination: upload` makes the export the upload.
+        # `testFlightInternalTestingOnly` keeps the build out of external
+        # testing and the App Store, which is what "internal" means here.
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+
+      - name: Remove the key from the runner
+        # A self-hosted workspace outlives the job; the key must not.
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/ExportOptions.plist"
