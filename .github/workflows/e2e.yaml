@@ -27,11 +27,16 @@ on:
           (e.g. integration_test/patrol/login_test.dart). Empty runs the subset.
         type: string
         default: ""
-  schedule:
-    # 03:17 UTC. Off the hour on purpose: the top of the hour is when most of
-    # GitHub's scheduled workflows queue, and a nightly that waits 40 minutes
-    # for a macOS runner has spent its budget on the queue.
-    - cron: "17 3 * * *"
+  # No schedule for now. The nightly ran on hosted runners, where a macOS
+  # minute is billed as ten: about 112 billed minutes a night, half of the
+  # month's allowance, for a matrix that had been red every night since
+  # September. Run it by hand until it passes, then put this back:
+  #
+  # schedule:
+  #   # 03:17 UTC. Off the hour on purpose: the top of the hour is when most of
+  #   # GitHub's scheduled workflows queue, and a nightly that waits 40 minutes
+  #   # for a macOS runner has spent its budget on the queue.
+  #   - cron: "17 3 * * *"
 
 # A second nightly while the first is still running would fight it for the same
 # shared homeserver name per runner — they are separate VMs, so this is really
