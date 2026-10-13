@@ -79,8 +79,10 @@ That secret **and** the four Android signing secrets above are required: the
 workflow fails on its first step when any is missing, rather than building a
 debug-signed bundle Play would refuse.
 
-The `versionCode` is the workflow's run number (`--build-number`), which rises
-on every run, so manual runs never collide. Internal testing is the one track
+The `versionCode` is the number of commits on `main` (`--build-number`), which
+rises with every commit, so a manual run of a newer `main` needs neither a
+version bump nor a tag. Running it twice on the same commit is refused by
+Play, as the same build uploaded twice should be. Internal testing is the one track
 Play accepts a build on before the store listing is complete, so this works
 with `tooling/store/` still unuploaded.
 

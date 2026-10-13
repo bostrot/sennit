@@ -12,8 +12,8 @@ on:
       - main
     paths:
       - 'apps/weft/pubspec.yaml'
-  # The version code is the build time, so a manual run produces one Play
-  # accepts without a pubspec bump.
+  # The version code is the commit count, so a manual run of a newer main
+  # produces one Play accepts without a pubspec bump.
   workflow_dispatch:
 
 # Two uploads racing for the internal track would both build, and the slower
@@ -146,12 +146,18 @@ jobs:
 
       - name: Build App Bundle
         if: steps.check_version.outputs.changed == 'true'
-        # Seconds since the epoch: unique per run and always rising, which
-        # the run number is too, but Play compares against every code the app
-        # has ever had — papervault already sits at 1787693707, and Braid's
-        # first bundle went up from a workstation the same way. Stays below
-        # Play's 2100000000 ceiling until 2036.
-        run: flutter build appbundle --release --build-number="$(date +%s)"
+        # The number of commits on the branch: it rises with every commit, so
+        # a manual run of a newer main needs no pubspec bump and no tag, and it
+        # is the same count tooling/scripts/release.sh writes after the `+`.
+        # Not the build time. That was here once, on the belief that Braid's
+        # first bundle carried one; it carried 1, and Play then refused to let
+        # a release jump from 1 to 1.79 billion without an override that
+        # cannot be taken back — its ceiling is 2100000000, and every later
+        # code has to be higher than the last. Two runs of one commit share a
+        # code and the second is refused, which is the right answer to
+        # uploading the same build twice. Needs the full history: see
+        # `fetch-depth: 0` above.
+        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)"
         working-directory: apps/weft
 
       - name: Upload to Play Store

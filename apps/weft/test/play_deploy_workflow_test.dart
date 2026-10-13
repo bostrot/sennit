@@ -66,12 +66,14 @@ void main() {
 
   test('every run gets a version code above every earlier one', () {
     // Play refuses a versionCode at or below one the app has already had.
-    // The pubspec build number does not move on a manual run, and the run
-    // number starts far below the timestamp codes already on Play.
-    expect(
-      _input(_step(workflow, 'Build App Bundle'), 'run'),
-      contains(r'--build-number=$(date +%s)'),
-    );
+    // The pubspec build number does not move on a manual run; the commit
+    // count does, and stays small — a timestamp would spend most of Play's
+    // 2100000000 ceiling on the first upload and cannot be walked back.
+    final run = _input(_step(workflow, 'Build App Bundle'), 'run');
+    expect(run, contains(r'--build-number=$(git rev-list --count HEAD)'));
+    expect(run, isNot(contains('date +%s')));
+    // A shallow clone counts one commit, every time.
+    expect(_input(_step(workflow, 'Checkout code'), 'fetch-depth'), '0');
   });
 
   test('the upload targets the package id the app is actually built with', () {
