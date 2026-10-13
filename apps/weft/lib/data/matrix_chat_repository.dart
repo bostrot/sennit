@@ -1696,7 +1696,20 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     //
     // The local badge is not lost by this: the request lives in its own section
     // with its own affordances, and clearing it is what accepting does.
-    if (chat.isPendingRequest) return;
+    //
+    // Asked of the rooms as they are now, not only of [chat]: that is the
+    // inbox as of the last rebuild, and rebuilds are scheduled, not immediate.
+    // Someone who answers a request and keeps reading is, for the second or
+    // so until the next one, still looking at a row that says "pending" — and
+    // the receipt for a conversation they have just spoken in went unsent.
+    if (chat.isPendingRequest &&
+        chat.sources.every((source) {
+          final room = _client.getRoomById(source.roomId);
+          return room == null ||
+              _requestStateOf(room) == ChatRequestState.pending;
+        })) {
+      return;
+    }
 
     // What a read-anchored retention policy counts from. Recorded per *chat*
     // and not per leg, because that is the granularity the user reads at: they
