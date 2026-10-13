@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5F60000000000000000000DD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5F60000000000000000000ED /* Assets.xcassets */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
@@ -232,6 +233,7 @@
 		5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "WeftWatch-Debug.xcconfig"; sourceTree = "<group>"; };
 		5F60000000000000000000EB /* WeftWatch-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "WeftWatch-Release.xcconfig"; sourceTree = "<group>"; };
 		5F60000000000000000000EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		5F60000000000000000000ED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5F60000000000000000000EE /* WeftWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WeftWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F70000000000000000000EE /* WeftWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeftWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		735C6D103AFEED4AF8AC2807 /* Pods-WeftWidget.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WeftWidget.release.xcconfig"; path = "Target Support Files/Pods-WeftWidget/Pods-WeftWidget.release.xcconfig"; sourceTree = "<group>"; };
@@ -415,6 +417,7 @@
 				5F60000000000000000000EA /* WeftWatch-Debug.xcconfig */,
 				5F60000000000000000000EB /* WeftWatch-Release.xcconfig */,
 				5F60000000000000000000EC /* README.md */,
+				5F60000000000000000000ED /* Assets.xcassets */,
 			);
 			path = WeftWatch;
 			sourceTree = "<group>";
@@ -783,6 +786,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5F60000000000000000000DD /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1569,6 +1573,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -1599,6 +1604,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -1627,6 +1633,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bostrot.weft.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
