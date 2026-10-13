@@ -99,23 +99,52 @@ jobs:
             --build-number="$(git rev-list --count HEAD)"
         working-directory: apps/weft
 
+      - name: Unlock the signing keychain
+        # Automatic signing makes an Apple Development certificate the first
+        # time it archives on a machine and keeps its private key in the
+        # default keychain. A runner started as a service has no window to
+        # ask for the login keychain's password in, so the first attempt
+        # ended in "User interaction is not allowed" and left a certificate
+        # on the portal with no key anywhere. A self-hosted Mac therefore
+        # carries a keychain of its own, `ci.keychain-db`, set as the default,
+        # with its password beside it in ~/.ci-keychain-pass; a hosted runner
+        # has neither and its login keychain is already open.
+        run: |
+          if [ -f "$HOME/.ci-keychain-pass" ]; then
+            security unlock-keychain -p "$(cat "$HOME/.ci-keychain-pass")" ci.keychain-db
+          fi
+
       - name: Archive
         # xcodebuild and not `flutter build ipa`: the tool passes
         # `-sdk iphoneos`, which forces the watch companion onto the iOS SDK
         # — see release.yml's ios job. A generic iOS destination lets each
         # target pick its own.
+        #
+        # Twice, if the first fails on a self-hosted Mac: a key Xcode has only
+        # just created is not yet one codesign may use without asking, and
+        # the partition list that allows it can only be set once the key
+        # exists. Every later run finds it already set.
         run: |
-          xcodebuild archive \
-            -workspace apps/weft/ios/Runner.xcworkspace \
-            -scheme Runner -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          archive() {
+            xcodebuild archive \
+              -workspace apps/weft/ios/Runner.xcworkspace \
+              -scheme Runner -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
+              DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+              CODE_SIGN_STYLE=Automatic \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+              -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+              -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          }
+          allow_codesign() {
+            [ -f "$HOME/.ci-keychain-pass" ] || return 1
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+              -k "$(cat "$HOME/.ci-keychain-pass")" ci.keychain-db > /dev/null
+          }
+          allow_codesign || true
+          archive || { allow_codesign && archive; }
 
       - name: Upload to TestFlight
         # `destination: upload` makes the export the upload.
