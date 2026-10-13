@@ -64,6 +64,16 @@ jobs:
             exit 1
           fi
 
+      - name: Put CocoaPods and rustup's Rust on PATH
+        # A self-hosted runner's PATH is whatever its service started with,
+        # which is neither Homebrew's `pod` nor rustup. ~/.cargo/bin goes in
+        # last so it ends up first: flutter_vodozemac needs rustup's
+        # toolchains, not a Homebrew rustc that only knows the host.
+        run: |
+          [ -d /opt/homebrew/bin ] && echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          [ -d "$HOME/.cargo/bin" ] && echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - name: Setup Flutter
         uses: ./.github/actions/setup-flutter
         with:
