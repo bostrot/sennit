@@ -12,5 +12,7 @@
 "NSPhotoLibraryUsageDescription" = "Braid necesita tu fototeca para que puedas enviar fotos y vídeos en una conversación.";
 "NSCameraUsageDescription" = "Braid necesita la cámara para que puedas hacer una foto y enviarla en una conversación.";
 "NSLocationWhenInUseUsageDescription" = "Braid comparte tu ubicación solo cuando tocas «compartir ubicación» en un chat.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Braid comparte tu ubicación solo cuando tocas «compartir ubicación» en un chat. Nunca la sigue en segundo plano.";
+"NSCalendarsUsageDescription" = "Braid añade un evento a tu calendario solo cuando se lo pides, para una fecha mencionada en un chat.";
 "NSContactsUsageDescription" = "Braid muestra los nombres de tu agenda en lugar de los que les asignan las redes de mensajería. Los contactos se comparan en este dispositivo y nunca se suben.";
 "NSMicrophoneUsageDescription" = "Braid necesita el micrófono para que puedas hablar en una llamada de voz o de vídeo.";

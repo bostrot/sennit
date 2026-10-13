@@ -38,6 +38,16 @@
 	     The camera description above already covers a video call. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Braid shares your position only when you tap "share location" in a chat.</string>
+	<!-- Neither of the next two is a permission Braid asks for. App Store
+	     Connect scans the binary for the APIs behind them — geolocator links
+	     the "always" location call, add_2_calendar links EventKit — and
+	     refuses a build whose Info.plist has no sentence for an API it can
+	     see, used or not: the first TestFlight upload failed processing on
+	     the calendar one. The sentences say what the app does do. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Braid shares your position only when you tap "share location" in a chat. It never follows it in the background.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Braid adds an event to your calendar only when you ask it to, for a date mentioned in a chat.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Braid shows your address book names for people instead of the names messaging networks assign them. Contacts are matched on this device and never uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>

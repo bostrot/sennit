@@ -12,5 +12,7 @@
 "NSPhotoLibraryUsageDescription" = "Braid 需要访问你的照片图库，以便你在对话中发送照片和视频。";
 "NSCameraUsageDescription" = "Braid 需要使用相机，以便你拍摄照片并在对话中发送。";
 "NSLocationWhenInUseUsageDescription" = "Braid 只有在你于聊天中点按「共享位置」时才会共享你的位置。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Braid 只有在你于聊天中点按「共享位置」时才会共享你的位置，绝不会在后台持续获取。";
+"NSCalendarsUsageDescription" = "Braid 只有在你要求时，才会把聊天中提到的日期添加为日历日程。";
 "NSContactsUsageDescription" = "Braid 会显示你通讯录中的名字，而不是消息网络分配的名字。匹配只在本设备上进行，绝不会上传。";
 "NSMicrophoneUsageDescription" = "Braid 需要使用麦克风，以便你在语音或视频通话中讲话。";
