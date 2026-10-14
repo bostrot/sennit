@@ -10,6 +10,7 @@ import '../data/chat_repository.dart';
 import '../data/demo_repository.dart';
 import '../data/matrix_chat_repository.dart';
 import '../data/sms_chat_repository.dart';
+import '../services/background/background_work.dart';
 import '../services/sms/sms_platform.dart';
 import 'package:weft_store/weft_store.dart';
 
@@ -65,6 +66,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
     retention: stores.retention,
     settings: stores.settings,
     sms: ref.watch(smsRepositoryProvider),
+    onUploads: ref.watch(backgroundWorkProvider).reflectUploads,
   );
   ref.onDispose(repository.dispose);
   return repository;

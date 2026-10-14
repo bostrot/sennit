@@ -52,13 +52,15 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
     SmsChatRepository? sms,
+    void Function(List<UploadTask> tasks)? onUploads,
   }) : _store = store,
        _settings = settings,
        _searchStore = searchStore,
        _retention = retention,
        _transportOverride = transport,
        _readBytes = readBytes,
-       _sms = sms {
+       _sms = sms,
+       _onUploads = onUploads {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     final storedHandles = _store?.loadHandles() ?? const <NetworkHandle>[];
@@ -151,6 +153,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// SMS, when this device has it and Braid holds the role. Null everywhere
   /// else, which is the state every path below has to work in anyway.
   final SmsChatRepository? _sms;
+
+  /// Told about every change to the upload queue, so the app can keep
+  /// uploads running — with their progress in a notification — after the user
+  /// leaves it.
+  final void Function(List<UploadTask> tasks)? _onUploads;
 
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
@@ -1493,6 +1500,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   void _onUploadsChanged(List<UploadTask> tasks) {
+    _onUploads?.call(tasks);
     for (final roomId in {for (final task in tasks) task.roomId}) {
       unawaited(_dispatchRoom(roomId));
     }

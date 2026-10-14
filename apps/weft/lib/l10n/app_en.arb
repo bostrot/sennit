@@ -5883,6 +5883,45 @@
   "@notificationChannelBackgroundDescription": {
     "description": "Description of the background channel, in the operating system's notification settings, naming what appears there."
   },
+  "backgroundWorkBackingUp": "Backing up your chats",
+  "@backgroundWorkBackingUp": {
+    "description": "Title of the progress notification shown while a backup archive is being written, so the backup keeps running when the app is in the background. Keep under ~40 chars."
+  },
+  "backgroundWorkRestoring": "Restoring a backup",
+  "@backgroundWorkRestoring": {
+    "description": "Title of the progress notification shown while a backup archive is being restored. Keep under ~40 chars."
+  },
+  "backgroundWorkSendingAttachments": "{count, plural, =1{Sending 1 attachment} other{Sending {count} attachments}}",
+  "@backgroundWorkSendingAttachments": {
+    "description": "Title of the progress notification shown while photos, videos or files are still uploading. Keep under ~40 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backgroundWorkIndexingSearch": "Making messages searchable",
+  "@backgroundWorkIndexingSearch": {
+    "description": "Title of the progress notification shown while messages are embedded for search by meaning. Keep under ~40 chars."
+  },
+  "backgroundWorkMessagesLeft": "{count, plural, =1{1 message left} other{{count} messages left}}",
+  "@backgroundWorkMessagesLeft": {
+    "description": "Second line of the search-indexing progress notification. Keep under ~30 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "backgroundWorkMore": "{count, plural, =1{+1 more task} other{+{count} more tasks}}",
+  "@backgroundWorkMore": {
+    "description": "Small text beside the progress notification when more than one long task is running at once. Keep under ~20 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationChannelGroupMessages": "Messages",
   "@notificationChannelGroupMessages": {
     "description": "Name of the channel group the per-messenger channels sit under, in the operating system's notification settings. Keep under ~16 chars.",

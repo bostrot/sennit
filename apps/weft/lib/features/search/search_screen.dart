@@ -12,6 +12,7 @@ import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../app/search_providers.dart';
+import '../../services/background/background_work.dart';
 import '../chat/chat_view.dart';
 
 /// Search across every conversation.
@@ -240,9 +241,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     'semantic results may be incomplete.',
                 action: TextButton(
                   onPressed: () async {
-                    await backfill.drainAll(
-                      onProgress: (_) {
-                        if (mounted) setState(() {});
+                    final l10n = context.l10n;
+                    // Kept alive in the background: a long history takes
+                    // minutes to embed, and this is the button someone
+                    // presses before putting the phone down.
+                    await ref.read(backgroundWorkProvider).run(
+                      l10n.backgroundWorkIndexingSearch,
+                      (job) {
+                        final total = backfill.pending;
+                        return backfill.drainAll(
+                          onProgress: (remaining) {
+                            job.update(
+                              detail: l10n.backgroundWorkMessagesLeft(
+                                remaining,
+                              ),
+                              fraction: total > 0
+                                  ? 1 - remaining / total
+                                  : null,
+                            );
+                            if (mounted) setState(() {});
+                          },
+                        );
                       },
                     );
                   },

@@ -45,5 +45,50 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftWatchChannel") {
       WeftWatchChannel.register(with: registrar)
     }
+    // Long jobs the user started — a backup, a restore, uploads. Lazily would
+    // do, but every other channel is here and this one costs nothing until used.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftBackgroundWork") {
+      WeftBackgroundWork.register(with: registrar)
+    }
+  }
+}
+
+/// `com.bostrot.weft/background_work`: the iOS end of `IosBackgroundWorkHost`.
+///
+/// `begin` asks for the background time iOS grants a task in progress, so a
+/// backup or an upload started just before the user switched away finishes
+/// instead of freezing mid-file; `end` hands it back. When iOS runs out of
+/// patience first, the expiration handler ends the task itself — an assertion
+/// held past its expiry gets the whole app killed.
+enum WeftBackgroundWork {
+  private static var task: UIBackgroundTaskIdentifier = .invalid
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(
+      name: "com.bostrot.weft/background_work", binaryMessenger: registrar.messenger())
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "begin":
+        let name = (call.arguments as? [String: Any])?["name"] as? String
+        begin(name: name ?? "Background work")
+        result(nil)
+      case "end":
+        end()
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private static func begin(name: String) {
+    guard task == .invalid else { return }
+    task = UIApplication.shared.beginBackgroundTask(withName: name) { end() }
+  }
+
+  private static func end() {
+    guard task != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(task)
+    task = .invalid
   }
 }

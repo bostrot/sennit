@@ -27,8 +27,10 @@ import 'package:weft_backup/weft_backup.dart';
 // which lives with the schema rather than with the format.
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../attachments/media_exporter.dart';
+import '../background/background_work.dart';
 
 /// The extension, and the only one the restore picker offers.
 ///
@@ -105,12 +107,14 @@ class BackupService {
     Future<Directory> Function()? mediaDirectory,
     Future<Directory> Function()? stagingDirectory,
     DateTime Function()? now,
+    BackgroundWork? background,
   }) : _stores = stores,
        _exporter = exporter,
        _picker = picker,
        _mediaDirectory = mediaDirectory ?? _defaultMediaDirectory,
        _stagingDirectory = stagingDirectory ?? _defaultStagingDirectory,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _background = background;
 
   final WeftStores _stores;
   final MediaExporter _exporter;
@@ -118,6 +122,11 @@ class BackupService {
   final Future<Directory> Function() _mediaDirectory;
   final Future<Directory> Function() _stagingDirectory;
   final DateTime Function() _now;
+
+  /// Keeps an export or restore running, with its progress in a notification,
+  /// when the user leaves the app to wait for it. Null in tests and on
+  /// platforms that do not need it.
+  final BackgroundWork? _background;
 
   /// Recorded in the manifest, for a support conversation. Never parsed.
   final String appVersion;
@@ -184,18 +193,22 @@ class BackupService {
     final target = File(p.join(staging.path, suggestedFileName()));
 
     try {
-      await exportArchiveToFile(
-        source: StoreBackupSource(
-          database: _stores.db,
-          mediaDirectory: await _mediaDirectory(),
+      await _tracked(
+        weftPlatformL10n().backgroundWorkBackingUp,
+        onProgress,
+        (onProgress) async => exportArchiveToFile(
+          source: StoreBackupSource(
+            database: _stores.db,
+            mediaDirectory: await _mediaDirectory(),
+          ),
+          passphrase: passphrase,
+          target: target,
+          appVersion: appVersion,
+          createdAt: _now(),
+          includeMedia: includeMedia,
+          onProgress: onProgress,
+          shouldContinue: shouldContinue,
         ),
-        passphrase: passphrase,
-        target: target,
-        appVersion: appVersion,
-        createdAt: _now(),
-        includeMedia: includeMedia,
-        onProgress: onProgress,
-        shouldContinue: shouldContinue,
       );
 
       if (_exporter.canSave) {
@@ -243,15 +256,19 @@ class BackupService {
   }) async {
     final reader = await openArchiveFile(archive.file, passphrase);
     try {
-      return await importArchive(
-        reader: reader,
-        sink: StoreBackupSink(
-          database: _stores.db,
-          mediaDirectory: await _mediaDirectory(),
+      return await _tracked(
+        weftPlatformL10n().backgroundWorkRestoring,
+        onProgress,
+        (onProgress) async => importArchive(
+          reader: reader,
+          sink: StoreBackupSink(
+            database: _stores.db,
+            mediaDirectory: await _mediaDirectory(),
+          ),
+          mode: mode,
+          onProgress: onProgress,
+          shouldContinue: shouldContinue,
         ),
-        mode: mode,
-        onProgress: onProgress,
-        shouldContinue: shouldContinue,
       );
     } finally {
       await reader.close();
@@ -273,6 +290,33 @@ class BackupService {
     } finally {
       await reader.close();
     }
+  }
+
+  /// Runs [body] as a background job titled [title], forwarding its progress
+  /// both to the screen's [onProgress] and to the notification.
+  ///
+  /// Only the archive work is tracked. The save dialog and share sheet after
+  /// an export are the user's own to dismiss, and a notification saying
+  /// "backing up" over a share sheet would be a job that is not running.
+  Future<T> _tracked<T>(
+    String title,
+    void Function(BackupProgress progress)? onProgress,
+    Future<T> Function(void Function(BackupProgress progress) onProgress) body,
+  ) {
+    final background = _background;
+    if (background == null) {
+      return body((progress) => onProgress?.call(progress));
+    }
+    return background.run(
+      title,
+      (job) => body((progress) {
+        onProgress?.call(progress);
+        job.update(
+          fraction: progress.fraction,
+          indeterminate: progress.fraction == null,
+        );
+      }),
+    );
   }
 
   Future<void> _sweep(Directory staging) async {
@@ -299,6 +343,7 @@ final backupServiceProvider = Provider<BackupService>((ref) {
     exporter: ref.watch(mediaExporterProvider),
     picker: ref.watch(archivePickerProvider),
     appVersion: kBraidVersion,
+    background: ref.watch(backgroundWorkProvider),
   );
 });
 

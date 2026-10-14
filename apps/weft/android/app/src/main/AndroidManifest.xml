@@ -91,6 +91,11 @@
          permission only enables *asking* — the user answers a system dialog,
          and saying no costs delivery during Doze, not the feature. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <!-- Long jobs the user started: a backup, a restore, attachments still
+         uploading, the search backfill. `dataSync` is the type for exactly
+         that, and like every type it needs its own permission from Android 14.
+         See `AndroidBackgroundWorkHost`. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <!-- Bluetooth headsets are a call audio *route*, and from Android 12 the
@@ -286,6 +291,17 @@
             android:name=".call.CallForegroundService"
             android:exported="false"
             android:foregroundServiceType="phoneCall"/>
+        <!-- flutter_local_notifications' own service, started by
+             `AndroidBackgroundWorkHost` while a long job runs so it survives the
+             user leaving the app. Does no work itself; its notification is the
+             job's progress. Stops with the task: swiping Braid away ends the
+             engine the job runs in, and a notification outliving it would
+             claim a backup that is no longer happening. -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:stopWithTask="true"
+            android:foregroundServiceType="dataSync"/>
         <!-- The built-in background connection. Holds the process (and the
              headless engine with the Matrix sync loop) alive behind a
              minimum-importance notification. See WeftSyncService. -->
