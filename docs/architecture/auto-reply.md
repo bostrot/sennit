@@ -295,7 +295,9 @@ one, and a retry loop against someone else's Ollama is a way to make a phone
 hot.
 
 `AutoReplyOutcome` names them: `notConfigured`, `unreachable`, `timedOut`,
-`refused` (the model answered with nothing sendable), `sendFailed`. Each becomes
+`refused` (the model answered with nothing sendable), `declined` (the model
+chose not to answer — not a fault, and shown without the error icon),
+`sendFailed`. Each becomes
 its own sentence through `l10n_labels.dart`, on the auto-reply screen's
 "Recent replies" list — a feature that speaks for someone must be able to say
 what it said, and must not fail where only a developer can see it. The log is in
@@ -304,9 +306,19 @@ conversation into the settings table.
 
 `parseAutoReply` is stricter than `parseSmartReplies` and deliberately so. A chip
 nobody taps costs nothing; this text is *sent*, to a person, on WhatsApp, and
-cannot be unsent. So reasoning that never closed its `<think>`, a heading, a
-bulleted analysis, and a 600-character run-on with no sentence to cut at are all
-refused rather than best-efforted into a message.
+cannot be unsent.
+
+So the model is told to answer in a fixed format: the message inside
+`<reply>…</reply>`, or exactly `<no-reply/>` when the user's prompt or the
+conversation says nothing should go out ("don't answer work chats", a message
+that needs no answer). Only the text inside the last `<reply>` pair is ever
+sent; everything outside it is thrown away unread. That is what keeps a thinking
+model's narration out of the conversation: untagged reasoning used to read as an
+ordinary sentence and was sent. An answer without the tags, a `<reply>` that never
+closes, reasoning that never closed its `<think>`, and — inside the tags — a
+heading, a bulleted analysis or a 600-character run-on with no sentence to cut at
+are all refused rather than best-efforted into a message. When the last marker is
+`<no-reply/>` the outcome is `declined`.
 
 ## Where it is wired
 

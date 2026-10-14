@@ -6914,6 +6914,10 @@
   "@autoReplyOutcomeRefused": {
     "description": "Log line when the model answered but with nothing sendable — reasoning it never finished, or an empty answer. About 44 chars."
   },
+  "autoReplyOutcomeDeclined": "Your model chose not to reply",
+  "@autoReplyOutcomeDeclined": {
+    "description": "Log line, and dry-run result, when the model answered that no message should be sent — the user's instruction or the conversation called for silence. Not an error. About 40 chars."
+  },
   "autoReplyOutcomeSendFailed": "The reply could not be sent",
   "@autoReplyOutcomeSendFailed": {
     "description": "Log line when a reply was written and the network refused to carry it. About 40 chars."

@@ -13,102 +13,207 @@ import 'package:weft/services/ai/auto_reply_writer.dart';
 /// and cannot be unsent. So the parser refuses everything that is not plainly a
 /// message rather than making a best effort at one.
 void main() {
-  group('what is accepted', () {
-    test('a plain sentence', () {
-      expect(
-        parseAutoReply('I am away until Monday and will read this then.'),
-        'I am away until Monday and will read this then.',
+  /// What [inner] comes to when the model answers in the format.
+  String? reply(String inner) => parseAutoReply('<reply>$inner</reply>').text;
+
+  group('the answer format', () {
+    test('a tagged message is the reply', () {
+      final draft = parseAutoReply('<reply>Sure, see you at six.</reply>');
+
+      expect(draft.outcome, AutoReplyOutcome.sent);
+      expect(draft.text, 'Sure, see you at six.');
+    });
+
+    test('an answer outside the format is never sent', () {
+      // The bug this exists for: a thinking model's narration, untagged, read
+      // as a sentence and went out.
+      final draft = parseAutoReply(
+        'Okay, Grace is asking whether Ada can make Friday. The instruction '
+        'says to say she is away, so I should write something short.',
       );
+
+      expect(draft.outcome, AutoReplyOutcome.refused);
+      expect(draft.text, isNull);
     });
 
-    test('surrounding whitespace goes', () {
-      expect(
-        parseAutoReply('  Sure, see you at six.\n\n'),
-        'Sure, see you at six.',
-      );
-    });
-
-    test('a reply wrapped in quotes is unwrapped', () {
-      expect(
-        parseAutoReply('"Sure, see you at six."'),
-        'Sure, see you at six.',
-      );
-      expect(
-        parseAutoReply('“Sure, see you at six.”'),
-        'Sure, see you at six.',
-      );
-    });
-
-    test('a quotation inside the reply is left alone', () {
-      // Only a pair wrapping the *whole* text is the model formatting; two
-      // quoted phrases are two quotations.
-      const text = 'She said "yes" and I said "fine".';
-      expect(parseAutoReply(text), text);
-    });
-
-    test('a label the prompt invited is stripped', () {
-      expect(parseAutoReply('Reply: I will be there.'), 'I will be there.');
-      expect(parseAutoReply('Message: I will be there.'), 'I will be there.');
-    });
-
-    test('a fenced block is the answer inside it', () {
-      expect(
-        parseAutoReply('```\nI will be there at six.\n```'),
-        'I will be there at six.',
-      );
-    });
-
-    test("a thinking model's answer after its reasoning", () {
+    test('reasoning around the tags is thrown away', () {
       expect(
         parseAutoReply(
-          '<think>They asked about this afternoon. Ada is away.</think>\n'
-          'I am away this afternoon, sorry.',
-        ),
+          'Grace wants to know about Friday. Ada is away, so a short note.\n'
+          '<reply>I am away on Friday, sorry.</reply>\n'
+          'That keeps it brief.',
+        ).text,
+        'I am away on Friday, sorry.',
+      );
+    });
+
+    test("a thinking model's tagged reasoning is thrown away", () {
+      expect(
+        parseAutoReply(
+          '<think>I could answer <reply>Maybe</reply> but no.</think>\n'
+          '<reply>I am away this afternoon, sorry.</reply>',
+        ).text,
         'I am away this afternoon, sorry.',
       );
     });
 
-    test('a reply that is only an emoji is refused, one with words is not', () {
-      expect(parseAutoReply('👍'), isNull);
-      expect(parseAutoReply('Sounds good 👍'), 'Sounds good 👍');
+    test('the last tagged message wins over a draft in the reasoning', () {
+      expect(
+        parseAutoReply(
+          'First try: <reply>Yo.</reply> Too casual. Better:\n'
+          '<reply>I will get back to you tonight.</reply>',
+        ).text,
+        'I will get back to you tonight.',
+      );
     });
-  });
 
-  group('what is refused', () {
-    test('nothing at all', () {
-      expect(parseAutoReply(''), isNull);
-      expect(parseAutoReply('   \n  '), isNull);
+    test('text whose lower case is longer does not shift the message', () {
+      // 'İ' lower-cases to two code units; offsets taken from a lower-cased
+      // copy would cut the wrong slice out of the original.
+      expect(
+        parseAutoReply('İİİİ İstanbul? <reply>I land at six.</reply>').text,
+        'I land at six.',
+      );
+    });
+
+    test('tags in any case are read', () {
+      expect(parseAutoReply('<REPLY>On my way.</Reply>').text, 'On my way.');
+    });
+
+    test('a message opened and never closed is refused', () {
+      // The budget ran out mid-message.
+      expect(
+        parseAutoReply('<reply>I am away until Monday and will').outcome,
+        AutoReplyOutcome.refused,
+      );
+    });
+
+    test('an empty message is refused', () {
+      expect(
+        parseAutoReply('<reply>  </reply>').outcome,
+        AutoReplyOutcome.refused,
+      );
     });
 
     test('reasoning that never came out of the tag', () {
       // An unclosed <think> means the budget ran out mid-thought; there is no
       // answer in there to send.
       expect(
-        parseAutoReply('<think>Let me consider what Ada would say here and'),
-        isNull,
+        parseAutoReply(
+          '<think>Let me consider <reply>what Ada would say</reply> and',
+        ).outcome,
+        AutoReplyOutcome.refused,
+      );
+    });
+  });
+
+  group('choosing not to reply', () {
+    test('the decline marker is a decline, not a failure', () {
+      final draft = parseAutoReply('<no-reply/>');
+
+      expect(draft.outcome, AutoReplyOutcome.declined);
+      expect(draft.text, isNull);
+    });
+
+    test('spellings a model is likely to use are all a decline', () {
+      for (final marker in ['<no_reply/>', '<NO-REPLY />', '<no-reply>']) {
+        expect(
+          parseAutoReply(marker).outcome,
+          AutoReplyOutcome.declined,
+          reason: marker,
+        );
+      }
+    });
+
+    test('a decline after a drafted reply wins', () {
+      expect(
+        parseAutoReply(
+          'Maybe <reply>See you then.</reply>? No — they said not to answer '
+          'work chats. <no-reply/>',
+        ).outcome,
+        AutoReplyOutcome.declined,
       );
     });
 
+    test('a reply after a considered decline wins', () {
+      expect(
+        parseAutoReply(
+          'I could stay quiet with <no-reply/>, but they asked directly.\n'
+          '<reply>I am away until Monday.</reply>',
+        ).text,
+        'I am away until Monday.',
+      );
+    });
+  });
+
+  group('what is accepted', () {
+    test('a plain sentence', () {
+      expect(
+        reply('I am away until Monday and will read this then.'),
+        'I am away until Monday and will read this then.',
+      );
+    });
+
+    test('surrounding whitespace goes', () {
+      expect(reply('  Sure, see you at six.\n\n'), 'Sure, see you at six.');
+    });
+
+    test('a reply wrapped in quotes is unwrapped', () {
+      expect(reply('"Sure, see you at six."'), 'Sure, see you at six.');
+      expect(reply('“Sure, see you at six.”'), 'Sure, see you at six.');
+    });
+
+    test('a quotation inside the reply is left alone', () {
+      // Only a pair wrapping the *whole* text is the model formatting; two
+      // quoted phrases are two quotations.
+      const text = 'She said "yes" and I said "fine".';
+      expect(reply(text), text);
+    });
+
+    test('a label the prompt invited is stripped', () {
+      expect(reply('Reply: I will be there.'), 'I will be there.');
+      expect(reply('Message: I will be there.'), 'I will be there.');
+    });
+
+    test('a fenced block is the answer inside it', () {
+      expect(
+        reply('```\nI will be there at six.\n```'),
+        'I will be there at six.',
+      );
+    });
+
+    test('a reply that is only an emoji is refused, one with words is not', () {
+      expect(reply('👍'), isNull);
+      expect(reply('Sounds good 👍'), 'Sounds good 👍');
+    });
+  });
+
+  group('what is refused', () {
+    test('nothing at all', () {
+      expect(reply(''), isNull);
+      expect(reply('   \n  '), isNull);
+    });
+
     test('a heading, which is the model analysing rather than answering', () {
-      expect(parseAutoReply("# Here's my reply"), isNull);
-      expect(parseAutoReply('- I could say I am away'), isNull);
-      expect(parseAutoReply('* Option one'), isNull);
+      expect(reply("# Here's my reply"), isNull);
+      expect(reply('- I could say I am away'), isNull);
+      expect(reply('* Option one'), isNull);
     });
 
     test('a label with nothing after it', () {
-      expect(parseAutoReply('The message to send:'), isNull);
+      expect(reply('The message to send:'), isNull);
     });
 
     test('punctuation with no letters in it', () {
-      expect(parseAutoReply('...'), isNull);
-      expect(parseAutoReply('---'), isNull);
+      expect(reply('...'), isNull);
+      expect(reply('---'), isNull);
     });
   });
 
   group('the length ceiling', () {
     test('a long reply is cut at a sentence boundary', () {
       final long = '${'This is a complete sentence. ' * 40}And a final one.';
-      final capped = parseAutoReply(long)!;
+      final capped = reply(long)!;
 
       expect(capped.length, lessThanOrEqualTo(kAutoReplyMaxChars));
       expect(capped, endsWith('.'));
@@ -117,12 +222,12 @@ void main() {
     test('a run-on with no sentence end is refused, not truncated', () {
       // Six hundred characters with nothing to cut at is a model that has
       // stopped writing a message, and half of it is worse than none of it.
-      expect(parseAutoReply('word ' * 200), isNull);
+      expect(reply('word ' * 200), isNull);
     });
 
     test('a reply just under the ceiling is untouched', () {
       final text = '${'a' * (kAutoReplyMaxChars - 1)}.';
-      expect(parseAutoReply(text), text);
+      expect(reply(text), text);
     });
   });
 
@@ -156,7 +261,9 @@ void main() {
     });
 
     test('an ordinary completion becomes a draft', () async {
-      final draft = await ask(client: answering('I am away until Monday.'));
+      final draft = await ask(
+        client: answering('<reply>I am away until Monday.</reply>'),
+      );
 
       expect(draft.outcome, AutoReplyOutcome.sent);
       expect(draft.text, 'I am away until Monday.');
@@ -256,6 +363,26 @@ void main() {
       );
 
       expect(draft.outcome, AutoReplyOutcome.refused);
+    });
+
+    test('the request asks for the answer format', () async {
+      String? body;
+      final client = MockClient((request) async {
+        body = request.body;
+        return http.Response('{}', 500);
+      });
+
+      await ask(client: client);
+
+      expect(body, contains(kAutoReplyOpen));
+      expect(body, contains(kAutoReplyDecline));
+    });
+
+    test('a decline reads as declined, with nothing to send', () async {
+      final draft = await ask(client: answering('<no-reply/>'));
+
+      expect(draft.outcome, AutoReplyOutcome.declined);
+      expect(draft.text, isNull);
     });
 
     test('a completion the parser will not take reads as refused', () async {

@@ -207,14 +207,21 @@ class _AttemptLog extends ConsumerWidget {
         for (final attempt in attempts)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              attempt.succeeded
-                  ? Icons.check_circle_outline_rounded
-                  : Icons.error_outline_rounded,
-              color: attempt.succeeded
-                  ? context.colors.primary
-                  : context.colors.error,
-            ),
+            leading: attempt.outcome == AutoReplyOutcome.declined
+                // The model doing what it was asked: staying quiet is not a
+                // fault to go and fix.
+                ? Icon(
+                    Icons.do_not_disturb_on_outlined,
+                    color: context.colors.onSurfaceVariant,
+                  )
+                : Icon(
+                    attempt.succeeded
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.error_outline_rounded,
+                    color: attempt.succeeded
+                        ? context.colors.primary
+                        : context.colors.error,
+                  ),
             title: Text(attempt.chatTitle),
             subtitle: Text(
               semanticsSentence([

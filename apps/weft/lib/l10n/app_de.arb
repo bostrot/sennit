@@ -1181,6 +1181,7 @@
   "autoReplyOutcomeUnreachable": "Dein Modell war nicht erreichbar",
   "autoReplyOutcomeTimedOut": "Dein Modell hat zu lange gebraucht",
   "autoReplyOutcomeRefused": "Dein Modell hat nichts Brauchbares geschrieben",
+  "autoReplyOutcomeDeclined": "Dein Modell hat entschieden, nicht zu antworten",
   "autoReplyOutcomeSendFailed": "Die Antwort konnte nicht gesendet werden",
   "autoReplyRefusalCap": "Zurückgehalten – diese Unterhaltung hatte ihre {count} Antworten für diese Stunde",
   "autoReplyRefusalCooling": "Zurückgehalten – wartet vor der nächsten Antwort",

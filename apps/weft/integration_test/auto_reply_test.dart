@@ -71,7 +71,9 @@ void main() {
   test(
     'a rule answers Bob, and Alice still has an unread conversation',
     () async {
-      final model = await _FakeModel.start('I am away until Monday.');
+      final model = await _FakeModel.start(
+        '<reply>I am away until Monday.</reply>',
+      );
       addTearDown(model.close);
 
       final alice = newSession('alice');

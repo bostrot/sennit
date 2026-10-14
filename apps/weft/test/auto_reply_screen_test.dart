@@ -464,6 +464,49 @@ void main() {
 
       expect(find.textContaining('could not be reached'), findsOneWidget);
     });
+
+    testWidgets('a decline is shown as a choice, not an error', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          chatRepositoryProvider.overrideWithValue(
+            _FakeChatRepository(const []),
+          ),
+          autoReplyServiceProvider.overrideWithValue(null),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(autoReplyLogProvider.notifier)
+          .add(
+            AutoReplyAttempt(
+              chatId: '!a:example.org',
+              chatTitle: 'Grace',
+              at: DateTime.utc(2026, 1, 15, 10),
+              outcome: AutoReplyOutcome.declined,
+              ruleName: 'Out of office',
+            ),
+          );
+
+      tester.view.physicalSize = const Size(900, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
+            theme: WeftTheme.build(),
+            home: const AutoReplyScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('chose not to reply'), findsOneWidget);
+      expect(find.byIcon(Icons.do_not_disturb_on_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline_rounded), findsNothing);
+    });
   });
 }
 

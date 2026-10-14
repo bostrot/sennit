@@ -1182,6 +1182,7 @@
   "autoReplyOutcomeUnreachable": "Não foi possível contactar o seu modelo",
   "autoReplyOutcomeTimedOut": "O seu modelo demorou demasiado",
   "autoReplyOutcomeRefused": "O seu modelo não escreveu nada aproveitável",
+  "autoReplyOutcomeDeclined": "O seu modelo optou por não responder",
   "autoReplyOutcomeSendFailed": "Não foi possível enviar a resposta",
   "autoReplyRefusalCap": "Retida — esta conversa já teve as suas {count} respostas desta hora",
   "autoReplyRefusalCooling": "Retida — a aguardar antes de responder de novo",

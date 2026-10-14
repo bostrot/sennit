@@ -29,8 +29,12 @@ enum AutoReplyOutcome {
   timedOut,
 
   /// The model answered, but with nothing usable — reasoning it never came out
-  /// of, an empty string, or a refusal.
+  /// of, an empty string, or anything outside the answer format.
   refused,
+
+  /// The model answered in the format and chose not to reply, because the
+  /// user's instruction or the conversation said no message should go out.
+  declined,
 
   /// A reply was written and the transport would not send it.
   sendFailed,
@@ -121,11 +125,22 @@ Future<AutoReplyDraft> composeAutoReply({
                 'content':
                     'You are writing one chat message on behalf of the user, '
                     'who is not at their phone. Follow their instruction '
-                    'exactly. Output ONLY the message to send — no greeting '
+                    'exactly.\n\n'
+                    'Answer in exactly this format and nothing else:\n'
+                    '$kAutoReplyOpen'
+                    'the message to send'
+                    '$kAutoReplyClose\n\n'
+                    'Inside the tags put ONLY the message — no greeting '
                     'unless the instruction asks for one, no explanation, no '
                     'quotation marks, no markdown, no signature. Write in the '
                     "same language as the conversation. Keep it under four "
                     'sentences.\n\n'
+                    'If no message should be sent — the instruction says not '
+                    'to answer in a situation like this one, or the newest '
+                    'message needs no answer — output exactly '
+                    '$kAutoReplyDecline instead.\n\n'
+                    'Anything outside the tags is thrown away, and an answer '
+                    'without them is never sent.\n\n'
                     "The user's instruction:\n$instruction",
               },
               {
@@ -133,7 +148,7 @@ Future<AutoReplyDraft> composeAutoReply({
                 'content':
                     'Conversation "$chatTitle" (newest message last):\n'
                     '${transcript.join('\n')}\n\n'
-                    'The message to send:',
+                    'Your answer, in the format above:',
               },
             ],
           }),
@@ -156,12 +171,11 @@ Future<AutoReplyDraft> composeAutoReply({
       return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
     }
 
-    final text = parseAutoReply(content);
-    if (text == null) {
+    final draft = parseAutoReply(content);
+    if (draft.outcome == AutoReplyOutcome.refused) {
       debugPrint('weft: auto-reply: nothing usable in ${jsonEncode(content)}');
-      return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
     }
-    return AutoReplyDraft.written(text);
+    return draft;
   } on TimeoutException {
     debugPrint('weft: auto-reply against $url timed out');
     return const AutoReplyDraft.failed(AutoReplyOutcome.timedOut);
@@ -173,23 +187,74 @@ Future<AutoReplyDraft> composeAutoReply({
   }
 }
 
-/// Pulls a sendable message out of whatever the model said, or null.
+/// The tags the model must wrap its message in.
 ///
-/// Null rather than a best effort, and that is the difference between this and
-/// `parseSmartReplies`. A chip nobody taps costs nothing; this text is *sent*,
-/// to a person, on WhatsApp, and cannot be unsent. So everything that is not
-/// plainly a message is refused: reasoning the model never came out of, a
-/// heading, an empty string.
-String? parseAutoReply(String content) {
-  var text = content.trim();
+/// A format rather than free prose, because free prose is where a thinking
+/// model's narration ends up: "Okay, they asked about Friday, so I should…"
+/// reads as a sentence to every heuristic, and it was being sent. With the
+/// message fenced in tags, everything outside them is thrown away unread, and
+/// an answer that never opens or never closes them is not sent at all.
+const String kAutoReplyOpen = '<reply>';
+const String kAutoReplyClose = '</reply>';
 
-  // Thinking models narrate before they answer. The tagged form is easy; an
+/// What the model writes instead of [kAutoReplyOpen] when the user's
+/// instruction or the conversation says no message should go out.
+const String kAutoReplyDecline = '<no-reply/>';
+
+/// Pulls a sendable message out of whatever the model said.
+///
+/// A [AutoReplyDraft.written] only for an answer in the format the prompt
+/// asks for; [AutoReplyOutcome.declined] when the model chose not to reply;
+/// [AutoReplyOutcome.refused] for everything else. No best effort, and that is
+/// the difference between this and `parseSmartReplies`. A chip nobody taps
+/// costs nothing; this text is *sent*, to a person, on WhatsApp, and cannot be
+/// unsent.
+AutoReplyDraft parseAutoReply(String content) {
+  const refused = AutoReplyDraft.failed(AutoReplyOutcome.refused);
+
+  // Thinking models narrate before they answer, and the narration may well
+  // quote the format it is about to use. The tagged form goes first; an
   // unclosed <think> means the reasoning ran to the end of the budget and there
   // is no answer in there at all.
-  text = text
+  final text = content
       .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
       .trim();
-  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) return null;
+  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) return refused;
+
+  // The last marker is the answer. Untagged reasoning can mention either one
+  // before the model settles on what it means. Matched by pattern rather than
+  // on a lower-cased copy, whose offsets need not line up with the original's.
+  final open = RegExp(
+    r'<\s*reply\s*>',
+    caseSensitive: false,
+  ).allMatches(text).lastOrNull;
+  final decline = RegExp(
+    r'<\s*no[-_ ]?reply\s*/?\s*>',
+    caseSensitive: false,
+  ).allMatches(text).lastOrNull;
+  if (decline != null && decline.start > (open?.start ?? -1)) {
+    return const AutoReplyDraft.failed(AutoReplyOutcome.declined);
+  }
+  if (open == null) return refused;
+
+  final close = RegExp(
+    r'<\s*/\s*reply\s*>',
+    caseSensitive: false,
+  ).firstMatch(text.substring(open.end));
+  // Opened and never closed: the budget ran out mid-message, and the first
+  // half of a message is worse than none of it.
+  if (close == null) return refused;
+
+  final message = _clean(text.substring(open.end, open.end + close.start));
+  return message == null ? refused : AutoReplyDraft.written(message);
+}
+
+/// The message inside the tags tidied into something sendable, or null.
+///
+/// The model was told to put only the message there, and mostly does; this is
+/// for the times it does not.
+String? _clean(String message) {
+  var text = message.trim();
 
   // A fenced block is the model formatting an answer it was told not to
   // format. The contents are the answer.

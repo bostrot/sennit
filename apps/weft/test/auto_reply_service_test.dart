@@ -243,6 +243,25 @@ void main() {
       },
     );
 
+    test(
+      'a model that chose not to reply sends nothing, and says so',
+      () async {
+        final h = buildAutoReplyService(
+          chat: chat(),
+          rules: const [away],
+          composer: FakeComposer(failWith: AutoReplyOutcome.declined),
+        );
+        addTearDown(h.incoming.close);
+        addTearDown(h.service.dispose);
+
+        await h.service.handleMessage(msg());
+
+        expect(h.transport.sent, isEmpty);
+        expect(h.attempts.single.outcome, AutoReplyOutcome.declined);
+        expect(h.attempts.single.succeeded, isFalse);
+      },
+    );
+
     test('a failure is not retried', () async {
       // A model that timed out once will time out again while the same message
       // is the newest one, and a retry loop against someone else's Ollama is a
