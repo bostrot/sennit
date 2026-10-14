@@ -15,6 +15,18 @@ import '../../services/ai/smart_replies.dart' show probeLlm;
 import 'models_screen.dart';
 import 'settings_section.dart';
 
+/// The three endpoints this screen configures, as "copy from" names them.
+enum _Endpoint {
+  embeddings('embeddings'),
+  transcription('whisper'),
+  llm('llm');
+
+  const _Endpoint(this.testKey);
+
+  /// The key this endpoint's test result is filed under.
+  final String testKey;
+}
+
 /// Configuration for the user's own transcription and embedding endpoints.
 ///
 /// Both are off by default and gated behind an explicit warning: enabling them
@@ -80,6 +92,77 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Fills [to]'s address and key from [from]'s.
+  ///
+  /// One server usually answers for all three — an Ollama or LM Studio box
+  /// speaks embeddings, chat and often Whisper on the same base URL — and
+  /// typing it three times is how the three drift apart. Copies what is
+  /// *typed* in [from], falling back to its stored key: the key field is
+  /// blank for "keep the current one", so the typed text alone would copy
+  /// nothing from an endpoint that was set up last week.
+  ///
+  /// The model is left alone on purpose. It is the one field that is never
+  /// the same between an embedding, a speech and a chat endpoint.
+  void _copyEndpoint(_Endpoint from, _Endpoint to) {
+    final stores = ref.read(storesProvider);
+    final (fromUrl, fromKey, storedKey) = switch (from) {
+      _Endpoint.embeddings => (
+        _embeddingUrl,
+        _embeddingKey,
+        stores.embeddingApiKey,
+      ),
+      _Endpoint.transcription => (
+        _sttUrl,
+        _sttKey,
+        stores.transcriptionApiKey,
+      ),
+      _Endpoint.llm => (_llmUrl, _llmKey, stores.llmApiKey),
+    };
+    final (toUrl, toKey) = switch (to) {
+      _Endpoint.embeddings => (_embeddingUrl, _embeddingKey),
+      _Endpoint.transcription => (_sttUrl, _sttKey),
+      _Endpoint.llm => (_llmUrl, _llmKey),
+    };
+    final key = fromKey.text.isNotEmpty ? fromKey.text : (storedKey ?? '');
+    setState(() {
+      toUrl.text = fromUrl.text.trim();
+      if (key.isNotEmpty) toKey.text = key;
+      // Whatever the last test said, it said about the old address.
+      _testResult.remove(to.testKey);
+    });
+  }
+
+  Widget _copyRow(_Endpoint target) {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: WeftSpace.sm),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: MenuAnchor(
+          menuChildren: [
+            for (final source in _Endpoint.values)
+              if (source != target)
+                MenuItemButton(
+                  onPressed: () => _copyEndpoint(source, target),
+                  child: Text(switch (source) {
+                    _Endpoint.embeddings => l10n.endpointsEmbeddingsTitle,
+                    _Endpoint.transcription => l10n.endpointsTranscriptionTitle,
+                    _Endpoint.llm => l10n.endpointsLlmTitle,
+                  }),
+                ),
+          ],
+          builder: (context, controller, _) => TextButton.icon(
+            key: ValueKey('copy-into-${target.name}'),
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
+            icon: const Icon(Icons.content_copy_rounded, size: 16),
+            label: Text(l10n.endpointsCopyFrom),
+          ),
+        ),
+      ),
+    );
   }
 
   final Map<String, String?> _testResult = {};
@@ -380,7 +463,8 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 secret: true,
                 hint: context.l10n.settingsKeepCurrentKeyHint,
               ),
-              _testRow('embeddings', _probeEmbeddings),
+              _copyRow(_Endpoint.embeddings),
+              _testRow(_Endpoint.embeddings.testKey, _probeEmbeddings),
             ],
             const SizedBox(height: WeftSpace.xl),
 
@@ -414,7 +498,8 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 secret: true,
                 hint: context.l10n.settingsKeepCurrentKeyHint,
               ),
-              _testRow('whisper', _probeWhisper),
+              _copyRow(_Endpoint.transcription),
+              _testRow(_Endpoint.transcription.testKey, _probeWhisper),
               SwitchListTile(
                 title: Text(context.l10n.endpointsAutoTranscribeTitle),
                 subtitle: Text(context.l10n.endpointsAutoTranscribeSubtitle),
@@ -445,7 +530,8 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
               secret: true,
               hint: context.l10n.settingsKeepCurrentKeyHint,
             ),
-            _testRow('llm', _probeLlmEndpoint),
+            _copyRow(_Endpoint.llm),
+            _testRow(_Endpoint.llm.testKey, _probeLlmEndpoint),
           ],
         ),
       ),

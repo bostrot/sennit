@@ -17,14 +17,12 @@ import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
-import 'auto_reply_screen.dart';
+import 'ai_screen.dart';
 import 'backup_screen.dart';
 import 'integrations_screen.dart';
 import 'devices_screen.dart';
-import 'endpoints_screen.dart';
 import 'link_previews_screen.dart';
 import 'mcp_screen.dart';
-import 'models_screen.dart';
 import 'notifications_screen.dart';
 import 'security_screen.dart';
 import 'shortcuts_sheet.dart';
@@ -143,22 +141,10 @@ class SettingsScreen extends ConsumerWidget {
 
             header(l10n.settingsSectionSearchAndIntelligence),
             tile(
-              icon: Icons.manage_search_rounded,
-              title: l10n.settingsEndpointsTitle,
-              subtitle: l10n.settingsEndpointsSubtitle,
-              onTap: () => push(const EndpointsScreen()),
-            ),
-            tile(
-              icon: Icons.download_for_offline_outlined,
-              title: l10n.settingsModelsTitle,
-              subtitle: l10n.settingsModelsSubtitle,
-              onTap: () => push(const ModelsScreen()),
-            ),
-            tile(
-              icon: Icons.smart_toy_outlined,
-              title: l10n.settingsAutoReplyTitle,
-              subtitle: l10n.settingsAutoReplySubtitle,
-              onTap: () => push(const AutoReplyScreen()),
+              icon: Icons.auto_awesome_outlined,
+              title: l10n.settingsAiTitle,
+              subtitle: l10n.settingsAiSubtitle,
+              onTap: () => push(const AiSettingsScreen()),
             ),
             const _AgendaToggle(),
             const _SendOnEnterToggle(),

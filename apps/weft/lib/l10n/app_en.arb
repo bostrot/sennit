@@ -3492,6 +3492,19 @@
     "description": "Shown beside the test button when the endpoint answered. Keep under ~18 chars.",
     "maxLength": 36
   },
+  "endpointsCopyFrom": "Copy address and key from…",
+  "@endpointsCopyFrom": {
+    "description": "Button under each endpoint's fields on the endpoints screen. Opens a menu of the other endpoints; picking one fills this endpoint's base URL and API key with that one's. Keep under ~32 chars.",
+    "maxLength": 56
+  },
+  "settingsAiTitle": "AI",
+  "@settingsAiTitle": {
+    "description": "Title of the settings row, and of the screen it opens, that gathers every AI setting: endpoints, local models and auto-reply. Use the abbreviation readers of this language know. Keep under ~20 chars."
+  },
+  "settingsAiSubtitle": "Endpoints, local models and auto-reply",
+  "@settingsAiSubtitle": {
+    "description": "One-line subtitle under 'AI', listing what the screen holds. Keep under ~60 chars."
+  },
   "integrationsTitle": "Integrations",
   "@integrationsTitle": {
     "description": "App bar title of the integrations screen, where Home Assistant and paperless-ngx are configured. Keep under ~24 chars.",

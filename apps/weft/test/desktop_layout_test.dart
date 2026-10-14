@@ -10,6 +10,7 @@ import 'package:weft/features/contact/contact_profile.dart';
 import 'package:weft/features/inbox/inbox_shell.dart';
 import 'package:weft/features/merge/merge_screen.dart';
 import 'package:weft/features/search/search_screen.dart';
+import 'package:weft/features/settings/ai_screen.dart';
 import 'package:weft/features/settings/endpoints_screen.dart';
 import 'package:weft/features/settings/integrations_screen.dart';
 import 'package:weft/features/settings/link_previews_screen.dart';
@@ -88,6 +89,7 @@ void main() {
     'settings': SettingsScreen.new,
     'notifications': NotificationsScreen.new,
     'integrations': IntegrationsScreen.new,
+    'ai': AiSettingsScreen.new,
     'endpoints': EndpointsScreen.new,
     'mcp': McpScreen.new,
     'models': ModelsScreen.new,

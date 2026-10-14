@@ -27,6 +27,7 @@ import 'package:weft/features/inbox/new_chat_sheet.dart';
 import 'package:weft/features/inbox/requests_screen.dart';
 import 'package:weft/features/merge/merge_screen.dart';
 import 'package:weft/features/search/search_screen.dart';
+import 'package:weft/features/settings/ai_screen.dart';
 import 'package:weft/features/settings/auto_reply_screen.dart';
 import 'package:weft/features/settings/backup_screen.dart';
 import 'package:weft/features/settings/devices_screen.dart';
@@ -562,9 +563,18 @@ final List<RouteStep> routeSteps = [
     settles: false,
   ),
   RouteStep(
+    label: '32a-ai',
+    open: (w) async {
+      await w.openSettings();
+      await w.tapText(_l10n.settingsAiTitle);
+    },
+    arrival: () => find.byType(AiSettingsScreen),
+  ),
+  RouteStep(
     label: '33-endpoints',
     open: (w) async {
       await w.openSettings();
+      await w.tapText(_l10n.settingsAiTitle);
       await w.tapText(_l10n.settingsEndpointsTitle);
     },
     arrival: () => find.byType(EndpointsScreen),
@@ -573,6 +583,7 @@ final List<RouteStep> routeSteps = [
     label: '34-models',
     open: (w) async {
       await w.openSettings();
+      await w.tapText(_l10n.settingsAiTitle);
       await w.tapText(_l10n.settingsModelsTitle);
     },
     arrival: () => find.byType(ModelsScreen),
@@ -582,6 +593,7 @@ final List<RouteStep> routeSteps = [
     label: '34a-auto-reply',
     open: (w) async {
       await w.openSettings();
+      await w.tapText(_l10n.settingsAiTitle);
       await w.tapText(_l10n.settingsAutoReplyTitle);
     },
     arrival: () => find.byType(AutoReplyScreen),
@@ -590,6 +602,7 @@ final List<RouteStep> routeSteps = [
     label: '34b-auto-reply-editor',
     open: (w) async {
       await w.openSettings();
+      await w.tapText(_l10n.settingsAiTitle);
       await w.tapText(_l10n.settingsAutoReplyTitle);
       // No rules on a fresh demo profile, so the door into the editor is the
       // FAB rather than a pencil beside a row that does not exist.
