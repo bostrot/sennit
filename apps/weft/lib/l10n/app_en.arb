@@ -145,6 +145,19 @@
   "@settingsMcpSubtitle": {
     "description": "One-line subtitle under 'MCP server'. 'Agents' means the reader's own AI programs; 'Braid' is the app name and is never translated. Keep under ~60 chars."
   },
+  "settingsSectionAbout": "About",
+  "@settingsSectionAbout": {
+    "description": "Section heading at the bottom of the settings screen, above the row that opens the app's version and licence information. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsAboutTitle": "About Braid",
+  "@settingsAboutTitle": {
+    "description": "Title of a settings row that opens a dialog with the app's version, build details and open-source licences. 'Braid' is the app name and is never translated. Keep under ~24 chars."
+  },
+  "settingsAboutSubtitle": "Version, build details and licences",
+  "@settingsAboutSubtitle": {
+    "description": "One-line subtitle under 'About Braid'. 'Build details' are the commit and build date of test builds; 'licences' are the open-source licences of the libraries the app uses. Keep under ~60 chars."
+  },
   "settingsReadReceiptsTitle": "Send read receipts",
   "@settingsReadReceiptsTitle": {
     "description": "Title of a switch row. A read receipt is the signal that tells a sender their message was read. Keep under ~30 chars."

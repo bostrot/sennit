@@ -8,11 +8,13 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
 
 import '../../app/a11y.dart';
+import '../../app/build_info.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
+import '../../services/backup/backup_service.dart' show kBraidVersion;
 import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
@@ -197,9 +199,31 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: l10n.settingsMcpSubtitle,
               onTap: () => push(const McpScreen()),
             ),
+
+            header(l10n.settingsSectionAbout),
+            tile(
+              icon: Icons.info_outline_rounded,
+              title: l10n.settingsAboutTitle,
+              subtitle: l10n.settingsAboutSubtitle,
+              onTap: () => _showAbout(context),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Flutter's About dialog, which carries the licence page with it.
+  ///
+  /// A test build adds its commit and build date under the version, so a bug
+  /// report can name the exact build; see [BuildInfo.summary].
+  static void _showAbout(BuildContext context) {
+    final build = BuildInfo.current.summary;
+    showAboutDialog(
+      context: context,
+      applicationName: 'Braid',
+      applicationVersion: kBraidVersion,
+      children: [if (build != null) SelectableText(build)],
     );
   }
 }

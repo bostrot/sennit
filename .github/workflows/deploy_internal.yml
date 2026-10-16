@@ -144,6 +144,12 @@ jobs:
         run: flutter pub get
         working-directory: apps/weft
 
+      - name: Record the build details
+        if: steps.check_version.outputs.changed == 'true'
+        # Commit, branch and build time for Settings → About, so a tester can
+        # say which internal build they are on: they all carry one version.
+        run: tooling/scripts/build_info.sh > "$RUNNER_TEMP/build_info.json"
+
       - name: Build App Bundle
         if: steps.check_version.outputs.changed == 'true'
         # The number of commits on the branch: it rises with every commit, so
@@ -157,7 +163,7 @@ jobs:
         # code and the second is refused, which is the right answer to
         # uploading the same build twice. Needs the full history: see
         # `fetch-depth: 0` above.
-        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)"
+        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)" --dart-define-from-file="$RUNNER_TEMP/build_info.json"
         working-directory: apps/weft
 
       - name: Upload to Play Store

@@ -97,9 +97,14 @@ jobs:
         # both stores, rising with every commit and needing no bump. The
         # extensions and the watch app read it from Generated.xcconfig, and
         # an appex whose version differs from its host is refused at upload.
+        # The build details for Settings → About ride along in the same
+        # file: --config-only writes the dart-defines into it, and the
+        # archive below compiles Dart with them.
         run: |
+          ../../tooling/scripts/build_info.sh > "$RUNNER_TEMP/build_info.json"
           flutter build ios --release --config-only --no-codesign \
-            --build-number="$(git rev-list --count HEAD)"
+            --build-number="$(git rev-list --count HEAD)" \
+            --dart-define-from-file="$RUNNER_TEMP/build_info.json"
         working-directory: apps/weft
 
       - name: Unlock the signing keychain
