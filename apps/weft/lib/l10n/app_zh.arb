@@ -350,6 +350,8 @@
   "chatShowActionsHint": "显示操作",
   "chatMessageDeleted": "消息已删除",
   "chatSentAt": "{time} 发送",
+  "chatGalleryItem": "第 {position} 张照片，共 {total} 张",
+  "chatGalleryMore": "还有 {count} 张",
   "chatEditedTooltipWithHistory": "已编辑 — 各版本可在消息操作中查看",
   "chatEditedTooltip": "此消息已编辑",
   "chatEditedLabel": "已编辑",

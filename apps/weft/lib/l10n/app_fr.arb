@@ -349,6 +349,8 @@
   "chatShowActionsHint": "afficher les actions",
   "chatMessageDeleted": "Message supprimé",
   "chatSentAt": "Envoyé à {time}",
+  "chatGalleryItem": "Photo {position} sur {total}",
+  "chatGalleryMore": "{count} de plus",
   "chatEditedTooltipWithHistory": "Modifié — les versions sont dans les actions du message",
   "chatEditedTooltip": "Ce message a été modifié",
   "chatEditedLabel": "Modifié",

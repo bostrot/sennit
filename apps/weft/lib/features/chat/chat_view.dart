@@ -52,6 +52,7 @@ import 'attachment_source_sheet.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
 import 'link_preview_card.dart';
+import 'media_gallery.dart';
 import 'media_viewer.dart';
 import 'message_actions_sheet.dart';
 import 'reaction_bar.dart';
@@ -1409,6 +1410,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
             messages: _view.messages,
             rootEventId: rootId,
           ).reversed.toList(growable: false);
+    // Photos sent as a batch fold into one album bubble, drawn by the row of
+    // the batch's newest photo; the rows of the others draw nothing.
+    final galleries = galleryLayout(
+      visible,
+      standsAlone: (m) => rootId == null && grouping.threadFor(m) != null,
+    );
 
     // After the frame rather than during it: an announcement is a platform call
     // and a build is not the place to make one, and the message being announced
@@ -1514,6 +1521,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             if (i == visible.length) {
                               return _historyFooter();
                             }
+                            if (galleries.hidden.contains(i)) {
+                              // Empty, but keyed: a reply chip that jumps to
+                              // one of the album's photos still lands on it.
+                              return SizedBox.shrink(
+                                key: _messageKeys.putIfAbsent(
+                                  visible[i].eventId,
+                                  GlobalKey.new,
+                                ),
+                              );
+                            }
+                            final gallery = galleries.runs[i];
                             var message = visible[i];
                             // Transcripts arrive after the event was mapped; overlay the
                             // session cache so a finished transcription shows in place.
@@ -1529,8 +1547,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                 transcript: cachedTranscript.text,
                               );
                             }
-                            final older = i + 1 < visible.length
-                                ? visible[i + 1]
+                            // An album reaches back to its oldest photo, so
+                            // the day divider and the sender's name are
+                            // decided by what came before the whole batch.
+                            final olderIndex = (gallery?.oldestIndex ?? i) + 1;
+                            final older = olderIndex < visible.length
+                                ? visible[olderIndex]
                                 : null;
                             // One message, one line in anything copied out of
                             // a drag across several of them — the alternative
@@ -1568,8 +1590,30 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                             receiptsEnabled: receiptsEnabled,
                                           ),
                                       replyPreview: _replyPreviewFor(message),
+                                      content: gallery == null
+                                          ? null
+                                          : MediaGallery(
+                                              items: gallery.items,
+                                              onOpen: widget.preview
+                                                  ? null
+                                                  : _openMedia,
+                                              onActions: widget.preview
+                                                  ? null
+                                                  : (photo) => unawaited(
+                                                      _openActions(photo),
+                                                    ),
+                                            ),
+                                      // Any photo of an album: a jump to one
+                                      // lands on the album that draws it.
                                       highlighted:
-                                          message.eventId == _highlightEventId,
+                                          message.eventId ==
+                                              _highlightEventId ||
+                                          (gallery?.items.any(
+                                                (m) =>
+                                                    m.eventId ==
+                                                    _highlightEventId,
+                                              ) ??
+                                              false),
                                       transcribing: _transcribing.contains(
                                         message.eventId,
                                       ),
@@ -3272,8 +3316,9 @@ class _MessageBubble extends StatelessWidget {
 
   /// Replaces the bubble's own content.
   ///
-  /// Set only for an in-flight upload, which is driven by an `UploadTask` rather
-  /// than by the stand-in message supplying the chrome around it.
+  /// Set for an in-flight upload, which is driven by an `UploadTask` rather
+  /// than by the stand-in message supplying the chrome around it, and for an
+  /// album, which draws several messages inside the chrome of its newest.
   final Widget? content;
 
   /// Pulse marking the message a jump landed on.

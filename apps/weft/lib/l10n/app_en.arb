@@ -2123,6 +2123,33 @@
       }
     }
   },
+  "chatGalleryItem": "Photo {position} of {total}",
+  "@chatGalleryItem": {
+    "description": "Screen-reader label for one tile of an album: several photos sent together and drawn as a grid in one bubble.",
+    "placeholders": {
+      "position": {
+        "type": "int",
+        "description": "Which photo of the album this tile is, counting from 1 in the order they were sent.",
+        "example": "2"
+      },
+      "total": {
+        "type": "int",
+        "description": "How many photos the album holds.",
+        "example": "13"
+      }
+    }
+  },
+  "chatGalleryMore": "{count} more",
+  "@chatGalleryMore": {
+    "description": "Screen-reader clause on the last tile of an album, which is drawn with '+9' over it: how many further photos the album holds beyond the four shown. Always 1 or more.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "The number of photos not shown as tiles.",
+        "example": "9"
+      }
+    }
+  },
   "chatEditedTooltipWithHistory": "Edited — the versions are in the message actions",
   "@chatEditedTooltipWithHistory": {
     "description": "Tooltip on the small 'edited' mark under a message that has earlier versions kept, pointing at where to read them."

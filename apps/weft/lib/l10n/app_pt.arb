@@ -350,6 +350,8 @@
   "chatShowActionsHint": "mostrar as ações",
   "chatMessageDeleted": "Mensagem excluída",
   "chatSentAt": "Enviada às {time}",
+  "chatGalleryItem": "Foto {position} de {total}",
+  "chatGalleryMore": "mais {count}",
   "chatEditedTooltipWithHistory": "Editada — as versões estão nas ações da mensagem",
   "chatEditedTooltip": "Esta mensagem foi editada",
   "chatEditedLabel": "Editada",
