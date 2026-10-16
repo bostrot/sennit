@@ -89,37 +89,48 @@ void main() {
   });
 
   group('tooling/scripts/build_info.sh', () {
-    test('prints the JSON the defines are read from', () {
-      final root = _repoFile(
-        'tooling/scripts/build_info.sh',
-      ).parent.parent.parent;
-      final result = Process.runSync(
-        'bash',
-        ['tooling/scripts/build_info.sh'],
-        workingDirectory: root.path,
-        environment: {'GITHUB_REF_NAME': 'main', 'GITHUB_REF_TYPE': 'branch'},
-      );
-      expect(result.exitCode, 0, reason: '${result.stderr}');
-      final json = jsonDecode(result.stdout as String) as Map;
-      expect(json.keys, {'GIT_SHA', 'GIT_REF', 'GIT_TAG', 'BUILD_TIME'});
-      expect(json['GIT_SHA'], matches(RegExp(r'^[0-9a-f]{7,}$')));
-      expect(json['GIT_REF'], 'main');
-      expect(DateTime.tryParse(json['BUILD_TIME'] as String), isNotNull);
-    }, skip: Platform.isWindows ? 'needs bash' : null);
+    test(
+      'prints the JSON the defines are read from',
+      () {
+        final root = _repoFile(
+          'tooling/scripts/build_info.sh',
+        ).parent.parent.parent;
+        final result = Process.runSync(
+          'bash',
+          ['tooling/scripts/build_info.sh'],
+          workingDirectory: root.path,
+          environment: {'GITHUB_REF_NAME': 'main', 'GITHUB_REF_TYPE': 'branch'},
+        );
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        final json = jsonDecode(result.stdout as String) as Map;
+        expect(json.keys, {'GIT_SHA', 'GIT_REF', 'GIT_TAG', 'BUILD_TIME'});
+        expect(json['GIT_SHA'], matches(RegExp(r'^[0-9a-f]{7,}$')));
+        expect(json['GIT_REF'], 'main');
+        expect(DateTime.tryParse(json['BUILD_TIME'] as String), isNotNull);
+      },
+      skip: Platform.isWindows ? 'needs bash' : null,
+    );
 
-    test('a tag push is recorded as a tagged build', () {
-      final root = _repoFile(
-        'tooling/scripts/build_info.sh',
-      ).parent.parent.parent;
-      final result = Process.runSync(
-        'bash',
-        ['tooling/scripts/build_info.sh'],
-        workingDirectory: root.path,
-        environment: {'GITHUB_REF_NAME': 'v9.9.9', 'GITHUB_REF_TYPE': 'tag'},
-      );
-      expect(result.exitCode, 0, reason: '${result.stderr}');
-      expect((jsonDecode(result.stdout as String) as Map)['GIT_TAG'], 'v9.9.9');
-    }, skip: Platform.isWindows ? 'needs bash' : null);
+    test(
+      'a tag push is recorded as a tagged build',
+      () {
+        final root = _repoFile(
+          'tooling/scripts/build_info.sh',
+        ).parent.parent.parent;
+        final result = Process.runSync(
+          'bash',
+          ['tooling/scripts/build_info.sh'],
+          workingDirectory: root.path,
+          environment: {'GITHUB_REF_NAME': 'v9.9.9', 'GITHUB_REF_TYPE': 'tag'},
+        );
+        expect(result.exitCode, 0, reason: '${result.stderr}');
+        expect(
+          (jsonDecode(result.stdout as String) as Map)['GIT_TAG'],
+          'v9.9.9',
+        );
+      },
+      skip: Platform.isWindows ? 'needs bash' : null,
+    );
   });
 
   test('both store uploads build with the details', () {

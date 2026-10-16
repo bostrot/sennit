@@ -118,11 +118,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
         _embeddingKey,
         stores.embeddingApiKey,
       ),
-      _Endpoint.transcription => (
-        _sttUrl,
-        _sttKey,
-        stores.transcriptionApiKey,
-      ),
+      _Endpoint.transcription => (_sttUrl, _sttKey, stores.transcriptionApiKey),
       _Endpoint.llm => (_llmUrl, _llmKey, stores.llmApiKey),
     };
     final (toUrl, toKey) = switch (to) {
