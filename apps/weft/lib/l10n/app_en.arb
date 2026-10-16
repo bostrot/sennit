@@ -3514,6 +3514,18 @@
   "@endpointsAutoTranscribeSubtitle": {
     "description": "Subtitle under the auto-transcribe toggle, naming the manual alternative. 'Transcribe' is the label of the message action, already translated elsewhere."
   },
+  "endpointsTranscriptionLanguageField": "Spoken language",
+  "@endpointsTranscriptionLanguageField": {
+    "description": "Label of the dropdown on the endpoints screen that sets which language voice messages are spoken in, sent to the transcription model. Keep under ~30 chars."
+  },
+  "endpointsTranscriptionLanguageDetect": "Detect automatically",
+  "@endpointsTranscriptionLanguageDetect": {
+    "description": "First option of the spoken-language dropdown: let the transcription model work out the language itself. Keep under ~30 chars."
+  },
+  "endpointsTranscriptionLanguageHelper": "Some models, such as Cohere Transcribe, cannot detect the language and transcribe everything as English. Pick the language you speak in your voice messages.",
+  "@endpointsTranscriptionLanguageHelper": {
+    "description": "Helper text under the spoken-language dropdown, explaining why it exists. 'Cohere Transcribe' is a product name and stays as-is."
+  },
   "endpointsLlmTitle": "AI assistant (LLM)",
   "@endpointsLlmTitle": {
     "description": "Section heading on the endpoints screen for the chat model. 'LLM' is the usual abbreviation for a large language model and normally stays as-is. Keep under ~26 chars."

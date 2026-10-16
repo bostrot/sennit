@@ -12,6 +12,7 @@ import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../services/ai/smart_replies.dart' show probeLlm;
+import '../../services/transcription/transcription_languages.dart';
 import 'models_screen.dart';
 import 'settings_section.dart';
 
@@ -66,6 +67,10 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     text: _settings.getString(WeftSettings.transcriptionModel) ?? 'whisper-1',
   );
   final _sttKey = TextEditingController();
+
+  /// Empty for "detect it": the dropdown needs a non-null value to select.
+  late String _sttLanguage =
+      _settings.getString(WeftSettings.transcriptionLanguage) ?? '';
 
   late final _llmUrl = TextEditingController(
     text: _settings.getString(WeftSettings.llmBaseUrl) ?? '',
@@ -353,6 +358,11 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     _settings.setBool(WeftSettings.transcriptionAutoRun, value: _sttAuto);
     _settings.setString(WeftSettings.transcriptionBaseUrl, _sttUrl.text.trim());
     _settings.setString(WeftSettings.transcriptionModel, _sttModel.text.trim());
+    if (_sttLanguage.isEmpty) {
+      _settings.remove(WeftSettings.transcriptionLanguage);
+    } else {
+      _settings.setString(WeftSettings.transcriptionLanguage, _sttLanguage);
+    }
     _settings.setString(WeftSettings.llmBaseUrl, _llmUrl.text.trim());
     _settings.setString(WeftSettings.llmModel, _llmModel.text.trim());
 
@@ -508,6 +518,9 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ],
+            // Outside the switch: an on-device model reads the same setting,
+            // and it is the only transcription a user without an endpoint has.
+            _languageField(),
             const SizedBox(height: WeftSpace.xl),
 
             SettingsSectionHeader(
@@ -534,6 +547,42 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             _testRow(_Endpoint.llm.testKey, _probeLlmEndpoint),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The spoken language sent with every voice message.
+  ///
+  /// Whisper detects it, so "detect" is the default; Cohere Transcribe cannot,
+  /// and an endpoint serving it reads no language as English — German speech
+  /// then comes back as an English rendering of what was said.
+  Widget _languageField() {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(top: WeftSpace.md),
+      child: DropdownButtonFormField<String>(
+        key: const ValueKey('transcription-language'),
+        initialValue: _sttLanguage,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: l10n.endpointsTranscriptionLanguageField,
+          helperText: l10n.endpointsTranscriptionLanguageHelper,
+          helperMaxLines: 4,
+        ),
+        items: [
+          DropdownMenuItem(
+            value: '',
+            child: Text(l10n.endpointsTranscriptionLanguageDetect),
+          ),
+          // A stored code from before this list grew, or typed into the
+          // settings database by hand, stays selectable rather than throwing.
+          if (_sttLanguage.isNotEmpty &&
+              !kTranscriptionLanguages.containsKey(_sttLanguage))
+            DropdownMenuItem(value: _sttLanguage, child: Text(_sttLanguage)),
+          for (final entry in kTranscriptionLanguages.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: (value) => setState(() => _sttLanguage = value ?? ''),
       ),
     );
   }
