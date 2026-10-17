@@ -354,4 +354,4 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 /// only ever shown back to the user in a support conversation. It is checked
 /// against `pubspec.yaml` by `backup_version_test.dart`, so it cannot drift
 /// silently.
-const String kBraidVersion = '1.0.3';
+const String kBraidVersion = '1.0.4';
