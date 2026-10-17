@@ -349,6 +349,134 @@
   "@commonMergedChats": {
     "description": "Menu entry and Mac sidebar row that opens the merged-chats screen. 'Merged' = two conversations with the same person on different messengers shown as one thread. Under ~20 chars."
   },
+  "todoTitle": "To-do list",
+  "@todoTitle": {
+    "description": "Heading of the to-do list screen, and its entry in the inbox menu and the Mac sidebar. Keep under ~20 chars."
+  },
+  "todoAddHint": "Add a to-do",
+  "@todoAddHint": {
+    "description": "Hint text in the field at the top of the to-do list where the user types a new entry."
+  },
+  "todoEmpty": "Nothing to do. Add something above — or switch on the assistant in the settings at the top, and it adds what people ask of you in chats.",
+  "@todoEmpty": {
+    "description": "Shown on the to-do list when nothing is open."
+  },
+  "todoDoneSection": "Done ({count})",
+  "@todoDoneSection": {
+    "description": "Header of the folded section listing finished to-dos, with how many there are.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many finished to-dos there are.",
+        "example": "3"
+      }
+    }
+  },
+  "todoClearDone": "Clear done",
+  "@todoClearDone": {
+    "description": "Button that removes every finished to-do from the list. Keep under ~16 chars."
+  },
+  "todoDoneCleared": "Finished to-dos removed",
+  "@todoDoneCleared": {
+    "description": "Confirmation after the finished to-dos were removed."
+  },
+  "todoDeleted": "To-do deleted",
+  "@todoDeleted": {
+    "description": "Confirmation after one to-do was swiped away."
+  },
+  "todoDueOn": "Due {date}",
+  "@todoDueOn": {
+    "description": "Under a to-do: the day it is due. Also the label of the date button in the edit dialog once a date is set.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "The due date, already formatted for the locale.",
+        "example": "May 5, 2026"
+      }
+    }
+  },
+  "todoFromChat": "From {chat}",
+  "@todoFromChat": {
+    "description": "Under a to-do the assistant added: the conversation it came from.",
+    "placeholders": {
+      "chat": {
+        "type": "String",
+        "description": "The conversation's name — a person's name or a group title. Never translated.",
+        "example": "Anna"
+      }
+    }
+  },
+  "todoAddedByAssistant": "Added by the assistant",
+  "@todoAddedByAssistant": {
+    "description": "Tooltip and screen-reader label of the small sparkle icon on a to-do the assistant added."
+  },
+  "todoEditTitle": "Edit to-do",
+  "@todoEditTitle": {
+    "description": "Tooltip of a to-do's edit button, and title of the edit dialog."
+  },
+  "todoTitleField": "To-do",
+  "@todoTitleField": {
+    "description": "Label of the text field holding a to-do's text in the edit dialog."
+  },
+  "todoSetDue": "Set due date",
+  "@todoSetDue": {
+    "description": "Button in the edit dialog that opens a date picker for the due date."
+  },
+  "todoClearDue": "Remove due date",
+  "@todoClearDue": {
+    "description": "Tooltip of the button that removes a to-do's due date."
+  },
+  "todoSettingsTooltip": "To-do settings",
+  "@todoSettingsTooltip": {
+    "description": "Tooltip of the button in the to-do list's top bar that opens its settings."
+  },
+  "todoAiTitle": "Keep the list with AI",
+  "@todoAiTitle": {
+    "description": "Switch title: lets the AI assistant read chats and keep the to-do list. Keep under ~30 chars."
+  },
+  "todoAiSubtitle": "When someone asks you for something, you promise something, or a chat shows a to-do is done, the list is updated. Only messages that sound like that are sent to your AI endpoint, with the recent conversation around them.",
+  "@todoAiSubtitle": {
+    "description": "Subtitle under the AI switch, saying what it does and what gets sent where."
+  },
+  "todoAiWarning": "Sends chat messages to your AI endpoint",
+  "@todoAiWarning": {
+    "description": "Screen-reader hint on the AI switch: the privacy consequence of switching it on."
+  },
+  "todoAiNeedsEndpoint": "Set up an AI endpoint in Settings → AI first.",
+  "@todoAiNeedsEndpoint": {
+    "description": "Subtitle under the disabled AI switch when no AI endpoint is configured yet."
+  },
+  "todoHaTitle": "Also add to Home Assistant",
+  "@todoHaTitle": {
+    "description": "Switch title: also add to-dos to a Home Assistant to-do list. 'Home Assistant' is a product name and stays as it is."
+  },
+  "todoHaSubtitle": "New to-dos are added to a Home Assistant to-do list too, and ticking one off here ticks it off there.",
+  "@todoHaSubtitle": {
+    "description": "Subtitle under the Home Assistant switch."
+  },
+  "todoHaNeedsSetup": "Connect Home Assistant in Settings → Integrations first.",
+  "@todoHaNeedsSetup": {
+    "description": "Subtitle under the disabled Home Assistant switch when Home Assistant is not connected yet."
+  },
+  "todoHaListField": "Home Assistant list",
+  "@todoHaListField": {
+    "description": "Label of the drop-down choosing which Home Assistant to-do list entries go to."
+  },
+  "todoHaNoLists": "Home Assistant has no to-do lists yet. Add one, for example with the Local To-do integration.",
+  "@todoHaNoLists": {
+    "description": "Shown when Home Assistant has no to-do lists to choose from. 'Local To-do' is the name of a Home Assistant integration and stays in English."
+  },
+  "todoHaLoadFailed": "Could not load the lists from Home Assistant: {error}",
+  "@todoHaLoadFailed": {
+    "description": "Shown when the list of Home Assistant to-do lists could not be loaded, with the error.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "description": "The technical error, in English.",
+        "example": "Home Assistant answered 401."
+      }
+    }
+  },
   "inboxTimeNow": "Now",
   "@inboxTimeNow": {
     "description": "Timestamp shown beside a conversation whose newest message arrived less than a minute ago. Extremely tight — it sits at the end of a one-line row; keep under ~6 chars.",

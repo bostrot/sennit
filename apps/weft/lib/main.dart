@@ -20,6 +20,7 @@ import 'app/share_providers.dart';
 import 'app/shortcuts.dart';
 import 'app/snapshot_providers.dart';
 import 'app/stores.dart';
+import 'app/todo_providers.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/auth/verification_screen.dart';
@@ -315,6 +316,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // both — a second subscription would answer every message twice, which for
     // this one means sending two messages.
     ref.read(autoReplyServiceProvider)?.start();
+    // Same stream, same reason; it reads nothing until the user switches the
+    // assistant on in the to-do list's settings.
+    ref.read(todoAgentProvider)?.start();
 
     await _ensureNotificationPermission();
     // Registration and rule reconciliation both need permission to have been

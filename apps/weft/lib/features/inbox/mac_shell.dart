@@ -17,6 +17,7 @@ import '../bridges/bridges_screen.dart';
 import '../chat/chat_preview.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
+import '../todo/todo_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
 import '../settings/settings_screen.dart';
@@ -320,8 +321,15 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             ],
           ),
         const SizedBox(height: WeftSpace.md),
-        // The three destinations, at the bottom where a Mac keeps them —
+        // The destinations, at the bottom where a Mac keeps them —
         // below the content the sidebar is actually for, not mixed into it.
+        MacSidebarRow(
+          icon: Icons.checklist_rounded,
+          label: context.l10n.todoTitle,
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const TodoScreen())),
+        ),
         MacSidebarRow(
           icon: Icons.merge_rounded,
           label: context.l10n.commonMergedChats,

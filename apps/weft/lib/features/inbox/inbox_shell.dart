@@ -17,6 +17,7 @@ import '../bridges/bridges_screen.dart';
 import '../chat/chat_preview.dart';
 import '../chat/chat_view.dart';
 import '../merge/merge_screen.dart';
+import '../todo/todo_screen.dart';
 import '../status/status_bar.dart';
 import 'label_sheet.dart';
 import 'mac_shell.dart';
@@ -719,6 +720,12 @@ class _InboxHeader extends ConsumerWidget {
                       }
                     case 'archived':
                       ref.read(showArchivedProvider.notifier).toggle();
+                    case 'todo':
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const TodoScreen(),
+                        ),
+                      );
                     case 'merge':
                       navigator.push(
                         MaterialPageRoute<void>(
@@ -768,6 +775,10 @@ class _InboxHeader extends ConsumerWidget {
                             : context.l10n.inboxMenuShowArchived,
                       ),
                     ),
+                  ),
+                  PopupMenuItem(
+                    value: 'todo',
+                    child: Text(context.l10n.todoTitle),
                   ),
                   PopupMenuItem(
                     value: 'merge',
