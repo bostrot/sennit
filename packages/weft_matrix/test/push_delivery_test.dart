@@ -309,6 +309,66 @@ void main() {
       await pipeline.dispose();
     });
 
+    test('a message in the chat on screen is not announced', () async {
+      final session = _FakeSession();
+      final asked = <String>[];
+      final posted = <MatrixNotification>[];
+      final pipeline = MatrixNotificationPipeline(
+        session: session,
+        chatForRoom: (_) => _mergedChat(),
+        policy: NotificationPolicy.new,
+        // Asked about the *chat*: a merged contact is open as one
+        // conversation, whichever leg the message came in on.
+        isChatOpen: (chatId) {
+          asked.add(chatId);
+          return chatId == 'merged:contact_1';
+        },
+        now: () => now,
+      );
+      pipeline.notifications.listen(posted.add);
+
+      final decision = await pipeline.handleMessage(
+        _message(roomId: '!sig:example.org', network: ChatNetwork.signal),
+      );
+      await pumpEventQueue();
+
+      expect(decision?.suppression, NotificationSuppression.chatOpen);
+      expect(asked, ['merged:contact_1']);
+      expect(posted, isEmpty);
+      await pipeline.dispose();
+    });
+
+    test('a chat that is not on screen still notifies', () async {
+      final pipeline = MatrixNotificationPipeline(
+        session: _FakeSession(),
+        chatForRoom: (_) => _chat(),
+        policy: NotificationPolicy.new,
+        isChatOpen: (chatId) => chatId == 'some-other-chat',
+        now: () => now,
+      );
+
+      expect((await pipeline.handleMessage(_message()))!.delivers, isTrue);
+      await pipeline.dispose();
+    });
+
+    test('the test notification ignores what is on screen', () async {
+      final pipeline = MatrixNotificationPipeline(
+        session: _FakeSession(),
+        chatForRoom: (_) => _chat(),
+        policy: NotificationPolicy.new,
+        isChatOpen: (_) => true,
+        now: () => now,
+      );
+
+      final decision = await pipeline.handleSynthetic(
+        message: _message(),
+        chat: _chat(),
+      );
+
+      expect(decision.delivers, isTrue);
+      await pipeline.dispose();
+    });
+
     test('quiet hours can deliver silently', () async {
       final pipeline = MatrixNotificationPipeline(
         session: _FakeSession(),
@@ -474,6 +534,125 @@ void main() {
     expect((await pipeline.handleMessage(_message()))!.delivers, isTrue);
     await pipeline.dispose();
   });
+
+  _settleTests();
+}
+
+/// What a catch-up sync does: announces the message, applies the receipt that
+/// came down with it, and only then says the sync is done.
+void _settleTests() {
+  group('releaseWhenSettled', () {
+    test('holds a message until the sync that carried it is applied', () async {
+      final source = StreamController<String>();
+      final settled = StreamController<void>.broadcast();
+      final seen = <String>[];
+      final sub = releaseWhenSettled(
+        source.stream,
+        settled.stream,
+      ).listen(seen.add);
+
+      source.add('a');
+      source.add('b');
+      await pumpEventQueue();
+      expect(seen, isEmpty);
+
+      settled.add(null);
+      await pumpEventQueue();
+      expect(seen, ['a', 'b']);
+
+      await sub.cancel();
+      await source.close();
+      await settled.close();
+    });
+
+    test('a receipt in the same sync is seen before the decision', () async {
+      final now = DateTime.utc(2026, 8, 17, 12);
+      final timeline = StreamController<WeftMessage>();
+      final synced = StreamController<void>.broadcast();
+      final readMarkers = <String, DateTime>{};
+      final session = _FakeSession(
+        readMarkers: readMarkers,
+        incoming: releaseWhenSettled(timeline.stream, synced.stream),
+      );
+      final pipeline = _pipelineFor(session, now: now);
+      final posted = <MatrixNotification>[];
+      pipeline.notifications.listen(posted.add);
+      pipeline.start();
+
+      // The order the SDK applies one response in.
+      timeline.add(_message());
+      await pumpEventQueue();
+      readMarkers['!wa:example.org'] = now;
+      synced.add(null);
+      await pumpEventQueue();
+
+      expect(posted, isEmpty);
+      expect(pipeline.dedupe.contains(r'$evt1'), isTrue);
+
+      await pipeline.dispose();
+      await timeline.close();
+      await synced.close();
+    });
+
+    test(
+      'a sync that never settles delays a message, never loses it',
+      () async {
+        final source = StreamController<String>();
+        final seen = <String>[];
+        final sub = releaseWhenSettled(
+          source.stream,
+          const Stream<void>.empty(),
+          limit: const Duration(milliseconds: 20),
+        ).listen(seen.add);
+
+        source.add('a');
+        await pumpEventQueue();
+        expect(seen, isEmpty);
+
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(seen, ['a']);
+
+        await sub.cancel();
+        await source.close();
+      },
+    );
+
+    test('whatever is held goes out when the source closes', () async {
+      final source = StreamController<String>();
+      final seen = <String>[];
+      final done = Completer<void>();
+      releaseWhenSettled(
+        source.stream,
+        const Stream<void>.empty(),
+      ).listen(seen.add, onDone: done.complete);
+
+      source.add('a');
+      await source.close();
+      await done.future;
+
+      expect(seen, ['a']);
+    });
+  });
+
+  group('latestReadAt', () {
+    final earlier = DateTime.utc(2026, 8, 17, 11);
+    final later = DateTime.utc(2026, 8, 17, 12);
+
+    test('a receipt filed under the main thread counts', () {
+      // Element files a read of the ordinary timeline there, and nowhere else.
+      expect(latestReadAt(null, later), later);
+      expect(latestReadAt(earlier, null), earlier);
+    });
+
+    test('the newer of the two wins, whichever timeline it is in', () {
+      expect(latestReadAt(earlier, later), later);
+      expect(latestReadAt(later, earlier), later);
+    });
+
+    test('no receipt at all is still "no idea"', () {
+      expect(latestReadAt(null, null), isNull);
+    });
+  });
 }
 
 MatrixNotificationPipeline _pipelineFor(
@@ -530,12 +709,17 @@ class _FakeSession implements MatrixNotificationSession {
     Map<String, WeftMessage> messages = const {},
     this.readMarkers = const {},
     Set<String>? displayNames,
+    Stream<WeftMessage>? incoming,
   }) : _messages = messages,
+       _incoming = incoming,
        ownDisplayNames = displayNames ?? const {'Me'};
 
   final Map<String, WeftMessage> _messages;
   final Map<String, DateTime> readMarkers;
   final _controller = StreamController<WeftMessage>.broadcast();
+
+  /// Stands in for the sync stream when a test is about *when* it delivers.
+  final Stream<WeftMessage>? _incoming;
 
   /// Event ids actually fetched, so "the push path did not go to the server"
   /// is assertable.
@@ -550,7 +734,7 @@ class _FakeSession implements MatrixNotificationSession {
   final Set<String> ownDisplayNames;
 
   @override
-  Stream<WeftMessage> get incomingMessages => _controller.stream;
+  Stream<WeftMessage> get incomingMessages => _incoming ?? _controller.stream;
 
   @override
   Future<WeftMessage?> messageFor({

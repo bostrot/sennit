@@ -17,6 +17,7 @@ import '../services/notifications/notification_actions.dart'
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import '../services/notifications/conversation_clearer.dart';
 import '../services/notifications/notification_service.dart';
+import '../services/notifications/open_chats.dart';
 import '../services/notifications/push_registration.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';
@@ -144,6 +145,14 @@ final conversationClearerProvider = Provider<ConversationClearer>((ref) {
   );
 });
 
+/// Which conversations are on screen, for the notification path to ask.
+///
+/// Its own provider rather than a field on the service for the reason
+/// [notificationDismisserProvider] is one: the chat screen has to report here,
+/// and a screen that reached for the service would build the whole
+/// notification stack to say it had opened.
+final openChatsProvider = Provider<OpenChats>((ref) => OpenChats());
+
 /// The push gateway the user configured, or null.
 final pushGatewayProvider = Provider<Uri?>((ref) {
   ref.watch(settingsRevisionProvider);
@@ -222,6 +231,8 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     // A function rather than a value — a mute applied from the notification
     // shade must affect the next message, not the next launch.
     policy: () => ref.read(notificationPolicyProvider),
+    // A message landing in the conversation on screen has been seen already.
+    isChatOpen: ref.watch(openChatsProvider).isOpen,
   );
 
   final service = WeftNotificationService(

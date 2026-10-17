@@ -184,6 +184,81 @@ typedef ChatForRoom = Chat? Function(String roomId);
 /// message, not the next launch.
 typedef NotificationPolicyLookup = NotificationPolicy Function();
 
+/// Whether a chat is on screen, in an app the user is looking at.
+///
+/// Asked with the *chat* id, after the merge fold, for the reason [ChatForRoom]
+/// exists: a merged contact is open as one conversation, whichever leg the
+/// message arrived on. Asked per message rather than held, because what is on
+/// screen changes far more often than anything else the pipeline reads.
+typedef ChatOpenLookup = bool Function(String chatId);
+
+/// How long a message that arrived on sync waits for that sync to finish
+/// before it is released anyway.
+///
+/// Long, because the sync that needs the wait most is the catch-up after hours
+/// offline, which is also the slowest one to apply. It is a ceiling on a sync
+/// that failed part-way, not a delay anyone sees: a healthy sync releases its
+/// messages the moment it has been applied.
+const kSyncSettleLimit = Duration(seconds: 10);
+
+/// Holds each event of [source] until [settled] next fires.
+///
+/// A sync response is applied a room at a time, and within a room the timeline
+/// comes before the receipts. So at the moment a message is announced, the
+/// read receipt that came down *in the same response* has not been applied yet
+/// — and that is exactly the pair a phone gets when it comes back online after
+/// the conversation was had, and read, on a laptop. Deciding there and then
+/// notifies about every one of those messages. Deciding once the response has
+/// been applied in full is what lets the read marker speak first.
+///
+/// Order is kept. [limit] releases whatever is held if [settled] never fires —
+/// a sync that threw half-way through must delay a notification, not lose it.
+Stream<T> releaseWhenSettled<T>(
+  Stream<T> source,
+  Stream<void> settled, {
+  Duration limit = kSyncSettleLimit,
+}) {
+  late final StreamController<T> controller;
+  final held = <T>[];
+  StreamSubscription<T>? sourceSub;
+  StreamSubscription<void>? settledSub;
+  Timer? timer;
+
+  void release() {
+    timer?.cancel();
+    timer = null;
+    if (held.isEmpty) return;
+    final ready = List<T>.of(held);
+    held.clear();
+    ready.forEach(controller.add);
+  }
+
+  controller = StreamController<T>(
+    onListen: () {
+      settledSub = settled.listen((_) => release());
+      sourceSub = source.listen(
+        (event) {
+          held.add(event);
+          timer ??= Timer(limit, release);
+        },
+        onError: controller.addError,
+        onDone: () {
+          release();
+          unawaited(settledSub?.cancel());
+          unawaited(controller.close());
+        },
+      );
+    },
+    onCancel: () async {
+      timer?.cancel();
+      held.clear();
+      await sourceSub?.cancel();
+      await settledSub?.cancel();
+    },
+  );
+  return controller.stream;
+}
+
 /// Turns Matrix events into notification decisions, whichever way they arrive.
 ///
 /// Two entry points, one body: [handlePush] for an `event_id_only` poke that
@@ -201,12 +276,14 @@ class MatrixNotificationPipeline {
     required MatrixNotificationSession session,
     required ChatForRoom chatForRoom,
     required NotificationPolicyLookup policy,
+    ChatOpenLookup? isChatOpen,
     NotificationDedupe? dedupe,
     DateTime Function()? now,
     WeftNotifyStrings Function()? words,
   }) : _session = session,
        _chatForRoom = chatForRoom,
        _policy = policy,
+       _isChatOpen = isChatOpen,
        _dedupe = dedupe ?? NotificationDedupe(),
        _now = now ?? DateTime.now,
        _words = words ?? _englishWords;
@@ -214,6 +291,10 @@ class MatrixNotificationPipeline {
   final MatrixNotificationSession _session;
   final ChatForRoom _chatForRoom;
   final NotificationPolicyLookup _policy;
+
+  /// Null wherever there is no screen to ask about — the background isolate,
+  /// and every test that is not about this.
+  final ChatOpenLookup? _isChatOpen;
   final NotificationDedupe _dedupe;
 
   /// Chats that have already had their one notification as a pending request.
@@ -348,6 +429,9 @@ class MatrixNotificationPipeline {
       // stranger?" is a question about what *this* app has done.
       isFirstFromSender:
           !chat.isPendingRequest || _announcedRequests.add(chat.id),
+      // Never for a synthetic message: the test button must not be answered
+      // with "you are looking at it" by whatever happens to be on screen.
+      chatOpen: dedupe && (_isChatOpen?.call(chat.id) ?? false),
     );
 
     if (decision case final DeliveredDecision delivered) {
@@ -402,7 +486,13 @@ class _ClientNotificationSession implements MatrixNotificationSession {
   }
 
   @override
-  Stream<WeftMessage> get incomingMessages async* {
+  Stream<WeftMessage> get incomingMessages =>
+      // Held until the sync that carried them has been applied in full, so a
+      // receipt in the same response is in [lastReadAt] before anything is
+      // decided. See [releaseWhenSettled].
+      releaseWhenSettled(_timelineMessages, _client.onSync.stream);
+
+  Stream<WeftMessage> get _timelineMessages async* {
     await for (final event in _client.onTimelineEvent.stream) {
       // Sync decrypts before this stream fires; an event still typed
       // `m.room.encrypted` here is one whose keys have not arrived. It is
@@ -450,11 +540,29 @@ class _ClientNotificationSession implements MatrixNotificationSession {
   @override
   DateTime? lastReadAt(String roomId) {
     final room = _client.getRoomById(roomId);
+    if (room == null) return null;
     // `latestOwnReceipt` is the newest of the user's public and private read
     // receipts, so a message read on their laptop stops the phone notifying
     // about it as soon as that receipt syncs.
-    return room?.receiptState.global.latestOwnReceipt?.timestamp;
+    //
+    // Both timelines, because which one a receipt lands in is the *sending*
+    // client's choice: Element and everything else thread-aware files a read
+    // of the ordinary timeline under `thread_id: main`, and the SDK keeps
+    // those apart from the unthreaded ones. Reading `global` alone made every
+    // read on such a client invisible here.
+    return latestReadAt(
+      room.receiptState.global.latestOwnReceipt?.timestamp,
+      room.receiptState.mainThread?.latestOwnReceipt?.timestamp,
+    );
   }
+}
+
+/// The later of two read markers, either of which may be missing.
+@visibleForTesting
+DateTime? latestReadAt(DateTime? a, DateTime? b) {
+  if (a == null) return b;
+  if (b == null) return a;
+  return a.isAfter(b) ? a : b;
 }
 
 String? _asString(Object? value) {

@@ -116,6 +116,7 @@ NotificationDecision decide({
   DateTime? lastReadAt,
   NotificationDedupe? dedupe,
   bool isFirstFromSender = true,
+  bool chatOpen = false,
 }) {
   return evaluateNotification(
     message: message ?? msg(),
@@ -127,6 +128,7 @@ NotificationDecision decide({
     ownDisplayNames: ownDisplayNames,
     dedupe: dedupe,
     isFirstFromSender: isFirstFromSender,
+    chatOpen: chatOpen,
   );
 }
 

@@ -120,6 +120,32 @@ void main() {
       );
     });
 
+    test('a message in the conversation on screen does not notify', () {
+      expect(
+        reasonFor(decide(chatOpen: true)),
+        NotificationSuppression.chatOpen,
+      );
+    });
+
+    test('a mention in the conversation on screen does not notify either', () {
+      // It was drawn in front of them with every other line of the chat.
+      final decision = decide(
+        message: msg(body: 'Ada, are you there?'),
+        chatOpen: true,
+      );
+      expect(reasonFor(decision), NotificationSuppression.chatOpen);
+      expect(decision.mentioned, isFalse);
+    });
+
+    test('an open chat does not outrank the reasons it was never eligible', () {
+      // The first rule that fires is the diagnosis; "you were looking at it"
+      // must not replace "it was your own message".
+      expect(
+        reasonFor(decide(message: msg(isOwn: true), chatOpen: true)),
+        NotificationSuppression.ownMessage,
+      );
+    });
+
     test('a message newer than the read marker still notifies', () {
       expect(
         decide(

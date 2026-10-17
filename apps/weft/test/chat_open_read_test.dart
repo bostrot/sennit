@@ -5,6 +5,7 @@ import 'package:weft/app/notification_providers.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/services/notifications/conversation_clearer.dart';
 import 'package:weft/services/notifications/notification_actions.dart';
+import 'package:weft/services/notifications/open_chats.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
@@ -50,16 +51,22 @@ void main() {
   });
   tearDown(() => demo.dispose());
 
+  // Foreground is the app's to say, not the test binding's.
+  late OpenChats openChats;
+  setUp(() => openChats = OpenChats(isForeground: () => true));
+
   Future<List<String>> pump(
     WidgetTester tester, {
     String chatId = mergedChat,
     List<String>? dismissed,
+    bool preview = false,
   }) async {
     final cleared = dismissed ?? <String>[];
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           chatRepositoryProvider.overrideWithValue(repository),
+          openChatsProvider.overrideWithValue(openChats),
           notificationDismisserProvider.overrideWith(
             () => _RecordingDismisser(cleared),
           ),
@@ -67,13 +74,30 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
-          home: ChatView(chatId: chatId),
+          home: ChatView(chatId: chatId, preview: preview),
         ),
       ),
     );
     await tester.pumpAndSettle();
     return cleared;
   }
+
+  testWidgets('an open chat is on screen, and stops being when it is left', (
+    tester,
+  ) async {
+    await pump(tester);
+    expect(openChats.isOpen(mergedChat), isTrue);
+    expect(openChats.isOpen('!konrad_wa_room:example.org'), isFalse);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    expect(openChats.isOpen(mergedChat), isFalse);
+  });
+
+  testWidgets('a preview is a peek, and is not on screen', (tester) async {
+    await pump(tester, preview: true);
+    expect(openChats.isOpen(mergedChat), isFalse);
+  });
 
   List<String> readCalls() => repository.calls
       .where((c) => c.method == 'markRead')
@@ -99,6 +123,7 @@ void main() {
       ProviderScope(
         overrides: [
           chatRepositoryProvider.overrideWithValue(repository),
+          openChatsProvider.overrideWithValue(openChats),
           notificationDismisserProvider.overrideWith(
             () => _RecordingDismisser(cleared),
           ),
@@ -133,6 +158,7 @@ void main() {
       ProviderScope(
         overrides: [
           chatRepositoryProvider.overrideWithValue(repository),
+          openChatsProvider.overrideWithValue(openChats),
           notificationDismisserProvider.overrideWith(
             () => _RecordingDismisser(cleared),
           ),

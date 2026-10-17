@@ -38,6 +38,13 @@ enum NotificationSuppression {
   /// device is the same fact arriving twice.
   alreadyRead,
 
+  /// The conversation is on screen, in an app the user is looking at.
+  ///
+  /// The message has just been drawn in front of them; a banner over the top of
+  /// it, and a buzz for it, says nothing they have not already seen. Only ever
+  /// true in the foreground app — a background isolate has no screen.
+  chatOpen,
+
   /// This event id has already been decided on. A message reaching the app by
   /// both push and sync is the normal case, not an error.
   duplicate,
@@ -721,6 +728,10 @@ class NotificationDedupe {
 /// cannot cheaply answer it — a background push isolate with no timeline —
 /// should not be forced to invent an answer that changes ordinary behaviour.
 ///
+/// [chatOpen] is whether [chat] is on screen right now. False by default for
+/// the same reason: only the foreground app can know, and everything else
+/// behaves as it always has.
+///
 /// Order matters. Cheap and unarguable rules come first (own message, redacted,
 /// already read), then the switches the user set, then the ones a mention can
 /// break through. The first rule that fires wins and is reported as *the*
@@ -736,6 +747,7 @@ NotificationDecision evaluateNotification({
   Set<String> ownDisplayNames = const {},
   NotificationDedupe? dedupe,
   bool isFirstFromSender = true,
+  bool chatOpen = false,
 }) {
   // Before anything else, so that a second delivery of an event already
   // decided on is reported as a duplicate whatever the first verdict was.
@@ -781,6 +793,13 @@ NotificationDecision evaluateNotification({
   if (lastReadAt != null && !message.timestamp.isAfter(lastReadAt)) {
     return const NotificationDecision.suppress(
       NotificationSuppression.alreadyRead,
+    );
+  }
+  // Being looked at. Ahead of the mention check on purpose: a mention in the
+  // conversation on screen is as visible as every other line of it.
+  if (chatOpen) {
+    return const NotificationDecision.suppress(
+      NotificationSuppression.chatOpen,
     );
   }
 

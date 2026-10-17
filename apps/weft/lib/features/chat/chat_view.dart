@@ -35,6 +35,7 @@ import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
 import '../../services/attachments/clipboard_images.dart';
+import '../../services/notifications/open_chats.dart';
 import '../../services/schedule/scheduled_actions.dart';
 import '../settings/integrations_screen.dart';
 import 'paperless_picker_sheet.dart';
@@ -205,9 +206,28 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// provider through a dead `BuildContext` throws.
   late final ComposerHandle _composerHandle;
 
+  /// Held for the same reason as [_composerHandle]: [dispose] has to say this
+  /// conversation is no longer on screen, and cannot read a provider to do it.
+  late final OpenChats _openChats;
+
+  /// The chat this view has reported as on screen, if any.
+  String? _onScreenChatId;
+
+  /// Tells the notification path which conversation this view is showing, so
+  /// a message arriving in it is not announced over the top of itself. A
+  /// preview is a peek, not a read, and reports nothing.
+  void _reportOnScreen(String? chatId) {
+    if (widget.preview || chatId == _onScreenChatId) return;
+    final previous = _onScreenChatId;
+    if (previous != null) _openChats.leave(previous);
+    if (chatId != null) _openChats.enter(chatId);
+    _onScreenChatId = chatId;
+  }
+
   @override
   void initState() {
     super.initState();
+    _openChats = ref.read(openChatsProvider);
     _composerHandle = ref.read(composerHandleProvider)
       ..register(this, _composerFocus);
     // Every sync re-emits the chat list, which makes it the heartbeat this
@@ -320,6 +340,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // so an unconditional release here would clear the registration the
     // incoming screen has already made.
     _composerHandle.release(this);
+    _reportOnScreen(null);
     // A conversation left before it arrived.
     _stopWaitingForChat();
     _composerFocus.dispose();
@@ -340,6 +361,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _announcedEventId = null;
     final chatId = _chatId;
     _timelineChatId = chatId;
+    _reportOnScreen(chatId);
     try {
       // Before the timeline is built, not after: a self-deleting chat that
       // came due while the app was closed would otherwise draw the messages
