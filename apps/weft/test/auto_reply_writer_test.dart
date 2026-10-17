@@ -88,6 +88,50 @@ void main() {
       );
     });
 
+    test('a message the model ended without its closing tag is sent', () {
+      // Small models drop the closing tag. When the model stopped by itself
+      // the message is all there.
+      expect(
+        parseAutoReply('<reply>I am away until Monday.', finished: true).text,
+        'I am away until Monday.',
+      );
+    });
+
+    test('what the model wrote after a forgotten tag is not sent', () {
+      expect(
+        parseAutoReply(
+          '<reply>I am away until Monday.\n\nI kept it short because the '
+          'instruction asked for that.',
+          finished: true,
+        ).text,
+        'I am away until Monday.',
+      );
+    });
+
+    test('a mangled closing tag is refused, not sent', () {
+      expect(
+        parseAutoReply(
+          '<reply>I am away until Monday.</repl',
+          finished: true,
+        ).outcome,
+        AutoReplyOutcome.refused,
+      );
+    });
+
+    test('a finished answer still needs to open the tag', () {
+      expect(
+        parseAutoReply('I am away until Monday.', finished: true).outcome,
+        AutoReplyOutcome.refused,
+      );
+    });
+
+    test('a thought that never ended is refused even when finished', () {
+      expect(
+        parseAutoReply('<think>Maybe <reply>I am away', finished: true).outcome,
+        AutoReplyOutcome.refused,
+      );
+    });
+
     test('an empty message is refused', () {
       expect(
         parseAutoReply('<reply>  </reply>').outcome,
@@ -246,19 +290,21 @@ void main() {
       timeout: const Duration(seconds: 1),
     );
 
-    http.Client answering(String content) => MockClient((request) async {
-      return http.Response(
-        jsonEncode({
-          'choices': [
-            {
-              'message': {'content': content},
-            },
-          ],
-        }),
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      );
-    });
+    http.Client answering(String content, {String? finishReason}) =>
+        MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'content': content},
+                  'finish_reason': ?finishReason,
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        });
 
     test('an ordinary completion becomes a draft', () async {
       final draft = await ask(
@@ -390,6 +436,38 @@ void main() {
 
       expect(draft.outcome, AutoReplyOutcome.refused);
       expect(draft.text, isNull);
+    });
+
+    test('a model that stopped without closing the tag is sent', () async {
+      final draft = await ask(
+        client: answering('<reply>Back on Monday.', finishReason: 'stop'),
+      );
+
+      expect(draft.text, 'Back on Monday.');
+    });
+
+    test('a model cut off by the budget mid-message is refused', () async {
+      final draft = await ask(
+        client: answering('<reply>Back on Monday, and', finishReason: 'length'),
+      );
+
+      expect(draft.outcome, AutoReplyOutcome.refused);
+    });
+
+    test('the budget leaves a thinking model room to answer', () async {
+      String? body;
+      final client = MockClient((request) async {
+        body = request.body;
+        return http.Response('{}', 500);
+      });
+
+      await ask(client: client);
+
+      final asked = (jsonDecode(body!) as Map)['max_tokens'] as int;
+      expect(asked, kAutoReplyMaxTokens);
+      // Reasoning spends the same budget as the reply. 220 was all spent
+      // inside <think>, and nothing was ever sent.
+      expect(asked, greaterThanOrEqualTo(1024));
     });
   });
 }

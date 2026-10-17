@@ -187,7 +187,8 @@ class _NoEndpointNotice extends StatelessWidget {
 ///
 /// A feature that speaks for someone must be able to say what it said. This is
 /// also where a failure surfaces: a model that would not answer, a conversation
-/// that hit its cap, a send the homeserver refused.
+/// that hit its cap, a send the homeserver refused — and, for the failures
+/// another go can fix, a button to have it.
 class _AttemptLog extends ConsumerWidget {
   const _AttemptLog();
 
@@ -196,6 +197,7 @@ class _AttemptLog extends ConsumerWidget {
     final l10n = context.l10n;
     final attempts = ref.watch(autoReplyLogProvider);
     if (attempts.isEmpty) return const SizedBox.shrink();
+    final service = ref.watch(autoReplyServiceProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,6 +231,22 @@ class _AttemptLog extends ConsumerWidget {
                 if (attempt.text != null) '“${attempt.text}”',
               ]),
             ),
+            // Only on failures another go can fix, and only with a service to
+            // ask — the retry goes through the rules like any new message.
+            trailing: attempt.canRetry && service != null
+                ? IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    tooltip: l10n.commonRetry,
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final tried = await service.retry(attempt.chatId);
+                      if (tried) return;
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(l10n.autoReplyRetryNothingLeft)),
+                      );
+                    },
+                  )
+                : null,
           ),
         Align(
           alignment: AlignmentDirectional.centerEnd,

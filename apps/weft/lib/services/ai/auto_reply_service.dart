@@ -48,7 +48,29 @@ class AutoReplyAttempt {
   final String? text;
 
   bool get succeeded => outcome == AutoReplyOutcome.sent;
+
+  /// Whether the screen offers to try this one again.
+  ///
+  /// Only the failures another go can fix: the model, the network or the
+  /// transport let the user down. A decline was the model doing what it was
+  /// told, a missing endpoint needs the endpoints screen, and the engine's
+  /// refusals — the cap, the cooldown, the schedule — would refuse again.
+  bool get canRetry => switch (outcome) {
+    AutoReplyOutcome.refused ||
+    AutoReplyOutcome.unreachable ||
+    AutoReplyOutcome.timedOut ||
+    AutoReplyOutcome.sendFailed => true,
+    _ => false,
+  };
 }
+
+/// How many more times a reply the model wrote outside the format is asked
+/// for, before it is reported as [AutoReplyOutcome.refused].
+///
+/// One. A model at a non-zero temperature that missed the tags once mostly
+/// finds them the second time; one that misses twice is misconfigured, and a
+/// third request would only make the user wait longer to find out.
+const int kAutoReplyFormatRetries = 1;
 
 /// How many attempts are remembered.
 ///
@@ -164,7 +186,40 @@ class AutoReplyService {
     if (chat == null) return;
 
     _remember(chat.id, message);
+    await _answer(chat, message);
+  }
 
+  /// Tries [chatId] again after a failed attempt.
+  ///
+  /// The settings screen's Retry. It answers the newest message the other
+  /// side sent, through [shouldReply] like any other — a rule switched off
+  /// since, a schedule that has closed or a cap that has filled refuses the
+  /// retry the same way it would refuse a new message, so a tap cannot send
+  /// what the rules would not.
+  ///
+  /// False, and nothing attempted, when there is nothing left to answer: the
+  /// conversation is gone from this session's context, or the newest thing in
+  /// it is already from the user's side — they answered themselves, or a
+  /// reply went out after all.
+  Future<bool> retry(String chatId) async {
+    final recent = _context.of(chatId);
+    if (recent.isEmpty) return false;
+    final newest = recent.last;
+    if (newest.isOwn || newest.isAutoReply) return false;
+    final chat = _chatForRoom(newest.roomId);
+    if (chat == null) return false;
+    await _answer(chat, newest, reportEveryRefusal: true);
+    return true;
+  }
+
+  /// [reportEveryRefusal] is for a retry the user asked for, where silence
+  /// would read as the button doing nothing: "no rule covers this chat any
+  /// more" is worth a log line when someone just tapped Retry on it.
+  Future<void> _answer(
+    Chat chat,
+    WeftMessage message, {
+    bool reportEveryRefusal = false,
+  }) async {
     final decision = shouldReply(
       message: message,
       chat: _stateFor(chat),
@@ -179,7 +234,7 @@ class AutoReplyService {
       // yourself" and "no rule covers this chat" are true of almost every
       // message that arrives, and a log full of them would bury the one entry
       // that matters.
-      if (_isWorthReporting(decision.refusal)) {
+      if (reportEveryRefusal || _isWorthReporting(decision.refusal)) {
         _report(chat: chat, refusal: decision.refusal);
       }
       return;
@@ -255,14 +310,30 @@ class AutoReplyService {
     if (endpoint == null) {
       return const AutoReplyDraft.failed(AutoReplyOutcome.notConfigured);
     }
-    return _composer(
+    final transcript = transcriptFor(chat.id);
+    Future<AutoReplyDraft> ask() => _composer(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
       apiKey: endpoint.apiKey,
       instruction: rule.prompt,
       chatTitle: chat.title,
-      transcript: transcriptFor(chat.id),
+      transcript: transcript,
     );
+
+    var draft = await ask();
+    // Only a format miss is asked for again — see [kAutoReplyFormatRetries].
+    // An empty transcript is refused before any request and would be again.
+    for (
+      var retry = 0;
+      retry < kAutoReplyFormatRetries &&
+          draft.outcome == AutoReplyOutcome.refused &&
+          transcript.isNotEmpty;
+      retry++
+    ) {
+      debugPrint('weft: auto-reply: asking ${chat.id} again after a refusal');
+      draft = await ask();
+    }
+    return draft;
   }
 
   /// The conversation slice that would be sent to the model, oldest first.

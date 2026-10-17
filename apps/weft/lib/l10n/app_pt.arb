@@ -1192,6 +1192,7 @@
   "autoReplyOutcomeRefused": "O seu modelo não escreveu nada aproveitável",
   "autoReplyOutcomeDeclined": "O seu modelo optou por não responder",
   "autoReplyOutcomeSendFailed": "Não foi possível enviar a resposta",
+  "autoReplyRetryNothingLeft": "Já não há nada para responder nesta conversa",
   "autoReplyRefusalCap": "Retida — esta conversa já teve as suas {count} respostas desta hora",
   "autoReplyRefusalCooling": "Retida — a aguardar antes de responder de novo",
   "autoReplyRefusalOutsideSchedule": "Retida — fora do horário da regra",

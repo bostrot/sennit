@@ -289,10 +289,27 @@ happened — but it is bounded, in memory only, and dropped with the service.
 
 ## Failure
 
-Every failure sends nothing, throws nothing, and is **not retried**. A model
-that timed out once will time out again while the same message is the newest
-one, and a retry loop against someone else's Ollama is a way to make a phone
-hot.
+Every failure sends nothing and throws nothing. Only `refused` is retried on
+its own, once (`kAutoReplyFormatRetries`): a model sampled at temperature 0.6
+that missed the format once mostly hits it the second time. Everything else is
+**not retried** automatically — a model that timed out once will time out again
+while the same message is the newest one, and a retry loop against someone
+else's Ollama is a way to make a phone hot.
+
+Instead, a `refused`, `unreachable`, `timedOut` or `sendFailed` line in "Recent
+replies" carries a Retry button (`AutoReplyAttempt.canRetry`). It calls
+`AutoReplyService.retry`, which answers the newest message the other side sent
+through `shouldReply` like any new message — a rule switched off since, a closed
+schedule or a full cap refuses the retry too, and on a retry that refusal is
+logged rather than swallowed. When the newest message in the session's context
+is already from the user's side (they answered, or a reply went out) or the
+conversation is no longer in memory, there is nothing to answer and the screen
+says so.
+
+The completion budget is `kAutoReplyMaxTokens` (1024) with a 60-second deadline.
+The reasoning of a thinking model spends the same budget as the reply, and at
+the old 220 tokens it was all spent inside `<think>`, so every answer was
+refused.
 
 `AutoReplyOutcome` names them: `notConfigured`, `unreachable`, `timedOut`,
 `refused` (the model answered with nothing sendable), `declined` (the model
@@ -314,10 +331,12 @@ conversation says nothing should go out ("don't answer work chats", a message
 that needs no answer). Only the text inside the last `<reply>` pair is ever
 sent; everything outside it is thrown away unread. That is what keeps a thinking
 model's narration out of the conversation: untagged reasoning used to read as an
-ordinary sentence and was sent. An answer without the tags, a `<reply>` that never
-closes, reasoning that never closed its `<think>`, and — inside the tags — a
-heading, a bulleted analysis or a 600-character run-on with no sentence to cut at
-are all refused rather than best-efforted into a message. When the last marker is
+ordinary sentence and was sent. An answer without the tags, a `<reply>` cut off
+by the budget (`finish_reason` other than `stop`), reasoning that never closed
+its `<think>`, and — inside the tags — a heading, a bulleted analysis or a
+600-character run-on with no sentence to cut at are all refused rather than
+best-efforted into a message. A `<reply>` the model ended itself without the
+closing tag is sent: small models drop it, and the message is all there. When the last marker is
 `<no-reply/>` the outcome is `declined`.
 
 ## Where it is wired

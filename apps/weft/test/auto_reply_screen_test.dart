@@ -17,6 +17,8 @@ import 'package:weft/features/settings/auto_reply_screen.dart';
 import 'package:weft/services/ai/auto_reply_service.dart';
 import 'package:weft/services/ai/auto_reply_writer.dart';
 
+import 'support/auto_reply_fakes.dart';
+
 /// The screen is the only place an [AutoReplyRule] is written by a human, so
 /// what these pin is the round trip: a control moves, the rule the engine reads
 /// changes, and the blob in the real [SettingsStore] changes with it.
@@ -373,6 +375,129 @@ void main() {
   });
 
   group('the attempt log', () {
+    Future<ProviderContainer> pumpLog(
+      WidgetTester tester, {
+      required AutoReplyAttempt attempt,
+      AutoReplyService? service,
+    }) async {
+      final container = ProviderContainer(
+        overrides: [
+          chatRepositoryProvider.overrideWithValue(
+            _FakeChatRepository(const []),
+          ),
+          autoReplyServiceProvider.overrideWithValue(service),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(autoReplyLogProvider.notifier).add(attempt);
+
+      tester.view.physicalSize = const Size(900, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
+            theme: WeftTheme.build(),
+            home: const AutoReplyScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    const grace = '!grace:example.org';
+    final graceChat = Chat(
+      id: grace,
+      title: 'Grace',
+      unreadCount: 1,
+      sources: const [ChatSource(roomId: grace, network: ChatNetwork.whatsapp)],
+    );
+    AutoReplyAttempt failed(AutoReplyOutcome outcome) => AutoReplyAttempt(
+      chatId: grace,
+      chatTitle: 'Grace',
+      at: DateTime.utc(2026, 1, 15, 10),
+      outcome: outcome,
+      ruleName: 'Out of office',
+    );
+
+    testWidgets('a failure the model caused can be retried, and sends', (
+      tester,
+    ) async {
+      final h = buildAutoReplyService(
+        chat: graceChat,
+        rules: [rule()],
+        composer: FakeComposer(
+          script: const [AutoReplyOutcome.refused, AutoReplyOutcome.refused],
+        ),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+      await h.service.handleMessage(
+        WeftMessage(
+          eventId: r'$in',
+          roomId: grace,
+          network: ChatNetwork.whatsapp,
+          senderId: '@whatsapp_grace:example.org',
+          senderName: 'Grace',
+          timestamp: DateTime.utc(2026, 1, 15, 10),
+          kind: MessageKind.text,
+          isOwn: false,
+          body: 'are you around?',
+        ),
+      );
+      expect(h.transport.sent, isEmpty);
+
+      await pumpLog(tester, attempt: h.attempts.single, service: h.service);
+      await tester.tap(find.byTooltip('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(h.transport.sent.single.body, 'I am away until Monday.');
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('says so when there is nothing left to answer', (tester) async {
+      final h = buildAutoReplyService(chat: graceChat, rules: [rule()]);
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await pumpLog(
+        tester,
+        attempt: failed(AutoReplyOutcome.timedOut),
+        service: h.service,
+      );
+      await tester.tap(find.byTooltip('Retry'));
+      await tester.pumpAndSettle();
+
+      expect(h.composer.calls, isEmpty);
+      expect(find.textContaining('nothing left to answer'), findsOneWidget);
+    });
+
+    testWidgets('a decline offers no retry', (tester) async {
+      final h = buildAutoReplyService(chat: graceChat, rules: [rule()]);
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await pumpLog(
+        tester,
+        attempt: failed(AutoReplyOutcome.declined),
+        service: h.service,
+      );
+
+      expect(find.byTooltip('Retry'), findsNothing);
+    });
+
+    testWidgets('no service, no retry button that would do nothing', (
+      tester,
+    ) async {
+      await pumpLog(tester, attempt: failed(AutoReplyOutcome.unreachable));
+
+      expect(find.byTooltip('Retry'), findsNothing);
+    });
+
     testWidgets('is absent until something has happened', (tester) async {
       await pump(tester);
 

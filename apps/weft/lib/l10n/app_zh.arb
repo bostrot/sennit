@@ -1192,6 +1192,7 @@
   "autoReplyOutcomeRefused": "你的模型没有写出可用的内容",
   "autoReplyOutcomeDeclined": "你的模型选择不回复",
   "autoReplyOutcomeSendFailed": "无法发送该回复",
+  "autoReplyRetryNothingLeft": "这段对话中已没有需要回复的内容",
   "autoReplyRefusalCap": "已暂缓——该对话本小时的 {count} 条回复已用完",
   "autoReplyRefusalCooling": "已暂缓——正在等待后再次回复",
   "autoReplyRefusalOutsideSchedule": "已暂缓——不在规则的时段内",

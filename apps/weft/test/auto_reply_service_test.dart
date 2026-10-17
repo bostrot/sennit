@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_autoreply/weft_autoreply.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft/services/ai/auto_reply_service.dart';
 import 'package:weft/services/ai/auto_reply_writer.dart';
 import 'package:weft/services/ai/conversation_context.dart';
 
@@ -262,10 +263,10 @@ void main() {
       },
     );
 
-    test('a failure is not retried', () async {
+    test('a timeout is not retried on its own', () async {
       // A model that timed out once will time out again while the same message
       // is the newest one, and a retry loop against someone else's Ollama is a
-      // way to make a phone hot.
+      // way to make a phone hot. The user's Retry is the way back.
       final h = buildAutoReplyService(
         chat: chat(),
         rules: const [away],
@@ -432,6 +433,196 @@ void main() {
 
       expect(draft.outcome, AutoReplyOutcome.notConfigured);
       expect(draft.text, isNull);
+    });
+  });
+
+  group('a reply outside the format is asked for again', () {
+    test('once, and the second answer is sent', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        composer: FakeComposer(script: const [AutoReplyOutcome.refused, null]),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(h.composer.calls, hasLength(1 + kAutoReplyFormatRetries));
+      expect(h.transport.sent.single.body, 'I am away until Monday.');
+      expect(h.attempts.single.outcome, AutoReplyOutcome.sent);
+    });
+
+    test('and no more than once, then it is reported', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        composer: FakeComposer(failWith: AutoReplyOutcome.refused),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(h.composer.calls, hasLength(1 + kAutoReplyFormatRetries));
+      expect(h.transport.sent, isEmpty);
+      expect(h.attempts.single.outcome, AutoReplyOutcome.refused);
+    });
+
+    test(
+      'a decline is an answer, not a miss, and is not asked again',
+      () async {
+        final h = buildAutoReplyService(
+          chat: chat(),
+          rules: const [away],
+          composer: FakeComposer(failWith: AutoReplyOutcome.declined),
+        );
+        addTearDown(h.incoming.close);
+        addTearDown(h.service.dispose);
+
+        await h.service.handleMessage(msg());
+
+        expect(h.composer.calls, hasLength(1));
+      },
+    );
+  });
+
+  group("the user's retry", () {
+    test('answers the newest message once the model is back', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        composer: FakeComposer(script: const [AutoReplyOutcome.timedOut]),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg(body: 'are you coming tonight?'));
+      expect(h.transport.sent, isEmpty);
+
+      final tried = await h.service.retry(room);
+
+      expect(tried, isTrue);
+      expect(h.transport.sent.single.body, 'I am away until Monday.');
+      expect(
+        h.composer.calls.last.transcript.last,
+        contains('are you coming tonight?'),
+      );
+      expect(h.attempts.map((a) => a.outcome), [
+        AutoReplyOutcome.timedOut,
+        AutoReplyOutcome.sent,
+      ]);
+    });
+
+    test('does not add the message to the context a second time', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        composer: FakeComposer(script: const [AutoReplyOutcome.unreachable]),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+      await h.service.retry(room);
+
+      expect(h.composer.calls.last.transcript, hasLength(1));
+    });
+
+    test('has nothing to do once a reply went out', () async {
+      final h = buildAutoReplyService(chat: chat(), rules: const [away]);
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+      final tried = await h.service.retry(room);
+
+      expect(tried, isFalse);
+      expect(h.transport.sent, hasLength(1));
+    });
+
+    test('has nothing to do for a conversation it never saw', () async {
+      final h = buildAutoReplyService(chat: chat(), rules: const [away]);
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      expect(await h.service.retry(room), isFalse);
+      expect(h.composer.calls, isEmpty);
+      expect(h.attempts, isEmpty);
+    });
+
+    test('still obeys the rules, and says why when they refuse', () async {
+      // The rule was switched off after the failure. A tap must not send what
+      // the rules would not, and must not look like it did nothing either.
+      var rules = const [away];
+      final composer = FakeComposer(script: const [AutoReplyOutcome.timedOut]);
+      final attempts = <AutoReplyAttempt>[];
+      final transport = FakeAutoReplyTransport();
+      final service = AutoReplyService(
+        incoming: const Stream.empty(),
+        transport: transport,
+        chatForRoom: (_) => chat(),
+        rules: () => rules,
+        labelsOf: (_) => const {},
+        isServiceChat: (_) => false,
+        isBroadcast: (_) => false,
+        ownUserIds: () => const {'@ada:example.org'},
+        endpoint: () => const AutoReplyEndpoint(
+          baseUrl: 'http://localhost:11434/v1',
+          model: 'llama3',
+        ),
+        onAttempt: attempts.add,
+        composer: composer.call,
+      );
+      addTearDown(service.dispose);
+
+      await service.handleMessage(msg());
+      rules = [away.copyWith(enabled: false)];
+      final tried = await service.retry(room);
+
+      expect(tried, isTrue);
+      expect(transport.sent, isEmpty);
+      expect(composer.calls, hasLength(1));
+      expect(attempts.last.refusal, isNotNull);
+      expect(attempts.last.outcome, isNull);
+    });
+  });
+
+  group('which attempts offer a retry', () {
+    AutoReplyAttempt attempt({
+      AutoReplyOutcome? outcome,
+      AutoReplyRefusal? refusal,
+    }) => AutoReplyAttempt(
+      chatId: room,
+      chatTitle: 'Grace',
+      at: DateTime.utc(2026, 1, 15, 10),
+      outcome: outcome,
+      refusal: refusal,
+    );
+
+    test('the failures another go can fix', () {
+      for (final outcome in [
+        AutoReplyOutcome.refused,
+        AutoReplyOutcome.unreachable,
+        AutoReplyOutcome.timedOut,
+        AutoReplyOutcome.sendFailed,
+      ]) {
+        expect(attempt(outcome: outcome).canRetry, isTrue, reason: '$outcome');
+      }
+    });
+
+    test('not a success, a decline, a missing model or a refusal', () {
+      for (final outcome in [
+        AutoReplyOutcome.sent,
+        AutoReplyOutcome.declined,
+        AutoReplyOutcome.notConfigured,
+      ]) {
+        expect(attempt(outcome: outcome).canRetry, isFalse, reason: '$outcome');
+      }
+      expect(
+        attempt(refusal: AutoReplyRefusal.conversationCap).canRetry,
+        isFalse,
+      );
     });
   });
 }

@@ -1191,6 +1191,7 @@
   "autoReplyOutcomeRefused": "Dein Modell hat nichts Brauchbares geschrieben",
   "autoReplyOutcomeDeclined": "Dein Modell hat entschieden, nicht zu antworten",
   "autoReplyOutcomeSendFailed": "Die Antwort konnte nicht gesendet werden",
+  "autoReplyRetryNothingLeft": "In dieser Unterhaltung gibt es nichts mehr zu beantworten",
   "autoReplyRefusalCap": "Zurückgehalten – diese Unterhaltung hatte ihre {count} Antworten für diese Stunde",
   "autoReplyRefusalCooling": "Zurückgehalten – wartet vor der nächsten Antwort",
   "autoReplyRefusalOutsideSchedule": "Zurückgehalten – außerhalb der Zeiten der Regel",

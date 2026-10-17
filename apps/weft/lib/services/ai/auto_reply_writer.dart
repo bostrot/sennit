@@ -11,10 +11,13 @@ import 'package:http/http.dart' as http;
 /// turns one into the other lives in `app/l10n_labels.dart`. The English on
 /// each case here is what a `debugPrint` shows, not what a user reads.
 ///
-/// Every value except [AutoReplyOutcome.sent] means **nothing was sent**, and
-/// none of them is retried. A model that timed out once will time out again
-/// while the same message is the newest one, and a retry loop against someone
-/// else's Ollama is a way to make a phone hot.
+/// Every value except [AutoReplyOutcome.sent] means **nothing was sent**. Only
+/// [AutoReplyOutcome.refused] is retried on its own, once, by the service: a
+/// model sampled at a non-zero temperature that missed the format once mostly
+/// hits it the second time. The rest are not — a model that timed out once
+/// will time out again while the same message is the newest one, and a retry
+/// loop against someone else's Ollama is a way to make a phone hot. Those wait
+/// for the user's Retry on the settings screen.
 enum AutoReplyOutcome {
   /// A reply was written and handed to the transport.
   sent,
@@ -68,6 +71,14 @@ class AutoReplyDraft {
 /// and a short paragraph — past that the words are not a reply any more.
 const int kAutoReplyMaxChars = 600;
 
+/// The completion budget asked for.
+///
+/// Far more than [kAutoReplyMaxChars] needs, because the budget is spent on
+/// reasoning too: a thinking model handed 220 tokens spent all of them inside
+/// `<think>` and never reached the tags, and every such answer was refused.
+/// The cap on what is *sent* is [kAutoReplyMaxChars], not this.
+const int kAutoReplyMaxTokens = 1024;
+
 /// Asks the configured LLM to write one reply, following the user's prompt.
 ///
 /// A sibling of `suggestSmartReplies` rather than a parameter on it, because
@@ -93,7 +104,7 @@ Future<AutoReplyDraft> composeAutoReply({
   required String chatTitle,
   required List<String> transcript,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 20),
+  Duration timeout = const Duration(seconds: 60),
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || instruction.trim().isEmpty) {
@@ -118,7 +129,7 @@ Future<AutoReplyDraft> composeAutoReply({
           body: jsonEncode({
             'model': model,
             'temperature': 0.6,
-            'max_tokens': 220,
+            'max_tokens': kAutoReplyMaxTokens,
             'messages': [
               {
                 'role': 'system',
@@ -161,17 +172,23 @@ Future<AutoReplyDraft> composeAutoReply({
     }
 
     final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final choice = ((decoded as Map)['choices'] as List?)
+        ?.cast<Map>()
+        .firstOrNull;
+    final content = choice?['message']?['content'] as String?;
     if (content == null) {
       debugPrint('weft: auto-reply: no content in the completion');
       return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
     }
 
-    final draft = parseAutoReply(content);
+    // "stop" is the model ending its answer itself, which is what tells an
+    // answer that forgot its closing tag apart from one cut off by the budget.
+    // Anything else — "length", or a server that does not say — is read as
+    // cut off.
+    final draft = parseAutoReply(
+      content,
+      finished: choice?['finish_reason'] == 'stop',
+    );
     if (draft.outcome == AutoReplyOutcome.refused) {
       debugPrint('weft: auto-reply: nothing usable in ${jsonEncode(content)}');
     }
@@ -203,13 +220,19 @@ const String kAutoReplyDecline = '<no-reply/>';
 
 /// Pulls a sendable message out of whatever the model said.
 ///
+/// [finished] is whether the model ended the answer itself (`finish_reason`
+/// "stop") rather than running out of budget. It decides one case only: a
+/// reply that was opened and never closed is the whole message when the model
+/// stopped on its own — small models drop the closing tag — and the first
+/// half of one when the budget cut it off.
+///
 /// A [AutoReplyDraft.written] only for an answer in the format the prompt
 /// asks for; [AutoReplyOutcome.declined] when the model chose not to reply;
 /// [AutoReplyOutcome.refused] for everything else. No best effort, and that is
 /// the difference between this and `parseSmartReplies`. A chip nobody taps
 /// costs nothing; this text is *sent*, to a person, on WhatsApp, and cannot be
 /// unsent.
-AutoReplyDraft parseAutoReply(String content) {
+AutoReplyDraft parseAutoReply(String content, {bool finished = false}) {
   const refused = AutoReplyDraft.failed(AutoReplyOutcome.refused);
 
   // Thinking models narrate before they answer, and the narration may well
@@ -241,12 +264,34 @@ AutoReplyDraft parseAutoReply(String content) {
     r'<\s*/\s*reply\s*>',
     caseSensitive: false,
   ).firstMatch(text.substring(open.end));
-  // Opened and never closed: the budget ran out mid-message, and the first
-  // half of a message is worse than none of it.
-  if (close == null) return refused;
+  // Opened and never closed. When the budget ran out that is the first half of
+  // a message, which is worse than none of it; when the model stopped by itself
+  // it only forgot the tag, and what follows the opening one is the message.
+  final String inside;
+  if (close != null) {
+    inside = text.substring(open.end, open.end + close.start);
+  } else if (finished) {
+    final unclosed = _unclosedMessage(text.substring(open.end));
+    if (unclosed == null) return refused;
+    inside = unclosed;
+  } else {
+    return refused;
+  }
 
-  final message = _clean(text.substring(open.end, open.end + close.start));
+  final message = _clean(inside);
   return message == null ? refused : AutoReplyDraft.written(message);
+}
+
+/// The message after a `<reply>` the model never closed, or null.
+///
+/// Up to the first blank line only: a model that forgot the tag may well go on
+/// to explain its answer, and the explanation must not be sent with it. Any
+/// `<` left in what remains is a mangled tag — `</repl`, a second `<reply>` —
+/// and a message with markup in it is not one to send.
+String? _unclosedMessage(String rest) {
+  final message = rest.trimLeft().split(RegExp(r'\n\s*\n')).first;
+  if (message.contains('<')) return null;
+  return message;
 }
 
 /// The message inside the tags tidied into something sendable, or null.

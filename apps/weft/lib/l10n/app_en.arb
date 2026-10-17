@@ -6974,6 +6974,10 @@
   "@autoReplyOutcomeSendFailed": {
     "description": "Log line when a reply was written and the network refused to carry it. About 40 chars."
   },
+  "autoReplyRetryNothingLeft": "There is nothing left to answer in this conversation",
+  "@autoReplyRetryNothingLeft": {
+    "description": "Toast after tapping Retry on a failed auto-reply when there is no longer a message to answer: the user replied themselves, a reply went out, or the app was restarted and no longer has the conversation in memory."
+  },
   "autoReplyRefusalCap": "Held back — this conversation has had its {count} replies for the hour",
   "@autoReplyRefusalCap": {
     "description": "Log line when a conversation has already had its hourly quota of automatic replies. About 70 chars.",

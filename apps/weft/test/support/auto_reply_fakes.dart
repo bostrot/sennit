@@ -47,11 +47,20 @@ class FakeAutoReplyTransport implements AutoReplyTransport {
 }
 
 /// A model that answers instantly with whatever it was told to.
+///
+/// [script] is for a model that changes its mind between calls: each call
+/// takes the next entry — a failure, or null for [reply] — and once it runs
+/// out every call answers as [failWith] says.
 class FakeComposer {
-  FakeComposer({this.reply = 'I am away until Monday.', this.failWith});
+  FakeComposer({
+    this.reply = 'I am away until Monday.',
+    this.failWith,
+    List<AutoReplyOutcome?> script = const [],
+  }) : _script = [...script];
 
   final String reply;
   final AutoReplyOutcome? failWith;
+  final List<AutoReplyOutcome?> _script;
 
   final List<({String instruction, List<String> transcript})> calls = [];
 
@@ -64,7 +73,7 @@ class FakeComposer {
     required List<String> transcript,
   }) async {
     calls.add((instruction: instruction, transcript: transcript));
-    final failure = failWith;
+    final failure = _script.isNotEmpty ? _script.removeAt(0) : failWith;
     if (failure != null) return AutoReplyDraft.failed(failure);
     return AutoReplyDraft.written(reply);
   }
