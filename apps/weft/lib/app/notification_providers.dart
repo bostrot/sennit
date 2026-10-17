@@ -24,6 +24,7 @@ import 'providers.dart';
 import 'snapshot_providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
+import 'calendar_providers.dart';
 
 /// The user's notification policy.
 ///
@@ -261,17 +262,27 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       debugPrint('weft: smart replies: no LLM endpoint is configured');
       return const [];
     }
+    // Bounded by the service's own buffer, not trimmed again here: one place
+    // decides how much conversation leaves the device, and that place is
+    // `kAiContextMessages`. Projected by the same function the auto-reply
+    // transcript goes through, so the two features send the one endpoint the
+    // same shape of conversation.
+    final transcript = transcriptLinesFor(thread);
     return suggestSmartReplies(
       baseUrl: baseUrl,
       model: model,
       apiKey: stores.llmApiKey,
       chatTitle: content.title,
-      // Bounded by the service's own buffer, not trimmed again here: one place
-      // decides how much conversation leaves the device, and that place is
-      // `kAiContextMessages`. Projected by the same function the auto-reply
-      // transcript goes through, so the two features send the one endpoint the
-      // same shape of conversation.
-      transcript: transcriptLinesFor(thread),
+      transcript: transcript,
+      // The same calendar section, under the same gate, as the auto-reply —
+      // so "Friday works!" is not offered for a Friday that does not. Two
+      // seconds at most: the notification waits for these chips, under a ten
+      // second cap that the model's own eight already mostly spends.
+      calendar: await aiCalendarContext(
+        ref,
+        transcript,
+        timeout: const Duration(seconds: 2),
+      ),
     );
   };
 

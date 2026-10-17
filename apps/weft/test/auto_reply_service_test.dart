@@ -625,4 +625,61 @@ void main() {
       );
     });
   });
+
+  group('the calendar', () {
+    test('the calendar section reaches the model', () async {
+      List<String>? asked;
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        calendar: (transcript) async {
+          asked = transcript;
+          return '- Fri 2026-01-16 09:00–10:00';
+        },
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg(body: 'free on Friday?'));
+
+      expect(asked, ['Grace: free on Friday?']);
+      expect(h.composer.calendars.single, '- Fri 2026-01-16 09:00–10:00');
+      expect(h.transport.sent, hasLength(1));
+    });
+
+    test('a calendar that fails does not stop the reply', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        calendar: (_) async => throw StateError('calendar server down'),
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(h.composer.calendars.single, isNull);
+      expect(h.transport.sent, hasLength(1));
+    });
+
+    test('a format retry asks the same calendar question once', () async {
+      var lookups = 0;
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        composer: FakeComposer(script: const [AutoReplyOutcome.refused, null]),
+        calendar: (_) async {
+          lookups++;
+          return 'busy';
+        },
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(lookups, 1);
+      expect(h.composer.calendars, ['busy', 'busy']);
+    });
+  });
 }

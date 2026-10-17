@@ -64,6 +64,9 @@ class FakeComposer {
 
   final List<({String instruction, List<String> transcript})> calls = [];
 
+  /// The calendar section each call was given, in call order.
+  final List<String?> calendars = [];
+
   Future<AutoReplyDraft> call({
     required String baseUrl,
     required String model,
@@ -71,8 +74,10 @@ class FakeComposer {
     required String instruction,
     required String chatTitle,
     required List<String> transcript,
+    String? calendar,
   }) async {
     calls.add((instruction: instruction, transcript: transcript));
+    calendars.add(calendar);
     final failure = _script.isNotEmpty ? _script.removeAt(0) : failWith;
     if (failure != null) return AutoReplyDraft.failed(failure);
     return AutoReplyDraft.written(reply);
@@ -102,6 +107,7 @@ buildAutoReplyService({
   FakeAutoReplyTransport? transport,
   AutoReplyLedger? ledger,
   DateTime? now,
+  Future<String?> Function(List<String> transcript)? calendar,
 }) {
   // Closed by the caller through the returned record — every test that takes
   // one registers an `addTearDown`. Not closed here, because the service is
@@ -127,6 +133,7 @@ buildAutoReplyService({
     composer: fakeComposer.call,
     ledger: ledger,
     now: now == null ? null : () => now,
+    calendar: calendar,
   );
 
   return (

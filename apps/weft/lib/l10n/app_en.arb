@@ -7080,5 +7080,90 @@
         "example": "30"
       }
     }
+  },
+  "integrationsCalendarTitle": "Shared calendar",
+  "@integrationsCalendarTitle": {
+    "description": "Heading of the integrations section where the user adds a calendar subscription address (ICS/webcal)."
+  },
+  "integrationsCalendarSubtitle": "Paste a calendar''s ICS address — the \"secret address in iCal format\" or any webcal:// link. Braid only reads it: invitations you send show when you''re busy, and AI replies can say whether you''re free.",
+  "@integrationsCalendarSubtitle": {
+    "description": "Subtitle under the shared-calendar heading. 'iCal' and 'webcal://' are technical names and stay as they are; the quoted phrase is Google Calendar's own label for the private address, so use Google's wording in the language if known."
+  },
+  "integrationsCalendarUrlField": "ICS address",
+  "@integrationsCalendarUrlField": {
+    "description": "Label of the text field holding the calendar subscription URL. Keep under ~24 chars."
+  },
+  "integrationsCalendarForAiTitle": "Use in AI replies",
+  "@integrationsCalendarForAiTitle": {
+    "description": "Switch title: lets auto-replies and AI reply suggestions see when the user is busy. Keep under ~30 chars."
+  },
+  "integrationsCalendarForAiSubtitle": "When a conversation is about meeting up, auto-replies and reply suggestions are told when you''re busy over the next two weeks — the times only, never what the appointments are.",
+  "@integrationsCalendarForAiSubtitle": {
+    "description": "Subtitle under the 'Use in AI replies' switch, saying exactly what is sent to the AI endpoint and when."
+  },
+  "integrationsCalendarForAiWarning": "Sends your busy times to your AI endpoint",
+  "@integrationsCalendarForAiWarning": {
+    "description": "Screen-reader hint on the 'Use in AI replies' switch: the one-sentence cost of turning it on. No full stop."
+  },
+  "integrationsCalendarRead": "{count, plural, =1{Calendar read: 1 event.} other{Calendar read: {count} events.}}",
+  "@integrationsCalendarRead": {
+    "description": "Status line after testing the calendar address successfully. Recurring events count once.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many events the calendar holds, recurring ones counted once.",
+        "example": "42"
+      }
+    }
+  },
+  "integrationsCalendarFailed": "Could not read the calendar — check the address.",
+  "@integrationsCalendarFailed": {
+    "description": "Status line when the calendar address could not be fetched or is not a calendar."
+  },
+  "integrationsCalendarInvalid": "That is not a web address — it should start with https:// or webcal://.",
+  "@integrationsCalendarInvalid": {
+    "description": "Status line when the text in the calendar field cannot be a calendar URL. 'https://' and 'webcal://' stay as they are."
+  },
+  "chatInviteBusyAllDay": "all day",
+  "@chatInviteBusyAllDay": {
+    "description": "Stands in for a time span when a calendar entry covers the whole day, inside lists like 'Busy: all day'. Lower case where the language allows; keep short."
+  },
+  "chatInviteFreeAllDay": "Your calendar is free all day",
+  "@chatInviteFreeAllDay": {
+    "description": "Header of the time picker while composing a calendar invitation, when the user's shared calendar has nothing on the chosen day. Keep under ~40 chars."
+  },
+  "chatInviteBusyHeader": "Busy: {spans}",
+  "@chatInviteBusyHeader": {
+    "description": "Header of the time picker while composing a calendar invitation, listing the times the user's calendar is busy on the chosen day.",
+    "placeholders": {
+      "spans": {
+        "type": "String",
+        "description": "Comma-separated time spans, already formatted, e.g. '09:00–10:30, 14:00–15:00'.",
+        "example": "09:00–10:30, 14:00–15:00"
+      }
+    }
+  },
+  "chatInviteClashTitle": "You''re busy then",
+  "@chatInviteClashTitle": {
+    "description": "Title of the dialog shown when an invitation is about to be sent for a time the user's own calendar is busy. Keep under ~30 chars."
+  },
+  "chatInviteClashBody": "Your calendar has something {span}. Send the invitation for this time anyway?",
+  "@chatInviteClashBody": {
+    "description": "Body of the busy-time dialog. The span is the busy time on that day.",
+    "placeholders": {
+      "span": {
+        "type": "String",
+        "description": "The busy time span, e.g. '14:00–15:00', or the translation of 'all day'.",
+        "example": "14:00–15:00"
+      }
+    }
+  },
+  "chatInviteClashPickAgain": "Pick another time",
+  "@chatInviteClashPickAgain": {
+    "description": "Dialog button: go back to the time picker. Keep under ~24 chars."
+  },
+  "chatInviteClashKeep": "Keep this time",
+  "@chatInviteClashKeep": {
+    "description": "Dialog button: use the busy time anyway. Keep under ~24 chars."
   }
 }

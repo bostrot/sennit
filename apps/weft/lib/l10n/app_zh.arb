@@ -1209,5 +1209,21 @@
   "retentionAnchorRead": "我阅读会话时",
   "retentionAnchorReadNote": "未读的消息永不删除。",
   "retentionHours": "{count, plural, other{{count} 小时}}",
-  "retentionDays": "{count, plural, other{{count} 天}}"
+  "retentionDays": "{count, plural, other{{count} 天}}",
+  "integrationsCalendarTitle": "共享日历",
+  "integrationsCalendarSubtitle": "粘贴日历的 ICS 地址——即「iCal 格式的私密地址」或任意 webcal:// 链接。Braid 只会读取它：你发送的邀请会显示你何时有安排，AI 回复也能说明你是否有空。",
+  "integrationsCalendarUrlField": "ICS 地址",
+  "integrationsCalendarForAiTitle": "用于 AI 回复",
+  "integrationsCalendarForAiSubtitle": "当对话涉及约见时，自动回复和回复建议会得知你未来两周何时有安排——只有时间，绝不包含安排的内容。",
+  "integrationsCalendarForAiWarning": "会把你的忙碌时间发送到你的 AI 端点",
+  "integrationsCalendarRead": "{count, plural, other{已读取日历：{count} 个日程。}}",
+  "integrationsCalendarFailed": "无法读取日历——请检查地址。",
+  "integrationsCalendarInvalid": "这不是网址——应以 https:// 或 webcal:// 开头。",
+  "chatInviteBusyAllDay": "全天",
+  "chatInviteFreeAllDay": "你的日历当天全天空闲",
+  "chatInviteBusyHeader": "忙碌：{spans}",
+  "chatInviteClashTitle": "你那时有安排",
+  "chatInviteClashBody": "你的日历在 {span} 已有安排。仍然按这个时间发送邀请吗？",
+  "chatInviteClashPickAgain": "选择其他时间",
+  "chatInviteClashKeep": "保留这个时间"
 }

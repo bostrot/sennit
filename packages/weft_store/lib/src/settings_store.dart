@@ -85,6 +85,11 @@ class SecretStore {
   static const String llmApiKey = 'llm_api_key';
   static const String paperlessToken = 'paperless_token';
 
+  /// A shared calendar's ICS address. A secret because a private address is
+  /// one: Google's, iCloud's and Nextcloud's carry the token that grants read
+  /// access in the URL itself.
+  static const String calendarIcsUrl = 'calendar_ics_url';
+
   Future<String?> read(String key) => _storage.read(key: key);
 
   Future<void> write(String key, String? value) async {
@@ -190,6 +195,15 @@ abstract final class WeftSettings {
 
   /// The user's paperless-ngx base URL.
   static const String paperlessUrl = 'integrations.paperless_url';
+
+  /// Whether auto-replies and reply suggestions may be told when the user is
+  /// busy, from the calendar under [SecretStore.calendarIcsUrl].
+  ///
+  /// On unless set: adding the calendar is the opt-in, and the integrations
+  /// screen says beside the address what it is used for. Even on, only busy
+  /// times are sent — never what the appointments are — and only when the
+  /// conversation is about when someone is free.
+  static const String calendarForAi = 'integrations.calendar_for_ai';
 
   /// An OpenAI-compatible chat-completions endpoint, e.g. a local Ollama.
   /// Empty means no LLM is configured and every feature that would use one

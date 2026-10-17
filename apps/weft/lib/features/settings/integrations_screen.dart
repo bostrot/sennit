@@ -4,8 +4,10 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/calendar_providers.dart';
 import '../../app/localisation.dart';
 import '../../app/stores.dart';
+import '../../services/agenda/ics_calendar.dart';
 import '../../services/integrations/home_assistant.dart';
 import '../../services/integrations/paperless.dart';
 import 'settings_section.dart';
@@ -44,7 +46,7 @@ final paperlessProvider = Provider<PaperlessClient?>((ref) {
   return client;
 });
 
-/// Home Assistant and paperless-ngx, both the user's own instances.
+/// Home Assistant, paperless-ngx and a shared calendar — all the user's own.
 class IntegrationsScreen extends ConsumerStatefulWidget {
   const IntegrationsScreen({super.key});
 
@@ -64,8 +66,21 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
   );
   final _paperlessToken = TextEditingController();
 
+  /// Shown in full rather than as a "keep the current one" blank like the
+  /// tokens: an address is something people paste, check and correct, and
+  /// clearing it is how the calendar is removed.
+  late final _calendarUrl = TextEditingController(
+    text: ref.read(storesProvider).calendarIcsUrl ?? '',
+  );
+  late bool _calendarForAi = _settings.getBool(
+    WeftSettings.calendarForAi,
+    fallback: true,
+  );
+
   String? _haStatus;
   String? _paperlessStatus;
+  String? _calendarStatus;
+  bool _calendarOk = false;
   bool _busy = false;
 
   @override
@@ -75,6 +90,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
       _haToken,
       _paperlessUrl,
       _paperlessToken,
+      _calendarUrl,
     ]) {
       controller.dispose();
     }
@@ -91,6 +107,11 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
     if (_paperlessToken.text.isNotEmpty) {
       await stores.setPaperlessToken(_paperlessToken.text.trim());
     }
+    final calendarUrl = _calendarUrl.text.trim();
+    if (calendarUrl != (stores.calendarIcsUrl ?? '')) {
+      await stores.setCalendarIcsUrl(calendarUrl.isEmpty ? null : calendarUrl);
+    }
+    _settings.setBool(WeftSettings.calendarForAi, value: _calendarForAi);
     ref.read(settingsRevisionProvider.notifier).bump();
     if (mounted) showWeftMessage(context, context.l10n.commonSaved);
   }
@@ -100,16 +121,35 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
       _busy = true;
       _haStatus = null;
       _paperlessStatus = null;
+      _calendarStatus = null;
     });
     await _save();
 
     final ha = ref.read(homeAssistantProvider);
     final paperless = ref.read(paperlessProvider);
+    final calendar = ref.read(icsCalendarProvider);
     final haOk = ha == null ? null : await ha.probe();
     final paperlessOk = paperless == null ? null : await paperless.probe();
+    int? calendarEvents;
+    if (calendar != null) {
+      try {
+        calendarEvents = (await calendar.load(force: true)).length;
+      } on IcsFetchException catch (error) {
+        debugPrint('weft: calendar test failed: $error');
+      }
+    }
     if (!mounted) return;
+    final l10n = context.l10n;
     setState(() {
       _busy = false;
+      _calendarOk = calendarEvents != null;
+      _calendarStatus = calendar == null
+          ? (_calendarUrl.text.trim().isEmpty
+                ? null
+                : l10n.integrationsCalendarInvalid)
+          : calendarEvents == null
+          ? l10n.integrationsCalendarFailed
+          : l10n.integrationsCalendarRead(calendarEvents);
       _haStatus = switch (haOk) {
         null => 'Not configured.',
         true => 'Connected.',
@@ -176,6 +216,29 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
             if (_paperlessStatus != null) _status(_paperlessStatus!),
             const SizedBox(height: WeftSpace.xl),
 
+            SettingsSectionHeader(
+              title: context.l10n.integrationsCalendarTitle,
+              subtitle: context.l10n.integrationsCalendarSubtitle,
+            ),
+            _field(
+              _calendarUrl,
+              context.l10n.integrationsCalendarUrlField,
+              hint: 'webcal://calendar.example/basic.ics',
+            ),
+            if (_calendarStatus != null)
+              _status(_calendarStatus!, ok: _calendarOk),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _calendarForAi,
+              onChanged: (value) => setState(() => _calendarForAi = value),
+              title: PrivacyGatedTitle(
+                title: context.l10n.integrationsCalendarForAiTitle,
+                warning: context.l10n.integrationsCalendarForAiWarning,
+              ),
+              subtitle: Text(context.l10n.integrationsCalendarForAiSubtitle),
+            ),
+            const SizedBox(height: WeftSpace.xl),
+
             FilledButton.tonalIcon(
               onPressed: _busy ? null : _test,
               icon: _busy
@@ -193,12 +256,12 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
     );
   }
 
-  Widget _status(String text) => Padding(
+  Widget _status(String text, {bool? ok}) => Padding(
     padding: const EdgeInsets.only(bottom: WeftSpace.sm),
     child: Text(
       text,
       style: context.text.bodySmall?.copyWith(
-        color: text == 'Connected.'
+        color: (ok ?? text == 'Connected.')
             ? context.palette.online
             : context.colors.onSurfaceVariant,
       ),

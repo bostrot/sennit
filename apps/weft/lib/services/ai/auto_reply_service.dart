@@ -108,6 +108,7 @@ class AutoReplyService {
     AutoReplyComposer? composer,
     AutoReplyLedger? ledger,
     DateTime Function()? now,
+    Future<String?> Function(List<String> transcript)? calendar,
   }) : _incoming = incoming,
        _transport = transport,
        _chatForRoom = chatForRoom,
@@ -120,7 +121,8 @@ class AutoReplyService {
        _onAttempt = onAttempt,
        _composer = composer ?? composeAutoReply,
        _ledger = ledger ?? AutoReplyLedger(),
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _calendar = calendar;
 
   final Stream<WeftMessage> _incoming;
   final AutoReplyTransport _transport;
@@ -135,6 +137,11 @@ class AutoReplyService {
   final AutoReplyComposer _composer;
   final AutoReplyLedger _ledger;
   final DateTime Function() _now;
+
+  /// The calendar section for a transcript, or null — see
+  /// `aiCalendarContext`. Asked once per attempt, before the first request, so
+  /// a format retry is the same question asked again.
+  final Future<String?> Function(List<String> transcript)? _calendar;
 
   StreamSubscription<WeftMessage>? _sub;
 
@@ -311,6 +318,7 @@ class AutoReplyService {
       return const AutoReplyDraft.failed(AutoReplyOutcome.notConfigured);
     }
     final transcript = transcriptFor(chat.id);
+    final calendar = await _calendarFor(transcript);
     Future<AutoReplyDraft> ask() => _composer(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
@@ -318,6 +326,7 @@ class AutoReplyService {
       instruction: rule.prompt,
       chatTitle: chat.title,
       transcript: transcript,
+      calendar: calendar,
     );
 
     var draft = await ask();
@@ -334,6 +343,19 @@ class AutoReplyService {
       draft = await ask();
     }
     return draft;
+  }
+
+  /// A calendar that cannot be read is no calendar: the reply still goes out,
+  /// it just cannot say whether Friday works.
+  Future<String?> _calendarFor(List<String> transcript) async {
+    final calendar = _calendar;
+    if (calendar == null || transcript.isEmpty) return null;
+    try {
+      return await calendar(transcript);
+    } on Object catch (error) {
+      debugPrint('weft: auto-reply: calendar unavailable: $error');
+      return null;
+    }
   }
 
   /// The conversation slice that would be sent to the model, oldest first.
@@ -427,4 +449,5 @@ typedef AutoReplyComposer =
       required String instruction,
       required String chatTitle,
       required List<String> transcript,
+      String? calendar,
     });

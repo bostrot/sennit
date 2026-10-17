@@ -15,6 +15,7 @@ Future<List<String>> suggestSmartReplies({
   String? apiKey,
   required String chatTitle,
   required List<String> transcript,
+  String? calendar,
   http.Client? client,
   Duration timeout = const Duration(seconds: 8),
 }) async {
@@ -46,7 +47,8 @@ Future<List<String>> suggestSmartReplies({
                     'Output ONLY a JSON object with a "replies" list of one '
                     'or two strings — no analysis, no commentary, no '
                     'markdown. Each reply is a complete sentence of at most '
-                    'eight words, in the same language as the conversation.',
+                    'eight words, in the same language as the conversation.'
+                    '${calendarPromptBlock(calendar)}',
               },
               // One worked example pins the format better than any amount
               // of instruction — and gives the template no placeholder text
@@ -100,6 +102,24 @@ Future<List<String>> suggestSmartReplies({
   } finally {
     if (owned) httpClient.close();
   }
+}
+
+/// The calendar paragraph both AI prompts end their system message with, or
+/// nothing when there is no calendar to tell.
+///
+/// One wording for both features for the reason `transcriptLinesFor` is
+/// shared: the same endpoint should not be told about the same week in two
+/// different ways. "Never mention what" is there because the section carries
+/// no titles to mention — a model that is not told so invents "I have a
+/// meeting".
+String calendarPromptBlock(String? calendar) {
+  if (calendar == null || calendar.trim().isEmpty) return '';
+  return '\n\nThe user\'s calendar, for when the conversation is about time:\n'
+      '$calendar\n'
+      'When someone asks whether the user is free, answer from this calendar. '
+      'When the time they ask about is busy, say so and offer a free time '
+      'instead. Never say what the user is busy with, and never promise a '
+      'time the calendar shows as busy.';
 }
 
 /// Pulls at most two usable suggestions out of whatever the model said.

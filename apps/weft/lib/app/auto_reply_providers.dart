@@ -9,6 +9,7 @@ import 'package:weft_store/weft_store.dart';
 import '../data/auto_reply_transport.dart';
 import '../services/ai/auto_reply_service.dart';
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
+import 'calendar_providers.dart';
 import 'labels.dart';
 import 'providers.dart';
 import 'session_providers.dart';
@@ -170,6 +171,9 @@ final autoReplyServiceProvider = Provider<AutoReplyService?>((ref) {
     endpoint: () => ref.read(autoReplyEndpointProvider),
     onAttempt: (attempt) =>
         ref.read(autoReplyLogProvider.notifier).add(attempt),
+    // Busy times, when the conversation is about meeting up — "are you free
+    // on Friday?" answered from the calendar rather than guessed.
+    calendar: (transcript) => aiCalendarContext(ref, transcript),
   );
 
   ref.onDispose(() => unawaited(service.dispose()));

@@ -1208,5 +1208,21 @@
   "retentionAnchorRead": "Wenn ich den Chat lese",
   "retentionAnchorReadNote": "Eine ungelesene Nachricht wird nie gelöscht.",
   "retentionHours": "{count, plural, =1{1 Stunde} other{{count} Stunden}}",
-  "retentionDays": "{count, plural, =1{1 Tag} other{{count} Tage}}"
+  "retentionDays": "{count, plural, =1{1 Tag} other{{count} Tage}}",
+  "integrationsCalendarTitle": "Geteilter Kalender",
+  "integrationsCalendarSubtitle": "Füge die ICS-Adresse eines Kalenders ein – die „Privatadresse im iCal-Format“ oder einen beliebigen webcal://-Link. Braid liest ihn nur: Einladungen, die du sendest, zeigen, wann du belegt bist, und KI-Antworten können sagen, ob du Zeit hast.",
+  "integrationsCalendarUrlField": "ICS-Adresse",
+  "integrationsCalendarForAiTitle": "Für KI-Antworten nutzen",
+  "integrationsCalendarForAiSubtitle": "Geht es in einem Gespräch ums Treffen, erfahren automatische Antworten und Antwortvorschläge, wann du in den nächsten zwei Wochen belegt bist – nur die Zeiten, nie was die Termine sind.",
+  "integrationsCalendarForAiWarning": "Sendet deine belegten Zeiten an deinen KI-Endpunkt",
+  "integrationsCalendarRead": "{count, plural, =1{Kalender gelesen: 1 Termin.} other{Kalender gelesen: {count} Termine.}}",
+  "integrationsCalendarFailed": "Der Kalender konnte nicht gelesen werden – prüfe die Adresse.",
+  "integrationsCalendarInvalid": "Das ist keine Webadresse – sie sollte mit https:// oder webcal:// beginnen.",
+  "chatInviteBusyAllDay": "ganztägig",
+  "chatInviteFreeAllDay": "Dein Kalender ist den ganzen Tag frei",
+  "chatInviteBusyHeader": "Belegt: {spans}",
+  "chatInviteClashTitle": "Da bist du belegt",
+  "chatInviteClashBody": "Dein Kalender hat {span} schon etwas. Die Einladung trotzdem für diese Zeit senden?",
+  "chatInviteClashPickAgain": "Andere Zeit wählen",
+  "chatInviteClashKeep": "Zeit beibehalten"
 }

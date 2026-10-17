@@ -1208,5 +1208,21 @@
   "retentionAnchorRead": "À la lecture de la conversation",
   "retentionAnchorReadNote": "Un message non lu n''est jamais supprimé.",
   "retentionHours": "{count, plural, =1{1 heure} other{{count} heures}}",
-  "retentionDays": "{count, plural, =1{1 jour} other{{count} jours}}"
+  "retentionDays": "{count, plural, =1{1 jour} other{{count} jours}}",
+  "integrationsCalendarTitle": "Calendrier partagé",
+  "integrationsCalendarSubtitle": "Colle l’adresse ICS d’un calendrier — l’« adresse secrète au format iCal » ou n’importe quel lien webcal://. Braid ne fait que la lire : les invitations que tu envoies montrent quand tu es occupé, et les réponses IA peuvent dire si tu es libre.",
+  "integrationsCalendarUrlField": "Adresse ICS",
+  "integrationsCalendarForAiTitle": "Utiliser pour les réponses IA",
+  "integrationsCalendarForAiSubtitle": "Quand une conversation parle de se voir, les réponses automatiques et les suggestions savent quand tu es occupé ces deux prochaines semaines — seulement les horaires, jamais l’objet des rendez-vous.",
+  "integrationsCalendarForAiWarning": "Envoie tes créneaux occupés à ton point de terminaison IA",
+  "integrationsCalendarRead": "{count, plural, =1{Calendrier lu : 1 événement.} other{Calendrier lu : {count} événements.}}",
+  "integrationsCalendarFailed": "Impossible de lire le calendrier — vérifie l’adresse.",
+  "integrationsCalendarInvalid": "Ce n’est pas une adresse web — elle doit commencer par https:// ou webcal://.",
+  "chatInviteBusyAllDay": "toute la journée",
+  "chatInviteFreeAllDay": "Ton calendrier est libre toute la journée",
+  "chatInviteBusyHeader": "Occupé : {spans}",
+  "chatInviteClashTitle": "Tu es occupé à ce moment",
+  "chatInviteClashBody": "Ton calendrier a déjà quelque chose {span}. Envoyer quand même l’invitation pour ce créneau ?",
+  "chatInviteClashPickAgain": "Choisir une autre heure",
+  "chatInviteClashKeep": "Garder cette heure"
 }

@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'smart_replies.dart' show calendarPromptBlock;
+
 /// How an attempt to write an auto-reply ended.
 ///
 /// A code rather than a sentence, for the reason every other package in this
@@ -96,6 +98,11 @@ const int kAutoReplyMaxTokens = 1024;
 /// `kAiContextMessages` — it is the quantity of conversation that leaves the
 /// device on every reply, so it is decided in one place for every AI feature
 /// and not here.
+///
+/// [calendar] is the user's busy times as `calendarPromptSection` writes them,
+/// or null. Given only when the conversation is about when someone is free, so
+/// "are you around on Friday?" is answered from the calendar instead of
+/// guessed, and a busy slot is met with a free one.
 Future<AutoReplyDraft> composeAutoReply({
   required String baseUrl,
   required String model,
@@ -103,6 +110,7 @@ Future<AutoReplyDraft> composeAutoReply({
   required String instruction,
   required String chatTitle,
   required List<String> transcript,
+  String? calendar,
   http.Client? client,
   Duration timeout = const Duration(seconds: 60),
 }) async {
@@ -152,7 +160,8 @@ Future<AutoReplyDraft> composeAutoReply({
                     '$kAutoReplyDecline instead.\n\n'
                     'Anything outside the tags is thrown away, and an answer '
                     'without them is never sent.\n\n'
-                    "The user's instruction:\n$instruction",
+                    "The user's instruction:\n$instruction"
+                    '${calendarPromptBlock(calendar)}',
               },
               {
                 'role': 'user',

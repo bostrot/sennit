@@ -23,6 +23,7 @@ void main() {
     SecretStore.homeAssistantToken: 'home-assistant',
     SecretStore.paperlessToken: 'paperless',
     SecretStore.llmApiKey: 'llm',
+    SecretStore.calendarIcsUrl: 'https://calendar.example/private.ics',
   };
 
   setUp(() => secrets = _RecordingSecrets(values));
@@ -35,8 +36,8 @@ void main() {
     addTearDown(stores.dispose);
 
     expect(secrets.reads.toSet(), values.keys.toSet());
-    // Five, not one. One means they went back to being read in a row, which is
-    // five keychain round trips laid end to end in front of the first frame.
+    // Six, not one. One means they went back to being read in a row, which is
+    // six keychain round trips laid end to end in front of the first frame.
     expect(secrets.peakInFlight, values.length);
   });
 
@@ -56,6 +57,7 @@ void main() {
     expect(stores.homeAssistantToken, 'home-assistant');
     expect(stores.paperlessToken, 'paperless');
     expect(stores.llmApiKey, 'llm');
+    expect(stores.calendarIcsUrl, 'https://calendar.example/private.ics');
   });
 
   test('a keychain with nothing in it opens the stores anyway', () async {
@@ -73,8 +75,8 @@ void main() {
 
   test('a keychain that refuses fails the bootstrap, once', () async {
     // The startup-error screen is driven by this future rejecting. Reading the
-    // five together must not turn one refusal into four unhandled errors
-    // alongside it — `Future.wait` listens to all five, so it does not.
+    // six together must not turn one refusal into five unhandled errors
+    // alongside it — `Future.wait` listens to all six, so it does not.
     final failing = _RecordingSecrets(
       values,
       failOn: SecretStore.paperlessToken,

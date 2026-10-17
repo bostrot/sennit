@@ -49,6 +49,7 @@ import 'agenda_chip.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
 import 'attachment_source_sheet.dart';
+import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
 import 'link_preview_card.dart';
@@ -1201,7 +1202,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   Future<void> _editInvite(WeftMessage message) async {
     final invite = message.calendarInvite;
     if (invite == null) return;
-    final when = await _pickDateTime(context, from: invite.start);
+    final when = await pickInviteTime(context, ref, from: invite.start);
     if (when == null || !mounted) return;
     final end = invite.end;
     await _run(
@@ -2464,7 +2465,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
     Future<void>.delayed(const Duration(seconds: 1), title.dispose);
     if (confirmed != true || title.text.trim().isEmpty || !mounted) return;
 
-    final when = await _pickDateTime(context, from: DateTime.now());
+    // The user's own calendar in view, so an invitation is not sent for a time
+    // they are already busy.
+    final when = await pickInviteTime(context, ref, from: DateTime.now());
     if (when == null || !mounted) return;
 
     await _run(
