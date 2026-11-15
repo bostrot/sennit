@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'database.dart';
 import 'homeserver.dart';
+import 'registration.dart';
 
 /// Where the session is in its lifecycle, flattened for the UI.
 enum WeftSessionState {
@@ -233,6 +234,101 @@ class WeftMatrixSession {
       rethrow;
     }
   }
+
+  /// What the current homeserver asks of someone creating an account.
+  ///
+  /// An empty registration request is the question: the server answers it
+  /// with the stages it would want, or with a refusal, and creates nothing
+  /// either way. Asked before the form is shown, so the invite-code field is
+  /// there when the server wants one and absent when it does not.
+  Future<RegistrationOffer> registrationOffer() async {
+    try {
+      await client.register();
+    } on sdk.MatrixException catch (e) {
+      final flows = e.authenticationFlows;
+      if (flows != null) {
+        return registrationOfferFor(flows.map((f) => f.stages));
+      }
+      if (_registrationClosed(e)) return RegistrationOffer.closed;
+      rethrow;
+    }
+    // No server registers an account from an empty request; one that claims
+    // to has not told us anything a form could be built on.
+    return RegistrationOffer.unsupported;
+  }
+
+  /// Creates an account on the current homeserver and signs this device in.
+  ///
+  /// Unlike [loginWithPassword] this never passes through
+  /// [WeftSessionState.connecting]: a taken username or a refused invite code
+  /// is the ordinary case here, and the form has to still be on screen, with
+  /// what was typed in it, when the refusal arrives.
+  Future<void> register({
+    required String username,
+    required String password,
+    String? registrationToken,
+  }) async {
+    final token = registrationToken?.trim() ?? '';
+    sdk.AuthenticationData? auth;
+    // One round trip per stage, and a bound on them: a server that keeps
+    // answering a completed stage with another challenge must not be followed
+    // forever.
+    for (var round = 0; round < 5; round++) {
+      try {
+        await client.register(
+          username: username,
+          password: password,
+          initialDeviceDisplayName: deviceDisplayName,
+          auth: auth,
+        );
+        _emit(_deriveState());
+        return;
+      } on sdk.MatrixException catch (e) {
+        final flows = e.authenticationFlows;
+        if (flows == null) {
+          if (_registrationClosed(e)) {
+            throw const RegistrationException(RegistrationFailure.closed);
+          }
+          rethrow;
+        }
+        final stage = nextRegistrationStage(
+          flows.map((f) => f.stages),
+          completed: e.completedAuthenticationFlows,
+        );
+        if (stage == null) {
+          throw const RegistrationException(RegistrationFailure.unsupported);
+        }
+        if (stage == RegistrationStage.token) {
+          if (token.isEmpty) {
+            throw const RegistrationException(
+              RegistrationFailure.tokenRequired,
+            );
+          }
+          // Asked for the stage that was just submitted: it was refused.
+          if (auth?.type == RegistrationStage.token) {
+            throw const RegistrationException(
+              RegistrationFailure.tokenRejected,
+            );
+          }
+        }
+        auth = sdk.AuthenticationData(
+          type: stage,
+          session: e.session,
+          additionalFields: {
+            if (stage == RegistrationStage.token) 'token': token,
+          },
+        );
+      }
+    }
+    throw const RegistrationException(RegistrationFailure.unsupported);
+  }
+
+  /// Whether [e] is a server saying it does not register accounts here —
+  /// switched off, or handed to a separate sign-up service.
+  static bool _registrationClosed(sdk.MatrixException e) =>
+      e.errcode == 'M_FORBIDDEN' ||
+      e.errcode == 'M_UNRECOGNIZED' ||
+      e.response?.statusCode == 404;
 
   /// Completes an SSO redirect using the token the browser handed back.
   Future<void> loginWithToken(String token) async {

@@ -173,6 +173,15 @@ abstract final class WeftSettings {
   /// existing installs get the same defaults offered the same way.
   static const String onboardingDone = 'onboarding.done';
 
+  /// Whether the feature walkthrough is owed: set when this install shows
+  /// the sign-in screen, cleared when the walkthrough ends. An install that
+  /// was already signed in when the walkthrough shipped never sets it.
+  static const String walkthroughPending = 'onboarding.walkthrough_pending';
+
+  /// Whether the walkthrough has been shown, so signing out and back in does
+  /// not owe it a second time.
+  static const String walkthroughDone = 'onboarding.walkthrough_done';
+
   /// Whether people are named from the device address book when a phone
   /// number matches, instead of whatever the network calls them. Off by
   /// default: reading contacts is a permission the user grants knowingly.

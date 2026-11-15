@@ -7,7 +7,11 @@ import '../../app/localisation.dart';
 
 import '../../app/session_providers.dart';
 
-/// Sign-in: resolve a homeserver, then authenticate against it.
+/// Where someone new lands unless they name a server of their own.
+const String kDefaultHomeserver = 'matrix.aachen.dev';
+
+/// Sign-in: resolve a homeserver, then authenticate against it — or create
+/// the account there first.
 ///
 /// The server is validated as its own step. Telling someone their password is
 /// wrong when the real problem was the server address is a bad experience, and
@@ -20,12 +24,22 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _homeserver = TextEditingController(text: 'matrix.org');
+  final _homeserver = TextEditingController(text: kDefaultHomeserver);
   final _username = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  final _inviteCode = TextEditingController();
 
   HomeserverDiscovery? _discovery;
   List<LoginFlow> _flows = const [];
+
+  /// What the server wants from a new account; null when it could not be
+  /// asked, in which case the form is offered and the server answers on
+  /// submit.
+  RegistrationOffer? _offer;
+
+  /// Creating an account rather than signing in to one.
+  bool _creating = false;
   bool _busy = false;
   String? _error;
 
@@ -34,6 +48,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _homeserver.dispose();
     _username.dispose();
     _password.dispose();
+    _confirm.dispose();
+    _inviteCode.dispose();
     super.dispose();
   }
 
@@ -44,6 +60,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _supportsSso => _flows.any((f) => f.type == 'm.login.sso');
 
+  /// Whether the create form has anything to submit to.
+  bool get _canCreate =>
+      _offer != RegistrationOffer.closed &&
+      _offer != RegistrationOffer.unsupported;
+
+  /// The server as the user knows it, for sentences about it.
+  String get _serverName =>
+      _discovery?.serverName ?? _discovery?.baseUrl.host ?? _homeserver.text;
+
+  /// The localpart as the server will store it. Matrix localparts are
+  /// lowercase, and a phone keyboard capitalises the first letter of a name.
+  String get _newLocalpart => _username.text.trim().toLowerCase();
+
   Future<void> _resolveServer() async {
     setState(() {
       _busy = true;
@@ -53,10 +82,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final session = ref.read(matrixSessionProvider);
       final discovery = await session.checkHomeserver(_homeserver.text);
       final flows = await session.supportedLoginFlows();
+      // Asked now rather than on the way into the create form, so that form
+      // opens already knowing whether it has an invite-code field.
+      RegistrationOffer? offer;
+      try {
+        offer = await session.registrationOffer();
+      } on Exception {
+        offer = null;
+      }
       if (!mounted) return;
       setState(() {
         _discovery = discovery;
         _flows = flows;
+        _offer = offer;
       });
     } on Exception catch (e) {
       if (!mounted) return;
@@ -90,6 +128,79 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _createAccount() async {
+    final l10n = context.l10n;
+    final username = _newLocalpart;
+    final String? problem;
+    if (username.isEmpty || _password.text.isEmpty) {
+      problem = l10n.loginErrorFieldsMissing;
+    } else if (_password.text != _confirm.text) {
+      problem = l10n.loginErrorPasswordMismatch;
+    } else if (_offer == RegistrationOffer.needsToken &&
+        _inviteCode.text.trim().isEmpty) {
+      problem = l10n.loginErrorInviteMissing;
+    } else {
+      problem = null;
+    }
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(matrixSessionProvider)
+          .register(
+            username: username,
+            password: _password.text,
+            registrationToken: _inviteCode.text,
+          );
+      // The moment the password manager should offer to keep the new
+      // credentials — the one login nobody has anywhere else yet.
+      TextInput.finishAutofillContext();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _humanizeRegistration(l10n, e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _setCreating(bool creating) {
+    setState(() {
+      _creating = creating;
+      _error = null;
+    });
+  }
+
+  String _humanizeRegistration(AppL10n l10n, Exception e) {
+    if (e is RegistrationException) {
+      return switch (e.reason) {
+        RegistrationFailure.closed => l10n.loginCreateClosed(_serverName),
+        RegistrationFailure.unsupported => l10n.loginCreateUnsupported(
+          _serverName,
+        ),
+        RegistrationFailure.tokenRequired => l10n.loginErrorInviteMissing,
+        RegistrationFailure.tokenRejected => l10n.loginErrorInviteRejected,
+      };
+    }
+    final text = e.toString();
+    if (text.contains('M_USER_IN_USE') || text.contains('M_EXCLUSIVE')) {
+      return l10n.loginErrorUsernameTaken;
+    }
+    if (text.contains('M_INVALID_USERNAME')) {
+      return l10n.loginErrorUsernameInvalid;
+    }
+    if (text.contains('M_WEAK_PASSWORD') || text.contains('M_PASSWORD_')) {
+      return l10n.loginErrorPasswordWeak;
+    }
+    return _humanize(e);
+  }
+
   /// Turns SDK and network errors into something a person can act on.
   static String _humanize(Exception e) {
     final text = e.toString();
@@ -109,6 +220,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     return 'Something went wrong. $text';
   }
+
+  String get _primaryLabel => !_serverResolved
+      ? context.l10n.commonContinue
+      : _creating
+      ? context.l10n.loginCreateAccount
+      : context.l10n.loginSignIn;
+
+  VoidCallback? get _primaryAction => !_serverResolved
+      ? _resolveServer
+      : !_creating
+      ? _signIn
+      : _canCreate
+      ? _createAccount
+      : null;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +276,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               onPressed: () => setState(() {
                                 _discovery = null;
                                 _flows = const [];
+                                _offer = null;
                               }),
                             )
                           : null,
@@ -163,7 +289,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   _ServerSummary(discovery: d),
                 ],
 
-                if (_serverResolved && _supportsPassword) ...[
+                if (_serverResolved && !_creating && _supportsPassword) ...[
                   const SizedBox(height: WeftSpace.lg),
                   // One autofill group over both fields, with the standard
                   // hints: this is the entire contract a password manager
@@ -215,9 +341,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
 
+                if (_serverResolved && _creating && !_canCreate) ...[
+                  const SizedBox(height: WeftSpace.lg),
+                  Text(
+                    _offer == RegistrationOffer.closed
+                        ? context.l10n.loginCreateClosed(_serverName)
+                        : context.l10n.loginCreateUnsupported(_serverName),
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+
+                if (_serverResolved && _creating && _canCreate) ...[
+                  const SizedBox(height: WeftSpace.lg),
+                  // The `new…` hints are what tell a password manager this is
+                  // a sign-up: it offers to generate a password instead of
+                  // offering the ones it has for other accounts.
+                  AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        WeftLabelledField(
+                          label: context.l10n.loginUsernameField,
+                          child: TextField(
+                            controller: _username,
+                            enabled: !_busy,
+                            autocorrect: false,
+                            autofocus: true,
+                            autofillHints: const [AutofillHints.newUsername],
+                            keyboardType: TextInputType.name,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.loginUsernameField,
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_newLocalpart.isNotEmpty) ...[
+                          const SizedBox(height: WeftSpace.xs),
+                          // The address is what other people will type to
+                          // reach this account, and the form is the last
+                          // moment it can still be changed.
+                          Text(
+                            context.l10n.loginCreateHandle(
+                              '@$_newLocalpart:$_serverName',
+                            ),
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: WeftSpace.sm),
+                        WeftLabelledField(
+                          label: context.l10n.loginPasswordField,
+                          child: TextField(
+                            controller: _password,
+                            enabled: !_busy,
+                            obscureText: true,
+                            autofillHints: const [AutofillHints.newPassword],
+                            decoration: InputDecoration(
+                              hintText: context.l10n.loginPasswordField,
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: WeftSpace.sm),
+                        WeftLabelledField(
+                          label: context.l10n.loginConfirmPasswordField,
+                          child: TextField(
+                            controller: _confirm,
+                            enabled: !_busy,
+                            obscureText: true,
+                            autofillHints: const [AutofillHints.newPassword],
+                            onSubmitted: (_) => _createAccount(),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.loginConfirmPasswordField,
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_offer == RegistrationOffer.needsToken) ...[
+                    const SizedBox(height: WeftSpace.sm),
+                    WeftLabelledField(
+                      label: context.l10n.loginInviteCodeField,
+                      child: TextField(
+                        controller: _inviteCode,
+                        enabled: !_busy,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        onSubmitted: (_) => _createAccount(),
+                        decoration: InputDecoration(
+                          hintText: context.l10n.loginInviteCodeField,
+                          prefixIcon: const Icon(
+                            Icons.confirmation_number_outlined,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: WeftSpace.xs),
+                    Text(
+                      context.l10n.loginInviteCodeHelp,
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+
                 if (_error case final message?) ...[
                   const SizedBox(height: WeftSpace.lg),
-                  _ErrorBanner(message: message),
+                  _ErrorBanner(
+                    message: message,
+                    label: _creating
+                        ? context.l10n.loginCreateFailed(message)
+                        : context.l10n.loginFailed(message),
+                  ),
                 ],
 
                 const SizedBox(height: WeftSpace.xl),
@@ -226,34 +479,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // name at all — a reader who came back to it was told only
                 // "button". The label outlives the text it is made of.
                 Semantics(
-                  label: _busy
-                      ? context.l10n.loginWorking
-                      : _serverResolved
-                      ? context.l10n.loginSignIn
-                      : context.l10n.commonContinue,
+                  label: _busy ? context.l10n.loginWorking : _primaryLabel,
                   excludeSemantics: true,
                   button: true,
                   child: FilledButton(
-                    onPressed: _busy
-                        ? null
-                        : _serverResolved
-                        ? _signIn
-                        : _resolveServer,
+                    onPressed: _busy ? null : _primaryAction,
                     child: _busy
                         ? const SizedBox(
                             height: 18,
                             width: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(
-                            _serverResolved
-                                ? context.l10n.loginSignIn
-                                : context.l10n.commonContinue,
-                          ),
+                        : Text(_primaryLabel),
                   ),
                 ),
 
-                if (_serverResolved && _supportsSso) ...[
+                // The way between the two forms sits under the button of the
+                // one that is showing: someone who arrived to sign up and
+                // found a sign-in form looks there next.
+                if (_serverResolved) ...[
+                  const SizedBox(height: WeftSpace.sm),
+                  TextButton(
+                    onPressed: _busy ? null : () => _setCreating(!_creating),
+                    child: Text(
+                      _creating
+                          ? context.l10n.loginSignInSwitch
+                          : context.l10n.loginCreateSwitch,
+                    ),
+                  ),
+                ],
+
+                if (_serverResolved && !_creating && _supportsSso) ...[
                   const SizedBox(height: WeftSpace.sm),
                   OutlinedButton.icon(
                     // Completing SSO needs the deep-link callback, which lands
@@ -349,9 +605,12 @@ class _ServerSummary extends StatelessWidget {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+  const _ErrorBanner({required this.message, required this.label});
 
   final String message;
+
+  /// What a screen reader is told: the message, named as the failure it is.
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +621,7 @@ class _ErrorBanner extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: context.l10n.loginFailed(message),
+      label: label,
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(WeftSpace.md),

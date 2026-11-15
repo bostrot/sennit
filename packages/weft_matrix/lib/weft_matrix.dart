@@ -25,6 +25,7 @@ export 'src/matrix_timeline_source.dart';
 export 'src/push_delivery.dart';
 export 'src/push_rules.dart';
 export 'src/pusher.dart';
+export 'src/registration.dart';
 export 'src/session.dart';
 export 'src/turn_servers.dart';
 export 'src/upload.dart';

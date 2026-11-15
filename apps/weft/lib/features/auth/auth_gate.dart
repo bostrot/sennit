@@ -11,6 +11,7 @@ import '../inbox/inbox_shell.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
 import 'verification_screen.dart';
+import 'walkthrough_screen.dart';
 
 /// Chooses the screen for the current session state.
 ///
@@ -49,6 +50,30 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     setState(() {});
   }
 
+  bool get _walkthroughPending {
+    if (kDemoMode) return false;
+    return _settings?.getBool(WeftSettings.walkthroughPending) ?? false;
+  }
+
+  /// Owes the walkthrough to whoever signs in from the sign-in screen, once
+  /// per install. Keyed on that screen having been shown rather than on a
+  /// successful sign-in: the session state turns over inside the sign-in
+  /// call, and a flag set after it would arrive after the inbox had.
+  void _armWalkthrough() {
+    final settings = _settings;
+    if (settings == null) return;
+    if (settings.getBool(WeftSettings.walkthroughDone)) return;
+    if (settings.getBool(WeftSettings.walkthroughPending)) return;
+    settings.setBool(WeftSettings.walkthroughPending, value: true);
+  }
+
+  void _finishWalkthrough() {
+    _settings
+      ?..setBool(WeftSettings.walkthroughPending, value: false)
+      ..setBool(WeftSettings.walkthroughDone, value: true);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sessionStateProvider);
@@ -80,6 +105,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Widget _forState(WeftSessionState state) {
+    if (state == WeftSessionState.loggedOut) _armWalkthrough();
     return switch (state) {
       WeftSessionState.loggedOut || WeftSessionState.softLoggedOut =>
         const LoginScreen(key: ValueKey('login')),
@@ -92,6 +118,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       _ when !_setupDone => SetupScreen(
         key: const ValueKey('setup'),
         onDone: _finishSetup,
+      ),
+      _ when _walkthroughPending => WalkthroughScreen(
+        key: const ValueKey('walkthrough'),
+        onDone: _finishWalkthrough,
       ),
       _ => const InboxShell(key: ValueKey('inbox')),
     };

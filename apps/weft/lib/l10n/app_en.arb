@@ -7426,5 +7426,205 @@
   "proLicenseUnreachable": "The key couldn’t be checked right now. Try again when you’re online.",
   "@proLicenseUnreachable": {
     "description": "Error under the licence key field: the licence service did not answer, so nothing is known about the key."
+  },
+  "loginCreateAccount": "Create account",
+  "@loginCreateAccount": {
+    "description": "Primary button on the sign-in screen while the create-account form is showing. Keep under ~24 chars."
+  },
+  "loginCreateSwitch": "New here? Create an account",
+  "@loginCreateSwitch": {
+    "description": "Text button under the Sign in button, switching the form to account creation. One line; keep under ~40 chars."
+  },
+  "loginSignInSwitch": "Already have an account? Sign in",
+  "@loginSignInSwitch": {
+    "description": "Text button under the Create account button, switching the form back to sign-in. One line; keep under ~40 chars."
+  },
+  "loginConfirmPasswordField": "Repeat password",
+  "@loginConfirmPasswordField": {
+    "description": "Label and hint of the second password field on the create-account form, where the password is typed again to catch a typo."
+  },
+  "loginInviteCodeField": "Invite code",
+  "@loginInviteCodeField": {
+    "description": "Label and hint of the field for a registration token, shown on the create-account form when the server only registers people its admin invited."
+  },
+  "loginInviteCodeHelp": "This server gives out accounts by invitation. Ask whoever runs it for a code.",
+  "@loginInviteCodeHelp": {
+    "description": "Helper text under the invite code field on the create-account form."
+  },
+  "loginCreateHandle": "You will be {handle}",
+  "@loginCreateHandle": {
+    "description": "Shown under the username field on the create-account form while typing: the full Matrix address the account will have.",
+    "placeholders": {
+      "handle": {
+        "type": "String",
+        "description": "The Matrix user id being created. Never translated.",
+        "example": "@anna:example.org"
+      }
+    }
+  },
+  "loginCreateClosed": "{server} is not accepting new accounts from the app right now.",
+  "@loginCreateClosed": {
+    "description": "Shown on the create-account form, or as its error, when the server has registration switched off.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The server's name. Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "loginCreateUnsupported": "{server} needs a sign-up step Braid cannot do yet. Create the account on the server''s website, then sign in here.",
+  "@loginCreateUnsupported": {
+    "description": "Shown on the create-account form, or as its error, when the server wants a captcha, an emailed link or similar that the app cannot complete.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The server's name. Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "loginCreateFailed": "Could not create the account. {message}",
+  "@loginCreateFailed": {
+    "description": "Screen-reader-only live label for the error banner above the Create account button.",
+    "placeholders": {
+      "message": {
+        "type": "String",
+        "description": "The reason already shown in the banner, passed through verbatim.",
+        "example": "That username is taken."
+      }
+    }
+  },
+  "loginErrorFieldsMissing": "Choose a username and a password.",
+  "@loginErrorFieldsMissing": {
+    "description": "Error banner on the create-account form when either field is empty."
+  },
+  "loginErrorPasswordMismatch": "The two passwords do not match.",
+  "@loginErrorPasswordMismatch": {
+    "description": "Error banner on the create-account form when the repeated password differs."
+  },
+  "loginErrorUsernameTaken": "That username is taken. Try another.",
+  "@loginErrorUsernameTaken": {
+    "description": "Error banner on the create-account form when the server says the username exists."
+  },
+  "loginErrorUsernameInvalid": "Usernames can only use lowercase letters, digits, dots, dashes and underscores.",
+  "@loginErrorUsernameInvalid": {
+    "description": "Error banner on the create-account form when the server rejects the username's characters."
+  },
+  "loginErrorPasswordWeak": "The server wants a stronger password. Try a longer one.",
+  "@loginErrorPasswordWeak": {
+    "description": "Error banner on the create-account form when the server's password policy rejects the password."
+  },
+  "loginErrorInviteMissing": "Enter your invite code.",
+  "@loginErrorInviteMissing": {
+    "description": "Error banner on the create-account form when the server needs an invite code and the field is empty."
+  },
+  "loginErrorInviteRejected": "That invite code was not accepted. Check it, or ask for a new one.",
+  "@loginErrorInviteRejected": {
+    "description": "Error banner on the create-account form when the server refuses the invite code."
+  },
+  "tourWelcomeTitle": "Welcome to Braid",
+  "@tourWelcomeTitle": {
+    "description": "Title of the first page of the feature walkthrough shown once after the first sign-in. 'Braid' is the app name and is not translated."
+  },
+  "tourWelcomeBody": "You are in. A minute now sets up what makes Braid more than a messenger: your other chat apps, an AI assistant, replies that write themselves. Everything here stays in Settings if you skip it.",
+  "@tourWelcomeBody": {
+    "description": "Body of the first walkthrough page. Centred paragraph; it scrolls if long."
+  },
+  "tourWelcomeAction": "Show me around",
+  "@tourWelcomeAction": {
+    "description": "Primary button on the first walkthrough page: starts the tour. Keep under ~24 chars."
+  },
+  "tourSkip": "Skip the tour",
+  "@tourSkip": {
+    "description": "Text button on the first walkthrough page: ends the walkthrough and opens the inbox. Keep under ~24 chars."
+  },
+  "tourNext": "Next",
+  "@tourNext": {
+    "description": "Text button on a walkthrough page: go to the next page without setting this feature up."
+  },
+  "tourProgress": "Step {current} of {total}",
+  "@tourProgress": {
+    "description": "Screen-reader label for the row of dots on a walkthrough page.",
+    "placeholders": {
+      "current": {
+        "type": "int",
+        "description": "The page being shown, from 1.",
+        "example": "2"
+      },
+      "total": {
+        "type": "int",
+        "description": "How many pages there are.",
+        "example": "6"
+      }
+    }
+  },
+  "tourBridgesTitle": "Bring your other messengers",
+  "@tourBridgesTitle": {
+    "description": "Title of the walkthrough page about bridges."
+  },
+  "tourBridgesBody": "WhatsApp, Signal, Telegram and more can land in this one inbox through the bridges on your Matrix server. Link an account and its chats appear next to everything else.",
+  "@tourBridgesBody": {
+    "description": "Body of the walkthrough page about bridges. The network names are not translated."
+  },
+  "tourBridgesAction": "Connect a messenger",
+  "@tourBridgesAction": {
+    "description": "Primary button on the bridges walkthrough page: opens the bridges screen. Keep under ~28 chars."
+  },
+  "tourAiTitle": "Add an AI assistant",
+  "@tourAiTitle": {
+    "description": "Title of the walkthrough page about the AI endpoint."
+  },
+  "tourAiBody": "Point Braid at any OpenAI-compatible endpoint, such as an Ollama server of your own, and it suggests replies right on the notification and turns voice messages into text.",
+  "@tourAiBody": {
+    "description": "Body of the walkthrough page about the AI endpoint. 'OpenAI' and 'Ollama' are product names."
+  },
+  "tourAiAction": "Set up AI",
+  "@tourAiAction": {
+    "description": "Primary button on the AI walkthrough page: opens the AI settings. Keep under ~28 chars."
+  },
+  "tourModelsTitle": "Or keep it on this device",
+  "@tourModelsTitle": {
+    "description": "Title of the walkthrough page about on-device models; it follows the page about AI endpoints."
+  },
+  "tourModelsBody": "Download a model once and search by meaning and voice transcription run right here. Nothing leaves the device.",
+  "@tourModelsBody": {
+    "description": "Body of the walkthrough page about on-device models."
+  },
+  "tourModelsAction": "Choose models",
+  "@tourModelsAction": {
+    "description": "Primary button on the on-device models walkthrough page: opens the models screen. Keep under ~28 chars."
+  },
+  "tourAutoReplyTitle": "Let Braid answer for you",
+  "@tourAutoReplyTitle": {
+    "description": "Title of the walkthrough page about auto-reply."
+  },
+  "tourAutoReplyBody": "Write a rule saying who, when and in what tone, and Braid replies while you are away. The chat stays unread, so you still come back to it.",
+  "@tourAutoReplyBody": {
+    "description": "Body of the walkthrough page about auto-reply."
+  },
+  "tourAutoReplyAction": "Create a rule",
+  "@tourAutoReplyAction": {
+    "description": "Primary button on the auto-reply walkthrough page: opens the auto-reply screen. Keep under ~28 chars."
+  },
+  "tourTodoTitle": "A to-do list that fills itself",
+  "@tourTodoTitle": {
+    "description": "Title of the walkthrough page about the to-do list."
+  },
+  "tourTodoBody": "When someone asks you for something, or you promise something, Braid can note it down, and tick it off when the chat shows it is done.",
+  "@tourTodoBody": {
+    "description": "Body of the walkthrough page about the AI-kept to-do list."
+  },
+  "tourTodoAction": "Open the to-do list",
+  "@tourTodoAction": {
+    "description": "Primary button on the to-do walkthrough page: opens the to-do list. Keep under ~28 chars."
+  },
+  "settingsTourTitle": "Feature tour",
+  "@settingsTourTitle": {
+    "description": "Settings row under About: reopens the walkthrough shown after the first sign-in."
+  },
+  "settingsTourSubtitle": "A short walk through what Braid can do",
+  "@settingsTourSubtitle": {
+    "description": "Subtitle of the Feature tour settings row."
   }
 }

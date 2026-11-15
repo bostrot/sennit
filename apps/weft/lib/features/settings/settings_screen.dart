@@ -11,6 +11,7 @@ import '../../app/a11y.dart';
 import '../../app/billing_providers.dart';
 import '../../app/build_info.dart';
 import '../../app/localisation.dart';
+import '../auth/walkthrough_screen.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
@@ -228,6 +229,18 @@ class SettingsScreen extends ConsumerWidget {
               title: l10n.settingsAboutTitle,
               subtitle: l10n.settingsAboutSubtitle,
               onTap: () => _showAbout(context),
+            ),
+            tile(
+              icon: Icons.explore_outlined,
+              title: l10n.settingsTourTitle,
+              subtitle: l10n.settingsTourSubtitle,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (route) => WalkthroughScreen(
+                    onDone: () => Navigator.of(route).pop(),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

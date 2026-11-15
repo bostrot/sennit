@@ -59,9 +59,10 @@ session provider rather than by tapping, which is why they are listed apart.
 |---|---|---|---|---|---|
 | Splash | `features/auth/auth_gate.dart:101` | screen | Launch, while stores or the session bootstrap | both | no — a frame of loading, asserted by `auth_gate_test.dart` |
 | Startup error | `features/auth/auth_gate.dart:130` | screen | Launch with a store that fails to open | both | no — needs an injected failure, not a tap |
-| Sign in | `features/auth/login_screen.dart:15` | screen | Launch signed out | both | no — pre-session; covered by the Patrol `login_test` |
+| Sign in | `features/auth/login_screen.dart:19` | screen | Launch signed out; *New here? Create an account* turns the same screen into sign-up | both | no — pre-session; covered by the Patrol `login_test` and `login_screen_test.dart` |
 | Verify this device | `features/auth/verification_screen.dart:18` | screen | Launch with `WeftSessionState.unverified`; also Settings ▸ Devices ▸ a device ▸ *Verify*; also pushed by `main.dart:317` when another client asks | both | yes, via the devices screen |
 | Setup | `features/auth/setup_screen.dart:24` | screen | First launch after sign-in, before `onboardingDone` | both | no — one-shot onboarding, covered by `setup_screen_test.dart` |
+| Walkthrough | `features/auth/walkthrough_screen.dart:20` | screen | After the first sign-in on an install, once setup is done; also Settings ▸ About ▸ *Feature tour* | both | no — one-shot onboarding, covered by `walkthrough_screen_test.dart` |
 
 ## The inbox itself
 
