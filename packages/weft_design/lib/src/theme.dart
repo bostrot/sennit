@@ -284,17 +284,42 @@ abstract final class WeftTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: brightness,
+      // The accent the user picked, as the accent they get. Material's default
+      // variant treats the seed as a hint and hands back a greyed cousin of it
+      // — the default violet came out as slate, and every preset as a muted
+      // version of itself — which is why the unread badge, the send button and
+      // the user's own bubbles all read as "disabled purple". `fidelity` keeps
+      // the seed's own chroma and still derives every on-colour for contrast.
+      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
       // Material's own high-contrast tone mapping: it pushes the on-colours to
       // the ends of their tonal palettes, which is exactly the adjustment that
       // would otherwise have to be hand-made for every scheme slot.
       contrastLevel: highContrast ? 1.0 : 0.0,
     );
 
+    // …except for the tertiary family, which keeps Material's default
+    // derivation. `fidelity` picks its tertiary by rotating the seed's hue a
+    // fixed distance, and for the default violet that lands on brown: the
+    // "Merged" pill, the merged caption in a conversation's bar and the
+    // brand mark's gradient all turned tan. The default variant's tertiary is
+    // the neighbouring mauve those were designed with.
+    final softer = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: brightness,
+      contrastLevel: highContrast ? 1.0 : 0.0,
+    );
+    final seeded = scheme.copyWith(
+      tertiary: softer.tertiary,
+      onTertiary: softer.onTertiary,
+      tertiaryContainer: softer.tertiaryContainer,
+      onTertiaryContainer: softer.onTertiaryContainer,
+    );
+
     // AMOLED pushes the base surface to true black to save power on OLED and
     // to make the accent colours pop, but keeps elevated surfaces lifted so the
     // hierarchy doesn't collapse into an unreadable void.
     final effectiveScheme = amoled && brightness == Brightness.dark
-        ? scheme.copyWith(
+        ? seeded.copyWith(
             surface: const Color(0xFF000000),
             surfaceContainerLowest: const Color(0xFF000000),
             surfaceContainerLow: const Color(0xFF0A0A0C),
@@ -302,7 +327,7 @@ abstract final class WeftTheme {
             surfaceContainerHigh: const Color(0xFF1A1A20),
             surfaceContainerHighest: const Color(0xFF222229),
           )
-        : scheme;
+        : seeded;
 
     final isDark = brightness == Brightness.dark;
     final palette = _paletteFor(
@@ -543,7 +568,11 @@ abstract final class WeftTheme {
       ),
       listTileTheme: ListTileThemeData(
         dense: true,
-        minVerticalPadding: 2,
+        // Room for a second line. At two points a title-and-subtitle row —
+        // which is every row in Settings — had its text touching the row
+        // above and below. A one-line menu item is unaffected: it is already
+        // held open by [minTileHeight].
+        minVerticalPadding: WeftSpace.dense,
         // `dense` shrinks the *text* and leaves the box: a menu of five items
         // still came out 240 points tall, where the system's is nearer 120.
         // The height and the density are what actually move it.
@@ -703,9 +732,17 @@ abstract final class WeftTheme {
       WeftContrast.uiComponent,
     );
 
+    // The user's own bubble is the accent as a *fill* in both themes. In the
+    // light theme that is `primary`. In the dark one `primary` is the pale
+    // tone meant for text on a dark page, and a column of pale lavender
+    // slabs is the brightest thing on a dark screen; the container tone is
+    // the same hue at a depth that sits in the page, with light ink on it.
+    final ownBubble = isDark ? scheme.primaryContainer : scheme.primary;
+    final ownBubbleText = isDark ? scheme.onPrimaryContainer : scheme.onPrimary;
+
     return WeftPalette(
-      ownBubble: scheme.primary,
-      ownBubbleText: scheme.onPrimary,
+      ownBubble: ownBubble,
+      ownBubbleText: ownBubbleText,
       peerBubble: peerBubble,
       peerBubbleText: scheme.onSurface,
       railBackground: amoled
@@ -720,7 +757,7 @@ abstract final class WeftTheme {
       // 13dp tick is a graphic that carries meaning, not body text.
       readReceipt: _ensureOn(
         brandBlue,
-        (_) => [...backgrounds, scheme.primary],
+        (_) => [...backgrounds, ownBubble],
         WeftContrast.uiComponent,
       ),
       callAccept: brandGreen,
