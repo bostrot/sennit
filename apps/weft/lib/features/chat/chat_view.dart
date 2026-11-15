@@ -135,7 +135,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// one reason: `FocusComposerIntent` is pressed while the user is in the
   /// inbox list, which on a two-pane window is a *sibling* of this widget. The
   /// registry in `shortcuts.dart` is how the shortcut reaches across.
-  final _composerFocus = FocusNode(debugLabel: 'Braid composer');
+  final _composerFocus = FocusNode(debugLabel: 'Sennit composer');
 
   final _scroll = ScrollController();
 
@@ -393,7 +393,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // names turns up a moment *after* the screen has asked for it. Giving
       // the verdict on the first look is what put "not in your inbox" over a
       // chat that was about to be there, on every tap of a notification that
-      // had cold-started Braid.
+      // had cold-started Sennit.
       //
       // Waiting draws as the same spinner an unsynced chat already shows, and
       // the wait is bounded: a link that is genuinely stale still says so, a
@@ -2788,7 +2788,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       : [
           // Disabled rather than hidden, with the reason in its tooltip: a
           // conversation with no Matrix-native leg cannot carry a call, and a
-          // button that quietly disappeared for bridged chats would read as Braid
+          // button that quietly disappeared for bridged chats would read as Sennit
           // having lost the feature.
           Consumer(
             builder: (context, ref, _) {
@@ -3921,7 +3921,7 @@ class _MessageBubble extends StatelessWidget {
 /// the eye gets a small mark it can learn once.
 ///
 /// Drawn for a peer's auto-reply as well as the user's own, which is the honest
-/// reading of the flag: another Braid saying "this was written by a machine" is
+/// reading of the flag: another Sennit saying "this was written by a machine" is
 /// exactly as worth showing as our own having said it.
 class _AutoReplyMarker extends StatelessWidget {
   const _AutoReplyMarker({required this.own});

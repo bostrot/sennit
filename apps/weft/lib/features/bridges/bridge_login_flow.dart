@@ -49,7 +49,7 @@ class BridgeLoginFlowScreen extends StatefulWidget {
   /// Opens the bot's management room.
   ///
   /// The escape hatch, and the reason a `cookies` step is a dead end rather
-  /// than a failure: Braid ships no embedded browser, and the admin room can
+  /// than a failure: Sennit ships no embedded browser, and the admin room can
   /// do everything the provisioning API can.
   final VoidCallback? onUseAdminRoom;
 
@@ -686,7 +686,7 @@ class _WaitStepState extends State<_WaitStep> {
   }
 }
 
-/// The one step type Braid cannot render.
+/// The one step type Sennit cannot render.
 class _CookiesUnsupported extends StatelessWidget {
   const _CookiesUnsupported({this.onUseAdminRoom});
 

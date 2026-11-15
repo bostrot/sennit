@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// Where a direct build buys Braid Pro and checks a licence key.
+/// Where a direct build buys Sennit Pro and checks a licence key.
 ///
 /// Both can be replaced at build time, so a fork that sells its own builds
 /// points them at its own shop: `--dart-define=BRAID_CHECKOUT_URL=…` and

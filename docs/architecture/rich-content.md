@@ -172,7 +172,7 @@ composer has already shown them the quote they were answering.
 ## The ticks say only what is actually known
 
 One tick sent, two ticks delivered, two blue ticks read. The vocabulary is a
-decade of WhatsApp and is not Braid's to reinvent; what *is* Braid's is being
+decade of WhatsApp and is not Sennit's to reinvent; what *is* Sennit's is being
 honest with it, because the ticks are the most-read four pixels in a messenger
 and a client that is casually wrong about them is one whose ticks stop meaning
 anything.
@@ -223,7 +223,7 @@ bubble at 1.05:1.
 ## Threads are a place, and most networks do not have one
 
 A Telegram forum topic arrives over the bridge as an `m.thread` relation, which
-is why threads exist in Braid at all: a forum group with forty topics flattened
+is why threads exist in Sennit at all: a forum group with forty topics flattened
 into one stream is not a conversation anybody can read. The domain shape is
 `ThreadSummary` and `ThreadGrouping` in `weft_domain`; the verb that produces
 them is `groupThreads` in `weft_richtext`, beside the other relation

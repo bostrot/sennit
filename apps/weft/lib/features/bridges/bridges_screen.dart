@@ -48,7 +48,7 @@ void _saveBridges(SettingsStore settings, List<_StoredBridge> bridges) {
 
 /// The user's bridges: health, logins, and the GUI login flow.
 ///
-/// Braid hosts nothing — every bridge here is one the user runs. A bridge is
+/// Sennit hosts nothing — every bridge here is one the user runs. A bridge is
 /// added by its provisioning URL; everything else (which network it serves,
 /// which login methods it offers) is asked of the bridge itself.
 class BridgesScreen extends ConsumerStatefulWidget {
@@ -175,7 +175,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     } on BridgeException catch (e) {
       if (!mounted) return;
       // The bridge's own sentence when it sent one — it is specific and
-      // already in whatever language the bridge speaks — and Braid's
+      // already in whatever language the bridge speaks — and Sennit's
       // translated one for a status code the bridge said nothing about.
       final reason = context.l10n.bridgeFailure(e) ?? e.message;
       setState(() {
@@ -588,7 +588,7 @@ class _DetectedGroup extends StatelessWidget {
   }
 }
 
-/// A bridge found on the homeserver that Braid is not configured for yet.
+/// A bridge found on the homeserver that Sennit is not configured for yet.
 ///
 /// Was a `ListTile` with two buttons inside its `subtitle`, which is a slot for
 /// one line of secondary text. Under the desktop's compact density the tile

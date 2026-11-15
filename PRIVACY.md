@@ -1,15 +1,15 @@
-# Braid Privacy Policy
+# Sennit Privacy Policy
 
 *Published at <https://erictrenkel.com/apps/braid/privacy.html> — that
 hosted copy is the one the app stores link to.*
 
 *Effective: 25 August 2026*
 
-Braid is a self-hosted messenger. It is designed so that the developer of
-Braid **cannot** see your data — there is no Braid cloud, no account with us,
+Sennit is a self-hosted messenger. It is designed so that the developer of
+Sennit **cannot** see your data — there is no Sennit cloud, no account with us,
 and no telemetry.
 
-## What Braid collects
+## What Sennit collects
 
 Nothing. The app contains no analytics, no crash reporting service, no
 advertising SDKs, and no tracking of any kind. The developer operates no
@@ -17,7 +17,7 @@ server that the app talks to.
 
 ## Where your data goes
 
-Braid talks exclusively to servers **you** configure:
+Sennit talks exclusively to servers **you** configure:
 
 - **Your Matrix homeserver.** Messages, media, contacts and encryption keys
   sync with the homeserver you sign in to. That server is operated by you or
@@ -28,27 +28,27 @@ Braid talks exclusively to servers **you** configure:
 - **Optional AI endpoints.** Voice transcription, semantic search
   embeddings, reply suggestions and auto-reply only run if you configure an
   endpoint for them. On-device models never send audio or text anywhere. If
-  you point Braid at a remote endpoint, the content you asked it to process
+  you point Sennit at a remote endpoint, the content you asked it to process
   is sent to that endpoint — which, again, you chose and control.
 
 ## Auto-reply
 
-Braid can answer messages for you, using the same model endpoint you
+Sennit can answer messages for you, using the same model endpoint you
 configured above and no other. Nothing about this feature reaches the
 developer, and there is no service in the middle.
 
 - It is **off until you write a rule and switch that rule on**. A rule you
   have saved but not enabled sends nothing.
-- When a rule fires, Braid sends your prompt and **the last few messages of
+- When a rule fires, Sennit sends your prompt and **the last few messages of
   that conversation** to your endpoint, and sends what comes back as a
   message from you. Nothing else about the conversation is included.
 - The reply is marked as machine-written, so you and anyone using a client
   that understands the marker can tell it apart from something you typed.
-- **The conversation stays unread.** Braid does not send a read receipt for
+- **The conversation stays unread.** Sennit does not send a read receipt for
   an auto-reply and does not clear the badge — on this device or on your
   others. The other side is told a message arrived, not that theirs was
   read.
-- Braid never auto-replies to a message request from someone you have not
+- Sennit never auto-replies to a message request from someone you have not
   answered. Replying would confirm your handle is live and being read, and
   that is a decision only you make.
 - No conversation receives more than three automatic replies an hour,
@@ -64,9 +64,9 @@ developer, and there is no service in the middle.
 
 ## Backups
 
-Braid can write your history to a single `.braid` file. That file is
+Sennit can write your history to a single `.sennit` file. That file is
 **created on your device, encrypted on your device, and never uploaded**.
-There is no Braid cloud to upload it to.
+There is no Sennit cloud to upload it to.
 
 - The file is encrypted with a passphrase you choose, using Argon2id and
   XChaCha20-Poly1305. The passphrase is not stored anywhere and is not
@@ -84,7 +84,7 @@ There is no Braid cloud to upload it to.
 
 ## Permissions
 
-Braid asks for permissions only when a feature needs them: microphone for
+Sennit asks for permissions only when a feature needs them: microphone for
 voice messages and calls, camera for photos and QR device verification,
 contacts for local name matching, location only when you explicitly share
 it into a chat, and notifications. Denying a permission disables only the

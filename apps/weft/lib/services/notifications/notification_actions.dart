@@ -202,7 +202,7 @@ class NotificationActionHandler {
   /// two are the same call.
   ///
   /// Only the policy is written, never the homeserver: a timed mute is
-  /// Braid-only because Matrix push rules cannot express an expiry, and pushing
+  /// Sennit-only because Matrix push rules cannot express an expiry, and pushing
   /// an unconditional server mute down for it would leave the room silent
   /// forever on every other client the user runs. See `push_rules.dart`.
   Future<NotificationActionResult> _mute(String chatId) async {

@@ -139,7 +139,7 @@ class NotificationPayload {
 
 /// A stable notification id for [key].
 ///
-/// The platforms want a 32-bit int where Braid has an event id, and the mapping
+/// The platforms want a 32-bit int where Sennit has an event id, and the mapping
 /// has to be a *function*: the same event must produce the same id in the sync
 /// path, in the push path, and in a process that starts an hour later to
 /// dismiss it. A counter would not survive the third case.

@@ -193,7 +193,7 @@ class SettingsPushKeyStore implements PushKeyStore {
 ///
 /// Null on desktop, and null in a build with no Firebase configuration — see
 /// [FirebasePushTransport.initialize]. Neither is an error: both mean "this
-/// device is notified from sync while Braid is running", which is the whole of
+/// device is notified from sync while Sennit is running", which is the whole of
 /// what desktop Weft has ever done.
 final pushTransportProvider = FutureProvider<PushTransport?>((ref) async {
   if (kDemoMode) return null;

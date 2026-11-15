@@ -21,8 +21,8 @@ Marked with `// l10n-ignore:` at the call site. Not outstanding work: each is a 
 
 | File | Line | Literal | Why |
 | --- | ---: | --- | --- |
-| `apps/weft/android/app/src/main/AndroidManifest.xml` | 113 | `'Braid'` | the app's own name, never translated. |
-| `apps/weft/lib/app/menus.dart` | 122 | `'Braid'` | macOS replaces this with the app's own name. |
+| `apps/weft/android/app/src/main/AndroidManifest.xml` | 113 | `'Sennit'` | the app's own name, never translated. |
+| `apps/weft/lib/app/menus.dart` | 122 | `'Sennit'` | macOS replaces this with the app's own name. |
 | `apps/weft/lib/data/demo_repository.dart` | 886 | `'Anna Maven'` | demo fixture, never shipped to a real inbox. |
 | `apps/weft/lib/data/demo_repository.dart` | 915 | `'Konrad Majewski'` | demo fixture, never shipped to a real inbox. |
 | `apps/weft/lib/data/demo_repository.dart` | 934 | `'Sofia Martinez'` | demo fixture, never shipped to a real inbox. |
@@ -34,12 +34,12 @@ Marked with `// l10n-ignore:` at the call site. Not outstanding work: each is a 
 | `apps/weft/lib/data/demo_repository.dart` | 1073 | `'Emma Robinson'` | demo fixture, never shipped to a real inbox. |
 | `apps/weft/lib/data/demo_repository.dart` | 1091 | `'Design Team'` | demo fixture, never shipped to a real inbox. |
 | `apps/weft/lib/features/auth/auth_gate.dart` | 158 | `'$error'` | the underlying error, in English, from the SDK. |
-| `apps/weft/lib/features/auth/login_screen.dart` | 296 | `'Braid'` | the app's own name, never translated. |
+| `apps/weft/lib/features/auth/login_screen.dart` | 296 | `'Sennit'` | the app's own name, never translated. |
 | `apps/weft/lib/features/chat/media_gallery.dart` | 300 | `'+${widget.more}'` | a count, the same in every language this app ships; its screen-reader label is translated. |
 | `apps/weft/lib/features/chat/thread_indicator.dart` | 104 | `'$title · $count'` | an interpolation of a room name and a count already formatted. |
 | `apps/weft/lib/features/chat/thread_indicator.dart` | 176 | `'$count'` | a bare number, not a sentence. |
 | `apps/weft/lib/features/settings/mcp_screen.dart` | 304 | `'$entry'` | a machine-readable audit line; its screen-reader label is translated. |
 | `apps/weft/lib/features/settings/pro_screen.dart` | 291 | `'BRAID-XXXXX-XXXXX-XXXXX-XXXXX'` | the shape of a licence key, not prose. |
 | `apps/weft/lib/features/settings/sms_screen.dart` | 292 | `'${context.l10n.smsRcsDialogBody(bridged ? context.l10n.smsRcsDialogBridgeClause : '')}.'` | an interpolation of strings already translated above. |
-| `apps/weft/lib/main.dart` | 494 | `'Braid'` | the app's own name, never translated. |
-| `apps/weft/lib/services/backup/backup_service.dart` | 63 | `'Braid backup'` | the name of Braid's own file format, as the system file dialog lists it. |
+| `apps/weft/lib/main.dart` | 494 | `'Sennit'` | the app's own name, never translated. |
+| `apps/weft/lib/services/backup/backup_service.dart` | 63 | `'Sennit backup'` | the name of Sennit's own file format, as the system file dialog lists it. |

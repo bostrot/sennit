@@ -327,7 +327,7 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
     });
 
-    testWidgets('a right-click still raises Braid’s own menu, once', (
+    testWidgets('a right-click still raises Sennit’s own menu, once', (
       tester,
     ) async {
       await pumpThread(tester, messages: exchange(), pointer: true);

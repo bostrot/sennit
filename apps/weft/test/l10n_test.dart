@@ -280,7 +280,7 @@ void main() {
       }
     });
 
-    test('every locale Braid declares has an Android catalogue', () {
+    test('every locale Sennit declares has an Android catalogue', () {
       // Android spells a region `-r`: `pt-BR` is `values-pt-rBR`. Getting that
       // wrong produces a directory Android silently never reads.
       const androidFor = {

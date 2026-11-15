@@ -8,18 +8,18 @@ import 'package:weft_sms/weft_sms.dart';
 /// message" action — and left out the one consequence the user cannot undo by
 /// reading: RCS stops working on the phone. Android has no RCS API for a
 /// third-party app, Google Messages speaks RCS only while it is the default,
-/// and so taking the role does not move RCS to Braid, it ends it. A user who
+/// and so taking the role does not move RCS to Sennit, it ends it. A user who
 /// finds that out afterwards has lost their group chats to green SMS with no
 /// warning at all.
 void main() {
   group('rcsStanding', () {
     RcsStanding standing({
       bool supported = true,
-      bool braidIsDefault = false,
+      bool sennitIsDefault = false,
       String? defaultPackage,
     }) => rcsStanding(
       supported: supported,
-      braidIsDefault: braidIsDefault,
+      sennitIsDefault: sennitIsDefault,
       defaultPackage: defaultPackage,
     );
 
@@ -37,14 +37,14 @@ void main() {
       );
     });
 
-    test('Braid holding the role means SMS and MMS only', () {
+    test('Sennit holding the role means SMS and MMS only', () {
       expect(
-        standing(braidIsDefault: true, defaultPackage: 'com.bostrot.weft'),
-        RcsStanding.offForBraid,
+        standing(sennitIsDefault: true, defaultPackage: 'com.bostrot.weft'),
+        RcsStanding.offForSennit,
       );
     });
 
-    test('another third-party app is the same position Braid would be in', () {
+    test('another third-party app is the same position Sennit would be in', () {
       expect(standing(defaultPackage: 'com.textra'), RcsStanding.offForOther);
       expect(standing(defaultPackage: null), RcsStanding.offForOther);
     });

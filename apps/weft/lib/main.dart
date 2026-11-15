@@ -248,7 +248,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// to open — the share would be gone, silently.
   bool _drainPending = false;
 
-  /// Reads whatever the iOS Share Extension staged while Braid was not running.
+  /// Reads whatever the iOS Share Extension staged while Sennit was not running.
   ///
   /// Cheap on every other platform and on an empty container alike: one channel
   /// call that answers with an empty list, or a [MissingPluginException] that
@@ -273,7 +273,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   ///
   /// After sign-in and not at launch, because everything below it needs a
   /// client: the pipeline fetches and decrypts events through the session, and
-  /// the pusher is registered against the account. A logged-out Braid has
+  /// the pusher is registered against the account. A logged-out Sennit has
   /// nothing to be notified about.
   Future<void> _startNotifications() async {
     if (_notificationsStarted) return;
@@ -340,7 +340,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// Answers "verify this session?" started from the user's *other* device.
   ///
   /// Element on the laptop (or any client) sends a to-device verification
-  /// request; without this listener it expired silently and Braid looked
+  /// request; without this listener it expired silently and Sennit looked
   /// unable to verify. The push lands in the same screen the devices list
   /// and the login flow use — one verification path, three doors.
   void _listenForVerificationRequests() {
@@ -422,7 +422,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
 
   /// A share that arrived before the app was ready for it.
   ///
-  /// The cold-start case: sharing a photo into a closed Braid delivers the
+  /// The cold-start case: sharing a photo into a closed Sennit delivers the
   /// intent while the session is still initialising, and the guard below
   /// used to *drop* it — the app opened onto a plain inbox and the user had
   /// to pick their files all over again inside it. Held here instead, and
@@ -491,13 +491,13 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
 
     return MaterialApp(
       // l10n-ignore: the app's own name, never translated.
-      title: 'Braid',
+      title: 'Sennit',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
       // The whole of Weft's right-to-left support hangs off these two lines:
       // `Directionality` has no other source, and until they were here every
       // directional layout API downstream was decoration. English first is the
-      // fallback — Braid's own strings are untranslated, so a device set to a
+      // fallback — Sennit's own strings are untranslated, so a device set to a
       // locale Weft does not declare gets English text in a left-to-right
       // layout rather than English text mirrored.
       localizationsDelegates: weftLocalizationsDelegates,

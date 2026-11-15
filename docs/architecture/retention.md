@@ -27,14 +27,14 @@ because assuming the stronger one is a privacy mistake a user cannot undo:
 | the user's own | redacted | everyone on the homeserver, and onward through each bridge as that network's own delete-for-everyone |
 | anybody else's | forgotten locally | this device only |
 
-Nobody else's copy is Braid's to delete. A client that claimed otherwise would
+Nobody else's copy is Sennit's to delete. A client that claimed otherwise would
 be lying about the one thing a disappearing message is asked to do.
 
 **Incoming disappearing messages already work and are not this feature.**
 WhatsApp's own timer is enforced by WhatsApp; when a message expires there,
-mautrix-whatsapp redacts it in the Matrix room and Braid renders the redaction
+mautrix-whatsapp redacts it in the Matrix room and Sennit renders the redaction
 like any other. What is *not* implemented is setting a remote network's native
-timer from Braid — the bridges expose no such control over the Matrix API, only
+timer from Sennit — the bridges expose no such control over the Matrix API, only
 through bot commands that differ per bridge and per version.
 
 ## The pieces
@@ -56,10 +56,10 @@ chat is opened — the clock does not stop when the app does, so a chat set to
 erase after an hour has a night's worth of messages due before its first bubble
 draws. A dormant install returns before it touches the database.
 
-Candidates come from `search_message`, which is Braid's own record of what was
+Candidates come from `search_message`, which is Sennit's own record of what was
 said — not from a Matrix timeline, which is an async SDK object that exists only
 for a chat somebody has looked at. That is what lets one pass cover every chat
-at startup. The cost is the record's own boundary: a message Braid never indexed
+at startup. The cost is the record's own boundary: a message Sennit never indexed
 is not swept, which in practice means a message with no text at all.
 
 For each due message: the user's own is redacted first, and only then dropped
@@ -77,7 +77,7 @@ dies halfway leaves a message hidden rather than half-deleted.
 ## Why a tombstone at all
 
 Because deleting the local copy does not stop the homeserver from serving it
-back. The next backfill of that room would hand Braid the event again, the
+back. The next backfill of that room would hand Sennit the event again, the
 mapper would turn it into a message, and the indexer would re-file the words the
 user was told had gone. `MatrixTimelineSource` reads the room's tombstones when
 the timeline opens and skips those events at the *mapper*, so a purged event

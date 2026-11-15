@@ -17,8 +17,8 @@ const kProOwnershipSetting = 'billing.pro_ownership';
 const kProLicenseSetting = 'billing.pro_license';
 
 /// The build's edition. A provider so tests can be the store build.
-final braidEditionProvider = Provider<BraidEdition>(
-  (_) => BraidEdition.current,
+final sennitEditionProvider = Provider<SennitEdition>(
+  (_) => SennitEdition.current,
 );
 
 /// Whether this platform takes payment through a store: Play on Android, the
@@ -40,14 +40,14 @@ final storeBillingPlatformProvider = Provider<bool>(
 /// The answer is the same one — it is how [ProStatus.charges] is defined.
 final billingStoreProvider = Provider<BillingStore?>((ref) {
   final charges =
-      ref.watch(braidEditionProvider) == BraidEdition.store &&
+      ref.watch(sennitEditionProvider) == SennitEdition.store &&
       ref.watch(storeBillingPlatformProvider);
   return charges ? InAppPurchaseBillingStore() : null;
 });
 
 /// The licence service, or null in a build that is not unlocked by a key.
 final licenseClientProvider = Provider<LicenseClient?>(
-  (ref) => ref.watch(braidEditionProvider) == BraidEdition.direct
+  (ref) => ref.watch(sennitEditionProvider) == SennitEdition.direct
       ? LicenseClient()
       : null,
 );
@@ -95,7 +95,7 @@ final proCheckoutProvider = NotifierProvider<ProCheckout, CheckoutState>(
   ProCheckout.new,
 );
 
-/// Whether Braid Pro is unlocked, and the purchase flow that changes it.
+/// Whether Sennit Pro is unlocked, and the purchase flow that changes it.
 class ProController extends Notifier<ProStatus> {
   StreamSubscription<List<StorePurchase>>? _purchases;
   Timer? _expiry;
@@ -111,7 +111,7 @@ class ProController extends Notifier<ProStatus> {
       _expiry = null;
     });
     final status = ProStatus(
-      edition: ref.watch(braidEditionProvider),
+      edition: ref.watch(sennitEditionProvider),
       storeBillingPlatform: ref.watch(storeBillingPlatformProvider),
       ownership: ProOwnership.fromJson(
         storesOrNull(ref)?.settings.getJson(kProOwnershipSetting),

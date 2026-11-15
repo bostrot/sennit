@@ -28,9 +28,9 @@ typedef SweepResult = ({int redacted, int forgotten, int deferred});
 ///   homeserver drops the content, every other client drops it, and the bridges
 ///   relay it onward as WhatsApp's or Signal's own delete-for-everyone.
 /// * **Everyone else's are forgotten locally**: dropped from the Matrix SDK's
-///   database, from Braid's message record, from any bytes staged on disk, and
+///   database, from Sennit's message record, from any bytes staged on disk, and
 ///   tombstoned so a backfill cannot walk them back in. The sender's copy is
-///   not Braid's to touch, and no client can make it so.
+///   not Sennit's to touch, and no client can make it so.
 ///
 /// ## Order, and what happens when a step fails
 ///
@@ -209,7 +209,7 @@ class RetentionSweeper {
     required DateTime at,
   }) async {
     // First, and before anything is actually dropped: the tombstone is what
-    // stops a backfill from re-serving the message and Braid's indexer from
+    // stops a backfill from re-serving the message and Sennit's indexer from
     // re-filing it. A pass that dies after this leaves a hidden message that
     // the next pass finishes deleting; one that died before it would leave a
     // message that came back.
@@ -227,7 +227,7 @@ class RetentionSweeper {
       debugPrint('weft: retention could not drop ${candidate.eventId}: $error');
     }
 
-    // Braid's own record of what was said — the one place a search would find
+    // Sennit's own record of what was said — the one place a search would find
     // the words again.
     _search.removeMessage(eventId: candidate.eventId, roomId: candidate.roomId);
 

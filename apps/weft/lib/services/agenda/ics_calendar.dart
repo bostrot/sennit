@@ -66,7 +66,7 @@ Uri? icsUriFrom(String? raw) {
 
 /// A shared calendar, fetched from its ICS address and held for a while.
 ///
-/// Read-only, and only ever the one URL the user typed: Braid never writes to
+/// Read-only, and only ever the one URL the user typed: Sennit never writes to
 /// this calendar and never asks anything else about it. Fetched on demand
 /// rather than polled, because the questions arrive rarely — an auto-reply
 /// about meeting up, an invitation being composed — and a calendar refreshed

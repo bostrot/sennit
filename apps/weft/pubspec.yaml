@@ -115,7 +115,7 @@ dependencies:
   weft_search: ^0.1.0
   weft_share: ^0.1.0
   weft_sms: ^0.1.0
-  # The `.braid` archive format, for the backup screen.
+  # The `.sennit` archive format, for the backup screen.
   weft_backup: ^0.1.0
   weft_snapshot: ^0.1.0
   weft_store: ^0.1.0

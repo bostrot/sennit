@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/build_info.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/features/settings/settings_screen.dart';
-import 'package:weft/services/backup/backup_service.dart' show kBraidVersion;
+import 'package:weft/services/backup/backup_service.dart' show kSennitVersion;
 
 import 'support/golden_harness.dart';
 
@@ -75,13 +75,13 @@ void main() {
       const SettingsScreen(),
       stores: WeftStores.inMemory(),
     );
-    final about = find.text('About Braid');
+    final about = find.text('About Sennit');
     await tester.scrollUntilVisible(about, 200);
     await tester.tap(about);
     await tester.pumpAndSettle();
 
     expect(find.byType(AboutDialog), findsOneWidget);
-    expect(find.text(kBraidVersion), findsOneWidget);
+    expect(find.text(kSennitVersion), findsOneWidget);
     // A test runs in debug mode with no defines, so the line is just that.
     final line = BuildInfo.current.summary;
     expect(line, isNotNull);

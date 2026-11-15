@@ -104,7 +104,7 @@ void main() {
     // has to arrive before the button that asks for it.
     expect(find.byType(PrivacyNotice), findsOneWidget);
     expect(find.textContaining('SMS is not encrypted'), findsOneWidget);
-    expect(find.text('Make Braid the SMS app'), findsOneWidget);
+    expect(find.text('Make Sennit the SMS app'), findsOneWidget);
   });
 
   testWidgets('the app that holds the role is named', (tester) async {
@@ -127,7 +127,7 @@ void main() {
     await repository.start();
     await pump(tester);
 
-    await tap(tester, 'Make Braid the SMS app');
+    await tap(tester, 'Make Sennit the SMS app');
 
     expect(channel.calls, contains('requestRole'));
     expect(find.textContaining('Nothing changed'), findsOneWidget);
@@ -135,7 +135,7 @@ void main() {
     // their choice as a failure is what makes a decline feel like a mistake.
     expect(find.byType(SnackBar), findsNothing);
     // Still offered, because the answer is allowed to change later.
-    expect(find.text('Make Braid the SMS app'), findsOneWidget);
+    expect(find.text('Make Sennit the SMS app'), findsOneWidget);
     expect(repository.isReady, isFalse);
     expect(repository.chats, isEmpty);
   });
@@ -152,11 +152,11 @@ void main() {
     channel.roleOutcome = 'granted';
     channel.status = isDefault;
     channel.threads = [smsThreadRow()];
-    await tap(tester, 'Make Braid the SMS app');
+    await tap(tester, 'Make Sennit the SMS app');
 
     expect(find.text('On'), findsOneWidget);
     // The offer is gone rather than disabled: there is no dialog left to raise.
-    expect(find.text('Make Braid the SMS app'), findsNothing);
+    expect(find.text('Make Sennit the SMS app'), findsNothing);
     expect(repository.chats, hasLength(1));
   });
 
@@ -203,7 +203,7 @@ void main() {
     await pump(tester);
 
     expect(find.text('Not available'), findsOneWidget);
-    expect(find.text('Make Braid the SMS app'), findsNothing);
+    expect(find.text('Make Sennit the SMS app'), findsNothing);
   });
 
   /// The RCS consequence, which is the one cost of the role that the user
@@ -211,7 +211,7 @@ void main() {
   ///
   /// Android has no RCS API for a third-party app: RCS is Google Messages
   /// talking to Google's network, and only while it holds the messaging role.
-  /// So taking the role does not move RCS to Braid, it ends it for the whole
+  /// So taking the role does not move RCS to Sennit, it ends it for the whole
   /// phone — and the screen used to describe everything the role costs except
   /// that. A user who found out afterwards had lost their group chats to green
   /// SMS with no warning at all.
@@ -235,7 +235,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
       expect(find.text('This turns RCS off'), findsOne);
 
       await tester.tap(find.text('Keep RCS'));
@@ -254,7 +254,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
       await tester.tap(find.text('Turn RCS off and continue'));
       await tester.pumpAndSettle();
 
@@ -270,7 +270,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
 
       expect(find.text('This turns RCS off'), findsNothing);
       expect(channel.calls, contains('requestRole'));
@@ -332,9 +332,9 @@ void main() {
   /// `requestRole` returned a boolean, so a decline, a system refusal and an
   /// activity destroyed under Android's dialog all arrived as `false` and were
   /// rendered with the decline copy. The third of those is the reported bug:
-  /// the user tapped "Braid", the system made Braid the default SMS app, the
+  /// the user tapped "Sennit", the system made Sennit the default SMS app, the
   /// activity was recreated while the dialog was up, and the screen said
-  /// *"Nothing changed. Braid is not your SMS app."* It was not a wording
+  /// *"Nothing changed. Sennit is not your SMS app."* It was not a wording
   /// problem — the screen had no way to know.
   group('outcomes', () {
     testWidgets('a system refusal does not read as a decline', (tester) async {
@@ -345,7 +345,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
 
       expect(find.textContaining('did not offer the choice'), findsOneWidget);
       expect(
@@ -367,13 +367,13 @@ void main() {
       channel.roleOutcome = 'interrupted';
       channel.status = isDefault;
       channel.threads = [smsThreadRow()];
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
 
       expect(find.text('On'), findsOneWidget);
       expect(
         find.textContaining('Nothing changed'),
         findsNothing,
-        reason: 'the screen must not deny a role the phone says Braid holds',
+        reason: 'the screen must not deny a role the phone says Sennit holds',
       );
       // And the inbox actually gained the network, rather than merely
       // relabelling the status row.
@@ -388,7 +388,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
 
       // Not the decline copy either — nobody knows whether they declined. What
       // the screen can honestly say is that the state above was re-read.
@@ -406,7 +406,7 @@ void main() {
       channel.calls.clear();
       await pump(tester);
 
-      await tap(tester, 'Make Braid the SMS app');
+      await tap(tester, 'Make Sennit the SMS app');
 
       // The old code refreshed only on a grant, which left the status row, the
       // RCS section and the offer rendering pre-dialog state after every other
@@ -430,7 +430,7 @@ void main() {
       await repository.start();
       await pump(tester);
 
-      expect(find.text('Make Braid the SMS app'), findsNothing);
+      expect(find.text('Make Sennit the SMS app'), findsNothing);
       expect(find.textContaining('did not offer the choice'), findsOneWidget);
     });
   });

@@ -7,14 +7,14 @@ import '../todo/todo_item.dart' show formatTodoDate;
 
 /// Talks to the user's own Home Assistant instance.
 ///
-/// Two things, deliberately few. Braid *fires an event* (`weft_message`) on
+/// Two things, deliberately few. Sennit *fires an event* (`weft_message`) on
 /// the HA bus, and everything else — lights, TTS, notifications on the wall
 /// tablet — is an automation the user writes against that event. And when the
-/// user asks for it, Braid mirrors its to-do list into one of HA's `todo`
+/// user asks for it, Sennit mirrors its to-do list into one of HA's `todo`
 /// entities through the `todo.add_item` and `todo.update_item` actions, which
 /// every to-do integration (Local To-do, Shopping List, CalDAV, Todoist, …)
 /// implements. The reverse direction needs no client at all: Home Assistant
-/// reaches Braid through the MCP server's `send_message` tool with a
+/// reaches Sennit through the MCP server's `send_message` tool with a
 /// `rest_command`.
 class HomeAssistantClient {
   HomeAssistantClient({

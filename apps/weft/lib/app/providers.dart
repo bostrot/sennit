@@ -240,7 +240,7 @@ final sendReadReceiptsProvider = Provider<bool>((ref) {
 
 /// Whether Return sends the message, or breaks the line.
 ///
-/// Off by default. Braid's composer grows to five lines and people write
+/// Off by default. Sennit's composer grows to five lines and people write
 /// paragraphs in it; a Return that sends turns every attempt at a second line
 /// into a message nobody meant to send, and there is no unsending it on a
 /// network the message has already left.

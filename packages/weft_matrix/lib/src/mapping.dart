@@ -839,7 +839,7 @@ const String kCalendarResponseType = 'com.bostrot.weft.calendar.response';
 /// It buys two things, and it is worth being precise about which. In the
 /// transcript it draws the "sent automatically" chip, so a person scrolling
 /// back can tell what they wrote from what their model wrote for them. In
-/// `weft_autoreply` it is the echo guard: two Braid users who have both
+/// `weft_autoreply` it is the echo guard: two Sennit users who have both
 /// switched auto-reply on would otherwise answer each other until one of their
 /// caps ran out.
 ///

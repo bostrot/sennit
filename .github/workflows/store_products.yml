@@ -1,6 +1,6 @@
 name: Store products
 
-# Creates the Braid Pro in-app product in Google Play and App Store Connect,
+# Creates the Sennit Pro in-app product in Google Play and App Store Connect,
 # with the credentials the deploy workflows already use. Run by hand, and
 # safe to run again: tooling/store/iap_products.py only creates what is
 # missing. Leave "apply" off to see what it would do.
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   products:
-    name: Braid Pro in the stores
+    name: Sennit Pro in the stores
     runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v4

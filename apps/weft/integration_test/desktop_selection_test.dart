@@ -178,7 +178,7 @@ void main() {
 
       // ------------------------------------------------------------ right-click
       //
-      // On the selection: Braid's own menu, with every verb it had before, and
+      // On the selection: Sennit's own menu, with every verb it had before, and
       // no second menu from the framework underneath it.
       await tester.tapAt(
         rectOf(rows.first).center,

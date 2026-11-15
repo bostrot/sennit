@@ -12,7 +12,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 /// What the timeline hands the rest of the app, and what it withholds.
 ///
 /// The tombstone filter is the whole of "a deleted message stays deleted" for a
-/// message Braid cannot redact. Removing the event from the SDK's database is
+/// message Sennit cannot redact. Removing the event from the SDK's database is
 /// not enough on its own — the homeserver still has it and the next backfill
 /// serves it straight back — so this is the check that the filter is applied at
 /// the mapper, before anything downstream can index, notify on, or quote it.

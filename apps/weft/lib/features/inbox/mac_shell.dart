@@ -68,7 +68,7 @@ import 'new_chat_sheet.dart';
   return (sidebar - fromSidebar, list - fromList);
 }
 
-/// Braid as a Mac window.
+/// Sennit as a Mac window.
 ///
 /// Three panes under one toolbar, which is the shape every desktop messenger
 /// and mail client has converged on because it is the one that uses a window:

@@ -37,7 +37,7 @@ const int kMaxTrackedNotificationsPerChat = 99;
 /// The conversation a test notification belongs to.
 ///
 /// A real id would be better in exactly one respect — the tap would land in a
-/// real chat — and worse in every other. Attributing Braid's own sample text to
+/// real chat — and worse in every other. Attributing Sennit's own sample text to
 /// a friend puts words in their mouth in the shade, counts a message they never
 /// sent into their summary, and makes the verdict depend on *their* mute rather
 /// than on the settings the user is looking at. So the test gets a conversation
@@ -83,7 +83,7 @@ class NotificationActivation {
 
 /// Where a rendered notification is actually posted.
 ///
-/// The one seam between Braid's notification logic and a plugin that needs a
+/// The one seam between Sennit's notification logic and a plugin that needs a
 /// device. Everything interesting — which channel, which group, what the body
 /// says, whether there should be a summary — is decided above this and arrives
 /// as a [NotificationPresentation]; this interface has four methods and no
@@ -163,7 +163,7 @@ class LocalNotificationSink implements NotificationSink {
         ),
         linux: const LinuxInitializationSettings(defaultActionName: 'Open'),
         windows: const WindowsInitializationSettings(
-          appName: 'Braid',
+          appName: 'Sennit',
           appUserModelId: 'com.bostrot.weft',
           // Identifies the COM activation callback. Fixed, because Windows
           // matches a toast's activation against the GUID that posted it: a
@@ -612,7 +612,7 @@ class WeftNotificationService {
   /// The chat's, not the room's: reading a merged conversation clears both
   /// legs, because the user read the conversation.
   /// Nothing in [_posted] does not mean nothing in the shade. A poke that
-  /// arrived while Braid was not running is posted by the background isolate,
+  /// arrived while Sennit was not running is posted by the background isolate,
   /// which keeps its own ledger and takes it with it when it exits — so the
   /// row the user is looking at, and tapped, is very often one this isolate
   /// has no record of. The ids are stable precisely so it can be cancelled

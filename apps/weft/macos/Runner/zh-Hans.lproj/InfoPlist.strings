@@ -1,6 +1,6 @@
 /* Simplified Chinese, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
 
-   The permission prompts iOS and macOS draw before Braid has run a line of
+   The permission prompts iOS and macOS draw before Sennit has run a line of
    Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
    out of the bundle, keyed by the `Info.plist` key each one overrides.
 

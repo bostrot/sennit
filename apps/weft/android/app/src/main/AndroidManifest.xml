@@ -30,7 +30,7 @@
          granted for a permission the package never declared, so the last one
          silently fails and `SmsApplication` then *disqualifies* the app for
          having "lost" a required op. The visible result is the one that was
-         reported: `RoleManager` says Braid holds ROLE_SMS, and
+         reported: `RoleManager` says Sennit holds ROLE_SMS, and
          `Telephony.Sms.getDefaultSmsPackage()` — which is what the app, the
          provider and every other app read — still names the previous holder.
          Nothing throws. The only trace is one logcat line from a system class:
@@ -110,7 +110,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <!-- l10n-ignore: the app's own name, never translated. -->
     <application
-        android:label="Braid"
+        android:label="Sennit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -294,7 +294,7 @@
         <!-- flutter_local_notifications' own service, started by
              `AndroidBackgroundWorkHost` while a long job runs so it survives the
              user leaving the app. Does no work itself; its notification is the
-             job's progress. Stops with the task: swiping Braid away ends the
+             job's progress. Stops with the task: swiping Sennit away ends the
              engine the job runs in, and a notification outliving it would
              claim a backup that is no longer happening. -->
         <service

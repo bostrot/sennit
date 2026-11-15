@@ -1,6 +1,6 @@
 name: weft_backup
 description: >-
-  The `.braid` archive: one encrypted, versioned container holding a user's
+  The `.sennit` archive: one encrypted, versioned container holding a user's
   cross-network history, written and read without a homeserver, a cloud account
   or a device. Pure Dart — the format, the crypto and the merge rules are
   decided in one test file rather than on a phone, and the package deliberately

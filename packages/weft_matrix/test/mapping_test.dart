@@ -663,8 +663,8 @@ void main() {
 
     test('a caption survives the trip out and back', () {
       // The writer and the reader asserted against each other rather than each
-      // against a literal. `toEventContent` is what Braid puts in the room and
-      // `mapEvent` is what Braid reads out of it, and a caption that came back
+      // against a literal. `toEventContent` is what Sennit puts in the room and
+      // `mapEvent` is what Sennit reads out of it, and a caption that came back
       // as a filename — or a filename that came back as a caption — is the one
       // failure the whole MSC2530 split exists to prevent.
       final decision = planUpload(

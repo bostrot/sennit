@@ -39,16 +39,16 @@ object SmsRole {
     ///
     /// A boolean was the bug. "Granted" has one meaning and every other answer
     /// has four, and folding them together is what produced a screen saying
-    /// "Nothing changed. Braid is not your SMS app" to a user who had just been
+    /// "Nothing changed. Sennit is not your SMS app" to a user who had just been
     /// made the default SMS app — see the phase-05 diagnosis note. Each of these
     /// leads somewhere different: [DENIED] is the only one the decline copy
     /// belongs on, [UNAVAILABLE] is a device to stop offering the role on, and
     /// [INTERRUPTED] means *ask the system again*, not *report a failure*.
     object Outcome {
-        /// Braid holds the role, confirmed by asking the system afterwards.
+        /// Sennit holds the role, confirmed by asking the system afterwards.
         const val GRANTED = "granted"
 
-        /// The dialog was shown and Braid still does not hold the role.
+        /// The dialog was shown and Sennit still does not hold the role.
         const val DENIED = "denied"
 
         /// No dialog could be shown: no telephony, no `ROLE_SMS` on this ROM,
@@ -106,7 +106,7 @@ object SmsRole {
 
     /// Whether this device has a default-SMS-app role to give at all.
     ///
-    /// Unlike [canRequest] this stays true once Braid holds the role, so the
+    /// Unlike [canRequest] this stays true once Sennit holds the role, so the
     /// screen can tell "the role does not exist here" from "there is nothing
     /// left to ask for".
     fun roleAvailable(context: Context): Boolean = try {
@@ -162,7 +162,7 @@ object SmsRole {
     ///
     /// The component check is part of the answer rather than a separate one: a
     /// build missing a required component is one the picker will not list, so a
-    /// button wired to this would open a dialog Braid is not in. Offering
+    /// button wired to this would open a dialog Sennit is not in. Offering
     /// nothing is the honest state, and `status` carries the reason across so
     /// Dart can say which of the two "no"s this is.
     fun canRequest(context: Context): Boolean {
@@ -179,7 +179,7 @@ object SmsRole {
     /// The role controller decides eligibility by resolving four components
     /// against the package, and an app missing one of them never appears in the
     /// picker — no error, no log line, and a dialog that either does not open or
-    /// opens without Braid in it. That is indistinguishable from a decline at
+    /// opens without Sennit in it. That is indistinguishable from a decline at
     /// the call site, so it is checked before the dialog rather than guessed at
     /// afterwards, and a false answer is reported as [Outcome.UNAVAILABLE].
     ///

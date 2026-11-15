@@ -1,6 +1,6 @@
 # The licence service
 
-A build from the release page (`BRAID_EDITION=direct`) unlocks Braid Pro with
+A build from the release page (`BRAID_EDITION=direct`) unlocks Sennit Pro with
 a licence key bought on the web. This directory is the server side of that:
 one [n8n](https://n8n.io) workflow, `braid-licensing.workflow.json`.
 
@@ -11,7 +11,7 @@ Stripe Payment Link ──checkout.session.completed──▶ POST /webhook/brai
                                                       mint BRAID-XXXXX-XXXXX-XXXXX-XXXXX
                                                       save the row, email the key
 
-Braid ──GET /webhook/braid/validate?license=BRAID-…──▶ {"valid": true|false}
+Sennit ──GET /webhook/braid/validate?license=BRAID-…──▶ {"valid": true|false}
 ```
 
 The app asks once when a key is entered and about once a month after that.
@@ -28,7 +28,7 @@ ever takes Pro away; an unreachable server changes nothing.
 | A Stripe product with a one-time price and a **Payment Link whose metadata is `app=braid`** | Stripe |
 | A Stripe webhook endpoint → `https://<n8n>/webhook/braid/stripe-events`, events `checkout.session.completed` and `checkout.session.async_payment_succeeded` | Stripe → Developers → Webhooks |
 
-The `app=braid` metadata is what tells a Braid sale from anything else sold
+The `app=braid` metadata is what tells a Sennit sale from anything else sold
 on the same Stripe account. Stripe copies a Payment Link's metadata onto each
 session it creates; a session without it gets no licence.
 

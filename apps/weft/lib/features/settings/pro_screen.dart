@@ -44,7 +44,7 @@ class ProBadge extends StatelessWidget {
   }
 }
 
-/// What Braid Pro unlocks, what it costs, and the buttons to buy or restore.
+/// What Sennit Pro unlocks, what it costs, and the buttons to buy or restore.
 ///
 /// Prices come from the store, already in the user's currency; nothing here
 /// knows an amount. A build that does not charge never links here, but the

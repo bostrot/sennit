@@ -426,7 +426,7 @@ abstract final class WeftTheme {
   /// Re-fits a built theme to the desktop.
   ///
   /// Applied on top of the shared theme rather than branched inside it,
-  /// because everything above this point is a decision about *Braid* — the
+  /// because everything above this point is a decision about *Sennit* — the
   /// palette, the contrast corrections, the focus ring — and everything here
   /// is a decision about *macOS*. Keeping the two apart is what stops the
   /// colour work from having to be repeated per platform.

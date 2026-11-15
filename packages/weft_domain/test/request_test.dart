@@ -82,7 +82,7 @@ void main() {
     });
 
     test('a bridged chat has nothing to join', () {
-      // The bridge joined the room on the user's behalf before Braid ever saw
+      // The bridge joined the room on the user's behalf before Sennit ever saw
       // it. A `join` here would be a no-op at best and a membership change the
       // remote network relays at worst.
       for (final network in const [

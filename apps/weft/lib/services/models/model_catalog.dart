@@ -47,7 +47,7 @@ abstract final class ModelCatalog {
   /// Embedding model for on-device semantic search.
   ///
   /// MiniLM as quantised ONNX rather than the earlier Gecko `.tflite`: Weft's
-  /// embedding runtime is ONNX Runtime, which every platform Braid builds on
+  /// embedding runtime is ONNX Runtime, which every platform Sennit builds on
   /// can load — the Gecko file needed a LiteRT runtime and a SentencePiece
   /// tokeniser this app never had, so it downloaded and then did nothing.
   /// Apache-2.0, ungated, 384 dimensions, WordPiece vocabulary. English-first —

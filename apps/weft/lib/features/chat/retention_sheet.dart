@@ -9,7 +9,7 @@ import '../../app/retention_providers.dart';
 /// The windows a conversation may be set to erase itself after.
 ///
 /// A short list rather than a duration picker, and the shortest is an hour on
-/// purpose. Braid sweeps once a minute and deletes from a message record it
+/// purpose. Sennit sweeps once a minute and deletes from a message record it
 /// fills as a chat is read — machinery that is honest at the scale of hours and
 /// would be quietly wrong at the scale of seconds, which is the scale a
 /// "5 minutes" option would promise.

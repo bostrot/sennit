@@ -1,4 +1,4 @@
-/// The seam between the `.braid` archive and Braid's own tables.
+/// The seam between the `.sennit` archive and Sennit's own tables.
 ///
 /// `weft_backup` owns the container, the crypto and the merge *rules*; this
 /// file owns the SQL and the files on disk. The dependency points one way —
@@ -8,7 +8,7 @@
 ///
 /// ## What a complete backup captures
 ///
-/// Braid's database, table by table, and what happens to each:
+/// Sennit's database, table by table, and what happens to each:
 ///
 /// | table              | in an archive | why                                    |
 /// | ------------------ | ------------- | -------------------------------------- |
@@ -28,10 +28,10 @@
 /// that `MediaFileStore` writes.
 ///
 /// **`search_message` is the history.** That deserves saying plainly, because
-/// the name suggests an index rather than a record. Braid does not keep its own
+/// the name suggests an index rather than a record. Sennit does not keep its own
 /// copy of the Matrix timeline — the SDK's database does — but the SDK's
 /// database is protocol state full of device keys, and it holds *rooms* rather
-/// than the cross-network view. `search_message` is where Braid's own answer to
+/// than the cross-network view. `search_message` is where Sennit's own answer to
 /// "what was said, by whom, on which network, in which unified chat" lives, and
 /// that answer is the thing that exists nowhere else once a bridge is gone.
 ///
@@ -75,7 +75,7 @@ const Set<String> kSettingsExcludedFromBackup = {
 /// built around.
 const int _pageSize = 500;
 
-/// Reads Braid's tables and the media directory into archive records.
+/// Reads Sennit's tables and the media directory into archive records.
 class StoreBackupSource implements BackupSource {
   StoreBackupSource({required WeftDatabase database, Directory? mediaDirectory})
     : _db = database,
@@ -341,7 +341,7 @@ class _MediaFile {
   final int length;
 }
 
-/// Writes archive records into Braid's tables and media directory.
+/// Writes archive records into Sennit's tables and media directory.
 ///
 /// **Merge is `INSERT … ON CONFLICT DO NOTHING`, everywhere.** An existing row
 /// wins over the archive's, which is the only choice that makes importing the

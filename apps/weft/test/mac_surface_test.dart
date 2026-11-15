@@ -9,7 +9,7 @@ import 'package:weft/features/inbox/mac_shell.dart';
 import 'support/golden_harness.dart';
 import 'package:weft/app/localisation.dart';
 
-/// What changes when Braid is a Mac window.
+/// What changes when Sennit is a Mac window.
 ///
 /// The claim these tests defend is that the surface is one decision, made once
 /// and carried in the theme: the same shell widget, the same providers and the

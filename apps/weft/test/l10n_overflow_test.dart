@@ -28,7 +28,7 @@ import 'support/session_fakes.dart';
 /// words.
 ///
 /// **German at 2.0× is the case this exists for.** German is the longest text
-/// Braid ships, the large-text end is where a row runs out of height, and the
+/// Sennit ships, the large-text end is where a row runs out of height, and the
 /// two compound: a subtitle that fits on two lines in English at 2.0× and on
 /// two lines in German at 1.0× can need four in German at 2.0×. Nothing else in
 /// the suite pumps that combination.
@@ -49,7 +49,7 @@ void main() {
   ///
   /// 1.0× is the default, and it is here because a German string can overflow
   /// unscaled — the large end is not the only end that fails. 2.0× is the
-  /// system maximum Braid honours.
+  /// system maximum Sennit honours.
   const scales = <double>[1.0, 2.0];
 
   /// A phone, not a desktop window.

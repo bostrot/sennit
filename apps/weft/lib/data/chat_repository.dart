@@ -319,7 +319,7 @@ abstract class ChatRepository {
   ///
   /// The other half of [redact], and deliberately a separate verb. A redaction
   /// is a message the room hears: it deletes for everyone and only the sender
-  /// may ask for it. This deletes the local copy of something Braid has no
+  /// may ask for it. This deletes the local copy of something Sennit has no
   /// standing to redact — a message somebody else sent, whose self-deletion the
   /// user asked for on their own device — and says nothing to anyone.
   ///

@@ -1,9 +1,9 @@
-/// Reading a `.braid` archive back.
+/// Reading a `.sennit` archive back.
 ///
 /// Two steps, because the restore screen has two:
 ///
 /// 1. [readArchivePreview] parses the plaintext header and answers "is this a
-///    Braid archive, can this build read it, and what does it say about
+///    Sennit archive, can this build read it, and what does it say about
 ///    itself" — **without the passphrase**. This is what the file picker's
 ///    result is shown against, so that "wrong file" is a sentence the user gets
 ///    before they have typed anything.
@@ -39,7 +39,7 @@ sealed class ArchiveOpenFailure implements Exception {
   const ArchiveOpenFailure();
 }
 
-/// Not a `.braid` file at all — the magic bytes are missing.
+/// Not a `.sennit` file at all — the magic bytes are missing.
 ///
 /// The likely truth is that the file picker was pointed at the wrong thing.
 final class NotAnArchiveFailure extends ArchiveOpenFailure {
@@ -49,7 +49,7 @@ final class NotAnArchiveFailure extends ArchiveOpenFailure {
   String toString() => 'NotAnArchiveFailure()';
 }
 
-/// A `.braid` file whose header does not parse.
+/// A `.sennit` file whose header does not parse.
 ///
 /// Distinct from [NotAnArchiveFailure] because the user picked the *right*
 /// file and it is damaged, which is a different and much worse thing to be
@@ -62,10 +62,10 @@ final class MalformedArchiveFailure extends ArchiveOpenFailure {
   String toString() => 'MalformedArchiveFailure()';
 }
 
-/// Written by a Braid whose container version this build does not know.
+/// Written by a Sennit whose container version this build does not know.
 ///
-/// The only failure here whose remedy is "update Braid", which is why it is
-/// worth being able to say exactly that. See [kBraidArchiveFormatVersion].
+/// The only failure here whose remedy is "update Sennit", which is why it is
+/// worth being able to say exactly that. See [kSennitArchiveFormatVersion].
 final class UnsupportedVersionFailure extends ArchiveOpenFailure {
   const UnsupportedVersionFailure(this.version);
 
@@ -129,7 +129,7 @@ Future<ArchiveHeader> readArchiveHeader(ArchiveInput input) async {
     HeaderProblem.notAnArchive => const NotAnArchiveFailure(),
     HeaderProblem.malformed => const MalformedArchiveFailure(),
     HeaderProblem.unsupportedVersion => UnsupportedVersionFailure(
-      result.version ?? kBraidArchiveFormatVersion,
+      result.version ?? kSennitArchiveFormatVersion,
     ),
   };
 }
@@ -419,7 +419,7 @@ class ImportOutcome {
   ///
   /// Separate from [skippedExisting] because they mean opposite things: one is
   /// a restore working exactly as designed, the other is an archive from a
-  /// newer Braid carrying something this build cannot store. The summary screen
+  /// newer Sennit carrying something this build cannot store. The summary screen
   /// says so, because silently dropping it would leave the user believing they
   /// have a complete copy.
   final int skippedUnknownType;

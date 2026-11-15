@@ -55,7 +55,7 @@ Future<void> addToDeviceCalendar({
       '${t.hour.toString().padLeft(2, '0')}'
       '${t.minute.toString().padLeft(2, '0')}00';
   final ics =
-      'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Braid//EN\r\n'
+      'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sennit//EN\r\n'
       'BEGIN:VEVENT\r\n'
       'DTSTART:${stamp(start)}\r\nDTEND:${stamp(until)}\r\n'
       'SUMMARY:${title.replaceAll(RegExp(r'[\r\n]'), ' ')}\r\n'

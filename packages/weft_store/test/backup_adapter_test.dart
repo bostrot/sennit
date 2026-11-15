@@ -29,7 +29,7 @@ void main() {
   setUp(() async {
     source = WeftDatabase.openAt(':memory:');
     target = WeftDatabase.openAt(':memory:');
-    workspace = await Directory.systemTemp.createTemp('braid-adapter');
+    workspace = await Directory.systemTemp.createTemp('sennit-adapter');
   });
 
   tearDown(() async {

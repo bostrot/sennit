@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Braid's mark: two strands plaited down the middle of a gradient tile.
+/// Sennit's mark: two strands plaited down the middle of a gradient tile.
 ///
 /// Drawn in code rather than shipped as an asset so the launcher icon, the
 /// splash, the login screen and every empty state render the same mark from
@@ -121,7 +121,7 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Braid',
+      label: 'Sennit',
       image: true,
       child: CustomPaint(
         size: Size.square(size),

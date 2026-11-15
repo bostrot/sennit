@@ -205,7 +205,7 @@ abstract interface class SnapshotGateway {
 /// would find every tick different and the diff would never fire. It is
 /// excluded, and the cost of excluding it is paid back by [rewriteAfter]: a
 /// payload that is never rewritten eventually crosses [kSnapshotStaleAfter] and
-/// the surfaces start saying "open Braid on your phone" while the app is running
+/// the surfaces start saying "open Sennit on your phone" while the app is running
 /// and the counts are correct. The surface flags *are* part of the key, because
 /// turning the watch off while the widget stays on changes nothing in the
 /// payload and everything about who may draw it.

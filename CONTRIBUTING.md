@@ -1,14 +1,14 @@
-# Contributing to Braid
+# Contributing to Sennit
 
-Thanks for wanting to help. Braid is a Flutter app in a Dart pub workspace —
+Thanks for wanting to help. Sennit is a Flutter app in a Dart pub workspace —
 most logic lives in pure-Dart packages under `packages/`, and most of the
 test suite runs without any device.
 
 ## Setting up
 
 ```bash
-git clone https://github.com/bostrot/braid.git
-cd braid
+git clone https://github.com/bostrot/sennit.git
+cd sennit
 flutter pub get
 flutter test
 ```
@@ -21,11 +21,11 @@ Synapse and a mock bridge lives in `tooling/docker/` — no real accounts or
 bridges required.
 
 A build from source is the community edition, with every feature unlocked.
-The published builds sell the AI features and integrations as Braid Pro: the
+The published builds sell the AI features and integrations as Sennit Pro: the
 Play and App Store builds as an in-app purchase
 (`--dart-define=BRAID_EDITION=store`), the release-page builds by licence key
 (`--dart-define=BRAID_EDITION=direct`). A new AI or integration feature needs
-a `ProFeature` gate in its provider. See `docs/decisions/adr-004-braid-pro.md`.
+a `ProFeature` gate in its provider. See `docs/decisions/adr-004-sennit-pro.md`.
 
 ## Making changes
 
@@ -58,7 +58,7 @@ a `ProFeature` gate in its provider. See `docs/decisions/adr-004-braid-pro.md`.
 
 ## Translating
 
-Braid ships six languages, five of them machine-seeded and waiting to be read
+Sennit ships six languages, five of them machine-seeded and waiting to be read
 by someone who speaks them. You need no Dart and no checkout: Weblate is set up
 against this repository, and a pull request works too.
 
@@ -72,7 +72,7 @@ you invest the time.
 
 ## Licence of contributions
 
-Braid is AGPL-3.0, and it is also published on the App Store and Google Play.
+Sennit is AGPL-3.0, and it is also published on the App Store and Google Play.
 Opening a pull request means you agree to the short
 [contributor licence agreement](CLA.md), which is what lets your code ship
 there too. You keep your copyright.

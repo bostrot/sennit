@@ -28,17 +28,17 @@ enum RetentionAnchor {
       values.firstWhereOrNull((anchor) => anchor.id == id) ?? arrival;
 }
 
-/// How long one conversation keeps a message before Braid deletes it.
+/// How long one conversation keeps a message before Sennit deletes it.
 ///
-/// The unit Braid can honestly promise, and the wording matters because the two
+/// The unit Sennit can honestly promise, and the wording matters because the two
 /// halves of "delete" are not equally true:
 ///
 /// * **The user's own messages are redacted** — removed for everyone the
 ///   homeserver can reach, and relayed onward as a delete by every bridge that
 ///   supports one.
 /// * **Messages other people sent are removed from this device**: from the
-///   local timeline, from Braid's own message record, and from any media staged
-///   on disk. Nobody else's copy is Braid's to delete, and a client that said
+///   local timeline, from Sennit's own message record, and from any media staged
+///   on disk. Nobody else's copy is Sennit's to delete, and a client that said
 ///   otherwise would be lying about the one thing a disappearing message is
 ///   asked to do.
 ///

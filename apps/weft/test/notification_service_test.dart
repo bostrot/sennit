@@ -1416,7 +1416,7 @@ void main() {
 
     test('a row this isolate never posted is still cleared', () async {
       // What a notification tap almost always looks like: the poke arrived
-      // while Braid was not running, the background isolate posted the row and
+      // while Sennit was not running, the background isolate posted the row and
       // exited with its ledger, and the isolate now asked to dismiss has no
       // record of it. The ids are stable so it can be cancelled regardless —
       // and it has to be, or the row the user just tapped stays in the shade.

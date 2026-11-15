@@ -16,13 +16,13 @@ import 'package:weft_design/weft_design.dart';
 void main() {
   Future<List<String>> pump(
     WidgetTester tester, {
-    BraidEdition edition = BraidEdition.community,
+    SennitEdition edition = SennitEdition.community,
   }) async {
     final done = <String>[];
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          braidEditionProvider.overrideWithValue(edition),
+          sennitEditionProvider.overrideWithValue(edition),
           storeBillingPlatformProvider.overrideWithValue(true),
           billingStoreProvider.overrideWithValue(null),
         ],
@@ -40,7 +40,7 @@ void main() {
 
   testWidgets('can be skipped from the first page', (tester) async {
     final done = await pump(tester);
-    expect(find.text('Welcome to Braid'), findsOneWidget);
+    expect(find.text('Welcome to Sennit'), findsOneWidget);
 
     await tester.tap(find.text('Skip the tour'));
     expect(done, ['done']);
@@ -55,7 +55,7 @@ void main() {
       'Bring your other messengers',
       'Add an AI assistant',
       'Or keep it on this device',
-      'Let Braid answer for you',
+      'Let Sennit answer for you',
       'A to-do list that fills itself',
     ];
     for (final title in titles) {
@@ -68,7 +68,7 @@ void main() {
   });
 
   testWidgets('a Pro feature is marked until Pro is unlocked', (tester) async {
-    await pump(tester, edition: BraidEdition.store);
+    await pump(tester, edition: SennitEdition.store);
     await tester.tap(find.text('Show me around'));
     await tester.pumpAndSettle();
     // Bridges are free.

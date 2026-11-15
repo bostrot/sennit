@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-/// Where a store purchase stands, in the words Braid acts on.
+/// Where a store purchase stands, in the words Sennit acts on.
 enum StorePurchaseStatus { pending, purchased, restored, canceled, error }
 
 /// One update from the store about one product.
@@ -22,7 +22,7 @@ class StorePurchase {
 
   /// The store wants an acknowledgement. Play refunds a purchase that is not
   /// acknowledged within three days, so this must be answered even when the
-  /// purchase is one Braid does not recognise.
+  /// purchase is one Sennit does not recognise.
   final bool needsCompletion;
 
   final String? error;
@@ -47,7 +47,7 @@ class StoreOffer {
   final String price;
 }
 
-/// The store, behind the few calls Braid makes.
+/// The store, behind the few calls Sennit makes.
 ///
 /// An interface so the purchase flow is testable without Play or StoreKit:
 /// the plugin's types need a platform channel to construct.

@@ -1,6 +1,6 @@
 /* Simplified Chinese, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
 
-   The permission prompts iOS and macOS draw before Braid has run a line of
+   The permission prompts iOS and macOS draw before Sennit has run a line of
    Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
    out of the bundle, keyed by the `Info.plist` key each one overrides.
 
@@ -9,10 +9,10 @@
    which is a permission prompt in the wrong language on a screen the user
    cannot get past. `l10n_test.dart` checks both directions. */
 
-"NSPhotoLibraryUsageDescription" = "Braid 需要访问你的照片图库，以便你在对话中发送照片和视频。";
-"NSCameraUsageDescription" = "Braid 需要使用相机，以便你拍摄照片并在对话中发送。";
-"NSLocationWhenInUseUsageDescription" = "Braid 只有在你于聊天中点按「共享位置」时才会共享你的位置。";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Braid 只有在你于聊天中点按「共享位置」时才会共享你的位置，绝不会在后台持续获取。";
-"NSCalendarsUsageDescription" = "Braid 只有在你要求时，才会把聊天中提到的日期添加为日历日程。";
-"NSContactsUsageDescription" = "Braid 会显示你通讯录中的名字，而不是消息网络分配的名字。匹配只在本设备上进行，绝不会上传。";
-"NSMicrophoneUsageDescription" = "Braid 需要使用麦克风，以便你在语音或视频通话中讲话。";
+"NSPhotoLibraryUsageDescription" = "Sennit 需要访问你的照片图库，以便你在对话中发送照片和视频。";
+"NSCameraUsageDescription" = "Sennit 需要使用相机，以便你拍摄照片并在对话中发送。";
+"NSLocationWhenInUseUsageDescription" = "Sennit 只有在你于聊天中点按「共享位置」时才会共享你的位置。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit 只有在你于聊天中点按「共享位置」时才会共享你的位置，绝不会在后台持续获取。";
+"NSCalendarsUsageDescription" = "Sennit 只有在你要求时，才会把聊天中提到的日期添加为日历日程。";
+"NSContactsUsageDescription" = "Sennit 会显示你通讯录中的名字，而不是消息网络分配的名字。匹配只在本设备上进行，绝不会上传。";
+"NSMicrophoneUsageDescription" = "Sennit 需要使用麦克风，以便你在语音或视频通话中讲话。";

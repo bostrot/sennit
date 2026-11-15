@@ -108,7 +108,7 @@ void main() {
       await _awaitChat(repository, roomId);
 
       // Alice writes and then opens the conversation, and neither is
-      // scene-setting. Braid holds a first message from someone the user has
+      // scene-setting. Sennit holds a first message from someone the user has
       // never answered as a *chat request*, and `shouldReply` refuses one
       // outright — correctly, and this test would then assert nothing. A
       // conversation Alice has spoken in and read is an ordinary one.
@@ -196,7 +196,7 @@ void main() {
       expect(
         onBobsSide!.content[kAutoReplyKey],
         isTrue,
-        reason: 'the marker is what stops two Braids answering each other',
+        reason: 'the marker is what stops two Sennits answering each other',
       );
 
       final mapped = mapEvent(

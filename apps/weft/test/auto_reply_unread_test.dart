@@ -11,7 +11,7 @@ import 'support/auto_reply_fakes.dart';
 
 /// The unread guarantee, which is the whole point of the feature.
 ///
-/// Replying normally marks a chat read on every network here, and on Braid's
+/// Replying normally marks a chat read on every network here, and on Sennit's
 /// own inbox it does so *without any receipt at all* — writing a message moves
 /// the room's newest event past every receipt it holds, and `isReadLocally`
 /// reads that as the user having caught up. That is right for a message they

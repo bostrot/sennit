@@ -5,19 +5,19 @@
      behind each string, and this one only the words. A key here that is not
      there (or missing from here) fails `l10n_test.dart`. -->
 <resources>
-    <string name="weft_widget_unread_name">Braid não lidas</string>
+    <string name="weft_widget_unread_name">Sennit não lidas</string>
     <string name="weft_widget_unread_description">Quantas mensagens não lidas você tem, em todas as conversas.</string>
-    <string name="weft_widget_inbox_name">Conversas do Braid</string>
+    <string name="weft_widget_inbox_name">Conversas do Sennit</string>
     <string name="weft_widget_inbox_description">Suas conversas mais recentes. Toque em uma para abrir.</string>
     <string name="weft_widget_inbox_heading">Recentes</string>
     <string name="weft_widget_unread_label">não lidas</string>
     <string name="weft_widget_merged">Conversa mesclada</string>
-    <string name="weft_widget_signed_out_title">Entre no Braid</string>
-    <string name="weft_widget_signed_out_body">Abra o Braid e entre para ver suas conversas aqui.</string>
+    <string name="weft_widget_signed_out_title">Entre no Sennit</string>
+    <string name="weft_widget_signed_out_body">Abra o Sennit e entre para ver suas conversas aqui.</string>
     <string name="weft_widget_disabled_title">Os widgets estão desligados</string>
-    <string name="weft_widget_disabled_body">Abra o Braid e ative Widgets da tela de início em Widgets e relógio.</string>
-    <string name="weft_widget_stale_title">Abra o Braid no seu telefone</string>
-    <string name="weft_widget_stale_body">Isto está desatualizado. Abra o Braid para atualizar.</string>
+    <string name="weft_widget_disabled_body">Abra o Sennit e ative Widgets da tela de início em Widgets e relógio.</string>
+    <string name="weft_widget_stale_title">Abra o Sennit no seu telefone</string>
+    <string name="weft_widget_stale_body">Isto está desatualizado. Abra o Sennit para atualizar.</string>
     <string name="weft_widget_empty_title">Nenhuma conversa</string>
     <string name="weft_widget_empty_body">Nada para mostrar ainda. Conversas em redes excluídas nunca aparecem aqui.</string>
     <string name="call_channel_name">Chamadas</string>
@@ -26,11 +26,11 @@
     <string name="call_incoming_video">Videochamada recebida</string>
     <string name="call_in_progress">Chamada em andamento</string>
     <string name="call_in_progress_video">Videochamada em andamento</string>
-    <string name="call_phone_account">Chamadas do Braid</string>
+    <string name="call_phone_account">Chamadas do Sennit</string>
     <string name="connection_channel_name">Conexão</string>
-    <string name="connection_channel_description">Mantém o Braid conectado para que as mensagens cheguem enquanto ele está fechado.</string>
+    <string name="connection_channel_description">Mantém o Sennit conectado para que as mensagens cheguem enquanto ele está fechado.</string>
     <string name="connection_title">Ouvindo mensagens</string>
-    <string name="connection_body">O Braid continua conectado em segundo plano.</string>
+    <string name="connection_body">O Sennit continua conectado em segundo plano.</string>
 
     <plurals name="weft_widget_unread_count">
         <item quantity="one">%1$d mensagem não lida</item>

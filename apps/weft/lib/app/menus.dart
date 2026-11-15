@@ -30,7 +30,7 @@ final macSidebarVisibleProvider = NotifierProvider<MacSidebarVisible, bool>(
   MacSidebarVisible.new,
 );
 
-/// Braid's menu bar.
+/// Sennit's menu bar.
 ///
 /// A Mac app without one is not a Mac app: the menu bar is where the system
 /// expects to find every verb, where a user goes to *discover* a keyboard
@@ -119,7 +119,7 @@ class WeftMenuBar extends ConsumerWidget {
           // The application menu, whatever it is labelled — macOS replaces the
           // label with the app's name and always draws it first.
           // l10n-ignore: macOS replaces this with the app's own name.
-          label: 'Braid',
+          label: 'Sennit',
           menus: [
             const PlatformProvidedMenuItem(
               type: PlatformProvidedMenuItemType.about,

@@ -14,7 +14,7 @@ related:
 
 # Localization Pipeline
 
-Braid's user-facing words live in ARB files under `apps/weft/lib/l10n/`.
+Sennit's user-facing words live in ARB files under `apps/weft/lib/l10n/`.
 `flutter gen-l10n` compiles them into an `AppL10n` class, and a widget reads one
 string from it as `context.l10n.settingsTitle`. Nothing user-facing should be a
 Dart literal; [[l10n-inventory]] is the machine-generated list of the ones that
@@ -78,7 +78,7 @@ Where a key needs a title and a subtitle, spell both out — `xTitle`, `xSubtitl
 
 ### Writing the description
 
-Write for a translator who cannot see the screen and has never used Braid. Say
+Write for a translator who cannot see the screen and has never used Sennit. Say
 where the string appears, what it does, and how much room it has:
 
 ```json
@@ -91,7 +91,7 @@ Three things earn their place in nearly every description: **the surface** ("app
 bar title", "one-line subtitle under 'Bridges'", "screen-reader-only label"),
 **the length budget**, and **which words must not be translated** — product
 names (`WhatsApp`, `Home Assistant`, `paperless-ngx`), the app's own name
-(`Braid`), and protocol terms (`Matrix`, `MCP`). A translator who is not told
+(`Sennit`), and protocol terms (`Matrix`, `MCP`). A translator who is not told
 will translate them, and a translated `paperless-ngx` matches nothing.
 
 ### Placeholders and plurals
@@ -143,7 +143,7 @@ escaping at all.
 
 `gen-l10n` refuses to generate a `zh_Hans` or `pt_BR` file unless a base
 `zh` / `pt` file also exists, because the region file is a *delta* on the base
-and a device asking for plain `pt` needs something to resolve to. Braid ships
+and a device asking for plain `pt` needs something to resolve to. Sennit ships
 exactly one written form of each language, so rather than duplicate sixty
 strings into a base file it keeps a single `app_zh.arb` and `app_pt.arb` whose
 content *is* the Simplified and Brazilian form. Each carries an `@@x-variant`
@@ -152,7 +152,7 @@ line saying so.
 `weftSupportedLocales` still declares `zh-Hans` and `pt-BR`, which is what the
 app honestly serves. The generated delegate's `isSupported` matches on language
 code alone, so both resolve; a device set to `pt-PT` or `zh-Hant` gets the form
-Braid has rather than English, which is the better of the two available
+Sennit has rather than English, which is the better of the two available
 failures. If a second written form is ever translated, add `app_zh_Hant.arb`
 beside the base and nothing else changes.
 
@@ -268,7 +268,7 @@ a string no locale can reach, and the audit tool fails the build on one.
 
 ### Apple usage descriptions
 
-A permission prompt is drawn before Braid has run a line of Dart, so its
+A permission prompt is drawn before Sennit has run a line of Dart, so its
 sentence comes out of the bundle: `Info.plist` for English, and
 `<locale>.lproj/InfoPlist.strings` for everything else, keyed by the
 `Info.plist` key each entry overrides.
@@ -280,7 +280,7 @@ gained the locales in `knownRegions`, a `PBXVariantGroup` named
 Adding a locale means touching the project file again; `plutil -lint` on the
 `.pbxproj` is the cheapest check that it is still readable.
 
-The iOS strings say "Braid" and the macOS ones say "Weft", because that is what
+The iOS strings say "Sennit" and the macOS ones say "Weft", because that is what
 each `Info.plist` says today. They are the product's own name, not something to
 translate — but the two disagreeing is a rebrand that has not finished, and
 worth fixing in English first.
@@ -304,7 +304,7 @@ translated says so at the call site:
 
 ```dart
 // l10n-ignore: the app's own name, never translated.
-label: 'Braid',
+label: 'Sennit',
 ```
 
 The marker goes on the literal's line or one of the two above it — an XML

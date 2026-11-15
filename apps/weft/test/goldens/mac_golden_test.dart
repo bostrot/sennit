@@ -17,7 +17,7 @@ import '../support/golden_harness.dart';
 /// A change that quietly put a 46pt avatar or a 16pt title back in the window
 /// would pass the whole rest of the suite.
 ///
-/// Captured at 1280×800, the smallest display Braid is expected to ship
+/// Captured at 1280×800, the smallest display Sennit is expected to ship
 /// against, because that is where the three panes are tightest.
 void main() {
   setUpAll(loadGoldenFonts);

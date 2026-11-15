@@ -76,7 +76,7 @@ sealed class BackupRecord {
 /// report *how much* it skipped. "Restored 4 300 messages" and "restored 4 300
 /// messages, skipped 12 entries this version cannot read" are different
 /// sentences, and only the second one is honest about an archive from a newer
-/// Braid.
+/// Sennit.
 ///
 /// It is also the **writer**-side escape hatch, and the reason [BackupRecord]
 /// can stay `sealed` without closing the format. A source that can answer a
@@ -303,17 +303,17 @@ final class SettingRecord extends BackupRecord {
   }
 }
 
-/// One message, as Braid's own store knows it.
+/// One message, as Sennit's own store knows it.
 ///
 /// This is the cross-network history the phase brief is about. It is
-/// deliberately *Braid's* view — the unified chat id, the network the message
-/// arrived on, the sender's name as Braid resolved it, the body already
+/// deliberately *Sennit's* view — the unified chat id, the network the message
+/// arrived on, the sender's name as Sennit resolved it, the body already
 /// projected to plain text by `SearchStore.indexMessage` — and not a Matrix
 /// event. A Matrix event would be re-derivable from a homeserver; this view is
 /// not, because it is the product of merge decisions and bridges that may be
 /// gone by the time the archive is opened.
 ///
-/// [reactions] rides along as a tally per emoji. Braid's own store does not
+/// [reactions] rides along as a tally per emoji. Sennit's own store does not
 /// persist reactions — they are aggregated live from the Matrix timeline — so a
 /// store-sourced export leaves this empty. The field exists because the record
 /// is the format's message, not the store's, and a source that *can* answer the

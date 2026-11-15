@@ -19,7 +19,7 @@ typedef UserMediaFactory =
 
 /// `weft_call`'s [MediaEngine], over `flutter_webrtc`.
 ///
-/// **This is the only file in Braid that talks to WebRTC.** Everything a call
+/// **This is the only file in Sennit that talks to WebRTC.** Everything a call
 /// decides — which of two crossed invites survives, whether an early candidate
 /// is applied or buffered, whether a failed video upgrade takes the call with
 /// it — is in `weft_call` above this interface, tested without a microphone.

@@ -60,19 +60,19 @@ void main() {
     });
 
     testWidgets('is disabled for a group, as a group', (tester) async {
-      // "Braid calls one person at a time" stays true however the room got
+      // "Sennit calls one person at a time" stays true however the room got
       // there, so it outranks the bridging answer.
       await pumpChat(
         tester,
         availability: const CallBlocked(
           CallBlocker.group,
-          'Braid calls one person at a time.',
+          'Sennit calls one person at a time.',
         ),
       );
 
       final button = callButton(tester);
       expect(button.onPressed, isNull);
-      expect(button.tooltip, 'Braid calls one person at a time.');
+      expect(button.tooltip, 'Sennit calls one person at a time.');
     });
 
     testWidgets('says so when there is no account behind it', (tester) async {

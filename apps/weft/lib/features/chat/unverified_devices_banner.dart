@@ -37,7 +37,7 @@ class UnverifiedDevicesBanner extends StatelessWidget {
     // Two different facts wearing one coat of paint, until now.
     //
     // An unverified device *of your own* is a problem you can fix in two taps,
-    // and it means Braid cannot promise your messages are only reaching you.
+    // and it means Sennit cannot promise your messages are only reaching you.
     // Someone else's unverified device is neither: it is the ordinary state of
     // every Matrix contact you have not personally verified, there is no
     // action in this app that resolves it, and their phone count is theirs to

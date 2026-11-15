@@ -114,13 +114,13 @@ enum CallBlocker {
 /// [Chat] carries rooms, not people.
 ///
 /// The order of the checks is the order the reasons matter in: a bridged group
-/// is refused as a group, because "Braid calls one person at a time" stays true
+/// is refused as a group, because "Sennit calls one person at a time" stays true
 /// however the room got there.
 CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
   if (chat.isGroup) {
     return const CallBlocked(
       CallBlocker.group,
-      'Braid calls one person at a time.',
+      'Sennit calls one person at a time.',
     );
   }
 
@@ -133,7 +133,7 @@ CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
     return CallBlocked(
       CallBlocker.bridged,
       '${_networkNames(chat.networks)} '
-      "can't carry calls — Braid calls over Matrix.",
+      "can't carry calls — Sennit calls over Matrix.",
       networks: chat.networks,
     );
   }
@@ -142,7 +142,7 @@ CallAvailability callAvailabilityFor(Chat chat, {UnifiedContact? contact}) {
   if (peer == null) {
     return const CallBlocked(
       CallBlocker.unknownPeer,
-      "Braid doesn't know a Matrix address for this conversation yet.",
+      "Sennit doesn't know a Matrix address for this conversation yet.",
     );
   }
 

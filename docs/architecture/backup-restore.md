@@ -13,22 +13,26 @@ related:
 
 # Encrypted Backup and Restore
 
-Braid holds conversations from every network in one local store. That is the
+Sennit holds conversations from every network in one local store. That is the
 product, and it is also the exposure: the unified view — which handles are the
 same person, what a bridge relayed before it was shut down, a voice note
 transcribed once and paid for once — exists nowhere but on the device. A
 homeserver can hand back Matrix rooms. It cannot hand back the merges.
 
-This document describes the `.braid` archive: one encrypted file, all networks,
+This document describes the `.sennit` archive: one encrypted file, all networks,
 media optional, key derived from a passphrase, written and read through the
 share sheet and the file picker with no cloud dependency anywhere in it.
+
+Archives written while the app was called Braid end in `.braid`. They are the
+same format — the magic bytes still read `BRAIDBAK` — and the restore picker
+offers both extensions.
 
 Three packages, and the split is deliberate:
 
 | package | owns | knows nothing about |
 | --- | --- | --- |
 | `weft_backup` | the container, the crypto, the merge rules | SQL, Flutter, disks |
-| `weft_store` | the adapters onto Braid's actual tables | the container's bytes |
+| `weft_store` | the adapters onto Sennit's actual tables | the container's bytes |
 | `apps/weft` | the screens, the file dialogs, the share sheet | either of the above's internals |
 
 `weft_backup` is pure Dart with no Flutter dependency, which is what lets the
@@ -97,7 +101,7 @@ checks for the same attack, because the cost is four bytes.
 Memory-hard, because the threat is an offline guessing attack against a file the
 user has deliberately put somewhere durable. Parameters: **64 MiB, 3 passes, 1
 lane** — RFC 9106's second recommended option. Chosen against the weakest device
-Braid supports rather than the fastest: this runs on a mid-range Android phone,
+Sennit supports rather than the fastest: this runs on a mid-range Android phone,
 in a foreground isolate, while the user watches a spinner. The first recommended
 option's 2 GiB would make export impossible on the devices that most need a
 backup.
@@ -183,14 +187,14 @@ and it should be the one with the detail in it.
 
 ## Versioning: degrade, don't refuse
 
-`kBraidArchiveFormatVersion` is a **major/minor** pair, and the two halves have
+`kSennitArchiveFormatVersion` is a **major/minor** pair, and the two halves have
 opposite policies because they deserve opposite advice.
 
 - **A higher minor is read normally.** Minor is bumped for additions only: a new
   record type, a new field on an existing record, a new manifest entry. Readers
   skip record types they do not know and ignore fields they do not know, exactly
   as `SnapshotCodec.decode` ignores unknown keys. An archive is never rejected
-  for containing more than the reader was taught. "Update Braid and try again"
+  for containing more than the reader was taught. "Update Sennit and try again"
   would be a lie here — the restore already worked.
 - **A higher major is refused**, with a typed failure naming the version. Major
   is reserved for a change to the *container* — the framing, the AEAD
@@ -200,7 +204,7 @@ opposite policies because they deserve opposite advice.
   worked.
 
 Skipped records are **counted and reported**, not swallowed. The restore summary
-says "12 entries were written by a newer version of Braid and could not be
+says "12 entries were written by a newer version of Sennit and could not be
 read". A user who believes they have a complete copy when they do not is exactly
 who this feature exists to protect.
 
@@ -211,7 +215,7 @@ which is the reason `SnapshotCodec` caps its payload on both sides too.
 
 ## What an archive holds
 
-Braid's own database, table by table:
+Sennit's own database, table by table:
 
 | table | in an archive | why |
 | --- | --- | --- |
@@ -230,10 +234,10 @@ Braid's own database, table by table:
 Plus, on disk, the staged attachments under `<support>/media/<event>/<name>`.
 
 **`search_message` is the history.** That deserves saying plainly, because the
-name suggests an index. Braid keeps no second copy of the Matrix timeline — the
+name suggests an index. Sennit keeps no second copy of the Matrix timeline — the
 SDK's database has that — but the SDK's database holds *rooms*, not the
 cross-network view, and it is protocol state full of device keys. `search_message`
-is where Braid's own answer to "what was said, by whom, on which network, in
+is where Sennit's own answer to "what was said, by whom, on which network, in
 which unified chat" lives, and that answer is what stops existing once a bridge
 is gone.
 
@@ -270,7 +274,7 @@ history. See [[multi-device]]. Duplicating it here, in a file the user emails to
 themselves, would undo it.
 
 Stated plainly because the restore screen has to say it: a restored archive
-gives back what Braid knew — the messages, who said them, which network they
+gives back what Sennit knew — the messages, who said them, which network they
 arrived on, the merges, the settings, the media — and does **not** give back the
 ability to decrypt anything new from the homeserver. That still comes from
 Matrix key backup.
@@ -341,7 +345,7 @@ their history.
 | --- | --- | --- |
 | `NotAnArchiveFailure` | no magic bytes | pick a different file |
 | `MalformedArchiveFailure` | header does not parse | the file is damaged near its start |
-| `UnsupportedVersionFailure` | major above this build's | update Braid |
+| `UnsupportedVersionFailure` | major above this build's | update Sennit |
 | `WrongPassphraseFailure` | first frame failed to authenticate | check the passphrase |
 | `TruncatedArchiveFailure` | file ends before its final frame | let a cloud download finish, then retry |
 | `DamagedArchiveFailure` | a later frame failed to authenticate | try another copy |

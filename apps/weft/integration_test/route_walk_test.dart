@@ -45,7 +45,7 @@ import 'package:weft/main.dart';
 
 import '../test/support/ui_audit.dart';
 
-/// Every surface in Braid, visited, photographed and measured.
+/// Every surface in Sennit, visited, photographed and measured.
 ///
 ///   cd apps/weft
 ///   flutter test integration_test/route_walk_test.dart \
@@ -86,7 +86,7 @@ import '../test/support/ui_audit.dart';
 ///
 /// ## Two shells, two runs
 ///
-/// Braid draws two layouts — `inbox_shell.dart:184` — and which one is chosen
+/// Sennit draws two layouts — `inbox_shell.dart:184` — and which one is chosen
 /// comes from the theme's surface token, which comes from
 /// `defaultTargetPlatform`. So *which* shell this walks is decided by the
 /// device it is given: `-d macos` walks the Mac window, an Android emulator or
@@ -199,7 +199,7 @@ void main() {
 /// installs, and on a real Android device that is most of the wall clock.
 ///
 /// Right-to-left is a *locale* here rather than a `Directionality` wrapper, and
-/// `ar` specifically. `localisation.dart` explains why that works: Braid
+/// `ar` specifically. `localisation.dart` explains why that works: Sennit
 /// declares `ar` and `he` for layout with no ARB file behind them, so the app
 /// turns right-to-left while its own words stay English — which is what keeps
 /// every finder in this file, all of which name controls in English, still
@@ -319,7 +319,7 @@ List<WalkPass> walkPasses(String spec) {
   ];
 }
 
-/// Braid's own words, in English.
+/// Sennit's own words, in English.
 ///
 /// Every finder below names a control the way the app names it, rather than
 /// with a literal beside it: a renamed string then breaks the step that opens
@@ -743,7 +743,7 @@ final List<RouteStep> routeSteps = [
 
 // ----------------------------------------------------------------- the driver
 
-/// Boots Braid once and walks it.
+/// Boots Sennit once and walks it.
 class RouteWalker {
   RouteWalker({
     required this.tester,
@@ -1343,7 +1343,7 @@ class RouteWalker {
   ///
   /// The app's own repaint boundary rather than the root view: a live binding
   /// paints its test scaffolding around the tree, and a record of the run
-  /// should show Braid and not the harness. Failures are logged and swallowed
+  /// should show Sennit and not the harness. Failures are logged and swallowed
   /// — a runner with no rasteriser can still answer every other question this
   /// file asks, and losing the images should not lose the audit.
   Future<void> shoot(String label) async {

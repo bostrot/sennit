@@ -51,8 +51,8 @@ void main() {
             },
             {'entity_id': 'light.kitchen', 'attributes': <String, Object?>{}},
             {
-              'entity_id': 'todo.braid',
-              'attributes': {'friendly_name': 'Braid'},
+              'entity_id': 'todo.sennit',
+              'attributes': {'friendly_name': 'Sennit'},
             },
           ]),
           200,
@@ -150,7 +150,7 @@ void main() {
 
       stores.settings
         ..setBool(TodoSettings.homeAssistantSync, value: true)
-        ..setString(TodoSettings.homeAssistantEntity, 'todo.braid');
+        ..setString(TodoSettings.homeAssistantEntity, 'todo.sennit');
       container.read(settingsRevisionProvider.notifier).bump();
 
       final item = list.add('Buy milk', due: DateTime(2026, 10, 20))!;
@@ -159,9 +159,9 @@ void main() {
 
       expect(haCalls, [
         '/api/services/todo/add_item '
-            '{"entity_id":"todo.braid","item":"Buy milk","due_date":"2026-10-20"}',
+            '{"entity_id":"todo.sennit","item":"Buy milk","due_date":"2026-10-20"}',
         '/api/services/todo/update_item '
-            '{"entity_id":"todo.braid","item":"Buy milk","status":"completed"}',
+            '{"entity_id":"todo.sennit","item":"Buy milk","status":"completed"}',
       ]);
     });
 
@@ -170,7 +170,7 @@ void main() {
       addTearDown(stores.dispose);
       stores.settings
         ..setBool(TodoSettings.homeAssistantSync, value: true)
-        ..setString(TodoSettings.homeAssistantEntity, 'todo.braid');
+        ..setString(TodoSettings.homeAssistantEntity, 'todo.sennit');
       haStatus = 500;
       final container = containerFor(stores, ha: fakeHa());
 
@@ -183,8 +183,8 @@ void main() {
   group('HomeAssistantClient to-do calls', () {
     test('lists only todo entities, sorted by name', () async {
       final lists = await fakeHa().todoLists();
-      expect(lists.map((l) => l.entityId), ['todo.braid', 'todo.shopping']);
-      expect(lists.first.name, 'Braid');
+      expect(lists.map((l) => l.entityId), ['todo.sennit', 'todo.shopping']);
+      expect(lists.first.name, 'Sennit');
     });
 
     test('retries without the date when a list has no due dates', () async {
@@ -210,7 +210,7 @@ void main() {
     test('reports a refusal it cannot work around', () async {
       haStatus = 401;
       await expectLater(
-        fakeHa().setTodoItemDone('todo.braid', 'Milk', done: false),
+        fakeHa().setTodoItemDone('todo.sennit', 'Milk', done: false),
         throwsA(isA<HomeAssistantException>()),
       );
       expect(haCalls.single, contains('"status":"needs_action"'));
@@ -294,11 +294,11 @@ void main() {
 
       await tester.tap(find.text(en.todoHaListField));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Braid').last);
+      await tester.tap(find.text('Sennit').last);
       await tester.pumpAndSettle();
       expect(
         stores.settings.getString(TodoSettings.homeAssistantEntity),
-        'todo.braid',
+        'todo.sennit',
       );
     });
   });

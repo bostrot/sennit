@@ -8,7 +8,7 @@
 # The `# component:` comments under each section are that second half.
 #
 # Weblate rather than a hosted proprietary service because it is AGPL and
-# self-hostable, which is the same answer Braid gives about its own homeserver.
+# self-hostable, which is the same answer Sennit gives about its own homeserver.
 #
 # See docs/TRANSLATING.md.
 

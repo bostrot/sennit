@@ -196,7 +196,7 @@ object SmsBridge {
                     // allows it — but the sent copy would never be written and
                     // the conversation would show one side of itself. Refusing
                     // is the honest failure.
-                    result.error("not_default", "Braid is not the default SMS app", null)
+                    result.error("not_default", "Sennit is not the default SMS app", null)
                 } else {
                     result.success(
                         SmsSender.send(context, address, body, args.int("subscriptionId")),

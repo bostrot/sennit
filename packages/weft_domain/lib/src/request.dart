@@ -5,7 +5,7 @@
 /// shape: the conversation is *held* rather than delivered, the sender is told
 /// nothing, and the user answers before anything else happens.
 ///
-/// Braid's version has to work across three quite different plumbings. A Matrix
+/// Sennit's version has to work across three quite different plumbings. A Matrix
 /// invite is a room with `membership: invite` and nothing in it. A bridged chat
 /// arrives in a room the bridge has already joined for you, so there is nothing
 /// to accept — what makes it a request is that the sender is a stranger. An SMS
@@ -132,7 +132,7 @@ class ChatRequestPlan {
 /// - **Matrix** — a real invite. Accepting joins the room; declining leaves it,
 ///   which is what tells the server the invite is answered.
 /// - **A bridged network** — the bridge joined the room on the user's behalf
-///   before Braid ever saw it, so there is nothing to join. Accepting is purely
+///   before Sennit ever saw it, so there is nothing to join. Accepting is purely
 ///   a local decision to stop holding the conversation. Declining still leaves
 ///   the room, because that is the only way to stop the bridge relaying into it.
 /// - **SMS** — no room, no membership, nothing to join or leave. Accepting and

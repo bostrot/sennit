@@ -14,9 +14,9 @@ on:
 
 env:
   FLUTTER_VERSION: '3.44.0'
-  # Which edition each build is: docs/decisions/adr-004-braid-pro.md.
+  # Which edition each build is: docs/decisions/adr-004-sennit-pro.md.
   #
-  # What goes on the release page sells Braid Pro by licence key — once
+  # What goes on the release page sells Sennit Pro by licence key — once
   # there is a checkout to send people to. Until the BRAID_CHECKOUT_URL
   # repository variable is set, those builds stay the community edition,
   # because a build that locks features with nowhere to buy them is worse
@@ -142,8 +142,8 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          cp apps/weft/build/app/outputs/flutter-apk/app-release.apk "dist/Braid-$VERSION-android.apk"
-          cp apps/weft/build/app/outputs/bundle/release/app-release.aab "dist/Braid-$VERSION-android.aab"
+          cp apps/weft/build/app/outputs/flutter-apk/app-release.apk "dist/Sennit-$VERSION-android.apk"
+          cp apps/weft/build/app/outputs/bundle/release/app-release.aab "dist/Sennit-$VERSION-android.aab"
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -179,7 +179,7 @@ jobs:
           set -- apps/weft/build/linux/*/release/bundle
           bundle=$1
           arch=$(basename "$(dirname "$(dirname "$bundle")")")
-          tar -czf "dist/Braid-$VERSION-linux-$arch.tar.gz" -C "$bundle" .
+          tar -czf "dist/Sennit-$VERSION-linux-$arch.tar.gz" -C "$bundle" .
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -206,7 +206,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path apps/weft/build/windows/x64/runner/Release/* `
-            -DestinationPath "dist/Braid-$env:VERSION-windows-x64.zip"
+            -DestinationPath "dist/Sennit-$env:VERSION-windows-x64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -246,7 +246,7 @@ jobs:
         # the version directory never is. The repair loop puts the canonical
         # links back first so the sealed layout is also a valid one.
         run: |
-          APP=apps/weft/build/macos/Build/Products/Release/Braid.app
+          APP=apps/weft/build/macos/Build/Products/Release/Sennit.app
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             name=$(basename "$fw" .framework)
             if [ -d "$fw/Versions/A" ]; then
@@ -283,7 +283,7 @@ jobs:
       - name: Codesign
         if: env.HAS_SIGNING == 'true'
         run: |
-          APP=apps/weft/build/macos/Build/Products/Release/Braid.app
+          APP=apps/weft/build/macos/Build/Products/Release/Sennit.app
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             if [ -d "$fw/Versions/A" ]; then
               codesign --force --options runtime --timestamp \
@@ -306,21 +306,21 @@ jobs:
         run: |
           mkdir -p dist
           ditto -c -k --keepParent \
-            apps/weft/build/macos/Build/Products/Release/Braid.app \
-            "dist/Braid-$VERSION-macos.zip"
+            apps/weft/build/macos/Build/Products/Release/Sennit.app \
+            "dist/Sennit-$VERSION-macos.zip"
       - name: Notarize and staple
         if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
         run: |
-          xcrun notarytool submit "dist/Braid-$VERSION-macos.zip" --wait \
+          xcrun notarytool submit "dist/Sennit-$VERSION-macos.zip" --wait \
             --apple-id "${{ secrets.APPLE_ID }}" \
             --password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" \
             --team-id "${{ secrets.APPLE_TEAM_ID }}"
           xcrun stapler staple \
-            apps/weft/build/macos/Build/Products/Release/Braid.app
+            apps/weft/build/macos/Build/Products/Release/Sennit.app
           rm dist/*.zip
           ditto -c -k --keepParent \
-            apps/weft/build/macos/Build/Products/Release/Braid.app \
-            "dist/Braid-$VERSION-macos.zip"
+            apps/weft/build/macos/Build/Products/Release/Sennit.app \
+            "dist/Sennit-$VERSION-macos.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -383,9 +383,9 @@ jobs:
         run: |
           mkdir -p dist
           if [ "$HAS_SIGNING" = "true" ]; then
-            cp apps/weft/build/ios/ipa/*.ipa "dist/Braid-$VERSION-ios.ipa"
+            cp apps/weft/build/ios/ipa/*.ipa "dist/Sennit-$VERSION-ios.ipa"
           else
-            cp unsigned.ipa "dist/Braid-$VERSION-ios-unsigned.ipa"
+            cp unsigned.ipa "dist/Sennit-$VERSION-ios-unsigned.ipa"
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -407,6 +407,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: Braid ${{ needs.verify.outputs.version }}
+          name: Sennit ${{ needs.verify.outputs.version }}
           generate_release_notes: true
           files: dist/*

@@ -13,7 +13,7 @@ const bool kDemoMode = bool.fromEnvironment('WEFT_DEMO');
 final matrixSessionProvider = Provider<WeftMatrixSession>((ref) {
   // The clientName stays 'Weft' — it keys the session database, and a
   // rename there is a logout. The device name is what other clients list.
-  final session = WeftMatrixSession(deviceDisplayName: 'Braid');
+  final session = WeftMatrixSession(deviceDisplayName: 'Sennit');
   ref.onDispose(session.dispose);
   return session;
 });

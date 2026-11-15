@@ -526,7 +526,7 @@ void main() {
 
       final rebuilt = utf8.encode(jsonEncode(json));
       final tampered = Uint8List.fromList([
-        ...kBraidArchiveMagic,
+        ...kSennitArchiveMagic,
         ...uint32Bytes(rebuilt.length),
         ...rebuilt,
         ...full.sublist(header.bytes.length),
@@ -560,7 +560,7 @@ void main() {
 
         final rebuilt = utf8.encode(jsonEncode(json));
         final tampered = Uint8List.fromList([
-          ...kBraidArchiveMagic,
+          ...kSennitArchiveMagic,
           ...uint32Bytes(rebuilt.length),
           ...rebuilt,
           ...full.sublist(header.bytes.length),
@@ -580,13 +580,13 @@ void main() {
           jsonDecode(utf8.decode(full.sublist(12, header.bytes.length)))
               as Map<String, Object?>;
       json['format'] = {
-        'major': kBraidArchiveFormatVersion.major + 5,
+        'major': kSennitArchiveFormatVersion.major + 5,
         'minor': 0,
       };
 
       final rebuilt = utf8.encode(jsonEncode(json));
       final bumped = Uint8List.fromList([
-        ...kBraidArchiveMagic,
+        ...kSennitArchiveMagic,
         ...uint32Bytes(rebuilt.length),
         ...rebuilt,
         ...full.sublist(header.bytes.length),
@@ -598,7 +598,7 @@ void main() {
           isA<UnsupportedVersionFailure>().having(
             (f) => f.version.major,
             'major',
-            kBraidArchiveFormatVersion.major + 5,
+            kSennitArchiveFormatVersion.major + 5,
           ),
         ),
       );
@@ -625,7 +625,7 @@ void main() {
   });
 
   group('forward compatibility', () {
-    /// An archive written by a Braid that knows one record type and one message
+    /// An archive written by a Sennit that knows one record type and one message
     /// field more than this build does, at a bumped minor version.
     Future<Uint8List> futureArchive() async {
       final records = <BackupRecord>[
@@ -648,7 +648,7 @@ void main() {
           'senderName': 'Someone',
           'timestamp': 1780000000000,
           'kind': 'text',
-          'body': 'written by a newer Braid',
+          'body': 'written by a newer Sennit',
           'quantumSignature': {'algorithm': 'dilithium', 'value': 'abc'},
         }),
       ];
@@ -687,7 +687,7 @@ void main() {
       await importInto(sink, await futureArchive());
 
       final message = sink.state.messages[r'!future:example.org $future']!;
-      expect(message.body, 'written by a newer Braid');
+      expect(message.body, 'written by a newer Sennit');
       expect(message.senderName, 'Someone');
     });
 
@@ -699,8 +699,8 @@ void main() {
       final kdf = cheapKdf();
       final cipher = CipherParameters(noncePrefix: Uint8List(16));
       final futureVersion = ArchiveVersion(
-        kBraidArchiveFormatVersion.major,
-        kBraidArchiveFormatVersion.minor + 3,
+        kSennitArchiveFormatVersion.major,
+        kSennitArchiveFormatVersion.minor + 3,
       );
 
       final header = encodeArchiveHeader(
@@ -805,9 +805,9 @@ void main() {
         }
       }
 
-      final directory = await Directory.systemTemp.createTemp('braid-backup');
+      final directory = await Directory.systemTemp.createTemp('sennit-backup');
       addTearDown(() => directory.delete(recursive: true));
-      final target = File('${directory.path}/large.braid');
+      final target = File('${directory.path}/large.sennit');
 
       final outcome = await exportArchiveToFile(
         source: GeneratedSource(
@@ -844,9 +844,9 @@ void main() {
 
   group('export to a file', () {
     test('a finished export lands under its final name', () async {
-      final directory = await Directory.systemTemp.createTemp('braid-backup');
+      final directory = await Directory.systemTemp.createTemp('sennit-backup');
       addTearDown(() => directory.delete(recursive: true));
-      final target = File('${directory.path}/backup.braid');
+      final target = File('${directory.path}/backup.sennit');
 
       final records = populated();
       await exportArchiveToFile(
@@ -867,9 +867,9 @@ void main() {
     });
 
     test('cancelling leaves nothing at the destination', () async {
-      final directory = await Directory.systemTemp.createTemp('braid-backup');
+      final directory = await Directory.systemTemp.createTemp('sennit-backup');
       addTearDown(() => directory.delete(recursive: true));
-      final target = File('${directory.path}/backup.braid');
+      final target = File('${directory.path}/backup.sennit');
 
       final records = populated();
       var seen = 0;

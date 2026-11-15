@@ -36,7 +36,7 @@ class DemoDeviceManager implements DeviceManager {
   List<WeftDevice> _devices = [
     WeftDevice(
       deviceId: 'BRAIDPHONE',
-      displayName: 'Braid on Pixel 8',
+      displayName: 'Sennit on Pixel 8',
       lastSeenIp: '192.168.1.24',
       lastSeenAt: DateTime(2026, 8, 15, 16, 40),
       isCurrent: true,
@@ -44,7 +44,7 @@ class DemoDeviceManager implements DeviceManager {
     ),
     WeftDevice(
       deviceId: 'BRAIDLAPTOP',
-      displayName: 'Braid on MacBook Pro',
+      displayName: 'Sennit on MacBook Pro',
       lastSeenIp: '192.168.1.31',
       lastSeenAt: DateTime(2026, 8, 15, 9, 12),
       trust: DeviceTrust.unverified,

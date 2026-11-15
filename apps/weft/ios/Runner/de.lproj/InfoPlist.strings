@@ -1,6 +1,6 @@
 /* German, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
 
-   The permission prompts iOS and macOS draw before Braid has run a line of
+   The permission prompts iOS and macOS draw before Sennit has run a line of
    Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
    out of the bundle, keyed by the `Info.plist` key each one overrides.
 
@@ -9,10 +9,10 @@
    which is a permission prompt in the wrong language on a screen the user
    cannot get past. `l10n_test.dart` checks both directions. */
 
-"NSPhotoLibraryUsageDescription" = "Braid braucht deine Fotomediathek, damit du Fotos und Videos in einer Unterhaltung senden kannst.";
-"NSCameraUsageDescription" = "Braid braucht die Kamera, damit du ein Foto aufnehmen und in einer Unterhaltung senden kannst.";
-"NSLocationWhenInUseUsageDescription" = "Braid teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Braid teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst. Im Hintergrund verfolgt Braid ihn nie.";
-"NSCalendarsUsageDescription" = "Braid trägt einen Termin nur dann in deinen Kalender ein, wenn du es für ein Datum aus einem Chat verlangst.";
-"NSContactsUsageDescription" = "Braid zeigt die Namen aus deinem Adressbuch statt der Namen, die Messaging-Netzwerke vergeben. Der Abgleich passiert auf diesem Gerät und wird nie hochgeladen.";
-"NSMicrophoneUsageDescription" = "Braid braucht das Mikrofon, damit du in einem Sprach- oder Videoanruf sprechen kannst.";
+"NSPhotoLibraryUsageDescription" = "Sennit braucht deine Fotomediathek, damit du Fotos und Videos in einer Unterhaltung senden kannst.";
+"NSCameraUsageDescription" = "Sennit braucht die Kamera, damit du ein Foto aufnehmen und in einer Unterhaltung senden kannst.";
+"NSLocationWhenInUseUsageDescription" = "Sennit teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst. Im Hintergrund verfolgt Sennit ihn nie.";
+"NSCalendarsUsageDescription" = "Sennit trägt einen Termin nur dann in deinen Kalender ein, wenn du es für ein Datum aus einem Chat verlangst.";
+"NSContactsUsageDescription" = "Sennit zeigt die Namen aus deinem Adressbuch statt der Namen, die Messaging-Netzwerke vergeben. Der Abgleich passiert auf diesem Gerät und wird nie hochgeladen.";
+"NSMicrophoneUsageDescription" = "Sennit braucht das Mikrofon, damit du in einem Sprach- oder Videoanruf sprechen kannst.";

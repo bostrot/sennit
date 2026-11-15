@@ -29,7 +29,7 @@ abstract interface class AutoReplyTransport {
   ///    after it, through the MSC2867 flag that syncs to the account's other
   ///    devices.
   /// 3. **Marked as machine-written**, with the `com.bostrot.weft.auto_reply`
-  ///    key, so the transcript can say so and another Braid will not answer it.
+  ///    key, so the transcript can say so and another Sennit will not answer it.
   ///    The key rides Matrix only; an SMS or bridged leg carries the words and
   ///    nothing else.
   ///

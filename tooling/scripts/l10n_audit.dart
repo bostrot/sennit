@@ -31,7 +31,7 @@
 ///
 /// ```dart
 /// // l10n-ignore: the app's own name, never translated.
-/// label: 'Braid',
+/// label: 'Sennit',
 /// ```
 ///
 /// The reason is required and lands in the inventory, so the exceptions stay a
@@ -72,7 +72,7 @@ const Set<String> _textParameters = {
 
 /// Functions whose given positional argument is a sentence shown to the user.
 ///
-/// `showWeftMessage(context, 'Braid was not allowed to read your contacts.')`
+/// `showWeftMessage(context, 'Sennit was not allowed to read your contacts.')`
 /// is a snack bar, and the literal is as user-facing as any `Text`, but nothing
 /// about the syntax says so.
 const Map<String, int> _messageFunctions = {
@@ -97,7 +97,7 @@ final RegExp _ignoreMarker = RegExp(
 /// none of which a translator should ever be handed: a URL, a bare identifier
 /// (`whisper-1`, `text-embedding-3-small`, `llama3.2`), and a hostname. The
 /// test is deliberately narrow — anything with a capital or a space is prose
-/// again — because "looks technical" would swallow `Braid` and `SMS`.
+/// again — because "looks technical" would swallow `Sennit` and `SMS`.
 bool _isMachineValue(String value) {
   if (RegExp(r'^[a-z][a-z0-9+.-]*://').hasMatch(value)) return true;
   return RegExp(r'^[a-z0-9][a-z0-9._/:@-]*$').hasMatch(value);

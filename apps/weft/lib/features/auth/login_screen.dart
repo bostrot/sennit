@@ -549,7 +549,7 @@ class _Wordmark extends StatelessWidget {
         const SizedBox(height: WeftSpace.lg),
         Text(
           // l10n-ignore: the app's own name, never translated.
-          'Braid',
+          'Sennit',
           style: context.text.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: -1,

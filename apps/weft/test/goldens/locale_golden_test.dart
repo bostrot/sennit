@@ -11,7 +11,7 @@ import 'package:weft/features/settings/settings_screen.dart';
 
 import '../support/golden_harness.dart';
 
-/// Braid drawn in the three languages that break a layout differently.
+/// Sennit drawn in the three languages that break a layout differently.
 ///
 /// `a11y_golden_test.dart` next door varies the *conditions* a screen is drawn
 /// under — text scale, contrast, direction — over English words. This file
@@ -21,7 +21,7 @@ import '../support/golden_harness.dart';
 ///
 /// Three locales, chosen because each stresses a different axis:
 ///
-/// * **`de`** — the long one. German compounds are the longest strings Braid
+/// * **`de`** — the long one. German compounds are the longest strings Sennit
 ///   ships in any language, and this is where a fixed-width chip, a tab label
 ///   or a two-line subtitle budgeted for English runs out of room.
 /// * **`zh`** — the short one. Simplified Chinese says the same thing in a
@@ -30,7 +30,7 @@ import '../support/golden_harness.dart';
 ///   English happened to fill it stops looking deliberate.
 /// * **`ar`** — the honest half-state. Arabic has no ARB file and is not going
 ///   to get one here; it is declared so the layout mirrors and Material's own
-///   Arabic is used, and Braid's own words fall back to English. That mixture
+///   Arabic is used, and Sennit's own words fall back to English. That mixture
 ///   is what an Arabic device actually shows today, so it is what the image
 ///   should show. See the library comment in `app/localisation.dart`.
 ///

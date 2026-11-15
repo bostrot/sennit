@@ -9,9 +9,9 @@ rejects other brands as keywords outright.
 
 | Field | Value | Limit |
 |---|---|---|
-| Apple app name | `Braid Messenger` | 30 |
+| Apple app name | `Sennit Messenger` | 30 |
 | Apple subtitle | `Self-hosted unified inbox` | 30 |
-| Play title | `Braid — Self-hosted Messenger` | 30 |
+| Play title | `Sennit — Self-hosted Messenger` | 30 |
 | Play short description | `One private inbox for every chat, on your own Matrix server and bridges.` | 80 |
 
 ## Apple keywords (100 chars max, comma-separated)
@@ -24,7 +24,7 @@ matrix,unified,inbox,bridge,self-hosted,private,chat,messaging,encrypted,federat
 
 **One inbox. Your server. Nobody in between.**
 
-Braid weaves every conversation you have — across networks like WhatsApp,
+Sennit weaves every conversation you have — across networks like WhatsApp,
 Signal, Telegram, Google Messages, Mattermost, SMS and Matrix — into a
 single private inbox. It connects to a Matrix homeserver that you run,
 through bridges that you control. No hosted middleman, no account with us,
@@ -52,15 +52,15 @@ BUILT FOR REAL LIFE
 • Desktop-class experience on tablets
 
 BRING YOUR OWN SERVER
-Braid is the client. You bring a Matrix homeserver and the bridges for the
+Sennit is the client. You bring a Matrix homeserver and the bridges for the
 networks you use (mautrix bridges are the reference setup). The app
 discovers your bridges and walks you through connecting each network, QR
 logins included. Setting up a homeserver takes some technical comfort —
 that independence is the entire point.
 
-Braid is open source under the AGPL-3.0 license.
+Sennit is open source under the AGPL-3.0 license.
 
-*Braid is not affiliated with the third-party networks reachable through
+*Sennit is not affiliated with the third-party networks reachable through
 bridges. Bridging automates your own accounts on those networks; whether
 their terms permit it is between you and them.*
 
@@ -75,8 +75,8 @@ inbox on your own Matrix server. No cloud between you and your messages.
 
 | Field | Value |
 |---|---|
-| Support URL | https://github.com/bostrot/braid |
-| Marketing URL | https://github.com/bostrot/braid |
+| Support URL | https://github.com/bostrot/sennit |
+| Marketing URL | https://github.com/bostrot/sennit |
 | Privacy policy | https://erictrenkel.com/apps/braid/privacy.html |
 
 ## Categories

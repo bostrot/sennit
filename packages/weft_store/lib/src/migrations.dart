@@ -233,7 +233,7 @@ const List<String> weftMigrations = [
   --
   -- A tombstone rather than trust in the deletion itself, because deleting a
   -- message from the Matrix SDK's local database does not stop the homeserver
-  -- from serving it back on the next backfill — and Braid's own indexer would
+  -- from serving it back on the next backfill — and Sennit's own indexer would
   -- then re-file a message the user was told had gone. Deliberately *not* in a
   -- backup: it is a fact about one device's copy, and a restore onto a fresh
   -- device re-syncs from the server regardless.

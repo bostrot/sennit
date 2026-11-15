@@ -65,7 +65,7 @@ void main() {
     // and the paste would sit on `File.length()` until the test timed out.
     await tester.runAsync(() async {
       // From inside the composer, which is where the shortcut is installed:
-      // the action is deliberately not app-wide, so ⌘V anywhere else in Braid
+      // the action is deliberately not app-wide, so ⌘V anywhere else in Sennit
       // is still an ordinary paste.
       Actions.invoke(
         tester.element(find.byType(TextField).first),

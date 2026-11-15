@@ -72,7 +72,7 @@ abstract final class WeftNotificationActions {
 ///
 /// An hour because that is what the action says, and a *timed* mute because
 /// that is the only kind this action can be: Matrix push rules have no expiry,
-/// so a mute that lifts itself is necessarily Braid's own. `push_rules.dart`
+/// so a mute that lifts itself is necessarily Sennit's own. `push_rules.dart`
 /// therefore never sends it to the homeserver, and the suppression happens
 /// where the body is readable — locally, in `evaluateNotification`.
 const Duration kMuteForAnHour = Duration(hours: 1);
@@ -128,7 +128,7 @@ List<AndroidNotificationAction> weftAndroidMessageActions({
       // *the* reply action rather than a button that happens to be first.
       semanticAction: SemanticAction.reply,
       // Deliberately left at its default of false. Generated replies are the
-      // system reading the message body to propose an answer to it, and Braid
+      // system reading the message body to propose an answer to it, and Sennit
       // has spent this whole phase keeping that body off every surface it does
       // not have to be on.
       showsUserInterface: true,
@@ -157,7 +157,7 @@ List<AndroidNotificationAction> weftAndroidMessageActions({
 /// place a user can turn a *sound* down without turning Weft off, and "mute
 /// WhatsApp, keep Signal" is the single most asked-for thing in a unified
 /// messenger. Weft's own [NotificationPolicy] can express the same idea, but
-/// only Braid obeys it — the channel is what the system's own settings screen,
+/// only Sennit obeys it — the channel is what the system's own settings screen,
 /// Do Not Disturb, and a smartwatch see.
 ///
 /// A merged chat therefore posts to *two* channels, one per leg, which is

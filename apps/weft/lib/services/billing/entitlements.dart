@@ -8,8 +8,8 @@ import 'package:flutter/foundation.dart';
 /// which unlocks every feature and never touches a store. That default is
 /// deliberate: a source checkout, a contributor's debug build and an
 /// F-Droid-style rebuild all get the whole app, and only the release pipeline
-/// opts into charging. See `docs/decisions/adr-004-braid-pro.md`.
-enum BraidEdition {
+/// opts into charging. See `docs/decisions/adr-004-sennit-pro.md`.
+enum SennitEdition {
   community,
 
   /// Uploaded to Play and the App Store; Pro is an in-app purchase.
@@ -20,19 +20,19 @@ enum BraidEdition {
   /// edition rather than a second button in [store].
   direct;
 
-  static BraidEdition parse(String value) =>
+  static SennitEdition parse(String value) =>
       switch (value.trim().toLowerCase()) {
         'store' => store,
         'direct' => direct,
         _ => community,
       };
 
-  static final BraidEdition current = parse(
+  static final SennitEdition current = parse(
     const String.fromEnvironment('BRAID_EDITION'),
   );
 }
 
-/// What Braid Pro unlocks.
+/// What Sennit Pro unlocks.
 ///
 /// One purchase unlocks all of them; the split exists so every gate names what
 /// it guards, and so a later plan (a hosted AI endpoint, say) can unlock a
@@ -59,7 +59,7 @@ enum ProFeature {
 /// How a product is sold.
 enum ProProductKind { lifetime, subscription }
 
-/// The store products Braid Pro is sold as.
+/// The store products Sennit Pro is sold as.
 ///
 /// The ids must match what is set up in Play Console and App Store Connect —
 /// the same id on both, which is what lets one table serve both stores.
@@ -163,7 +163,7 @@ class ProStatus {
     this.ownership,
   });
 
-  final BraidEdition edition;
+  final SennitEdition edition;
 
   /// Whether this platform sells Pro through a store at all — Android and
   /// iOS. A store build on a desktop has no way to take the payment, so
@@ -178,10 +178,10 @@ class ProStatus {
 
   /// Pro is bought through Play or the App Store here.
   bool get sellsInStore =>
-      edition == BraidEdition.store && storeBillingPlatform;
+      edition == SennitEdition.store && storeBillingPlatform;
 
   /// Pro is unlocked with a licence key here, on every platform.
-  bool get sellsByLicense => edition == BraidEdition.direct;
+  bool get sellsByLicense => edition == SennitEdition.direct;
 
   bool unlocks(ProFeature feature, {DateTime? now}) {
     if (!charges) return true;

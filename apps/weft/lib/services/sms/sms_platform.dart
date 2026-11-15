@@ -8,7 +8,7 @@ import 'package:weft_sms/weft_sms.dart';
 ///
 /// Three states, not a boolean, because the two "no" answers lead to different
 /// screens: a device with no radio can never carry SMS and must not be offered
-/// it, while a phone where Braid simply is not the default app is one tap away
+/// it, while a phone where Sennit simply is not the default app is one tap away
 /// from carrying it. Conflating them produces either a button that cannot work
 /// or a missing feature with no explanation.
 enum SmsAvailability {
@@ -16,14 +16,14 @@ enum SmsAvailability {
   /// where the channel has no handler. Nothing to offer and nothing to ask.
   unsupported,
 
-  /// The device can do SMS and Braid is not the app doing it.
+  /// The device can do SMS and Sennit is not the app doing it.
   ///
-  /// **This is a normal, fully supported state, not a degraded one.** Braid is a
+  /// **This is a normal, fully supported state, not a degraded one.** Sennit is a
   /// Matrix client that can also carry SMS; every other network works exactly
   /// as before and the SMS network is simply absent from the inbox.
   notDefault,
 
-  /// Braid holds `ROLE_SMS`: threads are readable, messages sendable, and
+  /// Sennit holds `ROLE_SMS`: threads are readable, messages sendable, and
   /// received messages arrive on [SmsPlatform.incoming].
   ready,
 }
@@ -34,13 +34,13 @@ enum SmsAvailability {
 /// can happen after the button is tapped and only one of them is a decline, but
 /// the old signature had one word for all four — so a role the system granted
 /// while the activity was being recreated came back as `false` and the screen
-/// said *"Nothing changed. Braid is not your SMS app"* to somebody who had just
-/// made Braid their SMS app. See the phase-05 diagnosis note.
+/// said *"Nothing changed. Sennit is not your SMS app"* to somebody who had just
+/// made Sennit their SMS app. See the phase-05 diagnosis note.
 ///
 /// The wire strings are [SmsRole.Outcome] on the Kotlin side; the two lists are
 /// the same list and neither may be extended alone.
 enum SmsRoleOutcome {
-  /// Braid holds the role, confirmed by asking the system after the dialog
+  /// Sennit holds the role, confirmed by asking the system after the dialog
   /// closed rather than by trusting its result code.
   granted,
 
@@ -103,7 +103,7 @@ class SmsPlatformStatus {
 
   /// Whether this device has a default-SMS-app role to give at all.
   ///
-  /// Stays true once Braid holds it, which is what separates it from
+  /// Stays true once Sennit holds it, which is what separates it from
   /// [canRequestRole]: "there is nothing left to ask for" and "this ROM has no
   /// such role" are both `canRequestRole: false` and are opposite sentences.
   final bool roleAvailable;
@@ -175,7 +175,7 @@ class SmsPlatformStatus {
 
 /// An MMS that reached the device and cannot be fetched.
 ///
-/// Braid does not download MMS yet — Android exposes the transport but not the
+/// Sennit does not download MMS yet — Android exposes the transport but not the
 /// PDU parser, so retrieval means vendoring AOSP's — and this is what says so.
 /// It exists rather than being dropped because the alternative is a message the
 /// sender watched leave their phone and the recipient never hears about.
@@ -241,13 +241,13 @@ abstract interface class SmsGateway {
 
   Future<int> markThreadRead(String threadId);
 
-  /// Messages received while Braid is running.
+  /// Messages received while Sennit is running.
   Stream<SmsMessage> get incoming;
 
   /// Send outcomes and delivery reports for messages already shown.
   Stream<SmsMessage> get statusUpdates;
 
-  /// MMS notifications Braid cannot retrieve.
+  /// MMS notifications Sennit cannot retrieve.
   Stream<SmsMmsPush> get mmsPushes;
 
   /// Replays anything that arrived before Dart was listening.

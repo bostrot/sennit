@@ -45,7 +45,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
   /// decline is a choice, a refusal is a fact about the phone, and an
   /// interrupted request is neither — it is a request whose answer has to be
   /// re-read rather than reported. Collapsing them is what put "Nothing
-  /// changed. Braid is not your SMS app" under a role the system had just
+  /// changed. Sennit is not your SMS app" under a role the system had just
   /// granted.
   ///
   /// Reported in the quiet box rather than a SnackBar that slides away — the
@@ -120,7 +120,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton.icon(
             icon: const Icon(Icons.sms_outlined, size: 18),
-            label: Text(context.l10n.smsMakeBraidDefault),
+            label: Text(context.l10n.smsMakeSennitDefault),
             onPressed: _busy ? null : () => _request(repository),
           ),
         ),
@@ -191,12 +191,12 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
   /// honestly — every incoming message, sole write access to the store — and
   /// left out the consequence a user cannot undo by reading: taking the role
   /// ends RCS for the whole phone. Android has no RCS API for a third-party
-  /// app, so this is not a feature Braid has yet to build; it is one it cannot
+  /// app, so this is not a feature Sennit has yet to build; it is one it cannot
   /// have, and saying so is the only useful thing to do about it.
   List<Widget> _rcs(BuildContext context, SmsPlatformStatus status) {
     final standing = rcsStanding(
       supported: status.availability != SmsAvailability.unsupported,
-      braidIsDefault: status.isReady,
+      sennitIsDefault: status.isReady,
       defaultPackage: status.defaultPackage,
     );
     if (standing == RcsStanding.unavailable) return const [];
@@ -210,7 +210,7 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
         title: l10n.smsRcsTitle,
         subtitle: switch (standing) {
           RcsStanding.withGoogleMessages => l10n.smsRcsWithGoogleMessages,
-          RcsStanding.offForBraid => l10n.smsRcsOffForBraid,
+          RcsStanding.offForSennit => l10n.smsRcsOffForSennit,
           RcsStanding.offForOther => l10n.smsRcsOffForOther(holder),
           RcsStanding.unavailable => '',
         },

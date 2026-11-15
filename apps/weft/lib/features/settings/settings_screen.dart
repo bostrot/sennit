@@ -16,7 +16,7 @@ import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
-import '../../services/backup/backup_service.dart' show kBraidVersion;
+import '../../services/backup/backup_service.dart' show kSennitVersion;
 import '../../services/billing/entitlements.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
@@ -256,8 +256,8 @@ class SettingsScreen extends ConsumerWidget {
     final build = BuildInfo.current.summary;
     showAboutDialog(
       context: context,
-      applicationName: 'Braid',
-      applicationVersion: kBraidVersion,
+      applicationName: 'Sennit',
+      applicationVersion: kSennitVersion,
       children: [if (build != null) SelectableText(build)],
     );
   }

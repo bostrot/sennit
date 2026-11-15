@@ -19,14 +19,14 @@ import '../../app/localisation.dart';
 /// can pretend to be a phone — which is the only way the Android and iOS
 /// branches below are reachable from `flutter test` on a laptop.
 abstract final class NotificationPlatform {
-  /// Where Braid registers a Matrix pusher and receives pokes.
+  /// Where Sennit registers a Matrix pusher and receives pokes.
   ///
   /// Not macOS, even though `firebase_messaging` declares a macOS
   /// implementation — and not Windows, where `firebase_core` alone is linked in
   /// — because a pub dependency cannot be made per-platform and both are
   /// therefore present in a desktop build whether or not they are wanted. A Mac
   /// has no APNs entitlement in an unsigned build, and asking it for a token
-  /// produces an exception rather than a token. Desktop Braid notifies from the
+  /// produces an exception rather than a token. Desktop Sennit notifies from the
   /// foreground sync path, which needs no gateway at all.
   static bool get supportsPush =>
       !kIsWeb &&
@@ -47,7 +47,7 @@ abstract final class NotificationPlatform {
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 }
 
-/// The app id Braid registers its pusher under, per platform.
+/// The app id Sennit registers its pusher under, per platform.
 ///
 /// Per platform and not per app: the gateway routes on this to decide whether a
 /// poke becomes an FCM message or an APNs one, so the two builds of the same
@@ -68,7 +68,7 @@ const String kIosPushAppId = 'com.bostrot.weft.ios';
 const Map<String, Object?> kIosDefaultPayload = {
   'aps': {
     'mutable-content': 1,
-    'alert': {'title': 'Braid', 'body': 'New message'},
+    'alert': {'title': 'Sennit', 'body': 'New message'},
     'sound': 'default',
   },
 };
@@ -110,7 +110,7 @@ abstract interface class PushTransport {
 
 /// [PushTransport] over `firebase_messaging`.
 ///
-/// The only file in Braid that imports Firebase. Everything above it takes a
+/// The only file in Sennit that imports Firebase. Everything above it takes a
 /// [PushTransport], so the platform check happens once — here, at construction
 /// — rather than at every use.
 class FirebasePushTransport implements PushTransport {
@@ -332,7 +332,7 @@ class WeftPushRegistration {
       appId: ios ? kIosPushAppId : kAndroidPushAppId,
       pushKey: token,
       gatewayUrl: gatewayUrl,
-      deviceDisplayName: deviceName ?? 'Braid',
+      deviceDisplayName: deviceName ?? 'Sennit',
       // `event_id_only` is set by `WeftPusher.toJson` and is not optional; see
       // `kEventIdOnlyFormat`. What varies per platform is only this.
       defaultPayload: ios ? kIosDefaultPayload : const {},

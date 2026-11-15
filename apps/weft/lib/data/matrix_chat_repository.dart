@@ -29,7 +29,7 @@ typedef AttachmentBytesLoader =
 
 /// Reads the file [AttachmentSource.filename] names.
 ///
-/// The pickers Braid uses hand over a real path, and Android's share-in copies a
+/// The pickers Sennit uses hand over a real path, and Android's share-in copies a
 /// `content://` grant to a temp file before building a source, so by the time a
 /// source reaches the repository its name is always openable. Read per upload
 /// attempt rather than held: a twenty-photo share must not pin twenty files in
@@ -132,7 +132,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       _smsSub = sms.updates.listen((_) => _rebuild());
       // Not awaited, and it must not be: reading the provider is a method
       // channel round trip, and the inbox has four other networks to draw
-      // meanwhile. A phone where Braid is not the default SMS app settles
+      // meanwhile. A phone where Sennit is not the default SMS app settles
       // immediately on "no threads" and nothing here ever fires again.
       unawaited(sms.start());
     }
@@ -150,7 +150,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   final AttachmentBytesLoader _readBytes;
 
-  /// SMS, when this device has it and Braid holds the role. Null everywhere
+  /// SMS, when this device has it and Sennit holds the role. Null everywhere
   /// else, which is the state every path below has to work in anyway.
   final SmsChatRepository? _sms;
 
@@ -567,7 +567,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         '${t.hour.toString().padLeft(2, '0')}'
         '${t.minute.toString().padLeft(2, '0')}00Z';
     final ics =
-        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Braid//EN\r\n'
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sennit//EN\r\n'
         'METHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:$uid\r\n'
         'DTSTART:${stamp(when)}\r\nDTEND:${stamp(until)}\r\n'
         'SUMMARY:${title.replaceAll(RegExp(r'[\r\n]'), ' ')}\r\n'
@@ -587,7 +587,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
     if (room.encrypted) {
       // No plain-media upload in an encrypted room; the custom key carries
-      // everything a Braid peer needs and the body carries it for humans.
+      // everything a Sennit peer needs and the body carries it for humans.
       await room.sendEvent({
         'msgtype': sdk.MessageTypes.Text,
         'body': readable,
@@ -1141,9 +1141,9 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   @override
   Future<void> forgetLocally(String roomId, String eventId) async {
-    // The SDK's own store, not Braid's: this is the copy the timeline is read
+    // The SDK's own store, not Sennit's: this is the copy the timeline is read
     // from, and the one a re-open would otherwise redraw the message out of.
-    // Braid's record of the message — the search index — is dropped by the
+    // Sennit's record of the message — the search index — is dropped by the
     // sweeper, which is also what writes the tombstone that keeps a backfill
     // from bringing it back.
     await _client.database.removeEvent(eventId, roomId);
@@ -1449,7 +1449,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // stops incoming MMS being retrieved — and a photo that quietly went out
     // over WhatsApp instead is worse than one that did not go.
     if (target.network == ChatNetwork.sms) {
-      throw StateError('Braid cannot send MMS attachments yet');
+      throw StateError('Sennit cannot send MMS attachments yet');
     }
     final room = _roomFor(target);
 
@@ -2367,7 +2367,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// "have they ever replied here", and answering it properly would mean
   /// paginating every room in the account on every rebuild. What is available
   /// for nothing is the room's own read/send state: `lastEvent` being the
-  /// user's, and the fact that Braid records where the user has read up to.
+  /// user's, and the fact that Sennit records where the user has read up to.
   ///
   /// It errs towards **not** a request. A conversation wrongly held out of the
   /// inbox is a message the user never sees; a conversation wrongly left in it
@@ -2387,7 +2387,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// A handle existing is not enough — the graph builds one from every direct
   /// chat, so every stranger has one the moment their room appears. What counts
   /// is a *merge*: the user looking at two handles and saying they are the same
-  /// person is a deliberate act, and the only durable record in Braid that they
+  /// person is a deliberate act, and the only durable record in Sennit that they
   /// know who this is.
   ///
   /// A phone number in the address book counts too, via the contact-name

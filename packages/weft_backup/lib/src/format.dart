@@ -1,4 +1,4 @@
-/// The `.braid` container: what is on disk, in what order, and which parts a
+/// The `.sennit` container: what is on disk, in what order, and which parts a
 /// reader may parse before it has the passphrase.
 library;
 
@@ -7,14 +7,14 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 
-/// The eight bytes every `.braid` file starts with.
+/// The eight bytes every `.sennit` file starts with.
 ///
 /// A magic number rather than trusting the extension, because the file picker
 /// hands back whatever the user tapped and "you chose the wrong file" and "you
 /// typed the wrong passphrase" must be different sentences. Without this they
 /// are the same sentence — a MAC failure — and the user retypes a correct
 /// passphrase five times at a holiday photo.
-const List<int> kBraidArchiveMagic = <int>[
+const List<int> kSennitArchiveMagic = <int>[
   0x42, 0x52, 0x41, 0x49, 0x44, 0x42, 0x41, 0x4B, // BRAIDBAK
 ];
 
@@ -39,9 +39,9 @@ const List<int> kBraidArchiveMagic = <int>[
 ///   half-decoded restore that looks like it worked.
 ///
 /// The split matters because these two failures deserve opposite advice.
-/// "Update Braid and try again" is right for a major; for a minor it would be a
+/// "Update Sennit and try again" is right for a major; for a minor it would be a
 /// lie, since the restore already worked.
-const ArchiveVersion kBraidArchiveFormatVersion = ArchiveVersion(1, 0);
+const ArchiveVersion kSennitArchiveFormatVersion = ArchiveVersion(1, 0);
 
 /// The largest plaintext header this reader will parse.
 ///
@@ -77,16 +77,16 @@ class ArchiveVersion implements Comparable<ArchiveVersion> {
   final int major;
   final int minor;
 
-  /// Whether a reader at [kBraidArchiveFormatVersion] can read this.
+  /// Whether a reader at [kSennitArchiveFormatVersion] can read this.
   ///
-  /// Only the major is consulted. See [kBraidArchiveFormatVersion] for why a
+  /// Only the major is consulted. See [kSennitArchiveFormatVersion] for why a
   /// newer minor is a normal, successful read.
-  bool get isReadable => major <= kBraidArchiveFormatVersion.major;
+  bool get isReadable => major <= kSennitArchiveFormatVersion.major;
 
   /// Whether this archive was written by something that knew more than us.
   bool get isFutureMinor =>
-      major == kBraidArchiveFormatVersion.major &&
-      minor > kBraidArchiveFormatVersion.minor;
+      major == kSennitArchiveFormatVersion.major &&
+      minor > kSennitArchiveFormatVersion.minor;
 
   Map<String, Object?> toJson() => {'major': major, 'minor': minor};
 
@@ -142,7 +142,7 @@ class KdfParameters {
 
   /// 64 MiB, 3 passes, 1 lane.
   ///
-  /// Chosen against the weakest device Braid supports rather than the fastest:
+  /// Chosen against the weakest device Sennit supports rather than the fastest:
   /// this runs on a mid-range Android phone, in a foreground isolate, while the
   /// user watches a spinner. 64 MiB is the RFC 9106 second recommended option
   /// and is comfortably survivable there; raising it to the first option's
@@ -177,7 +177,7 @@ class KdfParameters {
   /// Bounds-checked rather than trusted, because these numbers come out of an
   /// unauthenticated header and drive an allocation: a `memoryKiB` of 2^31 is
   /// an out-of-memory kill dressed up as a backup file. The upper bounds are
-  /// generous enough to accept anything a future Braid would plausibly write
+  /// generous enough to accept anything a future Sennit would plausibly write
   /// and low enough that a hostile file cannot use them as a weapon.
   static KdfParameters? fromJson(Object? raw) {
     if (raw is! Map) return null;
@@ -291,7 +291,7 @@ class ArchivePreview {
 
   final DateTime createdAt;
 
-  /// The Braid build that wrote this, for a support conversation. Free text —
+  /// The Sennit build that wrote this, for a support conversation. Free text —
   /// never parsed to decide behaviour, which is what [ArchiveVersion] is for.
   final String appVersion;
 
@@ -441,7 +441,7 @@ class ArchiveManifest {
 
 // -------------------------------------------------------------- header codec
 
-/// Serialises [ArchiveHeader] to the bytes that open a `.braid` file.
+/// Serialises [ArchiveHeader] to the bytes that open a `.sennit` file.
 ///
 /// Layout, in order:
 ///
@@ -458,7 +458,7 @@ Uint8List encodeArchiveHeader({
   required KdfParameters kdf,
   required CipherParameters cipher,
   required ArchivePreview preview,
-  ArchiveVersion version = kBraidArchiveFormatVersion,
+  ArchiveVersion version = kSennitArchiveFormatVersion,
 }) {
   final json = utf8.encode(
     jsonEncode({
@@ -470,7 +470,7 @@ Uint8List encodeArchiveHeader({
   );
 
   final out = BytesBuilder(copy: false)
-    ..add(kBraidArchiveMagic)
+    ..add(kSennitArchiveMagic)
     ..add(_uint32(json.length))
     ..add(json);
   return out.toBytes();
@@ -485,12 +485,12 @@ enum HeaderProblem {
   /// No magic, or fewer bytes than a header needs. The wrong file.
   notAnArchive,
 
-  /// Magic matched, structure did not. A `.braid` that was truncated or
+  /// Magic matched, structure did not. A `.sennit` that was truncated or
   /// corrupted in its first kilobyte — distinct from [notAnArchive] because the
   /// user did pick the right file and the advice is different.
   malformed,
 
-  /// A major version above this build's. See [kBraidArchiveFormatVersion].
+  /// A major version above this build's. See [kSennitArchiveFormatVersion].
   unsupportedVersion,
 }
 
@@ -529,13 +529,13 @@ HeaderParseResult parseArchiveHeader(Uint8List bytes) {
   if (bytes.length < prefixLength) {
     return const HeaderParseResult.failure(HeaderProblem.notAnArchive);
   }
-  for (var i = 0; i < kBraidArchiveMagic.length; i++) {
-    if (bytes[i] != kBraidArchiveMagic[i]) {
+  for (var i = 0; i < kSennitArchiveMagic.length; i++) {
+    if (bytes[i] != kSennitArchiveMagic[i]) {
       return const HeaderParseResult.failure(HeaderProblem.notAnArchive);
     }
   }
 
-  final jsonLength = _readUint32(bytes, kBraidArchiveMagic.length);
+  final jsonLength = _readUint32(bytes, kSennitArchiveMagic.length);
   if (jsonLength <= 0 || jsonLength > kMaxHeaderBytes) {
     return const HeaderParseResult.failure(HeaderProblem.malformed);
   }

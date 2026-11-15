@@ -169,7 +169,7 @@ void main() {
       expect(service.exports.single.passphrase, 'a long enough passphrase');
       expect(service.exports.single.includeMedia, isTrue);
       expect(
-        find.textContaining('/tmp/braid-2026-08-28.braid'),
+        find.textContaining('/tmp/sennit-2026-08-28.sennit'),
         findsOneWidget,
       );
     });
@@ -324,12 +324,12 @@ void main() {
           find.descendant(of: find.byType(AlertDialog), matching: matching);
 
       expect(find.text('This backup'), findsOneWidget);
-      expect(inDialog(find.text('braid-2026-08-28.braid')), findsOneWidget);
+      expect(inDialog(find.text('sennit-2026-08-28.sennit')), findsOneWidget);
       expect(inDialog(find.textContaining('Created')), findsOneWidget);
       expect(inDialog(find.textContaining('12 conversations')), findsOneWidget);
       expect(inDialog(find.text('Photos and files included')), findsOneWidget);
       expect(
-        inDialog(find.textContaining('Written by Braid 1.4.0')),
+        inDialog(find.textContaining('Written by Sennit 1.4.0')),
         findsOneWidget,
       );
 
@@ -431,7 +431,7 @@ void main() {
       expect(service.restores, isEmpty);
     });
 
-    testWidgets('an archive from a newer Braid says what it could not read', (
+    testWidgets('an archive from a newer Sennit says what it could not read', (
       tester,
     ) async {
       // Swallowing this would leave the user believing they have a complete
@@ -455,16 +455,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('7 items were already here'), findsOneWidget);
-      expect(find.textContaining('newer version of Braid'), findsOneWidget);
+      expect(find.textContaining('newer version of Sennit'), findsOneWidget);
     });
   });
 
   group('every typed failure gets its own sentence', () {
     /// Each failure, and a phrase only its message contains.
     const cases = <(String, String)>[
-      ('notAnArchive', 'not a Braid backup'),
+      ('notAnArchive', 'not a Sennit backup'),
       ('malformed', 'damaged near its start'),
-      ('unsupportedVersion', 'newer version of Braid (9.0)'),
+      ('unsupportedVersion', 'newer version of Sennit (9.0)'),
       ('wrongPassphrase', 'does not open this backup'),
       ('truncated', 'file ends early'),
       ('damaged', 'If you have another copy'),

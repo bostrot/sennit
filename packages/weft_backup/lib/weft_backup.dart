@@ -1,7 +1,7 @@
-/// The `.braid` archive: one encrypted file holding a user's cross-network
+/// The `.sennit` archive: one encrypted file holding a user's cross-network
 /// history, and the only way that history gets off the device.
 ///
-/// Braid keeps conversations from every network in one local store. That is the
+/// Sennit keeps conversations from every network in one local store. That is the
 /// feature, and it is also the exposure: the unified view — which handles are
 /// the same person, what a bridge said before it was shut down, a voice note
 /// transcribed once and never again — exists nowhere but on the device, and
@@ -11,7 +11,7 @@
 /// Four pieces:
 ///
 /// * [ArchiveHeader] and friends in `format.dart` — the container. Versioned,
-///   and **parseable before the passphrase**, so that "this is not a Braid
+///   and **parseable before the passphrase**, so that "this is not a Sennit
 ///   archive", "this build is too old to read it" and "that passphrase is
 ///   wrong" are three different sentences instead of one shrug.
 /// * `crypto.dart` — Argon2id from the passphrase, XChaCha20-Poly1305 over
@@ -30,7 +30,7 @@
 ///
 /// Pure Dart, and deliberately knows nothing about SQL or Flutter: the format
 /// is decided in one test file rather than on a device, and the adapters onto
-/// Braid's actual tables live in `weft_store`, where the schema already is.
+/// Sennit's actual tables live in `weft_store`, where the schema already is.
 library;
 
 // Consumers import this barrel, never src/.

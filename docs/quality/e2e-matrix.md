@@ -1635,7 +1635,7 @@ The manual pass, all of it on the emulator, all of it watched:
 
 | Checked on the device | Evidence |
 |---|---|
-| Braid is *eligible* for `ROLE_SMS` | The system's own dialog lists Braid beside Google Messages — the role controller resolved all four required components |
+| Sennit is *eligible* for `ROLE_SMS` | The system's own dialog lists Sennit beside Google Messages — the role controller resolved all four required components |
 | The role prompt appears, and a decline is a decline | Cancel → the screen keeps "Off" and shows "Nothing changed…", no SnackBar, the offer still there |
 | The role prompt is accepted, and the screen tells the truth | "Set as default" → status flips to **On**, the RCS section swaps to the role-held wording, the offer is replaced by "Choose a different SMS app", **and no note is shown at all** |
 | The role survives a reboot | `SatelliteController: … defaultSmsPackageName: com.bostrot.weft` after `adb reboot` |
@@ -1675,7 +1675,7 @@ E SmsApplication: com.bostrot.weft lost android:receive_wap_push: (no permission
 
 `RECEIVE_WAP_PUSH` and then `READ_CELL_BROADCASTS` — the second only surfaced
 once the first was added — are now declared, with the reasoning beside them, and
-`sms_manifest_test.dart` holds the set at six. Neither is a capability Braid
+`sms_manifest_test.dart` holds the set at six. Neither is a capability Sennit
 uses. The full trail is in the phase's working note.
 
 ### Run 2026-08-28: the suites that are not the matrix
@@ -2055,7 +2055,7 @@ and three passes — not the 8 KiB the other suites use:
    person across WhatsApp and SMS, 401 indexed messages, a transcript, and three
    attachment files in a media directory — two of which are byte-identical, so
    deduplication has something real to do.
-2. Exports to a `.braid` file, asserting the `.part` file is gone, that dedup
+2. Exports to a `.sennit` file, asserting the `.part` file is gone, that dedup
    collapsed the duplicate photo, that progress was reported, and that the
    header's preview is readable **without the passphrase**.
 3. Deletes the database and the media directory outright.
@@ -2077,7 +2077,7 @@ ones.
 
 Two limits worth stating rather than leaving implied:
 
-- **Reactions are not in the round trip**, because Braid's store does not persist
+- **Reactions are not in the round trip**, because Sennit's store does not persist
   them — they are aggregated live from the Matrix timeline. The archive format
   carries a `reactions` field on every message record and the round-trip suite
   exercises it, but no *source* populates it yet. See

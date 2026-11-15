@@ -115,7 +115,7 @@ abstract final class WeftSettings {
   /// Whether Return sends the message.
   ///
   /// False by default, which is the opposite of most messengers and is the
-  /// right default for this one: Braid's composer grows to five lines, people
+  /// right default for this one: Sennit's composer grows to five lines, people
   /// write paragraphs in it, and a Return that sends turns every attempt at a
   /// second line into a message nobody meant to send. Off, Return breaks the
   /// line and the platform's send chord — Cmd+Return, Ctrl+Return — sends.

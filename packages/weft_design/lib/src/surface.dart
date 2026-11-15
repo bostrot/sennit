@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
-/// The kind of machine Braid is drawing on.
+/// The kind of machine Sennit is drawing on.
 ///
 /// Not a restatement of `defaultTargetPlatform`, and deliberately not read from
 /// it at each call site. It is a *design* decision with two values, because the
@@ -37,7 +37,7 @@ WeftSurface get weftSurface =>
     ? WeftSurface.mac
     : WeftSurface.touch;
 
-/// Whether this machine drives Braid with a pointer and a hardware keyboard.
+/// Whether this machine drives Sennit with a pointer and a hardware keyboard.
 ///
 /// Deliberately *not* the same question as [weftSurface]. Windows and Linux
 /// answer the two differently: they keep the touch layout, because the desktop

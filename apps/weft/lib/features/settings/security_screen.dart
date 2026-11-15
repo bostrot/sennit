@@ -353,7 +353,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             color: context.colors.surfaceContainerHigh,
             borderRadius: WeftRadius.allMd,
           ),
-          // Spelled out. This is the one string in Braid a user has to
+          // Spelled out. This is the one string in Sennit a user has to
           // reproduce character for character and will never be shown again,
           // and as a single monospace run a screen reader announced it as one
           // word — which makes the screen whose entire purpose is "write this

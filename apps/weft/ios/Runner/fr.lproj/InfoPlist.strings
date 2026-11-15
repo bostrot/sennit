@@ -1,6 +1,6 @@
 /* French, machine-seeded 2026-08-28. TRANSLATOR REVIEW PENDING.
 
-   The permission prompts iOS and macOS draw before Braid has run a line of
+   The permission prompts iOS and macOS draw before Sennit has run a line of
    Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
    out of the bundle, keyed by the `Info.plist` key each one overrides.
 
@@ -9,10 +9,10 @@
    which is a permission prompt in the wrong language on a screen the user
    cannot get past. `l10n_test.dart` checks both directions. */
 
-"NSPhotoLibraryUsageDescription" = "Braid a besoin de votre photothèque pour que vous puissiez envoyer des photos et des vidéos dans une conversation.";
-"NSCameraUsageDescription" = "Braid a besoin de l’appareil photo pour que vous puissiez prendre une photo et l’envoyer dans une conversation.";
-"NSLocationWhenInUseUsageDescription" = "Braid ne partage votre position que lorsque vous touchez « partager la position » dans une discussion.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Braid ne partage votre position que lorsque vous touchez « partager la position » dans une discussion. Braid ne la suit jamais en arrière-plan.";
-"NSCalendarsUsageDescription" = "Braid n’ajoute un événement à votre calendrier que lorsque vous le demandez, pour une date mentionnée dans une discussion.";
-"NSContactsUsageDescription" = "Braid affiche les noms de votre carnet d’adresses plutôt que ceux que les réseaux de messagerie attribuent. La correspondance se fait sur cet appareil et n’est jamais téléversée.";
-"NSMicrophoneUsageDescription" = "Braid a besoin du micro pour que vous puissiez parler pendant un appel audio ou vidéo.";
+"NSPhotoLibraryUsageDescription" = "Sennit a besoin de votre photothèque pour que vous puissiez envoyer des photos et des vidéos dans une conversation.";
+"NSCameraUsageDescription" = "Sennit a besoin de l’appareil photo pour que vous puissiez prendre une photo et l’envoyer dans une conversation.";
+"NSLocationWhenInUseUsageDescription" = "Sennit ne partage votre position que lorsque vous touchez « partager la position » dans une discussion.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit ne partage votre position que lorsque vous touchez « partager la position » dans une discussion. Sennit ne la suit jamais en arrière-plan.";
+"NSCalendarsUsageDescription" = "Sennit n’ajoute un événement à votre calendrier que lorsque vous le demandez, pour une date mentionnée dans une discussion.";
+"NSContactsUsageDescription" = "Sennit affiche les noms de votre carnet d’adresses plutôt que ceux que les réseaux de messagerie attribuent. La correspondance se fait sur cet appareil et n’est jamais téléversée.";
+"NSMicrophoneUsageDescription" = "Sennit a besoin du micro pour que vous puissiez parler pendant un appel audio ou vidéo.";

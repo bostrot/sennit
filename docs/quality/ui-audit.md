@@ -13,7 +13,7 @@ related:
 
 # UI and Spacing Audit
 
-What a machine found by opening every screen in Braid, on both shells, and
+What a machine found by opening every screen in Sennit, on both shells, and
 measuring it. The machine is
 [`apps/weft/integration_test/route_walk_test.dart`](../../apps/weft/integration_test/route_walk_test.dart);
 the list of screens it walks is [`route-inventory.md`](route-inventory.md).
@@ -61,7 +61,7 @@ health.
   `debugIsWidgetLocalCreation`. With no pub roots configured that means *not
   `packages/flutter/`*, so a widget built by a pub dependency reads as local
   and there is no public API to tell which — a finding whose chain names no
-  Braid widget is one of those. UI-06 was.
+  Sennit widget is one of those. UI-06 was.
 - **Whole numbers only.** Every gap in this tree is a literal on the grid; a
   fractional inset is always derived — `WeftAvatar`'s ring is `size * 0.055`,
   a badge's border a proportion of its extent. Those are strokes wearing
@@ -287,7 +287,7 @@ desktop pass.
 
 ### Low
 
-**UI-06. One `Padding` of 5 with no Braid widget in its chain.**
+**UI-06. One `Padding` of 5 with no Sennit widget in its chain.**
 Reported on the chat screen as `AppBar › ConstrainedBox › DecoratedBox ›
 Padding`; no literal 5 exists anywhere in `apps/weft/lib` or
 `packages/weft_design/lib`. Almost certainly a pub dependency, which the

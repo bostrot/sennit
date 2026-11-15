@@ -46,7 +46,7 @@ void main() {
       // class is the entire evidence.
       'android.permission.RECEIVE_WAP_PUSH',
       // The sixth, and the next one `SmsApplication` stopped on once
-      // RECEIVE_WAP_PUSH was added. The op set is all-or-nothing: Braid never
+      // RECEIVE_WAP_PUSH was added. The op set is all-or-nothing: Sennit never
       // reads a cell broadcast, but an app that cannot hold every op the role
       // assigns is not named by `getDefaultSmsPackage()`, whatever RoleManager
       // says.

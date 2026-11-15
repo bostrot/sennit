@@ -1,7 +1,7 @@
 /// Weft's localisation surface: the locales it declares, what declaring them
 /// turns on, and where its own translated strings come from.
 ///
-/// Braid's user-facing words live in ARB files under `lib/l10n/`, and
+/// Sennit's user-facing words live in ARB files under `lib/l10n/`, and
 /// `flutter gen-l10n` compiles them into the [AppL10n] class this file wires
 /// into the widget tree. `lib/l10n/app_en.arb` is the template every other
 /// locale is keyed against; `context.l10n` is how a widget reads one.
@@ -11,14 +11,14 @@
 /// A `supportedLocales` list does two separable jobs, and it is worth keeping
 /// them apart because only the first is about translation:
 ///
-/// - It selects which of Braid's own ARB files [AppL10n] resolves against. A
+/// - It selects which of Sennit's own ARB files [AppL10n] resolves against. A
 ///   device set to Spanish gets `app_es.arb`; a device set to something with no
 ///   ARB file gets `app_en.arb`, because English is first in the list and
 ///   `basicLocaleListResolution` returns the first entry for anything it cannot
 ///   match. Keys never reach the screen — the fallback is a real English
 ///   sentence.
 /// - It is also the *only* source of three things that have nothing to do with
-///   Braid's strings. Without a declared locale, `Directionality` resolves to
+///   Sennit's strings. Without a declared locale, `Directionality` resolves to
 ///   left-to-right for every locale a device can be set to, and no amount of
 ///   `EdgeInsetsDirectional` downstream makes a difference because nothing was
 ///   ever going to set the direction. `Localizations.localeOf` is always
@@ -42,7 +42,7 @@
 ///   the claim that a person has; nothing else records it. See
 ///   `docs/TRANSLATING.md`.
 /// - **`ar`, `he`** have no ARB file and are not waiting for one here. They are
-///   declared for layout, and Braid's own words in them are English.
+///   declared for layout, and Sennit's own words in them are English.
 ///
 /// So "supported" means three different things down this list, and the honest
 /// summary is: five translated languages awaiting a human reader, two declared
@@ -55,7 +55,7 @@
 /// is being verified is the *layout*: that the thread mirrors, that the tail on
 /// a bubble swaps sides, that a timestamp is Arabic-Indic. Declaring them turns
 /// the app right-to-left and hands Material its Arabic and Hebrew strings while
-/// Braid's own text falls back to English — the honest half-state, and one that
+/// Sennit's own text falls back to English — the honest half-state, and one that
 /// makes an RTL golden a test of the layout rather than of a translation. When
 /// Arabic and Hebrew ARB files are written they simply appear, and nothing
 /// here changes.
@@ -77,7 +77,7 @@ import '../l10n/gen/app_l10n.dart';
 // the tests that need it.
 export '../l10n/gen/app_l10n.dart' show AppL10n, lookupAppL10n;
 
-/// The locales Braid declares.
+/// The locales Sennit declares.
 ///
 /// English first: it is both the fallback and the language `app_en.arb` is
 /// written in, and `basicLocaleListResolution` returns the first entry when the
@@ -85,7 +85,7 @@ export '../l10n/gen/app_l10n.dart' show AppL10n, lookupAppL10n;
 ///
 /// Then the five translated locales, each with an ARB file beside `app_en.arb`.
 /// `zh` carries a `scriptCode` and `pt` a `countryCode` because both languages
-/// have a second written form Braid does not ship — Traditional Chinese,
+/// have a second written form Sennit does not ship — Traditional Chinese,
 /// European Portuguese — and a bare `zh` would claim to serve a reader in
 /// Taipei with text written for Shanghai.
 ///
@@ -104,7 +104,7 @@ const List<Locale> weftSupportedLocales = [
 
 /// The delegates that make [weftSupportedLocales] mean anything.
 ///
-/// [_WeftAppL10nDelegate] is Braid's own strings, compiled from
+/// [_WeftAppL10nDelegate] is Sennit's own strings, compiled from
 /// `lib/l10n/*.arb`. The `Global*` trio is Material, Widgets and Cupertino;
 /// `GlobalWidgets` is the one that carries `textDirection`, and therefore the
 /// one that puts the app into RTL at all. All four are needed: without the
@@ -117,7 +117,7 @@ const List<LocalizationsDelegate<dynamic>> weftLocalizationsDelegates = [
   GlobalCupertinoLocalizations.delegate,
 ];
 
-/// [AppL10n.delegate], widened to cover the locales Braid declares without
+/// [AppL10n.delegate], widened to cover the locales Sennit declares without
 /// translating.
 ///
 /// The generated delegate supports exactly the languages that have an ARB file.
@@ -130,7 +130,7 @@ const List<LocalizationsDelegate<dynamic>> weftLocalizationsDelegates = [
 /// So [isSupported] answers for the whole of [weftSupportedLocales] and [load]
 /// hands back the English strings for anything the generator did not produce.
 /// That is the fallback the library comment above promises, made real: the
-/// declared-for-layout locales get RTL, Material's own Arabic, and Braid's
+/// declared-for-layout locales get RTL, Material's own Arabic, and Sennit's
 /// English words.
 ///
 /// Matching on `languageCode` alone is the same rule the generated delegate
@@ -153,7 +153,7 @@ class _WeftAppL10nDelegate extends LocalizationsDelegate<AppL10n> {
   bool shouldReload(covariant LocalizationsDelegate<AppL10n> old) => false;
 }
 
-/// Braid's own translated strings, for the locale that resolved here.
+/// Sennit's own translated strings, for the locale that resolved here.
 ///
 /// Reads as `context.l10n.settingsTitle` at a call site — the same shape as
 /// `context.colors` and `context.motion` from `weft_design`, and short enough
@@ -196,7 +196,7 @@ AppL10n weftPlatformL10n() {
 
 /// Points `intl`'s date formatting at [locale], when it has data for it.
 ///
-/// Every `DateFormat` in Braid is constructed without a locale — `DateFormat.Hm()`
+/// Every `DateFormat` in Sennit is constructed without a locale — `DateFormat.Hm()`
 /// on a bubble, `DateFormat.yMMMd()` on a device row — which means they all read
 /// `Intl.defaultLocale`. Setting it here is what makes a timestamp in an Arabic
 /// UI an Arabic timestamp rather than an English one sitting in a mirrored

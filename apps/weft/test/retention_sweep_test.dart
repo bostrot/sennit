@@ -123,7 +123,7 @@ void main() {
         repository.redacted,
         isEmpty,
         reason:
-            'redacting a message the user did not send is not Braid'
+            'redacting a message the user did not send is not Sennit'
             's to do',
       );
       expect(repository.forgotten, [r'$theirs']);

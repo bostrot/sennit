@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the TEST Mac: pull the freshest Braid.app from the build Mac and
+# Runs on the TEST Mac: pull the freshest Sennit.app from the build Mac and
 # relaunch. The mirror image of deploy_macos.sh, for when the test side wants
 # to drive — no inbound access to the test Mac needed at all.
 #
@@ -9,15 +9,15 @@
 #   • Get this script over once, using those same credentials:
 #       ssh you@build-mac cat \
 #         <repo>/tooling/scripts/pull_macos.sh \
-#         > ~/braid-pull.sh && chmod +x ~/braid-pull.sh
+#         > ~/sennit-pull.sh && chmod +x ~/sennit-pull.sh
 #   • Put the build host in your shell profile, so you type it once:
 #       export BRAID_HOST=you@build-mac
 #       export BRAID_REPO=/path/to/messenger
-#   • First launch only: right-click Braid.app → Open past Gatekeeper.
+#   • First launch only: right-click Sennit.app → Open past Gatekeeper.
 #
 # Usage:
-#   ~/braid-pull.sh            # pull whatever is built and relaunch
-#   ~/braid-pull.sh --build    # have the build Mac rebuild first, then pull
+#   ~/sennit-pull.sh            # pull whatever is built and relaunch
+#   ~/sennit-pull.sh --build    # have the build Mac rebuild first, then pull
 
 set -euo pipefail
 
@@ -35,13 +35,13 @@ Set the build host and its checkout first:
   export BRAID_HOST=you@build-mac        # whatever `ssh` already reaches
   export BRAID_REPO=/path/to/messenger   # the repo on that machine
 
-Then:  ~/braid-pull.sh          (pull what is built)
-       ~/braid-pull.sh --build  (rebuild there first, then pull)
+Then:  ~/sennit-pull.sh          (pull what is built)
+       ~/sennit-pull.sh --build  (rebuild there first, then pull)
 USAGE
   exit 2
 fi
 
-APP="$REPO/apps/weft/build/macos/Build/Products/$CONFIG/Braid.app"
+APP="$REPO/apps/weft/build/macos/Build/Products/$CONFIG/Sennit.app"
 
 if [ "${1:-}" = "--build" ]; then
   # `tr` rather than ${CONFIG,,}: macOS still ships bash 3.2 as /bin/bash, and
@@ -69,17 +69,17 @@ fi
 # The executable, not the bundle: a directory's mtime only moves when its own
 # entries change, so a rebuilt .app whose contents are all one level down still
 # reports the date of the build before it.
-BUILT="$(ssh "$HOST" "stat -f '%Sm' '$APP/Contents/MacOS/Braid'")"
-echo "==> Pulling $CONFIG Braid.app from $HOST (built $BUILT)"
+BUILT="$(ssh "$HOST" "stat -f '%Sm' '$APP/Contents/MacOS/Sennit'")"
+echo "==> Pulling $CONFIG Sennit.app from $HOST (built $BUILT)"
 
 mkdir -p ~/Applications
 # --delete keeps the bundle exact; a stale dylib from a previous build inside
 # a .app is a crash with a misleading stack.
-rsync -az --delete "$HOST:$APP/" ~/Applications/Braid.app/
+rsync -az --delete "$HOST:$APP/" ~/Applications/Sennit.app/
 
 echo "==> Relaunching"
-pkill -x Braid 2>/dev/null || true
+pkill -x Sennit 2>/dev/null || true
 sleep 1
-open ~/Applications/Braid.app
+open ~/Applications/Sennit.app
 
 echo "==> Done"

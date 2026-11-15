@@ -1,4 +1,4 @@
-/// Braid Pro: what a store build locks, what unlocks it, and what never locks.
+/// Sennit Pro: what a store build locks, what unlocks it, and what never locks.
 ///
 /// Three layers, each pinned on its own. The model decides from an edition,
 /// a platform and a purchase record; the controller turns store updates into
@@ -116,13 +116,13 @@ void main() {
 
   group('the model', () {
     test('only an explicit store define is the store edition', () {
-      expect(BraidEdition.parse('store'), BraidEdition.store);
-      expect(BraidEdition.parse(' Store '), BraidEdition.store);
-      expect(BraidEdition.parse(''), BraidEdition.community);
-      expect(BraidEdition.parse('pro'), BraidEdition.community);
-      expect(BraidEdition.parse('direct'), BraidEdition.direct);
+      expect(SennitEdition.parse('store'), SennitEdition.store);
+      expect(SennitEdition.parse(' Store '), SennitEdition.store);
+      expect(SennitEdition.parse(''), SennitEdition.community);
+      expect(SennitEdition.parse('pro'), SennitEdition.community);
+      expect(SennitEdition.parse('direct'), SennitEdition.direct);
       // Tests and source builds carry no define.
-      expect(BraidEdition.current, BraidEdition.community);
+      expect(SennitEdition.current, SennitEdition.community);
     });
 
     test(
@@ -130,10 +130,10 @@ void main() {
       () {
         for (final status in const [
           ProStatus(
-            edition: BraidEdition.community,
+            edition: SennitEdition.community,
             storeBillingPlatform: true,
           ),
-          ProStatus(edition: BraidEdition.store, storeBillingPlatform: false),
+          ProStatus(edition: SennitEdition.store, storeBillingPlatform: false),
         ]) {
           expect(status.charges, isFalse);
           for (final f in ProFeature.values) {
@@ -146,7 +146,7 @@ void main() {
     test('a direct build charges on every platform, by licence key', () {
       for (final phone in [true, false]) {
         final status = ProStatus(
-          edition: BraidEdition.direct,
+          edition: SennitEdition.direct,
           storeBillingPlatform: phone,
         );
         expect(status.charges, isTrue);
@@ -168,7 +168,7 @@ void main() {
 
     test('a store build on a phone locks every Pro feature until bought', () {
       const locked = ProStatus(
-        edition: BraidEdition.store,
+        edition: SennitEdition.store,
         storeBillingPlatform: true,
       );
       expect(locked.charges, isTrue);
@@ -248,7 +248,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           storesProvider.overrideWithValue(stores),
-          braidEditionProvider.overrideWithValue(BraidEdition.store),
+          sennitEditionProvider.overrideWithValue(SennitEdition.store),
           storeBillingPlatformProvider.overrideWithValue(true),
           billingStoreProvider.overrideWithValue(store),
           purchaseVerifierProvider.overrideWithValue((_) async => verified),
@@ -291,7 +291,7 @@ void main() {
       final relaunch = ProviderContainer(
         overrides: [
           storesProvider.overrideWithValue(stores),
-          braidEditionProvider.overrideWithValue(BraidEdition.store),
+          sennitEditionProvider.overrideWithValue(SennitEdition.store),
           storeBillingPlatformProvider.overrideWithValue(true),
           billingStoreProvider.overrideWithValue(null),
         ],
@@ -427,7 +427,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           storesProvider.overrideWithValue(stores),
-          braidEditionProvider.overrideWithValue(BraidEdition.direct),
+          sennitEditionProvider.overrideWithValue(SennitEdition.direct),
           storeBillingPlatformProvider.overrideWithValue(false),
           licenseClientProvider.overrideWithValue(licences.client),
         ],
@@ -528,7 +528,7 @@ void main() {
     Future<_FakeStore> pump(
       WidgetTester tester,
       Widget home, {
-      BraidEdition edition = BraidEdition.store,
+      SennitEdition edition = SennitEdition.store,
     }) async {
       tester.view.physicalSize = const Size(600, 2400);
       tester.view.devicePixelRatio = 1;
@@ -543,7 +543,7 @@ void main() {
             storesProvider.overrideWithValue(stores),
             // The settings screen asks which networks exist.
             chatRepositoryProvider.overrideWithValue(DemoChatRepository()),
-            braidEditionProvider.overrideWithValue(edition),
+            sennitEditionProvider.overrideWithValue(edition),
             storeBillingPlatformProvider.overrideWithValue(true),
             billingStoreProvider.overrideWithValue(store),
           ],
@@ -579,7 +579,7 @@ void main() {
       await pump(
         tester,
         const SettingsScreen(),
-        edition: BraidEdition.community,
+        edition: SennitEdition.community,
       );
       expect(find.byType(ProBadge), findsNothing);
       expect(find.text(en.proTitle), findsNothing);
@@ -616,7 +616,7 @@ void main() {
         ProviderScope(
           overrides: [
             storesProvider.overrideWithValue(stores),
-            braidEditionProvider.overrideWithValue(BraidEdition.direct),
+            sennitEditionProvider.overrideWithValue(SennitEdition.direct),
             storeBillingPlatformProvider.overrideWithValue(false),
             licenseClientProvider.overrideWithValue(licences.client),
             licenseCheckoutProvider.overrideWithValue(

@@ -30,7 +30,7 @@ class FakeBackupService implements BackupService {
       includeMedia: true,
     ),
     this.estimateError,
-    this.exportResult = '/tmp/braid-2026-08-28.braid',
+    this.exportResult = '/tmp/sennit-2026-08-28.sennit',
     this.exportError,
     this.pickResult,
     this.pickError,
@@ -88,7 +88,7 @@ class FakeBackupService implements BackupService {
   }
 
   @override
-  String suggestedFileName([DateTime? at]) => 'braid-2026-08-28.braid';
+  String suggestedFileName([DateTime? at]) => 'sennit-2026-08-28.sennit';
 
   @override
   Future<String?> export({
@@ -172,7 +172,7 @@ class FakeBackupService implements BackupService {
 /// The path never opened: every test that uses one has the service faked, so
 /// the file is a name for the preview dialog to print and nothing more.
 PickedArchive fakePickedArchive({
-  String name = 'braid-2026-08-28.braid',
+  String name = 'sennit-2026-08-28.sennit',
   DateTime? createdAt,
   String appVersion = '1.4.0',
   int chatCount = 12,

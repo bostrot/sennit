@@ -811,7 +811,7 @@ class _SmartRepliesTile extends ConsumerWidget {
 
 /// The no-extra-app answer to background messages.
 ///
-/// A switch over the native `WeftSyncService`: Braid itself holds the one
+/// A switch over the native `WeftSyncService`: Sennit itself holds the one
 /// connection the OS allows a reachable app (a specialUse foreground
 /// service), so messages arrive with the app closed and nothing else
 /// installed. The battery row appears while Doze could still cut the
@@ -884,7 +884,7 @@ class _BuiltInConnectionSectionState
     if (enabled && mounted && !_batteryExempt) await _walkBatteryExemption();
   }
 
-  /// True when Braid may post notifications — asking if the one prompt is
+  /// True when Sennit may post notifications — asking if the one prompt is
   /// still unspent, and pointing at system settings when it is not.
   Future<bool> _ensureNotificationsAllowed() async {
     final android = FlutterLocalNotificationsPlugin()

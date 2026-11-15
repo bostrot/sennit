@@ -1,6 +1,6 @@
 # Security Policy
 
-Braid handles private conversations, encryption keys and credentials for
+Sennit handles private conversations, encryption keys and credentials for
 your own infrastructure — security reports are taken seriously and answered
 quickly.
 

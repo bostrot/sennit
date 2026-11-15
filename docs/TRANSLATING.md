@@ -1,6 +1,6 @@
 ---
 type: reference
-title: Translating Braid
+title: Translating Sennit
 created: 2026-08-28
 tags: [l10n, contributing]
 related:
@@ -8,9 +8,9 @@ related:
   - '[[l10n-inventory]]'
 ---
 
-# Translating Braid
+# Translating Sennit
 
-Braid speaks six languages and is honest about which ones it has been *read*
+Sennit speaks six languages and is honest about which ones it has been *read*
 in. This is how to claim one, what the conventions are, and how to check your
 work before anyone else has to.
 
@@ -27,7 +27,7 @@ a patch.
 | `apps/weft/lib/l10n/app_<code>.arb` | One per language: the same keys, translated. No `@key` blocks. |
 | `apps/weft/lib/l10n/lint_allow.json` | Translations legitimately identical to the English, with the reason for each. |
 | `apps/weft/android/app/src/main/res/values-<code>/strings.xml` | The words Android draws itself: notification channel names, widget text, the watch. |
-| `apps/weft/ios/Runner/<code>.lproj/InfoPlist.strings` | The sentence in a permission dialog, drawn by iOS before Braid has run a line of code. |
+| `apps/weft/ios/Runner/<code>.lproj/InfoPlist.strings` | The sentence in a permission dialog, drawn by iOS before Sennit has run a line of code. |
 
 Six locales ship today: `en`, `de`, `es`, `fr`, `pt` (Brazilian) and `zh`
 (Simplified). `ar` and `he` are *declared* but not translated — see
@@ -78,17 +78,17 @@ and the prefix is how you find the screen a string is on.
 **Read the `@key` description before translating.** It is written for someone
 who cannot see the screen, and it says three things that change the answer:
 where the string appears, how much room it has, and which words must not be
-translated. `paperless-ngx`, `Matrix`, `MCP`, `WhatsApp` and `Braid` are names.
+translated. `paperless-ngx`, `Matrix`, `MCP`, `WhatsApp` and `Sennit` are names.
 A translated `paperless-ngx` matches nothing.
 
 ## Conventions
 
 **Register is informal, in every language.** `du` in German, `tu` in French,
-`tú` in Spanish, `você` in Portuguese. Braid talks to one person, not to an
+`tú` in Spanish, `você` in Portuguese. Sennit talks to one person, not to an
 institution. This is not negotiable per-locale: the whole app has to agree, and
 a single `vous` in a file of `tu` reads as a mistake rather than as politeness.
 
-**Use the words your messengers use.** People arrive at Braid from WhatsApp,
+**Use the words your messengers use.** People arrive at Sennit from WhatsApp,
 Telegram and Signal, and "read receipt", "sticker", "reaction", "archive" and
 "mute" all have a settled translation in each. Match it rather than the
 dictionary; a technically better word that nobody has seen before is worse.
@@ -118,7 +118,7 @@ is what you would write anyway and needs no escaping.
 
 French sets a space before `; ! ? :` and inside `« »`, and it must be
 **non-breaking** or the line wraps and leaves the punctuation stranded at the
-start of the next one. Braid uses:
+start of the next one. Sennit uses:
 
 | Where | Character |
 | --- | --- |
@@ -133,13 +133,13 @@ time, a URL or an `@user:server` handle, which take no space.
 Simplified only — `app_zh.arb` is what a device asking for `zh-Hant` gets, so
 there is nowhere for a Traditional character to be correct. Full-width
 punctuation (`，` `。` `：` `「」`), no spaces between Han characters, and a
-space between Han and Latin or digits (`通过 Braid 发送`). The `zh-traditional`
+space between Han and Latin or digits (`通过 Sennit 发送`). The `zh-traditional`
 and `zh-plural` lint rules check the first and the last of those.
 
 ### German
 
 Capitalise nouns, and prefer the shorter synonym wherever a string sits in a
-button, a chip or a tab. German is the longest text Braid ships and it is where
+button, a chip or a tab. German is the longest text Sennit ships and it is where
 layouts break; if a string has no short form, say so on the issue rather than
 inventing an abbreviation nobody uses.
 
@@ -201,8 +201,8 @@ a translation that fits the budget and still breaks the row.
 
 ## Weblate
 
-Braid is set up for [Weblate](https://weblate.org), which is self-hostable and
-AGPL — the same licence as Braid, which is why it rather than a hosted
+Sennit is set up for [Weblate](https://weblate.org), which is self-hostable and
+AGPL — the same licence as Sennit, which is why it rather than a hosted
 proprietary service.
 
 `.weblate` in the repository root configures the [`wlc`](https://docs.weblate.org/en/latest/wlc.html)

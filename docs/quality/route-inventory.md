@@ -1,6 +1,6 @@
 ---
 type: reference
-title: Braid Route Inventory
+title: Sennit Route Inventory
 created: 2026-08-28
 tags:
   - ui
@@ -11,15 +11,15 @@ related:
   - '[[e2e-matrix]]'
 ---
 
-# Braid Route Inventory
+# Sennit Route Inventory
 
-Every surface a person can reach in Braid, and the taps that get them there
+Every surface a person can reach in Sennit, and the taps that get them there
 from a cold inbox. Written for two readers: the route-walk harness in
 [`apps/weft/integration_test/route_walk_test.dart`](../../apps/weft/integration_test/route_walk_test.dart),
 which encodes the *Reached by* column as finders, and whoever has to check that
 a new screen was not quietly added without a walk step.
 
-Braid draws **two shells**, not one shell with conditions in it — see
+Sennit draws **two shells**, not one shell with conditions in it — see
 `inbox_shell.dart:184`. `context.isMac` picks `MacInboxShell` on macOS and
 `InboxShell` everywhere else, and a good third of the chrome differs: a network
 rail against a source list, a scrolling header against a toolbar, a FAB against
@@ -171,7 +171,7 @@ macOS. Every row below is a push from it unless said otherwise.
 | Backup & restore | `features/settings/backup_screen.dart:77` | screen | Settings ▸ *Backup* | both | yes |
 | Choose a passphrase | `features/settings/backup_screen.dart:471` | dialog | Backup ▸ *Create backup* | both | yes |
 | Creating backup / Restoring | `features/settings/backup_screen.dart:421` | dialog | Backup ▸ *Create backup* ▸ *Create*; Backup ▸ a restore ▸ *Restore* | both | yes |
-| This backup | `features/settings/backup_screen.dart:624` | dialog | Backup ▸ *Choose a file* ▸ a `.braid` file | both | yes, with a faked picker |
+| This backup | `features/settings/backup_screen.dart:624` | dialog | Backup ▸ *Choose a file* ▸ a `.sennit` file | both | yes, with a faked picker |
 | Restore passphrase | `features/settings/backup_screen.dart:569` | dialog | This backup ▸ *Continue* | both | yes, with a faked picker |
 | How should this be restored? | `features/settings/backup_screen.dart:677` | dialog | Restore passphrase ▸ *Continue* | both | yes, with a faked picker |
 | Delete what is on this device? | `features/settings/backup_screen.dart:756` | dialog | How should this be restored? ▸ *Replace what is here* ▸ *Restore* | both | yes, with a faked picker |
@@ -184,13 +184,13 @@ macOS. Every row below is a push from it unless said otherwise.
 
 ## Surfaces the OS raises
 
-Not reachable by tapping inside Braid, and therefore not in the route walk at
+Not reachable by tapping inside Sennit, and therefore not in the route walk at
 all. They belong to the Patrol suite — see
 [`integration_test/patrol/README.md`](../../apps/weft/integration_test/patrol/README.md).
 
 | Surface | Defined in | Raised by |
 |---|---|---|
-| Share into Braid | `features/share/share_target_sheet.dart:39` | Another app's `ACTION_SEND`, or the iOS Share Extension |
+| Share into Sennit | `features/share/share_target_sheet.dart:39` | Another app's `ACTION_SEND`, or the iOS Share Extension |
 | Notification rationale | `features/notifications/notification_rationale_sheet.dart:18` | The first session that becomes `ready` on a platform that prompts |
 | Permission dialogs | — | The OS, on camera and notifications |
 | Notification shade | — | The OS |
@@ -200,7 +200,7 @@ all. They belong to the Patrol suite — see
 Sixty-one surfaces. Forty-seven are walked; the fourteen that are not each
 have a reason in the **Walk** column, and none of them is "we forgot" — they
 are pre-session screens, surfaces gated on a real device grant, and the four
-the OS raises rather than Braid.
+the OS raises rather than Sennit.
 
 When a phase adds a screen it adds a row here and a step in
 `route_walk_test.dart`. The walk fails on a `Scaffold` it cannot reach, which

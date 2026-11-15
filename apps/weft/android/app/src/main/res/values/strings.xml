@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Strings the *launcher* renders.
 
-     Braid's own copy lives in Flutter's ARB catalogue and is reached through
+     Sennit's own copy lives in Flutter's ARB catalogue and is reached through
      `AppLocalizations`. Nothing in a Glance composable can reach it: the widget
      is drawn by the launcher's process, with no Flutter engine anywhere in it,
      so its strings have to be Android resources. That duplicates the
@@ -16,9 +16,9 @@
     <!-- Widget picker entries. `android:label` on the receiver and
          `android:description` in the provider XML — the label is the name under
          the icon, the description is the sentence beneath it on Android 12+. -->
-    <string name="weft_widget_unread_name">Braid unread</string>
+    <string name="weft_widget_unread_name">Sennit unread</string>
     <string name="weft_widget_unread_description">How many unread messages you have, across every conversation.</string>
-    <string name="weft_widget_inbox_name">Braid conversations</string>
+    <string name="weft_widget_inbox_name">Sennit conversations</string>
     <string name="weft_widget_inbox_description">Your most recent conversations. Tap one to open it.</string>
 
     <!-- The list widget's heading. "Recent" rather than "Inbox": the rows are
@@ -39,13 +39,13 @@
          The one empty state that must not mention the setting — the setting is
          not the problem, and pointing someone at it who has simply signed out
          sends them looking for a switch that will not help. -->
-    <string name="weft_widget_signed_out_title">Sign in to Braid</string>
-    <string name="weft_widget_signed_out_body">Open Braid and sign in to see your conversations here.</string>
+    <string name="weft_widget_signed_out_title">Sign in to Sennit</string>
+    <string name="weft_widget_signed_out_body">Open Sennit and sign in to see your conversations here.</string>
 
     <!-- Switched off: signed in, and the home screen may not draw. Names the
          switch as it is spelled on the settings screen. -->
     <string name="weft_widget_disabled_title">Widgets are off</string>
-    <string name="weft_widget_disabled_body">Open Braid and turn on Home screen widgets under Widgets &amp; watch.</string>
+    <string name="weft_widget_disabled_body">Open Sennit and turn on Home screen widgets under Widgets &amp; watch.</string>
 
     <!-- Stale or unreadable. Deliberately one sentence for both: a
          twelve-hour-old snapshot and a half-written one are the same fact to the
@@ -53,8 +53,8 @@
          nothing a home screen can offer for either except this. It does not say
          "error", because nothing has gone wrong: a phone that was not opened
          overnight arrives here every morning. -->
-    <string name="weft_widget_stale_title">Open Braid on your phone</string>
-    <string name="weft_widget_stale_body">This is out of date. Open Braid to refresh it.</string>
+    <string name="weft_widget_stale_title">Open Sennit on your phone</string>
+    <string name="weft_widget_stale_body">This is out of date. Open Sennit to refresh it.</string>
 
     <!-- Switched on, nothing to show: an empty inbox, or one whose every
          conversation is on a network you excluded. Phrased so it does not read
@@ -79,17 +79,17 @@
          Flutter engine alive at all. The wording matches
          `notification_channels.dart` where the two name the same thing, so a
          user reading Android's notification settings and a user reading
-         Braid's see one vocabulary. -->
+         Sennit's see one vocabulary. -->
     <string name="call_channel_name">Calls</string>
     <string name="call_channel_description">Incoming calls.</string>
     <string name="call_incoming">Incoming call</string>
     <string name="call_incoming_video">Incoming video call</string>
     <string name="call_in_progress">Call in progress</string>
     <string name="call_in_progress_video">Video call in progress</string>
-    <string name="call_phone_account">Braid calls</string>
+    <string name="call_phone_account">Sennit calls</string>
 
     <string name="connection_channel_name">Connection</string>
-    <string name="connection_channel_description">Keeps Braid connected so messages arrive while it is closed.</string>
+    <string name="connection_channel_description">Keeps Sennit connected so messages arrive while it is closed.</string>
     <string name="connection_title">Listening for messages</string>
-    <string name="connection_body">Braid stays connected in the background.</string>
+    <string name="connection_body">Sennit stays connected in the background.</string>
 </resources>

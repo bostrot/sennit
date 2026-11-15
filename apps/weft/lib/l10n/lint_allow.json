@@ -11,14 +11,14 @@
     "want. A reason is required — an allowlist of bare keys becomes a place to",
     "put anything that fails, and then the rule stops meaning anything.",
     "",
-    "Values used in every language — 'Braid', 'SMS', 'Bluetooth' — do not belong",
+    "Values used in every language — 'Sennit', 'SMS', 'Bluetooth' — do not belong",
     "here. They are in `_neverTranslated` in the lint, because they are the same",
     "answer for every locale and repeating them six times says less.",
     "",
     "See docs/TRANSLATING.md."
   ],
   "de": {
-    "autoReplyAudienceLabel": "Same word as contactLabels: Braid's German keeps 'Label'.",
+    "autoReplyAudienceLabel": "Same word as contactLabels: Sennit's German keeps 'Label'.",
     "autoReplyNameLabel": "'Name' is German.",
     "autoReplyPromptLabel": "German AI tooling says 'Prompt'; 'Eingabeaufforderung' is a Windows shell.",
     "backupPassphraseLabel": "'Passphrase' is the German word, and the one every German password manager uses.",
@@ -27,9 +27,9 @@
     "chatPollOptionN": "'Option' is German; only the number varies.",
     "chatSubtitleOnline": "'online' is the ordinary German word for it.",
     "chatTileOnline": "'online' is the ordinary German word for it.",
-    "commonBridges": "Braid's German keeps 'Bridge' — the mautrix projects and their docs are what a reader searches for.",
+    "commonBridges": "Sennit's German keeps 'Bridge' — the mautrix projects and their docs are what a reader searches for.",
     "commonPause": "'Pause' is German.",
-    "contactLabels": "Braid's German keeps 'Label'; 'Etikett' reads as a sticker on a jar.",
+    "contactLabels": "Sennit's German keeps 'Label'; 'Etikett' reads as a sticker on a jar.",
     "devicesNameField": "'Name' is German.",
     "inboxLabelTooltip": "Same word as contactLabels, singular.",
     "loginServerHeading": "'Server' is German.",
@@ -44,7 +44,7 @@
     "settingsBridgesTitle": "Same word as commonBridges.",
     "settingsSectionChats": "German messengers say 'Chats'.",
     "threadInChat": "'in' is the same word in German; only the placeholder follows.",
-    "threadOpen": "Braid's German keeps 'Thread', as every German messenger does.",
+    "threadOpen": "Sennit's German keeps 'Thread', as every German messenger does.",
     "threadTitle": "Same word as threadOpen."
   },
   "es": {

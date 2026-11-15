@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Creates the Braid Pro in-app product in Google Play and App Store Connect.
+"""Creates the Sennit Pro in-app product in Google Play and App Store Connect.
 
 The product ids are the ones the app asks the stores for, in
 `apps/weft/lib/services/billing/entitlements.dart`. A product id is for
@@ -36,13 +36,13 @@ PRICE_EUR = '14.99'
 # Store-facing copy. Apple allows 30 characters for the name and 45 for the
 # description; Play allows 55 and 200.
 LISTINGS = {
-    'en-US': ('Braid Pro', 'AI features and integrations. One payment.'),
-    'de-DE': ('Braid Pro', 'KI-Funktionen und Integrationen. Einmalig.'),
+    'en-US': ('Sennit Pro', 'AI features and integrations. One payment.'),
+    'de-DE': ('Sennit Pro', 'KI-Funktionen und Integrationen. Einmalig.'),
 }
 REVIEW_NOTE = (
     'Unlocks the AI features (auto-replies, reply suggestions, semantic '
     'search, voice-note transcription), the MCP server and the Home '
-    'Assistant, paperless-ngx and calendar integrations. Settings > Braid '
+    'Assistant, paperless-ngx and calendar integrations. Settings > Sennit '
     'Pro shows the purchase screen.'
 )
 
@@ -254,7 +254,7 @@ def appstore(apply):
     iap = call('POST', f'{ASC}/v2/inAppPurchases', token, body={'data': {
         'type': 'inAppPurchases',
         'attributes': {
-            'name': 'Braid Pro',
+            'name': 'Sennit Pro',
             'productId': PRODUCT_ID,
             'inAppPurchaseType': 'NON_CONSUMABLE',
             'familySharable': False,

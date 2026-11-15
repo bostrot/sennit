@@ -13,14 +13,14 @@ related:
 
 # LLM Auto-Reply
 
-Braid already talks to the user's own model for reply chips. This turns that
+Sennit already talks to the user's own model for reply chips. This turns that
 into an auto-responder: a prompt the user wrote, a rule deciding which
 conversations it covers, and a reply sent by itself when a matching message
 arrives — **while leaving the conversation unread**.
 
 That last clause is the interesting part of the design and the reason this
 document exists. Replying marks a chat read on essentially every network, and in
-Braid it does so *without any receipt at all*. Making a reply that does not is a
+Sennit it does so *without any receipt at all*. Making a reply that does not is a
 property of one specific code path, and the rest of this file is about which one
 and why.
 
@@ -168,7 +168,7 @@ every write, and a conversation is forgotten when its last entry expires.
 
 This is the crux. It is **not** about receipts.
 
-`MatrixChatRepository.markRead` is the only thing in Braid that writes an
+`MatrixChatRepository.markRead` is the only thing in Sennit that writes an
 `m.read`, and every one of its callers is a user gesture — opening a chat,
 swiping a row, the notification action. Nothing in the auto-reply path calls it.
 That part is easy.
@@ -243,7 +243,7 @@ It buys two things:
 - **In the transcript**, the small robot glyph beside the clock. Six months
   later, "did I say that or did the model" is not a question a transcript should
   leave open. Drawn for a peer's auto-reply as well as the user's own.
-- **In the engine**, the `autoReplyEcho` guard: two Braid users who have both
+- **In the engine**, the `autoReplyEcho` guard: two Sennit users who have both
   switched this on would otherwise answer each other.
 
 **It survives no bridge.** A reply relayed to WhatsApp arrives there as plain
@@ -255,7 +255,7 @@ needs no cooperation from the far side.
 ## What is sent to the model, and what is not
 
 The endpoint is the user's own: `ai.llm_base_url` and `ai.llm_model`, with the
-key in the platform keychain. The same endpoint the reply chips use. Braid hosts
+key in the platform keychain. The same endpoint the reply chips use. Sennit hosts
 nothing and there is no service in the middle.
 
 Per reply, one POST to `<base>/chat/completions` carrying:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Braid for macOS on this Mac and push it to the test Mac.
+# Build Sennit for macOS on this Mac and push it to the test Mac.
 #
 # The iteration loop this exists for: the build Mac compiles, rsync ships
 # only the changed bytes across to the test Mac, and the app is relaunched
@@ -33,10 +33,10 @@ if [ -z "$TARGET" ]; then
 fi
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-APP="$REPO/apps/weft/build/macos/Build/Products/Release/Braid.app"
+APP="$REPO/apps/weft/build/macos/Build/Products/Release/Sennit.app"
 
 if $BUILD; then
-  echo "==> Building Braid.app (release)"
+  echo "==> Building Sennit.app (release)"
   (
     cd "$REPO/apps/weft"
     RUSTC="$HOME/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc" \
@@ -50,9 +50,9 @@ echo "==> Syncing to $TARGET"
 ssh "$TARGET" 'mkdir -p ~/Applications'
 # --delete keeps the bundle exact; a stale dylib from a previous build inside
 # a .app is a crash with a misleading stack.
-rsync -az --delete "$APP/" "$TARGET:Applications/Braid.app/"
+rsync -az --delete "$APP/" "$TARGET:Applications/Sennit.app/"
 
 echo "==> Relaunching"
-ssh "$TARGET" 'pkill -x Braid 2>/dev/null || true; sleep 1; open ~/Applications/Braid.app'
+ssh "$TARGET" 'pkill -x Sennit 2>/dev/null || true; sleep 1; open ~/Applications/Sennit.app'
 
 echo "==> Done"

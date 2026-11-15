@@ -141,22 +141,22 @@
   "@settingsMcpTitle": {
     "description": "Title of a settings row that opens the MCP screen. MCP = Model Context Protocol, an acronym that stays untranslated. Keep under ~24 chars."
   },
-  "settingsMcpSubtitle": "Let your own agents read and send through Braid",
+  "settingsMcpSubtitle": "Let your own agents read and send through Sennit",
   "@settingsMcpSubtitle": {
-    "description": "One-line subtitle under 'MCP server'. 'Agents' means the reader's own AI programs; 'Braid' is the app name and is never translated. Keep under ~60 chars."
+    "description": "One-line subtitle under 'MCP server'. 'Agents' means the reader's own AI programs; 'Sennit' is the app name and is never translated. Keep under ~60 chars."
   },
   "settingsSectionAbout": "About",
   "@settingsSectionAbout": {
     "description": "Section heading at the bottom of the settings screen, above the row that opens the app's version and licence information. Keep under ~20 chars.",
     "maxLength": 40
   },
-  "settingsAboutTitle": "About Braid",
+  "settingsAboutTitle": "About Sennit",
   "@settingsAboutTitle": {
-    "description": "Title of a settings row that opens a dialog with the app's version, build details and open-source licences. 'Braid' is the app name and is never translated. Keep under ~24 chars."
+    "description": "Title of a settings row that opens a dialog with the app's version, build details and open-source licences. 'Sennit' is the app name and is never translated. Keep under ~24 chars."
   },
   "settingsAboutSubtitle": "Version, build details and licences",
   "@settingsAboutSubtitle": {
-    "description": "One-line subtitle under 'About Braid'. 'Build details' are the commit and build date of test builds; 'licences' are the open-source licences of the libraries the app uses. Keep under ~60 chars."
+    "description": "One-line subtitle under 'About Sennit'. 'Build details' are the commit and build date of test builds; 'licences' are the open-source licences of the libraries the app uses. Keep under ~60 chars."
   },
   "settingsReadReceiptsTitle": "Send read receipts",
   "@settingsReadReceiptsTitle": {
@@ -174,9 +174,9 @@
   "@settingsContactNamesSubtitle": {
     "description": "Three-line subtitle under the 'Use address book names' switch. 'WhatsApp' and 'Signal' are product names and stay. The last sentence is the privacy reassurance: no phone numbers leave the device."
   },
-  "settingsContactsDenied": "Braid was not allowed to read your contacts.",
+  "settingsContactsDenied": "Sennit was not allowed to read your contacts.",
   "@settingsContactsDenied": {
-    "description": "Snackbar shown when the reader turns on 'Use address book names' and then denies the operating system's contacts permission. One short sentence. 'Braid' is the app name and stays."
+    "description": "Snackbar shown when the reader turns on 'Use address book names' and then denies the operating system's contacts permission. One short sentence. 'Sennit' is the app name and stays."
   },
   "settingsSendOnEnterTitle": "Return sends the message",
   "@settingsSendOnEnterTitle": {
@@ -976,7 +976,7 @@
   },
   "smsNotEncrypted": "Not encrypted",
   "@smsNotEncrypted": {
-    "description": "The warning above the composer when the message will go out as an SMS. The single most important words on that bar: SMS is plaintext and Braid cannot change that. Keep under ~18 chars.",
+    "description": "The warning above the composer when the message will go out as an SMS. The single most important words on that bar: SMS is plaintext and Sennit cannot change that. Keep under ~18 chars.",
     "maxLength": 36
   },
   "smsComposerSemantics": "Not encrypted. {cost}",
@@ -1014,9 +1014,9 @@
       }
     }
   },
-  "chatUnverifiedOwnDevice": "One of your own devices is not verified, so Braid cannot promise the messages here are only reaching you.",
+  "chatUnverifiedOwnDevice": "One of your own devices is not verified, so Sennit cannot promise the messages here are only reaching you.",
   "@chatUnverifiedOwnDevice": {
-    "description": "The red banner at the top of a conversation when one of the reader's own devices has not been verified. 'Braid' is the app's name and is never translated. Two lines at most."
+    "description": "The red banner at the top of a conversation when one of the reader's own devices has not been verified. 'Sennit' is the app's name and is never translated. Two lines at most."
   },
   "chatUnverifiedOtherDevices": "{devices, plural, =1{One device here has not been verified.} other{{people, plural, =1{{devices} devices belonging to someone here have not been verified.} other{{devices} devices belonging to {people} people here have not been verified.}}}}",
   "@chatUnverifiedOtherDevices": {
@@ -1038,9 +1038,9 @@
   "@chatVerifyYourDevice": {
     "description": "Screen-reader-only label for the 'Verify' button in the unverified-devices banner. Not visible: 'Verify' alone is a verb with no object once it is read out of the strip it sits in."
   },
-  "voiceNeedsMicrophone": "Braid needs the microphone to record a voice message.",
+  "voiceNeedsMicrophone": "Sennit needs the microphone to record a voice message.",
   "@voiceNeedsMicrophone": {
-    "description": "Toast shown when recording a voice message was refused because the microphone permission is not granted. 'Braid' is the app's name and is never translated."
+    "description": "Toast shown when recording a voice message was refused because the microphone permission is not granted. 'Sennit' is the app's name and is never translated."
   },
   "voiceTooShort": "That was too short to send.",
   "@voiceTooShort": {
@@ -2104,9 +2104,9 @@
   "@chatTimeAlreadyPast": {
     "description": "Toast shown when the moment picked for a scheduled message has already gone by."
   },
-  "chatScheduledFor": "Scheduled for {time}. It sends while Braid is running.",
+  "chatScheduledFor": "Scheduled for {time}. It sends while Sennit is running.",
   "@chatScheduledFor": {
-    "description": "Toast confirming a message was parked in the outbox. The second sentence is the caveat that matters: nothing sends while the app is closed. 'Braid' is the app's name and is never translated.",
+    "description": "Toast confirming a message was parked in the outbox. The second sentence is the caveat that matters: nothing sends while the app is closed. 'Sennit' is the app's name and is never translated.",
     "placeholders": {
       "time": {
         "type": "String",
@@ -2119,9 +2119,9 @@
   "@chatPickerFailed": {
     "description": "Toast shown when the platform attachment picker refused to open — most often because a photo permission was denied."
   },
-  "chatNoLocationPermission": "Braid has no location permission.",
+  "chatNoLocationPermission": "Sennit has no location permission.",
   "@chatNoLocationPermission": {
-    "description": "Toast shown when sharing a location was refused because the location permission is not granted. 'Braid' is the app's name and is never translated."
+    "description": "Toast shown when sharing a location was refused because the location permission is not granted. 'Sennit' is the app's name and is never translated."
   },
   "chatGettingPosition": "Getting your position…",
   "@chatGettingPosition": {
@@ -2758,25 +2758,25 @@
     "description": "Tooltip on the refresh button of the SMS screen, for the user who granted the role in Android's own settings and came back. Keep under ~20 chars.",
     "maxLength": 40
   },
-  "smsUnsupportedDevice": "This device has no SMS. Braid carries SMS only on Android, where the system can hand one app the messaging role — everywhere else your conversations arrive over Matrix and its bridges.",
+  "smsUnsupportedDevice": "This device has no SMS. Sennit carries SMS only on Android, where the system can hand one app the messaging role — everywhere else your conversations arrive over Matrix and its bridges.",
   "@smsUnsupportedDevice": {
-    "description": "Shown in place of the whole SMS screen on a device that cannot carry SMS. 'Braid' is the app's name and 'Matrix' the protocol; neither is translated."
+    "description": "Shown in place of the whole SMS screen on a device that cannot carry SMS. 'Sennit' is the app's name and 'Matrix' the protocol; neither is translated."
   },
-  "smsPrivacyNotice": "SMS is not encrypted. Every message you send this way is readable by your carrier, by the recipient''s carrier, and by anyone who can see either network — and Braid cannot change that, because there is no encryption in SMS to switch on. It is here so one person''s texts and their bridged chats can be one conversation, not because it is safe.",
+  "smsPrivacyNotice": "SMS is not encrypted. Every message you send this way is readable by your carrier, by the recipient''s carrier, and by anyone who can see either network — and Sennit cannot change that, because there is no encryption in SMS to switch on. It is here so one person''s texts and their bridged chats can be one conversation, not because it is safe.",
   "@smsPrivacyNotice": {
-    "description": "The privacy notice at the top of the SMS screen. The point is that this is not a shortcoming Braid can fix — there is no encryption in SMS to switch on. 'Braid' is the app's name and is never translated."
+    "description": "The privacy notice at the top of the SMS screen. The point is that this is not a shortcoming Sennit can fix — there is no encryption in SMS to switch on. 'Sennit' is the app's name and is never translated."
   },
   "smsDefaultAppTitle": "Default messaging app",
   "@smsDefaultAppTitle": {
     "description": "Section heading on the SMS screen, above the current state of Android's messaging role. Keep under ~30 chars."
   },
-  "smsStateReady": "Braid is your default messaging app. Texts arrive in the same inbox as every bridged network, and a number that also has a WhatsApp or Signal chat can be merged with it.",
+  "smsStateReady": "Sennit is your default messaging app. Texts arrive in the same inbox as every bridged network, and a number that also has a WhatsApp or Signal chat can be merged with it.",
   "@smsStateReady": {
-    "description": "The sentence under the SMS screen's first heading when Braid holds the messaging role. 'Braid' is the app's name; 'WhatsApp' and 'Signal' are messenger names. None are translated."
+    "description": "The sentence under the SMS screen's first heading when Sennit holds the messaging role. 'Sennit' is the app's name; 'WhatsApp' and 'Signal' are messenger names. None are translated."
   },
-  "smsStateHeldByApp": "{app} holds the role. Until that changes, Braid cannot read or send texts and the SMS network is absent from your inbox.",
+  "smsStateHeldByApp": "{app} holds the role. Until that changes, Sennit cannot read or send texts and the SMS network is absent from your inbox.",
   "@smsStateHeldByApp": {
-    "description": "The sentence under the SMS screen's first heading when another app holds the messaging role, naming it. 'Braid' is the app's name and is never translated.",
+    "description": "The sentence under the SMS screen's first heading when another app holds the messaging role, naming it. 'Sennit' is the app's name and is never translated.",
     "placeholders": {
       "app": {
         "type": "String",
@@ -2785,9 +2785,9 @@
       }
     }
   },
-  "smsStateNotDefault": "Braid is not your messaging app, so the SMS network is absent from your inbox. Everything else is unaffected.",
+  "smsStateNotDefault": "Sennit is not your messaging app, so the SMS network is absent from your inbox. Everything else is unaffected.",
   "@smsStateNotDefault": {
-    "description": "The sentence under the SMS screen's first heading when Braid does not hold the role and Android will not say which app does. 'Braid' is the app's name."
+    "description": "The sentence under the SMS screen's first heading when Sennit does not hold the role and Android will not say which app does. 'Sennit' is the app's name."
   },
   "smsStateUnsupported": "This device cannot hand out the messaging role — it has no telephony, or the system does not offer the role at all.",
   "@smsStateUnsupported": {
@@ -2795,12 +2795,12 @@
   },
   "smsStatusOn": "On",
   "@smsStatusOn": {
-    "description": "The one-word state chip on the SMS screen when Braid holds the role. Keep under ~8 chars.",
+    "description": "The one-word state chip on the SMS screen when Sennit holds the role. Keep under ~8 chars.",
     "maxLength": 20
   },
   "smsStatusOff": "Off",
   "@smsStatusOff": {
-    "description": "The one-word state chip on the SMS screen when Braid does not hold the role. Keep under ~8 chars.",
+    "description": "The one-word state chip on the SMS screen when Sennit does not hold the role. Keep under ~8 chars.",
     "maxLength": 20
   },
   "smsStatusUnavailable": "Not available",
@@ -2808,11 +2808,11 @@
     "description": "The state chip on the SMS screen for a device with no messaging role to give. Keep under ~16 chars.",
     "maxLength": 32
   },
-  "smsStatusReadySemantics": "SMS is on. Braid is your messaging app.",
+  "smsStatusReadySemantics": "SMS is on. Sennit is your messaging app.",
   "@smsStatusReadySemantics": {
-    "description": "Screen-reader-only label for the SMS state row when Braid holds the role. Not visible: 'On' is a word with no subject, and the only thing saying what it qualifies is a 22dp lettermark at the far end of the row."
+    "description": "Screen-reader-only label for the SMS state row when Sennit holds the role. Not visible: 'On' is a word with no subject, and the only thing saying what it qualifies is a 22dp lettermark at the far end of the row."
   },
-  "smsStatusNotDefaultSemantics": "SMS is off. Braid is not your messaging app.",
+  "smsStatusNotDefaultSemantics": "SMS is off. Sennit is not your messaging app.",
   "@smsStatusNotDefaultSemantics": {
     "description": "Screen-reader-only label for the SMS state row when another app holds the role."
   },
@@ -2820,50 +2820,50 @@
   "@smsStatusUnsupportedSemantics": {
     "description": "Screen-reader-only label for the SMS state row on a device with no messaging role."
   },
-  "smsMissingPermissions": "Braid holds the role but not the SMS permissions, so no threads can be read. Grant them in Android''s app settings and check again.",
+  "smsMissingPermissions": "Sennit holds the role but not the SMS permissions, so no threads can be read. Grant them in Android''s app settings and check again.",
   "@smsMissingPermissions": {
-    "description": "Shown in red on the SMS screen for the one state that looks fine and reads empty: Braid holds the role but the permission group under it was not granted, so every read comes back with nothing."
+    "description": "Shown in red on the SMS screen for the one state that looks fine and reads empty: Sennit holds the role but the permission group under it was not granted, so every read comes back with nothing."
   },
   "smsRoleTitle": "What the role does",
   "@smsRoleTitle": {
     "description": "Section heading on the SMS screen, above the description of everything Android's messaging role grants. Keep under ~26 chars."
   },
-  "smsRoleSubtitle": "Android gives it all at once. The default app receives every incoming message, is the only app allowed to write to the phone''s message store, and answers the \"send a message\" action from your contacts and dialler. Braid writes what it receives and sends into that same store, so switching back to another app leaves your history where it was.",
+  "smsRoleSubtitle": "Android gives it all at once. The default app receives every incoming message, is the only app allowed to write to the phone''s message store, and answers the \"send a message\" action from your contacts and dialler. Sennit writes what it receives and sends into that same store, so switching back to another app leaves your history where it was.",
   "@smsRoleSubtitle": {
-    "description": "The honest description of Android's messaging role: it is granted all at once and cannot be taken in parts. 'Braid' is the app's name and is never translated."
+    "description": "The honest description of Android's messaging role: it is granted all at once and cannot be taken in parts. 'Sennit' is the app's name and is never translated."
   },
-  "smsMakeBraidDefault": "Make Braid the SMS app",
-  "@smsMakeBraidDefault": {
-    "description": "Button that asks Android for the messaging role. 'Braid' is the app's name and is never translated. Keep under ~30 chars.",
+  "smsMakeSennitDefault": "Make Sennit the SMS app",
+  "@smsMakeSennitDefault": {
+    "description": "Button that asks Android for the messaging role. 'Sennit' is the app's name and is never translated. Keep under ~30 chars.",
     "maxLength": 54
   },
-  "smsDeclined": "Nothing changed. Braid is not your SMS app, the SMS network stays out of your inbox, and every other conversation works exactly as it did. You can come back here whenever you like.",
+  "smsDeclined": "Nothing changed. Sennit is not your SMS app, the SMS network stays out of your inbox, and every other conversation works exactly as it did. You can come back here whenever you like.",
   "@smsDeclined": {
-    "description": "Shown after the user turned down Android's role dialog. Reassures that declining broke nothing — it is a choice, not a failure. 'Braid' is the app's name."
+    "description": "Shown after the user turned down Android's role dialog. Reassures that declining broke nothing — it is a choice, not a failure. 'Sennit' is the app's name."
   },
   "smsRoleUnavailable": "Android did not offer the choice. This phone''s build does not let another app take the messaging role, so there is nothing here to grant. Nothing is broken — every other network in your inbox works as before.",
   "@smsRoleUnavailable": {
-    "description": "Shown when the system refused to show its default-SMS-app dialog at all — the role is missing from this ROM, or the device has no telephony. Must not read as if the user declined: they were never asked, so avoid the 'nothing changed' phrasing used for a decline. 'Braid' is the app's name."
+    "description": "Shown when the system refused to show its default-SMS-app dialog at all — the role is missing from this ROM, or the device has no telephony. Must not read as if the user declined: they were never asked, so avoid the 'nothing changed' phrasing used for a decline. 'Sennit' is the app's name."
   },
-  "smsRoleInterrupted": "Braid lost track of that answer — the screen was rebuilt while Android''s dialog was open. The state above is read fresh from the phone, so it is right; tap Check again if you are not sure.",
+  "smsRoleInterrupted": "Sennit lost track of that answer — the screen was rebuilt while Android''s dialog was open. The state above is read fresh from the phone, so it is right; tap Check again if you are not sure.",
   "@smsRoleInterrupted": {
-    "description": "Shown when the app's activity was destroyed while Android's role dialog was on screen, so the answer never came back through the request. The status shown has been re-read from the platform. 'Check again' is the refresh button's tooltip on the same screen. 'Braid' is the app's name."
+    "description": "Shown when the app's activity was destroyed while Android's role dialog was on screen, so the answer never came back through the request. The status shown has been re-read from the platform. 'Check again' is the refresh button's tooltip on the same screen. 'Sennit' is the app's name."
   },
   "smsRcsTitle": "RCS",
   "@smsRcsTitle": {
     "description": "Section heading on the SMS screen about where RCS stands. 'RCS' is the standard's name and stays as-is."
   },
-  "smsRcsWithGoogleMessages": "Google Messages holds the messaging role, so this phone has RCS. Braid cannot take that over: Android has no RCS API for a third-party app — RCS is Google Messages talking to Google''s network, and only while it is the default. Making Braid your SMS app would turn RCS off for the whole phone and drop those conversations back to SMS and MMS.",
+  "smsRcsWithGoogleMessages": "Google Messages holds the messaging role, so this phone has RCS. Sennit cannot take that over: Android has no RCS API for a third-party app — RCS is Google Messages talking to Google''s network, and only while it is the default. Making Sennit your SMS app would turn RCS off for the whole phone and drop those conversations back to SMS and MMS.",
   "@smsRcsWithGoogleMessages": {
-    "description": "Subtitle under 'RCS' when Google Messages holds the role, so the phone has RCS and taking the role would end it. 'Google Messages' and 'Braid' are product names and are never translated."
+    "description": "Subtitle under 'RCS' when Google Messages holds the role, so the phone has RCS and taking the role would end it. 'Google Messages' and 'Sennit' are product names and are never translated."
   },
-  "smsRcsOffForBraid": "This phone sends SMS and MMS, and no RCS. That is not a setting waiting to be found: Android has no RCS API for a third-party app, and RCS works only in Google Messages while it holds the messaging role. To have RCS again, hand the role back.",
-  "@smsRcsOffForBraid": {
-    "description": "Subtitle under 'RCS' when Braid already holds the role, so the phone has no RCS. Says plainly that this is not a setting waiting to be found. 'Braid' and 'Google Messages' are product names."
+  "smsRcsOffForSennit": "This phone sends SMS and MMS, and no RCS. That is not a setting waiting to be found: Android has no RCS API for a third-party app, and RCS works only in Google Messages while it holds the messaging role. To have RCS again, hand the role back.",
+  "@smsRcsOffForSennit": {
+    "description": "Subtitle under 'RCS' when Sennit already holds the role, so the phone has no RCS. Says plainly that this is not a setting waiting to be found. 'Sennit' and 'Google Messages' are product names."
   },
-  "smsRcsOffForOther": "RCS is already off on this phone. {holder} holds the messaging role and RCS on Android works only in Google Messages, so making Braid your SMS app costs you no chat features.",
+  "smsRcsOffForOther": "RCS is already off on this phone. {holder} holds the messaging role and RCS on Android works only in Google Messages, so making Sennit your SMS app costs you no chat features.",
   "@smsRcsOffForOther": {
-    "description": "Subtitle under 'RCS' when a third app holds the role, so RCS is already off and taking the role costs nothing. 'Braid' and 'Google Messages' are product names.",
+    "description": "Subtitle under 'RCS' when a third app holds the role, so RCS is already off and taking the role costs nothing. 'Sennit' and 'Google Messages' are product names.",
     "placeholders": {
       "holder": {
         "type": "String",
@@ -2897,7 +2897,7 @@
   "@smsRcsDialogTitle": {
     "description": "Title of the dialog raised before taking the messaging role when doing so would end the phone's RCS. Keep under ~28 chars."
   },
-  "smsRcsDialogBody": "Google Messages is your SMS app, so this phone has RCS: typing indicators, read receipts, full-size photos, group chats that work. Braid cannot carry any of it — Android has no RCS API for a third-party app.\n\nTaking the role turns RCS off for the whole phone. Those conversations drop back to SMS and MMS{bridged}.",
+  "smsRcsDialogBody": "Google Messages is your SMS app, so this phone has RCS: typing indicators, read receipts, full-size photos, group chats that work. Sennit cannot carry any of it — Android has no RCS API for a third-party app.\n\nTaking the role turns RCS off for the whole phone. Those conversations drop back to SMS and MMS{bridged}.",
   "@smsRcsDialogBody": {
     "description": "Body of the RCS warning dialog. Two paragraphs separated by a blank line, then a clause that appears only when a Google Messages bridge is relaying through this phone. Product names are never translated.",
     "placeholders": {
@@ -2987,9 +2987,9 @@
       }
     }
   },
-  "devicesSignOutCurrentMessage": "This is the device you are using. Signing it out logs you out of Braid here, and any messages only this device can decrypt stay unreadable unless you have a key backup.",
+  "devicesSignOutCurrentMessage": "This is the device you are using. Signing it out logs you out of Sennit here, and any messages only this device can decrypt stay unreadable unless you have a key backup.",
   "@devicesSignOutCurrentMessage": {
-    "description": "Body of the sign-out dialog when the device being signed out is the one in the reader's hand. 'Braid' is the app's name and is never translated."
+    "description": "Body of the sign-out dialog when the device being signed out is the one in the reader's hand. 'Sennit' is the app's name and is never translated."
   },
   "devicesSignOutOtherMessage": "That session loses access immediately. If you did not recognise it, change your account password afterwards as well — a sign-out does not stop whoever has your password logging in again.",
   "@devicesSignOutOtherMessage": {
@@ -3381,9 +3381,9 @@
   "@mcpCopyKeyTitle": {
     "description": "Title of the dialog showing a newly minted MCP key. Keep under ~26 chars."
   },
-  "mcpCopyKeyBody": "This is the only time the key is shown. Braid stores only a hash; if it is lost, revoke it and create a new one.",
+  "mcpCopyKeyBody": "This is the only time the key is shown. Sennit stores only a hash; if it is lost, revoke it and create a new one.",
   "@mcpCopyKeyBody": {
-    "description": "Body of the new-key dialog. 'Braid' is the app's name and is never translated. The point is that there is no second chance."
+    "description": "Body of the new-key dialog. 'Sennit' is the app's name and is never translated. The point is that there is no second chance."
   },
   "mcpKeySpelledOut": "API key. Copy it with the Copy button, or write it down: {spelled}",
   "@mcpKeySpelledOut": {
@@ -3532,9 +3532,9 @@
       }
     }
   },
-  "mcpTunnelGaveUp": "cloudflared kept stopping (exit {code}). Braid stopped trying — start it again once it works from a terminal.",
+  "mcpTunnelGaveUp": "cloudflared kept stopping (exit {code}). Sennit stopped trying — start it again once it works from a terminal.",
   "@mcpTunnelGaveUp": {
-    "description": "Subtitle of the tunnel row after the process failed repeatedly and the supervisor stopped restarting it. 'cloudflared' is the binary's name and is never translated; 'Braid' is the app's name.",
+    "description": "Subtitle of the tunnel row after the process failed repeatedly and the supervisor stopped restarting it. 'cloudflared' is the binary's name and is never translated; 'Sennit' is the app's name.",
     "placeholders": {
       "code": {
         "type": "int",
@@ -3694,9 +3694,9 @@
   "@integrationsHomeAssistantTitle": {
     "description": "Section heading on the integrations screen. 'Home Assistant' is a product name and is never translated."
   },
-  "integrationsHomeAssistantSubtitle": "Every message action \"Send to Home Assistant\" fires a weft_message event on your instance — automate anything against it. For the other direction, point a rest_command at Braid''s MCP server and call its send_message tool.",
+  "integrationsHomeAssistantSubtitle": "Every message action \"Send to Home Assistant\" fires a weft_message event on your instance — automate anything against it. For the other direction, point a rest_command at Sennit''s MCP server and call its send_message tool.",
   "@integrationsHomeAssistantSubtitle": {
-    "description": "Subtitle under the Home Assistant heading. 'weft_message', 'rest_command', 'send_message' and 'MCP' are literal identifiers; 'Braid' is the app's name. None are translated."
+    "description": "Subtitle under the Home Assistant heading. 'weft_message', 'rest_command', 'send_message' and 'MCP' are literal identifiers; 'Sennit' is the app's name. None are translated."
   },
   "integrationsTokenField": "Long-lived access token (stored in the keychain)",
   "@integrationsTokenField": {
@@ -3810,9 +3810,9 @@
   "@securityYourKeyTitle": {
     "description": "Heading of the step showing the newly generated recovery key. Keep under ~28 chars."
   },
-  "securityYourKeySubtitle": "Write it down or put it in a password manager now. Braid cannot show it again, and nobody — not your homeserver, not us — can reissue it.",
+  "securityYourKeySubtitle": "Write it down or put it in a password manager now. Sennit cannot show it again, and nobody — not your homeserver, not us — can reissue it.",
   "@securityYourKeySubtitle": {
-    "description": "Subtitle under 'Your recovery key'. 'Braid' is the app's name and is never translated. There is genuinely no reissue, which is why the sentence is blunt."
+    "description": "Subtitle under 'Your recovery key'. 'Sennit' is the app's name and is never translated. There is genuinely no reissue, which is why the sentence is blunt."
   },
   "securityKeySpelledOut": "Recovery key. Copy it with the button below, or write it down: {spelled}",
   "@securityKeySpelledOut": {
@@ -3842,9 +3842,9 @@
   "@securityCheckTitle": {
     "description": "Heading of the step that checks the recovery key was saved correctly. Keep under ~26 chars."
   },
-  "securityCheckSubtitle": "Paste the key back in. This is the only chance to find out that what you saved is not what Braid generated.",
+  "securityCheckSubtitle": "Paste the key back in. This is the only chance to find out that what you saved is not what Sennit generated.",
   "@securityCheckSubtitle": {
-    "description": "Subtitle of the check step. This is genuinely the last chance to catch a transcription mistake. 'Braid' is the app's name."
+    "description": "Subtitle of the check step. This is genuinely the last chance to catch a transcription mistake. 'Sennit' is the app's name."
   },
   "securityKeyField": "Recovery key",
   "@securityKeyField": {
@@ -3910,9 +3910,9 @@
   "@backupExplainLocked": {
     "description": "What 'Backup locked' means, and what to do about it."
   },
-  "backupExplainOutOfDate": "This device is holding keys the backup does not have yet. They upload on their own; leave Braid open for a minute.",
+  "backupExplainOutOfDate": "This device is holding keys the backup does not have yet. They upload on their own; leave Sennit open for a minute.",
   "@backupExplainOutOfDate": {
-    "description": "What 'Backup out of date' means. Reassures that it resolves on its own. 'Braid' is the app's name."
+    "description": "What 'Backup out of date' means. Reassures that it resolves on its own. 'Sennit' is the app's name."
   },
   "backupExplainUpToDate": "Everything this device knows how to decrypt is in the backup, and your recovery key opens it on any new device.",
   "@backupExplainUpToDate": {
@@ -3998,9 +3998,9 @@
     "description": "App bar title of the widgets-and-watch screen. The ampersand joins two surfaces; use whatever the language joins them with. Keep under ~26 chars.",
     "maxLength": 47
   },
-  "surfacesNotice": "A widget and a watch cannot decrypt your messages, so Braid has to write what they show into a file outside the encrypted store. That file sits on this device where the system, and any backup of this device, can read it — and a home screen is read by whoever is standing next to you. Nothing is written until you switch a surface on below, and you choose how much of a conversation goes into it.",
+  "surfacesNotice": "A widget and a watch cannot decrypt your messages, so Sennit has to write what they show into a file outside the encrypted store. That file sits on this device where the system, and any backup of this device, can read it — and a home screen is read by whoever is standing next to you. Nothing is written until you switch a surface on below, and you choose how much of a conversation goes into it.",
   "@surfacesNotice": {
-    "description": "The privacy notice at the top of the widgets screen. The trade it describes is why the screen exists: a widget cannot decrypt, so something has to be written in the clear for it. Long — it is a paragraph in a red box. 'Braid' is the app's name."
+    "description": "The privacy notice at the top of the widgets screen. The trade it describes is why the screen exists: a widget cannot decrypt, so something has to be written in the clear for it. Long — it is a paragraph in a red box. 'Sennit' is the app's name."
   },
   "surfacesWriteWarning": "Turning this on writes your recent conversations to a file outside the encrypted store, which backups can read.",
   "@surfacesWriteWarning": {
@@ -4255,17 +4255,17 @@
     "description": "Section heading listing every silenced conversation. Keep under ~20 chars.",
     "maxLength": 40
   },
-  "notificationsMutedChatsSubtitle": "Everything currently silenced, whichever way it was muted. A timed mute is Braid''s own — Matrix push rules cannot express an expiry.",
+  "notificationsMutedChatsSubtitle": "Everything currently silenced, whichever way it was muted. A timed mute is Sennit''s own — Matrix push rules cannot express an expiry.",
   "@notificationsMutedChatsSubtitle": {
-    "description": "Subtitle under 'Muted chats'. A mute can live in two places, and only one of them can expire. 'Braid' is the app's name and 'Matrix' the protocol."
+    "description": "Subtitle under 'Muted chats'. A mute can live in two places, and only one of them can expire. 'Sennit' is the app's name and 'Matrix' the protocol."
   },
   "notificationsNothingMuted": "Nothing is muted.",
   "@notificationsNothingMuted": {
     "description": "Shown in place of the muted list when nothing is silenced. Keep under ~24 chars."
   },
-  "notificationsMutedInApp": "Muted in Braid",
+  "notificationsMutedInApp": "Muted in Sennit",
   "@notificationsMutedInApp": {
-    "description": "Part of the line under a muted conversation: silenced indefinitely by Braid itself. 'Braid' is the app's name and is never translated."
+    "description": "Part of the line under a muted conversation: silenced indefinitely by Sennit itself. 'Sennit' is the app's name and is never translated."
   },
   "notificationsMutedFor": "Muted for another {remaining}",
   "@notificationsMutedFor": {
@@ -4314,9 +4314,9 @@
     "description": "Section heading for the push gateway, which is how the device is woken with the app closed. One word. Keep under ~14 chars.",
     "maxLength": 28
   },
-  "notificationsPushSubtitle": "How this device is woken when Braid is not running. Braid hosts no gateway; point this at a sygnal instance you run, exactly as you do your homeserver. Left empty, notifications still arrive while the app is open.",
+  "notificationsPushSubtitle": "How this device is woken when Sennit is not running. Sennit hosts no gateway; point this at a sygnal instance you run, exactly as you do your homeserver. Left empty, notifications still arrive while the app is open.",
   "@notificationsPushSubtitle": {
-    "description": "Subtitle under 'Push'. 'Braid' is the app's name and 'sygnal' the name of the gateway software; neither is translated."
+    "description": "Subtitle under 'Push'. 'Sennit' is the app's name and 'sygnal' the name of the gateway software; neither is translated."
   },
   "notificationsGatewayField": "Push gateway",
   "@notificationsGatewayField": {
@@ -4332,16 +4332,16 @@
     "description": "Section heading above the test-notification button. Keep under ~24 chars.",
     "maxLength": 44
   },
-  "notificationsTestSubtitle": "Runs a message Braid made up through the same rules, the same rendering and the same channel a real one takes. If nothing appears, the reason is below.",
+  "notificationsTestSubtitle": "Runs a message Sennit made up through the same rules, the same rendering and the same channel a real one takes. If nothing appears, the reason is below.",
   "@notificationsTestSubtitle": {
-    "description": "Subtitle under 'Check it works'. The test is not a shortcut: it goes through the real rules, rendering and channel. 'Braid' is the app's name."
+    "description": "Subtitle under 'Check it works'. The test is not a shortcut: it goes through the real rules, rendering and channel. 'Sennit' is the app's name."
   },
   "notificationsSendTest": "Send test notification",
   "@notificationsSendTest": {
     "description": "Button that posts a made-up notification. Keep under ~34 chars.",
     "maxLength": 55
   },
-  "notificationsTestPosted": "Posted on the {network} channel. If nothing appeared, the block is the operating system rather than Braid — check its notification settings for this app.",
+  "notificationsTestPosted": "Posted on the {network} channel. If nothing appeared, the block is the operating system rather than Sennit — check its notification settings for this app.",
   "@notificationsTestPosted": {
     "description": "Result of the test when the notification was posted normally. The point of the second half: from here on it is the OS, not the app.",
     "placeholders": {
@@ -4393,9 +4393,9 @@
   "@pushStatusRegistered": {
     "description": "The push registration line when the homeserver has this device's token."
   },
-  "pushStatusUnsupported": "This platform has no push. Notifications arrive while Braid is running.",
+  "pushStatusUnsupported": "This platform has no push. Notifications arrive while Sennit is running.",
   "@pushStatusUnsupported": {
-    "description": "The push registration line on a platform with no push at all — desktop. 'Braid' is the app's name."
+    "description": "The push registration line on a platform with no push at all — desktop. 'Sennit' is the app's name."
   },
   "pushStatusNotConfigured": "No push gateway configured, so this device is not woken.",
   "@pushStatusNotConfigured": {
@@ -4464,9 +4464,9 @@
   "@notificationsBlockedTitle": {
     "description": "Title of the dialog shown when Android is blocking every notification from the app. Keep under ~30 chars."
   },
-  "notificationsBlockedBody": "The background connection exists to show you messages, and Android is currently blocking every notification from Braid. Allow notifications in system settings, then try again.",
+  "notificationsBlockedBody": "The background connection exists to show you messages, and Android is currently blocking every notification from Sennit. Allow notifications in system settings, then try again.",
   "@notificationsBlockedBody": {
-    "description": "Body of the notifications-blocked dialog. Explains why the background connection would be pointless. 'Braid' is the app's name."
+    "description": "Body of the notifications-blocked dialog. Explains why the background connection would be pointless. 'Sennit' is the app's name."
   },
   "notificationsOpenSettings": "Open settings",
   "@notificationsOpenSettings": {
@@ -4483,11 +4483,11 @@
   },
   "notificationsStayConnectedTitle": "Stay connected in the background",
   "@notificationsStayConnectedTitle": {
-    "description": "Toggle for Braid's own always-on background connection, Android only. Keep under ~40 chars."
+    "description": "Toggle for Sennit's own always-on background connection, Android only. Keep under ~40 chars."
   },
-  "notificationsStayConnectedSubtitle": "Braid keeps its own connection open behind a small permanent notification, so messages arrive while the app is closed — nothing else to install. Survives reboots.",
+  "notificationsStayConnectedSubtitle": "Sennit keeps its own connection open behind a small permanent notification, so messages arrive while the app is closed — nothing else to install. Survives reboots.",
   "@notificationsStayConnectedSubtitle": {
-    "description": "Subtitle under the background-connection toggle. The permanent notification is Android's requirement, not a choice. 'Braid' is the app's name."
+    "description": "Subtitle under the background-connection toggle. The permanent notification is Android's requirement, not a choice. 'Sennit' is the app's name."
   },
   "notificationsBatteryToggleTitle": "Allow unrestricted battery use",
   "@notificationsBatteryToggleTitle": {
@@ -4495,19 +4495,19 @@
   },
   "notificationsBatteryToggleSubtitle": "Without this, deep sleep cuts the connection and messages wait until the phone wakes. The dialog is Android''s own.",
   "@notificationsBatteryToggleSubtitle": {
-    "description": "Subtitle under the battery toggle. The last sentence sets the expectation that the next screen is not Braid's."
+    "description": "Subtitle under the battery toggle. The last sentence sets the expectation that the next screen is not Sennit's."
   },
   "notificationsUnifiedPushTitle": "Background push",
   "@notificationsUnifiedPushTitle": {
     "description": "Section heading for the UnifiedPush alternative, Android only. Keep under ~26 chars."
   },
-  "notificationsUnifiedPushOn": "Messages reach this phone even with Braid closed, through your UnifiedPush distributor.",
+  "notificationsUnifiedPushOn": "Messages reach this phone even with Sennit closed, through your UnifiedPush distributor.",
   "@notificationsUnifiedPushOn": {
-    "description": "Subtitle under 'Background push' once a UnifiedPush distributor is registered. 'UnifiedPush' is the standard's name and 'Braid' the app's; neither is translated."
+    "description": "Subtitle under 'Background push' once a UnifiedPush distributor is registered. 'UnifiedPush' is the standard's name and 'Sennit' the app's; neither is translated."
   },
-  "notificationsUnifiedPushOff": "An alternative to the built-in connection: a UnifiedPush distributor (the ntfy app) wakes this phone through your own push server, and Braid holds no connection of its own. Lightest on battery when several apps share the distributor.",
+  "notificationsUnifiedPushOff": "An alternative to the built-in connection: a UnifiedPush distributor (the ntfy app) wakes this phone through your own push server, and Sennit holds no connection of its own. Lightest on battery when several apps share the distributor.",
   "@notificationsUnifiedPushOff": {
-    "description": "Subtitle under 'Background push' before setup. 'UnifiedPush', 'ntfy' and 'Braid' are product names and are never translated."
+    "description": "Subtitle under 'Background push' before setup. 'UnifiedPush', 'ntfy' and 'Sennit' are product names and are never translated."
   },
   "notificationsTurnOff": "Turn off",
   "@notificationsTurnOff": {
@@ -4523,13 +4523,13 @@
   "@notificationsRegistering": {
     "description": "Toast after asking a UnifiedPush distributor to register: the answer arrives asynchronously, so the sentence has to say that waiting is normal."
   },
-  "authStarting": "Starting Braid",
+  "authStarting": "Starting Sennit",
   "@authStarting": {
-    "description": "Screen-reader-only label for the spinner on the launch screen. A slow start is a blank screen with a spinner on it, and a spinner with no label is a screen with nothing on it at all. 'Braid' is the app's name."
+    "description": "Screen-reader-only label for the spinner on the launch screen. A slow start is a blank screen with a spinner on it, and a spinner with no label is a screen with nothing on it at all. 'Sennit' is the app's name."
   },
-  "authStartupFailed": "Braid could not start",
+  "authStartupFailed": "Sennit could not start",
   "@authStartupFailed": {
-    "description": "Heading shown when the app could not start at all. The underlying error follows below it, untranslated. 'Braid' is the app's name."
+    "description": "Heading shown when the app could not start at all. The underlying error follows below it, untranslated. 'Sennit' is the app's name."
   },
   "loginServerHeading": "Server",
   "@loginServerHeading": {
@@ -4568,7 +4568,7 @@
   "@loginSso": {
     "description": "A deliberately disabled button for single sign-on, which needs a deep-link callback that has not shipped. 'M8' is the internal milestone name and stays as-is — surfacing a dead button with no explanation would be worse."
   },
-  "loginFooter": "Braid connects to your own Matrix server. It never proxies your messages through anyone else.",
+  "loginFooter": "Sennit connects to your own Matrix server. It never proxies your messages through anyone else.",
   "@loginFooter": {
     "description": "The line at the foot of the sign-in screen. 'Matrix' is the protocol name and is never translated."
   },
@@ -4613,9 +4613,9 @@
   "@setupNotificationsTitle": {
     "description": "Title of the first setup step, which asks for the notification permission. Phrased as what the reader gets, not as a permission name. Keep under ~34 chars."
   },
-  "setupNotificationsBody": "Braid shows who wrote and what they said, with reply buttons right on the notification. Android asks once — this is that moment.",
+  "setupNotificationsBody": "Sennit shows who wrote and what they said, with reply buttons right on the notification. Android asks once — this is that moment.",
   "@setupNotificationsBody": {
-    "description": "Body of the notification-permission step. Says that the OS prompt is about to appear and this is the only time it will ask. 'Braid' is the app's name."
+    "description": "Body of the notification-permission step. Says that the OS prompt is about to appear and this is the only time it will ask. 'Sennit' is the app's name."
   },
   "setupNotificationsAction": "Allow notifications",
   "@setupNotificationsAction": {
@@ -4626,9 +4626,9 @@
   "@setupConnectionTitle": {
     "description": "Title of the setup step that turns on the background connection, Android only. Keep under ~24 chars."
   },
-  "setupConnectionBody": "Messages arrive while Braid is closed: the app keeps its own connection open behind a small silent notification — nothing else to install, survives reboots. Android will also ask to exempt Braid from battery limits so messages arrive at night too.",
+  "setupConnectionBody": "Messages arrive while Sennit is closed: the app keeps its own connection open behind a small silent notification — nothing else to install, survives reboots. Android will also ask to exempt Sennit from battery limits so messages arrive at night too.",
   "@setupConnectionBody": {
-    "description": "Body of the stay-connected step. Names both prompts that follow. 'Braid' is the app's name."
+    "description": "Body of the stay-connected step. Names both prompts that follow. 'Sennit' is the app's name."
   },
   "setupContactsTitle": "Your names for people",
   "@setupContactsTitle": {
@@ -4662,9 +4662,9 @@
   "@verifyOtherDeviceBody": {
     "description": "The explanation when verifying somebody else's session from the devices list: comparing emoji makes each trust the other."
   },
-  "verifyExistingBody": "Confirm it is really you from a device you already use. Until you do, Braid cannot read messages sent before this device signed in.",
+  "verifyExistingBody": "Confirm it is really you from a device you already use. Until you do, Sennit cannot read messages sent before this device signed in.",
   "@verifyExistingBody": {
-    "description": "The explanation on a new sign-in when the account already has cross-signing: history stays locked until another device vouches for this one. 'Braid' is the app's name."
+    "description": "The explanation on a new sign-in when the account already has cross-signing: history stays locked until another device vouches for this one. 'Sennit' is the app's name."
   },
   "verifyFirstDeviceBody": "This is your first device. Setting up encryption now means you can verify future devices and recover your messages if you lose this one.",
   "@verifyFirstDeviceBody": {
@@ -4731,9 +4731,9 @@
     "description": "Button that opens the camera to read the other device's code. Keep under ~34 chars.",
     "maxLength": 55
   },
-  "verifyNoCamera": "This build of Braid cannot open a camera to read a code. Show the code above on whichever device has one, or compare emoji instead — both end up in the same place.",
+  "verifyNoCamera": "This build of Sennit cannot open a camera to read a code. Show the code above on whichever device has one, or compare emoji instead — both end up in the same place.",
   "@verifyNoCamera": {
-    "description": "Shown in place of the scan button on a build with no camera support, naming both ways out. 'Braid' is the app's name."
+    "description": "Shown in place of the scan button on a build with no camera support, naming both ways out. 'Sennit' is the app's name."
   },
   "verifyCompareEmojiInstead": "Compare emoji instead",
   "@verifyCompareEmojiInstead": {
@@ -4949,9 +4949,9 @@
   "@bridgeFlowCookiesTitle": {
     "description": "Heading of the one sign-in step the app cannot render: it needs a real browser window. Keep under ~34 chars."
   },
-  "bridgeFlowCookiesBody": "The bridge wants to read the cookies from a signed-in web session, which means logging in inside a browser window. Braid does not embed one — the bridge''s own management chat can do this step, and the account it connects is the same either way.",
+  "bridgeFlowCookiesBody": "The bridge wants to read the cookies from a signed-in web session, which means logging in inside a browser window. Sennit does not embed one — the bridge''s own management chat can do this step, and the account it connects is the same either way.",
   "@bridgeFlowCookiesBody": {
-    "description": "The explanation of the browser-only sign-in step, and the way round it. 'Braid' is the app's name and is never translated."
+    "description": "The explanation of the browser-only sign-in step, and the way round it. 'Sennit' is the app's name and is never translated."
   },
   "bridgeFlowOpenManagementChat": "Open the management chat",
   "@bridgeFlowOpenManagementChat": {
@@ -5014,9 +5014,9 @@
     "description": "The button that opens the add-bridge dialog — in the toolbar on desktop, a floating button on a phone. Keep under ~20 chars.",
     "maxLength": 40
   },
-  "bridgesEmpty": "No bridges yet.\n\nBraid connects to bridges you run on your own server — mautrix-whatsapp, -signal, -telegram and friends. Add one by its provisioning URL.",
+  "bridgesEmpty": "No bridges yet.\n\nSennit connects to bridges you run on your own server — mautrix-whatsapp, -signal, -telegram and friends. Add one by its provisioning URL.",
   "@bridgesEmpty": {
-    "description": "Shown when no bridge is configured or detected. Two paragraphs separated by a blank line. 'Braid' is the app's name; 'mautrix-whatsapp' and friends are project names. None are translated."
+    "description": "Shown when no bridge is configured or detected. Two paragraphs separated by a blank line. 'Sennit' is the app's name; 'mautrix-whatsapp' and friends are project names. None are translated."
   },
   "bridgesDetected": "Detected on your server",
   "@bridgesDetected": {
@@ -5214,9 +5214,9 @@
   "@callStartBusy": {
     "description": "Why a call could not be placed, shown next to the button that was pressed: a call is already up."
   },
-  "callStartMediaUnavailable": "Braid could not open your microphone or camera.",
+  "callStartMediaUnavailable": "Sennit could not open your microphone or camera.",
   "@callStartMediaUnavailable": {
-    "description": "Why a call could not be placed: this device's microphone or camera would not open. 'Braid' is the app's name."
+    "description": "Why a call could not be placed: this device's microphone or camera would not open. 'Sennit' is the app's name."
   },
   "callStartSignallingFailed": "The call could not be sent.",
   "@callStartSignallingFailed": {
@@ -5641,9 +5641,9 @@
     "description": "Both the button that starts a manual merge and the heading of the sheet it opens. Keep under ~24 chars.",
     "maxLength": 44
   },
-  "mergeIntro": "When the same person reaches you on several networks, their conversations can be woven into one thread. Braid suggests matches; only you confirm them.",
+  "mergeIntro": "When the same person reaches you on several networks, their conversations can be woven into one thread. Sennit suggests matches; only you confirm them.",
   "@mergeIntro": {
-    "description": "The paragraph at the top of the merged-chats screen. The last clause is the reassurance: nothing merges without a confirmation. 'Braid' is the app's name."
+    "description": "The paragraph at the top of the merged-chats screen. The last clause is the reassurance: nothing merges without a confirmation. 'Sennit' is the app's name."
   },
   "mergeSuggestions": "Suggestions",
   "@mergeSuggestions": {
@@ -5868,13 +5868,13 @@
   "@notificationRationaleTitle": {
     "description": "Heading of the sheet shown before the notification permission is asked for. Keep under ~36 chars."
   },
-  "notificationRationaleBody": "Braid can notify you when a message arrives on any of your networks. A merged contact is one notification, not one per network, and anything you have already read elsewhere stays quiet.",
+  "notificationRationaleBody": "Sennit can notify you when a message arrives on any of your networks. A merged contact is one notification, not one per network, and anything you have already read elsewhere stays quiet.",
   "@notificationRationaleBody": {
-    "description": "The main paragraph of the notification rationale sheet. 'Braid' is the app's name; 'merged' means one person reached on several networks shown as one thread."
+    "description": "The main paragraph of the notification rationale sheet. 'Sennit' is the app's name; 'merged' means one person reached on several networks shown as one thread."
   },
-  "notificationRationaleMechanism": "Message text is never sent to a push service — Braid is told only that something happened, then fetches and decrypts it on this device.",
+  "notificationRationaleMechanism": "Message text is never sent to a push service — Sennit is told only that something happened, then fetches and decrypts it on this device.",
   "@notificationRationaleMechanism": {
-    "description": "The smaller paragraph of the notification rationale sheet: the one thing about the mechanism a self-hoster wants to know before granting. 'Braid' is the app's name."
+    "description": "The smaller paragraph of the notification rationale sheet: the one thing about the mechanism a self-hoster wants to know before granting. 'Sennit' is the app's name."
   },
   "notificationRationaleAccept": "Turn on notifications",
   "@notificationRationaleAccept": {
@@ -5921,13 +5921,13 @@
     "description": "Title of the notification the 'Send test notification' button posts. It goes through the same channel and rendering as a real one. Keep under ~26 chars.",
     "maxLength": 47
   },
-  "pushNoGatewayDetail": "No push gateway is set, so this device will only be notified while Braid is running. Add one in Notification settings.",
+  "pushNoGatewayDetail": "No push gateway is set, so this device will only be notified while Sennit is running. Add one in Notification settings.",
   "@pushNoGatewayDetail": {
-    "description": "The push registration line when no gateway is configured, with the way to fix it. 'Braid' is the app's name; 'Notification settings' names a screen in this app."
+    "description": "The push registration line when no gateway is configured, with the way to fix it. 'Sennit' is the app's name; 'Notification settings' names a screen in this app."
   },
-  "pushNoTokenDetail": "The system has not issued a push token yet. Braid will register as soon as it does.",
+  "pushNoTokenDetail": "The system has not issued a push token yet. Sennit will register as soon as it does.",
   "@pushNoTokenDetail": {
-    "description": "The push registration line while the platform has not issued a token, reassuring that nothing needs doing. 'Braid' is the app's name."
+    "description": "The push registration line while the platform has not issued a token, reassuring that nothing needs doing. 'Sennit' is the app's name."
   },
   "attachPhotosAndVideos": "Photos and videos",
   "@attachPhotosAndVideos": {
@@ -6111,13 +6111,13 @@
   "@notificationChannelGroupDescription": {
     "description": "Description of the messages channel group, in the operating system's notification settings."
   },
-  "notificationTestSender": "Braid",
+  "notificationTestSender": "Sennit",
   "@notificationTestSender": {
     "description": "The sender's name on the test notification. It is the app talking about itself, so it is the app's own name — never translated."
   },
-  "notificationTestBody": "This is what a notification from Braid looks like.",
+  "notificationTestBody": "This is what a notification from Sennit looks like.",
   "@notificationTestBody": {
-    "description": "The body of the test notification, which is what the reader sees on the lock screen when they press 'Send test notification'. 'Braid' is the app's name."
+    "description": "The body of the test notification, which is what the reader sees on the lock screen when they press 'Send test notification'. 'Sennit' is the app's name."
   },
   "chatTileSelectHint": "select",
   "@chatTileSelectHint": {
@@ -6333,7 +6333,7 @@
       },
       "reason": {
         "type": "String",
-        "description": "Why, already worded — the bridge's own sentence or Braid's translation of a status code.",
+        "description": "Why, already worded — the bridge's own sentence or Sennit's translation of a status code.",
         "example": "The bridge is not responding."
       }
     }
@@ -6418,13 +6418,13 @@
       }
     }
   },
-  "callBlockedGroup": "Braid calls one person at a time.",
+  "callBlockedGroup": "Sennit calls one person at a time.",
   "@callBlockedGroup": {
-    "description": "Tooltip on a disabled call button: the conversation has more than two people in it, and Braid models one-to-one calls only. 'Braid' is the app's name and is never translated."
+    "description": "Tooltip on a disabled call button: the conversation has more than two people in it, and Sennit models one-to-one calls only. 'Sennit' is the app's name and is never translated."
   },
-  "callBlockedBridged": "{networks} cannot carry calls — Braid calls over Matrix.",
+  "callBlockedBridged": "{networks} cannot carry calls — Sennit calls over Matrix.",
   "@callBlockedBridged": {
-    "description": "Tooltip on a disabled call button: every leg of the conversation is bridged, so the other end is a ghost user that will never answer. 'Matrix' is the protocol name and 'Braid' the app's own; neither is translated.",
+    "description": "Tooltip on a disabled call button: every leg of the conversation is bridged, so the other end is a ghost user that will never answer. 'Matrix' is the protocol name and 'Sennit' the app's own; neither is translated.",
     "placeholders": {
       "networks": {
         "type": "String",
@@ -6433,9 +6433,9 @@
       }
     }
   },
-  "callBlockedUnknownPeer": "Braid does not know a Matrix address for this conversation yet.",
+  "callBlockedUnknownPeer": "Sennit does not know a Matrix address for this conversation yet.",
   "@callBlockedUnknownPeer": {
-    "description": "Tooltip on a disabled call button: nobody identifiable is on the other end yet. 'Matrix' is the protocol name and 'Braid' the app's own; neither is translated."
+    "description": "Tooltip on a disabled call button: nobody identifiable is on the other end yet. 'Matrix' is the protocol name and 'Sennit' the app's own; neither is translated."
   },
   "networkNamesTwo": "{first} and {second}",
   "@networkNamesTwo": {
@@ -6483,7 +6483,7 @@
     "description": "App bar title of the backup screen. Keep under ~20 chars.",
     "maxLength": 44
   },
-  "backupIntro": "Braid keeps every network''s conversations in one place on this device. A backup writes all of it to a single encrypted file that only your passphrase opens — no cloud account, nothing uploaded.",
+  "backupIntro": "Sennit keeps every network''s conversations in one place on this device. A backup writes all of it to a single encrypted file that only your passphrase opens — no cloud account, nothing uploaded.",
   "@backupIntro": {
     "description": "Opening paragraph of the backup screen, explaining what a backup is and that it stays local."
   },
@@ -6547,7 +6547,7 @@
     "description": "Section heading above the restore button.",
     "maxLength": 60
   },
-  "backupRestoreSectionSubtitle": "Pick a .braid file. Nothing is written until you have seen what it contains.",
+  "backupRestoreSectionSubtitle": "Pick a .sennit file. Nothing is written until you have seen what it contains.",
   "@backupRestoreSectionSubtitle": {
     "description": "Sentence under the 'Restore from a backup' section heading."
   },
@@ -6574,7 +6574,7 @@
     "description": "Title of the dialog that asks for the passphrase an export will be encrypted with.",
     "maxLength": 60
   },
-  "backupPassphraseBody": "This passphrase encrypts the file. Braid does not keep a copy of it.",
+  "backupPassphraseBody": "This passphrase encrypts the file. Sennit does not keep a copy of it.",
   "@backupPassphraseBody": {
     "description": "Explanatory line in the export passphrase dialog."
   },
@@ -6655,13 +6655,13 @@
       "path": {
         "type": "String",
         "description": "Where the file was written.",
-        "example": "/Users/me/Documents/braid-2026-08-28.braid"
+        "example": "/Users/me/Documents/sennit-2026-08-28.sennit"
       }
     }
   },
   "backupExportShared": "Backup created and handed to the share sheet.",
   "@backupExportShared": {
-    "description": "Confirmation shown on mobile, where there is no save dialog and the file goes to the system share sheet instead — so Braid cannot say where it ended up."
+    "description": "Confirmation shown on mobile, where there is no save dialog and the file goes to the system share sheet instead — so Sennit cannot say where it ended up."
   },
   "backupExportCancelled": "Backup cancelled. Nothing was saved.",
   "@backupExportCancelled": {
@@ -6695,7 +6695,7 @@
   "@backupRestorePreviewMediaExcluded": {
     "description": "Line in the archive preview stating that the archive was written without attachments."
   },
-  "backupRestorePreviewVersion": "Written by Braid {version}",
+  "backupRestorePreviewVersion": "Written by Sennit {version}",
   "@backupRestorePreviewVersion": {
     "description": "Line in the archive preview naming the app build that wrote the file. Diagnostic, for a support conversation.",
     "placeholders": {
@@ -6811,7 +6811,7 @@
       }
     }
   },
-  "backupRestoreSummaryUnknown": "{count, plural, =1{1 entry was written by a newer version of Braid and could not be read. Update Braid and restore again to get it.} other{{count} entries were written by a newer version of Braid and could not be read. Update Braid and restore again to get them.}}",
+  "backupRestoreSummaryUnknown": "{count, plural, =1{1 entry was written by a newer version of Sennit and could not be read. Update Sennit and restore again to get it.} other{{count} entries were written by a newer version of Sennit and could not be read. Update Sennit and restore again to get them.}}",
   "@backupRestoreSummaryUnknown": {
     "description": "Warning in the restore summary when the archive carried record types this build does not understand. Said out loud rather than swallowed, because a user who believes they have a complete copy when they do not is exactly who backups exist to protect.",
     "placeholders": {
@@ -6822,15 +6822,15 @@
       }
     }
   },
-  "backupErrorNotAnArchive": "That is not a Braid backup. Look for a file ending in .braid.",
+  "backupErrorNotAnArchive": "That is not a Sennit backup. Look for a file ending in .sennit.",
   "@backupErrorNotAnArchive": {
-    "description": "Failure message when the picked file has no Braid archive header at all — almost always the wrong file."
+    "description": "Failure message when the picked file has no Sennit archive header at all — almost always the wrong file."
   },
   "backupErrorMalformed": "This backup is damaged near its start and cannot be read.",
   "@backupErrorMalformed": {
-    "description": "Failure message for a real Braid archive whose header does not parse. Distinct from the wrong-file message because the user picked the right file and it is broken."
+    "description": "Failure message for a real Sennit archive whose header does not parse. Distinct from the wrong-file message because the user picked the right file and it is broken."
   },
-  "backupErrorUnsupportedVersion": "This backup was written by a newer version of Braid ({version}). Update Braid to restore it.",
+  "backupErrorUnsupportedVersion": "This backup was written by a newer version of Sennit ({version}). Update Sennit to restore it.",
   "@backupErrorUnsupportedVersion": {
     "description": "Failure message when the archive's container version is above what this build can read. The only failure whose remedy is updating the app, which is why it says so.",
     "placeholders": {
@@ -6869,9 +6869,9 @@
   "@autoReplyTitle": {
     "description": "App bar title of the auto-reply screen. Keep under ~20 chars."
   },
-  "autoReplyExplainer": "Braid sends these replies by itself, using the model you configured. The conversation stays unread, so you still come back to it. No conversation gets more than {count} automatic replies an hour.",
+  "autoReplyExplainer": "Sennit sends these replies by itself, using the model you configured. The conversation stays unread, so you still come back to it. No conversation gets more than {count} automatic replies an hour.",
   "@autoReplyExplainer": {
-    "description": "The always-visible warning box at the top of the auto-reply screen. Three facts a user would be upset to discover afterwards: messages go out by themselves, the chat stays unread, and there is an hourly ceiling. Do not translate 'Braid'. Three sentences, room for about 220 chars.",
+    "description": "The always-visible warning box at the top of the auto-reply screen. Three facts a user would be upset to discover afterwards: messages go out by themselves, the chat stays unread, and there is an hourly ceiling. Do not translate 'Sennit'. Three sentences, room for about 220 chars.",
     "placeholders": {
       "count": {
         "type": "int",
@@ -7066,9 +7066,9 @@
   "@autoReplyRecentTitle": {
     "description": "Section heading above the list of recent auto-reply attempts. About 20 chars."
   },
-  "autoReplyRecentSubtitle": "What auto-reply has done since Braid started.",
+  "autoReplyRecentSubtitle": "What auto-reply has done since Sennit started.",
   "@autoReplyRecentSubtitle": {
-    "description": "Sentence under the recent-replies heading saying how far back the list goes. Do not translate 'Braid'. About 60 chars."
+    "description": "Sentence under the recent-replies heading saying how far back the list goes. Do not translate 'Sennit'. About 60 chars."
   },
   "autoReplyClearLog": "Clear",
   "@autoReplyClearLog": {
@@ -7167,7 +7167,7 @@
       }
     }
   },
-  "retentionExplainer": "Your own messages are deleted for everyone. Messages other people sent are removed from this device only — nobody else''s copy is Braid''s to delete.",
+  "retentionExplainer": "Your own messages are deleted for everyone. Messages other people sent are removed from this device only — nobody else''s copy is Sennit''s to delete.",
   "@retentionExplainer": {
     "description": "Shown above the options, before anything can be chosen. Says plainly that the two halves of 'delete' are not equally strong, so nobody assumes the stronger one about their own privacy. Two sentences; length is not tight."
   },
@@ -7213,7 +7213,7 @@
   "@integrationsCalendarTitle": {
     "description": "Heading of the integrations section where the user adds a calendar subscription address (ICS/webcal)."
   },
-  "integrationsCalendarSubtitle": "Paste a calendar''s ICS address — the \"secret address in iCal format\" or any webcal:// link. Braid only reads it: invitations you send show when you''re busy, and AI replies can say whether you''re free.",
+  "integrationsCalendarSubtitle": "Paste a calendar''s ICS address — the \"secret address in iCal format\" or any webcal:// link. Sennit only reads it: invitations you send show when you''re busy, and AI replies can say whether you''re free.",
   "@integrationsCalendarSubtitle": {
     "description": "Subtitle under the shared-calendar heading. 'iCal' and 'webcal://' are technical names and stay as they are; the quoted phrase is Google Calendar's own label for the private address, so use Google's wording in the language if known."
   },
@@ -7294,49 +7294,49 @@
   "@chatInviteClashKeep": {
     "description": "Dialog button: use the busy time anyway. Keep under ~24 chars."
   },
-  "proTitle": "Braid Pro",
+  "proTitle": "Sennit Pro",
   "@proTitle": {
-    "description": "Title of the Braid Pro screen and its row in Settings. 'Braid Pro' is the paid tier's product name and is never translated."
+    "description": "Title of the Sennit Pro screen and its row in Settings. 'Sennit Pro' is the paid tier's product name and is never translated."
   },
   "proBadge": "Pro",
   "@proBadge": {
-    "description": "Small badge on a settings row whose feature needs Braid Pro. Product name; keep it 'Pro'. Keep under ~6 chars."
+    "description": "Small badge on a settings row whose feature needs Sennit Pro. Product name; keep it 'Pro'. Keep under ~6 chars."
   },
   "proSettingsSubtitle": "AI features and integrations",
   "@proSettingsSubtitle": {
-    "description": "Subtitle under 'Braid Pro' in Settings while it is not bought: what Pro covers. Keep under ~60 chars."
+    "description": "Subtitle under 'Sennit Pro' in Settings while it is not bought: what Pro covers. Keep under ~60 chars."
   },
   "proSettingsSubtitleOwned": "Unlocked. Thank you!",
   "@proSettingsSubtitleOwned": {
-    "description": "Subtitle under 'Braid Pro' in Settings once it is bought. Keep under ~60 chars."
+    "description": "Subtitle under 'Sennit Pro' in Settings once it is bought. Keep under ~60 chars."
   },
-  "proIntro": "Braid Pro unlocks everything that works with AI or with your other services. Chats, bridges and backups stay free.",
+  "proIntro": "Sennit Pro unlocks everything that works with AI or with your other services. Chats, bridges and backups stay free.",
   "@proIntro": {
-    "description": "Opening paragraph of the Braid Pro screen: what it unlocks and what stays free."
+    "description": "Opening paragraph of the Sennit Pro screen: what it unlocks and what stays free."
   },
   "proFeatureAi": "Auto-replies, reply suggestions and the to-do assistant",
   "@proFeatureAi": {
-    "description": "List item on the Braid Pro screen: the AI writing features."
+    "description": "List item on the Sennit Pro screen: the AI writing features."
   },
   "proFeatureSearch": "Search by meaning, not just by words",
   "@proFeatureSearch": {
-    "description": "List item on the Braid Pro screen: semantic search. Keyword search stays free."
+    "description": "List item on the Sennit Pro screen: semantic search. Keyword search stays free."
   },
   "proFeatureTranscription": "Voice-note transcription",
   "@proFeatureTranscription": {
-    "description": "List item on the Braid Pro screen: turning voice notes into text."
+    "description": "List item on the Sennit Pro screen: turning voice notes into text."
   },
   "proFeatureMcp": "An MCP server for your own agents",
   "@proFeatureMcp": {
-    "description": "List item on the Braid Pro screen. 'MCP' is a protocol name and is never translated; 'agents' means the reader's own AI programs."
+    "description": "List item on the Sennit Pro screen. 'MCP' is a protocol name and is never translated; 'agents' means the reader's own AI programs."
   },
   "proFeatureIntegrations": "Home Assistant, paperless-ngx and a shared calendar",
   "@proFeatureIntegrations": {
-    "description": "List item on the Braid Pro screen: the integrations. Product names stay as they are."
+    "description": "List item on the Sennit Pro screen: the integrations. Product names stay as they are."
   },
   "proBuyLifetime": "Buy once · {price}",
   "@proBuyLifetime": {
-    "description": "Button: buy Braid Pro with a single payment, followed by the store's price.",
+    "description": "Button: buy Sennit Pro with a single payment, followed by the store's price.",
     "placeholders": {
       "price": {
         "type": "String",
@@ -7347,7 +7347,7 @@
   },
   "proBuyMonthly": "Monthly · {price}",
   "@proBuyMonthly": {
-    "description": "Button: subscribe to Braid Pro monthly, followed by the store's monthly price.",
+    "description": "Button: subscribe to Sennit Pro monthly, followed by the store's monthly price.",
     "placeholders": {
       "price": {
         "type": "String",
@@ -7360,17 +7360,17 @@
   "@proSubscriptionNote": {
     "description": "Small print under the purchase buttons when a subscription is offered."
   },
-  "proOwnedLifetime": "You own Braid Pro. Thank you!",
+  "proOwnedLifetime": "You own Sennit Pro. Thank you!",
   "@proOwnedLifetime": {
-    "description": "Shown on the Braid Pro screen after a one-time purchase."
+    "description": "Shown on the Sennit Pro screen after a one-time purchase."
   },
-  "proOwnedMonthly": "Your Braid Pro subscription is active. Thank you!",
+  "proOwnedMonthly": "Your Sennit Pro subscription is active. Thank you!",
   "@proOwnedMonthly": {
-    "description": "Shown on the Braid Pro screen while a monthly subscription is active."
+    "description": "Shown on the Sennit Pro screen while a monthly subscription is active."
   },
-  "proIncluded": "Everything is included in this build of Braid.",
+  "proIncluded": "Everything is included in this build of Sennit.",
   "@proIncluded": {
-    "description": "Shown on the Braid Pro screen in a build that does not charge, such as one built from source."
+    "description": "Shown on the Sennit Pro screen in a build that does not charge, such as one built from source."
   },
   "proStoreUnavailable": "The store can’t be reached right now.",
   "@proStoreUnavailable": {
@@ -7403,7 +7403,7 @@
       }
     }
   },
-  "proBuyDirect": "Buy Braid Pro",
+  "proBuyDirect": "Buy Sennit Pro",
   "@proBuyDirect": {
     "description": "Button in a build downloaded from the release page: opens the checkout web page in the browser. Keep under ~28 chars."
   },
@@ -7417,9 +7417,9 @@
   },
   "proLicenseActivate": "Activate",
   "@proLicenseActivate": {
-    "description": "Button next to the licence key field: check the key and unlock Braid Pro. Keep under ~20 chars."
+    "description": "Button next to the licence key field: check the key and unlock Sennit Pro. Keep under ~20 chars."
   },
-  "proLicenseInvalid": "That key isn’t a valid Braid Pro licence. Check it against the email.",
+  "proLicenseInvalid": "That key isn’t a valid Sennit Pro licence. Check it against the email.",
   "@proLicenseInvalid": {
     "description": "Error under the licence key field: the key is mistyped, unknown or was deactivated."
   },
@@ -7473,7 +7473,7 @@
       }
     }
   },
-  "loginCreateUnsupported": "{server} needs a sign-up step Braid cannot do yet. Create the account on the server''s website, then sign in here.",
+  "loginCreateUnsupported": "{server} needs a sign-up step Sennit cannot do yet. Create the account on the server''s website, then sign in here.",
   "@loginCreateUnsupported": {
     "description": "Shown on the create-account form, or as its error, when the server wants a captcha, an emailed link or similar that the app cannot complete.",
     "placeholders": {
@@ -7523,11 +7523,11 @@
   "@loginErrorInviteRejected": {
     "description": "Error banner on the create-account form when the server refuses the invite code."
   },
-  "tourWelcomeTitle": "Welcome to Braid",
+  "tourWelcomeTitle": "Welcome to Sennit",
   "@tourWelcomeTitle": {
-    "description": "Title of the first page of the feature walkthrough shown once after the first sign-in. 'Braid' is the app name and is not translated."
+    "description": "Title of the first page of the feature walkthrough shown once after the first sign-in. 'Sennit' is the app name and is not translated."
   },
-  "tourWelcomeBody": "You are in. A minute now sets up what makes Braid more than a messenger: your other chat apps, an AI assistant, replies that write themselves. Everything here stays in Settings if you skip it.",
+  "tourWelcomeBody": "You are in. A minute now sets up what makes Sennit more than a messenger: your other chat apps, an AI assistant, replies that write themselves. Everything here stays in Settings if you skip it.",
   "@tourWelcomeBody": {
     "description": "Body of the first walkthrough page. Centred paragraph; it scrolls if long."
   },
@@ -7575,7 +7575,7 @@
   "@tourAiTitle": {
     "description": "Title of the walkthrough page about the AI endpoint."
   },
-  "tourAiBody": "Point Braid at any OpenAI-compatible endpoint, such as an Ollama server of your own, and it suggests replies right on the notification and turns voice messages into text.",
+  "tourAiBody": "Point Sennit at any OpenAI-compatible endpoint, such as an Ollama server of your own, and it suggests replies right on the notification and turns voice messages into text.",
   "@tourAiBody": {
     "description": "Body of the walkthrough page about the AI endpoint. 'OpenAI' and 'Ollama' are product names."
   },
@@ -7595,11 +7595,11 @@
   "@tourModelsAction": {
     "description": "Primary button on the on-device models walkthrough page: opens the models screen. Keep under ~28 chars."
   },
-  "tourAutoReplyTitle": "Let Braid answer for you",
+  "tourAutoReplyTitle": "Let Sennit answer for you",
   "@tourAutoReplyTitle": {
     "description": "Title of the walkthrough page about auto-reply."
   },
-  "tourAutoReplyBody": "Write a rule saying who, when and in what tone, and Braid replies while you are away. The chat stays unread, so you still come back to it.",
+  "tourAutoReplyBody": "Write a rule saying who, when and in what tone, and Sennit replies while you are away. The chat stays unread, so you still come back to it.",
   "@tourAutoReplyBody": {
     "description": "Body of the walkthrough page about auto-reply."
   },
@@ -7611,7 +7611,7 @@
   "@tourTodoTitle": {
     "description": "Title of the walkthrough page about the to-do list."
   },
-  "tourTodoBody": "When someone asks you for something, or you promise something, Braid can note it down, and tick it off when the chat shows it is done.",
+  "tourTodoBody": "When someone asks you for something, or you promise something, Sennit can note it down, and tick it off when the chat shows it is done.",
   "@tourTodoBody": {
     "description": "Body of the walkthrough page about the AI-kept to-do list."
   },
@@ -7623,7 +7623,7 @@
   "@settingsTourTitle": {
     "description": "Settings row under About: reopens the walkthrough shown after the first sign-in."
   },
-  "settingsTourSubtitle": "A short walk through what Braid can do",
+  "settingsTourSubtitle": "A short walk through what Sennit can do",
   "@settingsTourSubtitle": {
     "description": "Subtitle of the Feature tour settings row."
   }

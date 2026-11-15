@@ -1,10 +1,10 @@
-/// Wiring the `.braid` archive to the app: the stores it reads, the media
+/// Wiring the `.sennit` archive to the app: the stores it reads, the media
 /// directory it walks, and the platform dialogs at either end.
 ///
 /// `weft_backup` decides the format and `weft_store` supplies the SQL. What is
 /// left — and what lives here — is the part that needs a running app: which
 /// directory the attachments are in, what to call the file, and how a file gets
-/// out of Braid and back in on five platforms.
+/// out of Sennit and back in on five platforms.
 ///
 /// A class behind a provider rather than free functions, for the reason
 /// [MediaExporter] and [AttachmentPicker] are interfaces: everything at the
@@ -32,12 +32,17 @@ import '../../app/stores.dart';
 import '../attachments/media_exporter.dart';
 import '../background/background_work.dart';
 
-/// The extension, and the only one the restore picker offers.
+/// The extension archives are written with.
 ///
 /// Its own extension rather than `.zip` or `.dat` because the file has to be
 /// recognisable a year later in a Files app full of things, next to five other
 /// backups, by someone who is having a bad day.
-const String kBraidArchiveExtension = 'braid';
+const String kSennitArchiveExtension = 'sennit';
+
+/// What the extension was while the app was called Braid. Archives written
+/// then are the same format under the old name, so the restore picker still
+/// offers them; nothing is written with it any more.
+const String kLegacyArchiveExtension = 'braid';
 
 /// Picks an existing archive to restore from.
 ///
@@ -51,7 +56,7 @@ abstract class ArchivePicker {
   Future<File?> pickArchive();
 }
 
-/// `file_selector`, filtered to `.braid`.
+/// `file_selector`, filtered to `.sennit` and the older `.braid`.
 class PlatformArchivePicker implements ArchivePicker {
   const PlatformArchivePicker();
 
@@ -59,8 +64,11 @@ class PlatformArchivePicker implements ArchivePicker {
   Future<File?> pickArchive() async {
     final file = await openFile(
       acceptedTypeGroups: const [
-        // l10n-ignore: the name of Braid's own file format, as the system file dialog lists it.
-        XTypeGroup(label: 'Braid backup', extensions: [kBraidArchiveExtension]),
+        // l10n-ignore: the name of Sennit's own file format, as the system file dialog lists it.
+        XTypeGroup(
+          label: 'Sennit backup',
+          extensions: [kSennitArchiveExtension, kLegacyArchiveExtension],
+        ),
       ],
     );
     return file == null ? null : File(file.path);
@@ -148,7 +156,7 @@ class BackupService {
   /// system temporary directory, because a backup the user abandoned should not
   /// survive as a second copy of their history in application support.
   static Future<Directory> _defaultStagingDirectory() async =>
-      Directory.systemTemp.createTemp('braid-backup');
+      Directory.systemTemp.createTemp('sennit-backup');
 
   Future<BackupEstimate> estimate({required bool includeMedia}) async {
     final source = StoreBackupSource(
@@ -164,13 +172,13 @@ class BackupService {
   /// The name an archive is offered under.
   ///
   /// Dated, because the second thing anyone does with a backup is make another
-  /// one, and two files called `braid-backup.braid` is how the wrong one gets
+  /// one, and two files called `sennit-backup.sennit` is how the wrong one gets
   /// restored. ISO order so they sort chronologically in a file list.
   String suggestedFileName([DateTime? at]) {
     final when = at ?? _now();
     String two(int value) => value.toString().padLeft(2, '0');
-    return 'braid-${when.year}-${two(when.month)}-${two(when.day)}'
-        '.$kBraidArchiveExtension';
+    return 'sennit-${when.year}-${two(when.month)}-${two(when.day)}'
+        '.$kSennitArchiveExtension';
   }
 
   /// Writes an archive and hands it to the platform.
@@ -180,7 +188,7 @@ class BackupService {
   /// *export* — a different event, at a different point, and the one that
   /// happens with a progress bar on screen.
   ///
-  /// The staging directory is deleted either way. A `.braid` left in temp is a
+  /// The staging directory is deleted either way. A `.sennit` left in temp is a
   /// complete, passphrase-protected copy of the user's history that nothing
   /// will ever clean up.
   Future<String?> export({
@@ -342,7 +350,7 @@ final backupServiceProvider = Provider<BackupService>((ref) {
     stores: ref.watch(storesProvider),
     exporter: ref.watch(mediaExporterProvider),
     picker: ref.watch(archivePickerProvider),
-    appVersion: kBraidVersion,
+    appVersion: kSennitVersion,
     background: ref.watch(backgroundWorkProvider),
   );
 });
@@ -354,4 +362,4 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 /// only ever shown back to the user in a support conversation. It is checked
 /// against `pubspec.yaml` by `backup_version_test.dart`, so it cannot drift
 /// silently.
-const String kBraidVersion = '1.0.5';
+const String kSennitVersion = '1.0.5';

@@ -8,8 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// An interface with no camera behind it yet, and that is a deliberate,
 /// visible gap rather than an oversight. Matrix QR verification is asymmetric:
 /// one device shows a code and the other reads it, and *either* end may be the
-/// reader. Braid implements the shower end completely, which is enough to
-/// verify a new Braid device from an existing Element — and two Braid devices
+/// reader. Sennit implements the shower end completely, which is enough to
+/// verify a new Sennit device from an existing Element — and two Sennit devices
 /// still have emoji comparison, which needs no camera at all.
 ///
 /// What the reader end needs is a decoder that hands back **raw bytes**. The

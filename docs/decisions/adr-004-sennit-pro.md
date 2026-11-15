@@ -17,7 +17,7 @@ related:
 
 ## Context
 
-Braid is to be published as open source and still pay for itself. The model
+Sennit is to be published as open source and still pay for itself. The model
 to follow is Readest's: the whole app is public, and the store builds sell the
 parts that cost the most to build and keep working — there, cloud storage
 tiers or a one-time "all features" purchase; here, the AI features and the
@@ -32,7 +32,7 @@ same author. Both facts matter below.
 
 ### Three editions, one codebase
 
-`BraidEdition` in `apps/weft/lib/services/billing/entitlements.dart`, chosen
+`SennitEdition` in `apps/weft/lib/services/billing/entitlements.dart`, chosen
 with `--dart-define=BRAID_EDITION=…`:
 
 | Edition | Who gets it | How Pro is bought |
@@ -82,7 +82,7 @@ badge and open the Pro screen until Pro is bought.
 |---|---|---|
 | Play | `braid_pro_lifetime`, one-time product | EUR 14.99, converted per region |
 | App Store | `braid_pro_lifetime`, non-consumable | EUR 14.99 base, Germany |
-| Stripe | "Braid Pro", one-time price, sold through a Payment Link with metadata `app=braid` | EUR 14.99 |
+| Stripe | "Sennit Pro", one-time price, sold through a Payment Link with metadata `app=sennit` | EUR 14.99 |
 
 Both stores use the same id, so one table serves both, and the Pro screen
 shows whatever price the store returns, already in the user's currency.
@@ -159,8 +159,8 @@ Google has to bring its own. UnifiedPush works without it.
 Nothing charges until two repository variables say so, so each step can be
 done and checked on its own.
 
-1. **Stripe.** Create the product "Braid Pro" with a one-time price, a
-   Payment Link with metadata `app=braid`, and a webhook endpoint to
+1. **Stripe.** Create the product "Sennit Pro" with a one-time price, a
+   Payment Link with metadata `app=sennit`, and a webhook endpoint to
    `/webhook/braid/stripe-events`; `tooling/licensing/README.md` has the
    detail. Buy once with a 100 % coupon and check that the email arrives and
    the key activates. Then set the repository variable `BRAID_CHECKOUT_URL`
@@ -184,7 +184,7 @@ Create `braid_pro_monthly` in both consoles, add receipt verification behind
 - Every new AI or integration feature needs a `ProFeature` gate in its
   provider, or it ships free in the store build.
 - Tests run as the community edition. A test about a gate overrides
-  `braidEditionProvider`, as `test/braid_pro_test.dart` does.
+  `sennitEditionProvider`, as `test/sennit_pro_test.dart` does.
 - `in_app_purchase` is linked into every build, the community edition
   included. It does nothing until the store edition calls it.
 - The licence service is one more thing to keep running. If it is down,

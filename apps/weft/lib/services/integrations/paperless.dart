@@ -24,7 +24,7 @@ class PaperlessDocument {
 
 /// Talks to the user's own paperless-ngx instance.
 ///
-/// Read-only on purpose: Braid searches, lists and downloads so a document can
+/// Read-only on purpose: Sennit searches, lists and downloads so a document can
 /// be shared into a conversation. Filing things *into* the archive is
 /// paperless's own job (and its own apps do it better).
 class PaperlessClient {

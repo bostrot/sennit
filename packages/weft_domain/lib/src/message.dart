@@ -27,8 +27,8 @@ enum MessageKind {
 /// sent, two ticks delivered, two blue ticks read**, with [sending] before all
 /// of them and [failed] outside the sequence entirely.
 ///
-/// The vocabulary is a decade of WhatsApp and is not Braid's to reinvent. What
-/// *is* Braid's is being honest about it — see [resolveDeliveryState], which
+/// The vocabulary is a decade of WhatsApp and is not Sennit's to reinvent. What
+/// *is* Sennit's is being honest about it — see [resolveDeliveryState], which
 /// exists because half the networks here cannot report the top of the scale and
 /// a tick that claims a message was read when nobody knows is worse than no tick
 /// at all.
@@ -201,7 +201,7 @@ class WeftMessage {
 
   /// Whether a machine wrote this rather than a person.
   ///
-  /// True for a Braid auto-reply — the sender's or the user's own — read from
+  /// True for a Sennit auto-reply — the sender's or the user's own — read from
   /// the `com.bostrot.weft.auto_reply` key the sender puts on the event.
   /// Carried on the message for two consumers: the bubble, which says so rather
   /// than letting the user mistake their model's words for their own six months

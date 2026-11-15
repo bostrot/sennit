@@ -8,7 +8,7 @@
 // The event body that reached the webhook is not trusted. The node before
 // this one re-fetched the session straight from the Stripe API with our own
 // key, and the IF after it dropped anything that is not paid or is not a
-// Braid sale. So everything below reads from the re-fetched session, never
+// Sennit sale. So everything below reads from the re-fetched session, never
 // from the posted payload. "Existing licence" then looked the session up in
 // the licence table: a row that is already there means Stripe delivered this
 // event before (it retries on anything but a 2xx) and the customer may

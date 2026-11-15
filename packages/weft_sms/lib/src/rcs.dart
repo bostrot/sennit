@@ -1,14 +1,14 @@
 /// Where RCS stands on an Android phone, and what the messaging role does to it.
 ///
-/// RCS is the one network in this app that Braid cannot carry itself, and not
+/// RCS is the one network in this app that Sennit cannot carry itself, and not
 /// for want of trying: Android exposes no RCS API to a third-party app. RCS on
 /// Android is the Google Messages app talking to Google's Jibe network; the
 /// API that drives it is granted to a short list of Samsung system apps and
 /// nobody else; and Google Messages speaks RCS only while it holds the phone's
 /// default-messaging role.
 ///
-/// So "Braid is your SMS app" and "this phone has RCS" are mutually exclusive,
-/// and taking the role does not move RCS to Braid — it turns RCS off for the
+/// So "Sennit is your SMS app" and "this phone has RCS" are mutually exclusive,
+/// and taking the role does not move RCS to Sennit — it turns RCS off for the
 /// whole phone and drops those conversations back to SMS and MMS. That is a
 /// sentence the user has to read *before* the system dialog rather than
 /// discover a week later, and everything in this file exists to state it
@@ -20,7 +20,7 @@ library;
 /// One entry, because there is one: the carriers that ran their own RCS —
 /// AT&T's Advanced Messaging, Verizon through Samsung Messages — have handed
 /// it to Google's network, and every other messaging app on the Play Store is
-/// in exactly Braid's position.
+/// in exactly Sennit's position.
 const String kGoogleMessagesPackage = 'com.google.android.apps.messaging';
 
 /// Package ids worth spelling as names.
@@ -40,7 +40,7 @@ const Map<String, String> kMessagingAppNames = {
   'org.fossify.messages': 'Fossify Messages',
   'com.simplemobiletools.smsmessenger': 'Simple SMS Messenger',
   'com.google.android.apps.messaging.dogfood': 'Google Messages',
-  'com.bostrot.weft': 'Braid',
+  'com.bostrot.weft': 'Sennit',
 };
 
 /// [package] as something to read, falling back to the id itself.
@@ -60,26 +60,26 @@ enum RcsStanding {
   unavailable,
 
   /// Google Messages holds the role, so RCS is working — and it is working
-  /// *there*, not here. Braid sees those conversations only if the phone is
+  /// *there*, not here. Sennit sees those conversations only if the phone is
   /// bridged.
   withGoogleMessages,
 
-  /// Braid holds the role, so this phone sends SMS and MMS and no RCS.
-  offForBraid,
+  /// Sennit holds the role, so this phone sends SMS and MMS and no RCS.
+  offForSennit,
 
   /// Another app holds the role, and RCS is off for exactly the reason it
-  /// would be off for Braid. Nothing is lost by switching.
+  /// would be off for Sennit. Nothing is lost by switching.
   offForOther,
 }
 
 /// Where RCS stands, from the two facts the platform reports.
 RcsStanding rcsStanding({
   required bool supported,
-  required bool braidIsDefault,
+  required bool sennitIsDefault,
   required String? defaultPackage,
 }) {
   if (!supported) return RcsStanding.unavailable;
-  if (braidIsDefault) return RcsStanding.offForBraid;
+  if (sennitIsDefault) return RcsStanding.offForSennit;
   return isRcsCapableApp(defaultPackage)
       ? RcsStanding.withGoogleMessages
       : RcsStanding.offForOther;

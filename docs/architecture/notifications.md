@@ -404,13 +404,13 @@ right time, without the app having been opened.
 Different on the two platforms, and worth saying plainly because the advice is
 opposite to what people expect:
 
-- **Android — do not "force stop" Braid**, and where the phone has an
-  aggressive battery manager (Samsung, Xiaomi, OnePlus, Huawei), exempt Braid
+- **Android — do not "force stop" Sennit**, and where the phone has an
+  aggressive battery manager (Samsung, Xiaomi, OnePlus, Huawei), exempt Sennit
   from it. Force-stopping puts an app into a stopped state from which it
   receives *no broadcasts at all*, including `BOOT_COMPLETED`, until it is
   launched by hand. Swiping the app away from Recents is fine — `onTaskRemoved`
   hands the connection to the daemon and the service survives.
-- **iOS — do not force-quit Braid from the app switcher.** A force-quit on iOS
+- **iOS — do not force-quit Sennit from the app switcher.** A force-quit on iOS
   stops the system delivering background pushes to that app until it is opened
   again. Locking the phone, switching apps and rebooting are all fine; the swipe
   up out of the app switcher is the one action that is not.
@@ -450,10 +450,10 @@ opened is a boot receiver that did not fire — check `adb logcat -s WeftSync` f
 the refused-start warning, which distinguishes "Android said no" from "the
 broadcast never arrived".
 
-On iOS the equivalent is: reboot the device, do not open Braid, and send a
+On iOS the equivalent is: reboot the device, do not open Sennit, and send a
 message from another account. The notification should arrive; if the extension
 has not been provisioned it arrives as the placeholder alert, which still proves
-delivery. Force-quitting Braid from the app switcher before the reboot is the
+delivery. Force-quitting Sennit from the app switcher before the reboot is the
 control case — the notification should then *not* arrive until the app is opened.
 
 ## Tap routing has one router and two front doors
@@ -483,7 +483,7 @@ produced *yet* waits for it, drawing the same spinner an unsynced chat already
 draws, and opens as soon as it turns up. The wait is bounded (`_chatArrivalGrace`)
 and matches on the chat's room ids as well as its id, because the link carries
 the id the chat had when the notification was posted and a merge since then has
-moved it. Without that wait, every tap that cold-started Braid landed on "That
+moved it. Without that wait, every tap that cold-started Sennit landed on "That
 conversation is not in your inbox" for a conversation that was about to be
 there — the one failure a router cannot be blamed for, since it had already done
 its job.

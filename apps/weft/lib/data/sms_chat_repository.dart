@@ -273,12 +273,12 @@ class SmsChatRepository {
   ///
   /// No refresh follows, deliberately: the user is leaving for another app and
   /// the answer arrives when they return, through the same resume path that
-  /// already catches a role changed behind Braid's back.
+  /// already catches a role changed behind Sennit's back.
   Future<bool> openDefaultAppSettings() => _gateway.openDefaultAppSettings();
 
   /// Re-reads the role without ever subscribing twice.
   ///
-  /// The role can change while Braid is running and without Braid asking: the
+  /// The role can change while Sennit is running and without Sennit asking: the
   /// system's own settings hand it to another app, and a user who declined the
   /// dialog can walk into Settings and grant it there. [start] is the only path
   /// that subscribes, so it is taken only when nothing is subscribed yet —
@@ -364,7 +364,7 @@ class SmsChatRepository {
     // is a different wire format entirely, and quietly sending to the first
     // participant would look like a group reply and be a private message.
     if (thread.addresses.length > 1) {
-      throw StateError('Braid cannot send to a group MMS thread yet');
+      throw StateError('Sennit cannot send to a group MMS thread yet');
     }
     final address = thread.addresses.firstOrNull;
     if (address == null || address.isEmpty) {
@@ -380,7 +380,7 @@ class SmsChatRepository {
 
   /// Marks every message in a thread read, in the provider itself.
   ///
-  /// The provider, not a local flag: Braid holds the default-SMS role, so its
+  /// The provider, not a local flag: Sennit holds the default-SMS role, so its
   /// idea of what has been read is the phone's — a notification the user
   /// dismissed here must not still be unread for the next app that looks.
   Future<void> markRead(String roomId) async {
@@ -433,7 +433,7 @@ class SmsChatRepository {
   }
 
   void _onMmsPush(SmsMmsPush push) {
-    // Braid cannot retrieve an MMS: Android exposes the transport but not the
+    // Sennit cannot retrieve an MMS: Android exposes the transport but not the
     // PDU parser. Writing a placeholder row would put a message in the thread
     // that the rest of the phone would read as real, so this is logged and the
     // thread is re-read instead — the notification itself is in the provider,
@@ -472,7 +472,7 @@ class SmsChatRepository {
 
   /// A thread synthesised from a message that arrived before any read.
   ///
-  /// An SMS can start the process, so the very first thing Braid learns about a
+  /// An SMS can start the process, so the very first thing Sennit learns about a
   /// conversation is sometimes a message in it. Dropping that until the next
   /// provider read would lose the one notification the user is waiting for.
   SmsThread _threadFrom(SmsMessage message) => SmsThread(

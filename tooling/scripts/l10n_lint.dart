@@ -64,7 +64,7 @@ const String _allowFile = '$_arbDir/lint_allow.json';
 /// failure this check exists for, and an allowlist that grows to cover it
 /// would delete the check instead.
 const Set<String> _neverTranslated = {
-  'Braid',
+  'Sennit',
   'Matrix',
   'MCP',
   'SMS',
@@ -79,7 +79,7 @@ const Set<String> _neverTranslated = {
   'UnifiedPush',
   'Sam',
   'Original',
-  // The paid tier's name, like Braid itself.
+  // The paid tier's name, like Sennit itself.
   'Pro',
 };
 

@@ -139,7 +139,7 @@ jobs:
               -workspace apps/weft/ios/Runner.xcworkspace \
               -scheme Runner -configuration Release \
               -destination 'generic/platform=iOS' \
-              -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
+              -archivePath "$RUNNER_TEMP/Sennit.xcarchive" \
               DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
               CODE_SIGN_STYLE=Automatic \
               -allowProvisioningUpdates \
@@ -175,7 +175,7 @@ jobs:
           </plist>
           EOF
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/Braid.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Sennit.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \

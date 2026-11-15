@@ -29,7 +29,7 @@ void main() {
   late Directory profile;
 
   setUp(() async {
-    profile = await Directory.systemTemp.createTemp('braid-e2e');
+    profile = await Directory.systemTemp.createTemp('sennit-e2e');
   });
 
   tearDown(() async {
@@ -151,7 +151,7 @@ void main() {
       addTearDown(before.dispose);
       seed(before, beforeMedia);
 
-      final archive = File(p.join(profile.path, 'braid-2026-08-28.braid'));
+      final archive = File(p.join(profile.path, 'sennit-2026-08-28.sennit'));
       final progress = <BackupProgress>[];
 
       // No `kdfOverride`: the shipping Argon2id parameters, because "does a

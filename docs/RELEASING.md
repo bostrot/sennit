@@ -1,4 +1,4 @@
-# Releasing Braid
+# Releasing Sennit
 
 ## Cutting a release
 
@@ -69,7 +69,7 @@ The app itself has to exist first — the Play API cannot create one, so
 service account under **Setup → API access**, grant it *Manage releases*
 (plus *Manage store presence* if you also want to push listing changes), and
 download its JSON key. Papervault's service account works too once it is
-granted access to Braid.
+granted access to Sennit.
 
 | Secret | Value |
 |---|---|

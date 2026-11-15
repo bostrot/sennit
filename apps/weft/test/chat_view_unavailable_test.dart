@@ -328,7 +328,7 @@ void main() {
     expect(find.text('Anna Maven'), findsWidgets);
   });
 
-  // Regression: tapping a notification that cold-started Braid landed on
+  // Regression: tapping a notification that cold-started Sennit landed on
   // "not in your inbox" for a conversation that was perfectly present — the
   // deep link routes here before the chat list has been folded together, and
   // the screen took the first look as the verdict.

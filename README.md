@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/images/braid-icon.png" width="128" alt="Braid icon" />
+  <img src="docs/images/sennit-icon.png" width="128" alt="Sennit icon" />
 </p>
 
-<h1 align="center">Braid</h1>
+<h1 align="center">Sennit</h1>
 
 <p align="center"><b>Every conversation, one thread.</b></p>
 
@@ -19,13 +19,13 @@
   <a href="#getting-started">Getting started</a> ·
   <a href="#building">Building</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="#braid-pro">Braid Pro</a> ·
+  <a href="#sennit-pro">Sennit Pro</a> ·
   <a href="#license">License</a>
 </p>
 
 ---
 
-Braid is a [Matrix](https://matrix.org) client built from the ground up
+Sennit is a [Matrix](https://matrix.org) client built from the ground up
 around **bridged messaging**: pair it with a homeserver you run and
 [mautrix](https://github.com/mautrix) bridges you control, and every network
 your contacts live on becomes one conversation list — end-to-end encrypted
@@ -74,7 +74,7 @@ message that ever touches infrastructure you don't own.
   scheduled sending, reminders, and Home&nbsp;Assistant / paperless-ngx
   integrations.
 - 🛠️ An embedded [MCP](https://modelcontextprotocol.io) server, so your own
-  agents can search and send through Braid — guarded by scoped API keys.
+  agents can search and send through Sennit — guarded by scoped API keys.
 
 ## Screenshots
 
@@ -88,7 +88,7 @@ message that ever touches infrastructure you don't own.
 
 ## Getting started
 
-Braid is the *client*. You bring:
+Sennit is the *client*. You bring:
 
 1. **A Matrix homeserver** — [Synapse](https://element-hq.github.io/synapse/)
    or any spec-compliant server you run.
@@ -97,7 +97,7 @@ Braid is the *client*. You bring:
    [mautrix-signal](https://github.com/mautrix/signal),
    [mautrix-telegram](https://github.com/mautrix/telegram),
    [mautrix-gmessages](https://github.com/mautrix/gmessages), and friends.
-3. Braid, signed into your account. It discovers your bridges, walks you
+3. Sennit, signed into your account. It discovers your bridges, walks you
    through their login flows (QR codes included), and starts weaving.
 
 A Docker Compose reference for the server side lives in
@@ -105,13 +105,13 @@ A Docker Compose reference for the server side lives in
 
 > **A note on third-party networks:** bridges automate your own accounts on
 > networks whose terms of service may not allow it. That is your call to
-> make, on your infrastructure — Braid never touches those networks itself.
+> make, on your infrastructure — Sennit never touches those networks itself.
 > Use a dedicated number where you can, and know that bans, while rare, are
 > possible.
 
 ## Building
 
-Braid is a Flutter app in a Dart workspace of focused packages.
+Sennit is a Flutter app in a Dart workspace of focused packages.
 
 ```bash
 flutter pub get
@@ -144,13 +144,13 @@ The pure-Dart packages carry the bulk of the test suite — merge scoring,
 timeline interleaving, notification policy — and run without a device.
 Golden tests pin every screen in light, dark and accessibility variants.
 
-## Braid Pro
+## Sennit Pro
 
-All of Braid is in this repository, and a build from source has every feature
+All of Sennit is in this repository, and a build from source has every feature
 switched on. The builds published on Google Play, the App Store and the
 release page are free for messaging — every network, merged chats, calls, SMS,
 keyword search, backups — and sell the parts that take the most work to build
-and keep working as **Braid Pro**, a single payment with no subscription:
+and keep working as **Sennit Pro**, a single payment with no subscription:
 
 - AI auto-replies, reply suggestions and the to-do assistant
 - semantic search and voice-note transcription
@@ -168,8 +168,8 @@ Issues and pull requests are welcome — see
 
 ## License
 
-[AGPL-3.0](LICENSE). You can self-host, modify and redistribute Braid
-freely; if you offer a modified Braid to others over a network, share your
+[AGPL-3.0](LICENSE). You can self-host, modify and redistribute Sennit
+freely; if you offer a modified Sennit to others over a network, share your
 changes the same way.
 
 The licence covers the code, not the name: a fork you publish needs its own

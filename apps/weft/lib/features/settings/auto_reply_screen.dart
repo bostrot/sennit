@@ -371,7 +371,7 @@ class _AutoReplyRuleEditorState extends ConsumerState<AutoReplyRuleEditor> {
                   hintText: l10n.autoReplyPromptHint,
                   // The prompt is the feature. It goes to the model verbatim,
                   // which is what this says so nobody has to guess whether
-                  // Braid rewrites it first.
+                  // Sennit rewrites it first.
                   helperText: l10n.autoReplyPromptHelper,
                   helperMaxLines: 3,
                 ),

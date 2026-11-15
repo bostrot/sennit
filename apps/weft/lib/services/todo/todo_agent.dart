@@ -106,7 +106,7 @@ class TodoAgent {
     // Remembered even while the feature is off, so switching it on mid-way
     // through a conversation reads the conversation, not its last line.
     _context.remember(chat.id, message);
-    // A reply Braid wrote itself is not something the user promised.
+    // A reply Sennit wrote itself is not something the user promised.
     if (message.isAutoReply) return;
     if (!_enabled() || _endpoint() == null) return;
 

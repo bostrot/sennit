@@ -7,7 +7,7 @@ import 'weft_database.dart';
 
 /// One message a sweep may be about to delete.
 ///
-/// The columns of Braid's own message record that decide *how* it is deleted —
+/// The columns of Sennit's own message record that decide *how* it is deleted —
 /// [senderId] because the user's own messages are redacted for everyone and
 /// nobody else's can be, [hasMedia] because a photo also has bytes staged on
 /// disk that no database delete would reach.
@@ -209,10 +209,10 @@ class RetentionStore {
 
   /// Messages of [chatId] that [policy] has made due by [now].
   ///
-  /// Reads Braid's own message record rather than a Matrix timeline, which is
+  /// Reads Sennit's own message record rather than a Matrix timeline, which is
   /// what lets a sweep run over every chat at startup without opening one: a
   /// timeline is an async SDK object that exists only for a chat somebody has
-  /// looked at. The cost is the record's own boundary — a message Braid never
+  /// looked at. The cost is the record's own boundary — a message Sennit never
   /// indexed is not seen here — and that boundary is the right one anyway,
   /// because `search_message` *is* the history the user would find later.
   ///

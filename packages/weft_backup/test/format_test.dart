@@ -6,7 +6,7 @@ import 'package:weft_backup/weft_backup.dart';
 
 /// A header at this build's defaults, for mutating in the cases below.
 Uint8List sampleHeader({
-  ArchiveVersion version = kBraidArchiveFormatVersion,
+  ArchiveVersion version = kSennitArchiveFormatVersion,
   KdfParameters? kdf,
   CipherParameters? cipher,
 }) => encodeArchiveHeader(
@@ -23,18 +23,18 @@ Uint8List sampleHeader({
   ),
 );
 
-/// [header] with `format` replaced, re-encoded the way a future Braid would.
+/// [header] with `format` replaced, re-encoded the way a future Sennit would.
 Uint8List headerWithRawJson(Map<String, Object?> json) {
   final body = utf8.encode(jsonEncode(json));
   return Uint8List.fromList([
-    ...kBraidArchiveMagic,
+    ...kSennitArchiveMagic,
     ...uint32Bytes(body.length),
     ...body,
   ]);
 }
 
 Map<String, Object?> decodeHeaderJson(Uint8List header) {
-  final length = readUint32(header, kBraidArchiveMagic.length);
+  final length = readUint32(header, kSennitArchiveMagic.length);
   return jsonDecode(utf8.decode(header.sublist(12, 12 + length)))
       as Map<String, Object?>;
 }
@@ -46,7 +46,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       final header = result.header!;
-      expect(header.version, kBraidArchiveFormatVersion);
+      expect(header.version, kSennitArchiveFormatVersion);
       expect(header.kdf.id, KdfParameters.argon2id);
       expect(header.kdf.memoryKiB, KdfParameters.defaultMemoryKiB);
       expect(header.cipher.id, CipherParameters.xchacha20Poly1305);
@@ -100,7 +100,7 @@ void main() {
 
     test('magic followed by rubbish reads as malformed, not wrong-file', () {
       final bytes = Uint8List.fromList([
-        ...kBraidArchiveMagic,
+        ...kSennitArchiveMagic,
         ...uint32Bytes(4),
         ...utf8.encode('{{{{'),
       ]);
@@ -115,7 +115,7 @@ void main() {
 
     test('an absurd declared header length is refused, not allocated', () {
       final bytes = Uint8List.fromList([
-        ...kBraidArchiveMagic,
+        ...kSennitArchiveMagic,
         ...uint32Bytes(0x7FFFFFFF),
         ...utf8.encode('{}'),
       ]);
@@ -127,19 +127,19 @@ void main() {
     test('a future major is refused and names the version', () {
       final result = parseArchiveHeader(
         sampleHeader(
-          version: ArchiveVersion(kBraidArchiveFormatVersion.major + 1, 0),
+          version: ArchiveVersion(kSennitArchiveFormatVersion.major + 1, 0),
         ),
       );
       expect(result.problem, HeaderProblem.unsupportedVersion);
-      expect(result.version!.major, kBraidArchiveFormatVersion.major + 1);
+      expect(result.version!.major, kSennitArchiveFormatVersion.major + 1);
     });
 
     test('a future minor is read normally and flagged', () {
       final result = parseArchiveHeader(
         sampleHeader(
           version: ArchiveVersion(
-            kBraidArchiveFormatVersion.major,
-            kBraidArchiveFormatVersion.minor + 7,
+            kSennitArchiveFormatVersion.major,
+            kSennitArchiveFormatVersion.minor + 7,
           ),
         ),
       );
@@ -168,7 +168,7 @@ void main() {
 
     test('a primitive this build does not have reads as a version problem', () {
       // Same major, but named a cipher we cannot run. There is nothing to try,
-      // so "update Braid" is the honest advice rather than "file is damaged".
+      // so "update Sennit" is the honest advice rather than "file is damaged".
       final json = decodeHeaderJson(sampleHeader());
       (json['cipher']! as Map<String, Object?>)['id'] = 'aes-256-siv';
       final result = parseArchiveHeader(headerWithRawJson(json));

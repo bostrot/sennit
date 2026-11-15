@@ -23,7 +23,7 @@ sealed class WeftLink {
   ///   `/search?q={query}`      → open search pre-filled
   ///
   /// Plus the four telephony schemes — `sms:`, `smsto:`, `mms:`, `mmsto:` —
-  /// which are not Braid's own links at all: they are what the dialer, the
+  /// which are not Sennit's own links at all: they are what the dialer, the
   /// contacts app and a `sms:` link on a web page send, and handling them is
   /// required of the default SMS app.
   ///
@@ -50,7 +50,7 @@ sealed class WeftLink {
 
     // `Uri.pathSegments` is *already* percent-decoded, so `!abc%3Aexample.org`
     // arrives here as `!abc:example.org`. Decoding a second time was harmless
-    // for every id Braid generates — room ids are ASCII, contact ids are
+    // for every id Sennit generates — room ids are ASCII, contact ids are
     // `contact_<micros>_<n>`, and neither leaves a `%` behind for the second
     // pass to find — but it threw `ArgumentError` out of a method whose whole
     // contract is that an unknown link must not crash the router, for any id
@@ -161,7 +161,7 @@ class ComposeSmsLink extends WeftLink {
   }
 }
 
-/// Content another app shared into Braid.
+/// Content another app shared into Sennit.
 @immutable
 class SharedPayload {
   const SharedPayload({
@@ -219,7 +219,7 @@ class SharedPayload {
   );
 }
 
-/// Largest file Braid will take from a share intent.
+/// Largest file Sennit will take from a share intent.
 ///
 /// The composer has no such cap — it opens the file the user picked where it
 /// already is, and lets the homeserver be the one to say no. A share cannot:
@@ -362,7 +362,7 @@ class WeftIntents implements SharedFileResolver, ShareTargetPublisher {
     }
   }
 
-  /// Copies the bytes behind [uri] into a file Braid can open later, returning
+  /// Copies the bytes behind [uri] into a file Sennit can open later, returning
   /// its path.
   ///
   /// A path rather than the bytes, which is what this used to hand back. Two

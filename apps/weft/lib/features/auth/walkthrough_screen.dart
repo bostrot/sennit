@@ -12,7 +12,7 @@ import '../settings/models_screen.dart';
 import '../settings/pro_screen.dart';
 import '../todo/todo_screen.dart';
 
-/// The walkthrough after a first sign-in: what Braid can do beyond showing
+/// The walkthrough after a first sign-in: what Sennit can do beyond showing
 /// messages, one feature to a page, each with the way into setting it up.
 ///
 /// [SetupScreen] before it asks for what a messenger cannot work without;
@@ -22,7 +22,7 @@ import '../todo/todo_screen.dart';
 /// lands on the page that was left rather than in an inbox with the rest of
 /// the tour gone.
 ///
-/// A page for a Braid Pro feature behaves as its settings row does: until Pro
+/// A page for a Sennit Pro feature behaves as its settings row does: until Pro
 /// is unlocked it carries the Pro mark, and its button leads to the Pro
 /// screen instead of to settings that would do nothing.
 class WalkthroughScreen extends ConsumerStatefulWidget {
@@ -232,7 +232,7 @@ class _WalkthroughStep {
   final String body;
   final String action;
 
-  /// The Braid Pro feature this page is about, when it is one.
+  /// The Sennit Pro feature this page is about, when it is one.
   final ProFeature? feature;
 
   /// The screen the primary button opens. Null on a page with nothing to set

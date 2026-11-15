@@ -44,13 +44,13 @@ class MainFlutterWindow: NSWindow {
   ///
   ///  * **Full-size content.** The title bar stops being a bar and becomes the
   ///    top of the window, so the sidebar runs to the very top and the traffic
-  ///    lights float over it. Braid's toolbar reserves
+  ///    lights float over it. Sennit's toolbar reserves
   ///    `MacMetrics.trafficLightInset` for them.
   ///  * **Vibrancy behind everything.** An `NSVisualEffectView` under a
   ///    transparent Flutter view is the only way to get the real material —
   ///    the desktop, blurred and saturated by the compositor. A `BackdropFilter`
   ///    in Dart can only blur what Flutter itself has drawn, so a sidebar built
-  ///    that way is glass over a wall. Braid's sidebar is deliberately drawn
+  ///    that way is glass over a wall. Sennit's sidebar is deliberately drawn
   ///    with a translucent tint and no opaque fill, which is what lets this
   ///    show through; every other pane paints itself opaque.
   ///  * **Drag by the background.** With no title bar there is nothing left to

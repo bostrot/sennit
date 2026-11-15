@@ -1,4 +1,4 @@
-/// Writing a `.braid` archive.
+/// Writing a `.sennit` archive.
 ///
 /// ## What is deliberately not in here
 ///
@@ -21,7 +21,7 @@
 /// file the user emails to themselves would undo it.
 ///
 /// The consequence, stated plainly because the restore screen has to say it:
-/// a restored archive gives back what Braid knew — the messages, who said them,
+/// a restored archive gives back what Sennit knew — the messages, who said them,
 /// which network they arrived on, the merges, the settings, the media — and
 /// does **not** give back the ability to decrypt anything new from the
 /// homeserver. That still comes from Matrix key backup.
@@ -95,7 +95,7 @@ class BackupSummary {
 /// this package free of SQL and Flutter: the adapter over `weft_store` lives in
 /// `weft_store`, where the schema already is, and the tests here run against
 /// sources built by hand. It also leaves room for a source that can answer
-/// questions Braid's own tables cannot — reactions, for one, which are
+/// questions Sennit's own tables cannot — reactions, for one, which are
 /// aggregated live from the Matrix timeline and never persisted.
 abstract interface class BackupSource {
   /// Counts, cheaply, before the first byte is written.

@@ -19,7 +19,7 @@ import '../support/golden_harness.dart';
 ///   the privacy gates use. An assertion that the words are on screen is true
 ///   of a layout where they are grey, below the fields, and off the bottom of a
 ///   phone.
-/// * **The replace confirmation.** It is the only control in Braid that deletes
+/// * **The replace confirmation.** It is the only control in Sennit that deletes
 ///   a user's messages, and it has to look like it. A destructive button that
 ///   renders in the ordinary filled style is the failure.
 ///

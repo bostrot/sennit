@@ -169,7 +169,7 @@ extension WeftAutoReplyLabels on AppL10n {
   /// A weekday's short name, from `DateTime.monday`…`DateTime.sunday`.
   ///
   /// Off `intl`'s own symbols rather than a switch over seven ARB keys: the
-  /// names are already translated for every locale Braid ships, and a second
+  /// names are already translated for every locale Sennit ships, and a second
   /// set in the ARB would be seven more strings to keep in step with the
   /// calendar.
   String autoReplyWeekday(int weekday) {

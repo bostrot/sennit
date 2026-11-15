@@ -61,7 +61,7 @@ class UiFinding {
 /// The smallest a control may be on [surface] before it is a finding.
 ///
 /// Touch is [kWeftMinTapTarget], `weft_design`'s own 48 — Android's guideline,
-/// the stricter of the two Braid ships against, and the one the accessibility
+/// the stricter of the two Sennit ships against, and the one the accessibility
 /// suite already asserts.
 ///
 /// The pointer surface is **24**, and deliberately not
@@ -330,7 +330,7 @@ List<UiFinding> unnamedControlFindings(
 
 /// Every gap on screen that is not a [WeftSpace] token.
 ///
-/// Two shapes, which between them are how Braid states a gap:
+/// Two shapes, which between them are how Sennit states a gap:
 ///
 ///  * a childless `SizedBox` that is a direct child of a `Row` or `Column` —
 ///    the `const SizedBox(width: WeftSpace.sm)` spacer idiom. Restricted to
@@ -365,7 +365,7 @@ List<UiFinding> unnamedControlFindings(
 /// configured it means *not `packages/flutter/`*, so a widget built by a pub
 /// dependency reads as local. There is no public API for the creation location
 /// itself, so the report cannot say which — a finding whose chain names no
-/// Braid widget is the shape that takes.
+/// Sennit widget is the shape that takes.
 List<UiFinding> offScaleSpacingIn(
   WidgetTester tester, {
   required String surface,

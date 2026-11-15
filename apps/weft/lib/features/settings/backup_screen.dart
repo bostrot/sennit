@@ -1,4 +1,4 @@
-/// Getting a user's history out of Braid, and back in.
+/// Getting a user's history out of Sennit, and back in.
 ///
 /// Two flows on one screen, and they are not symmetrical. Export is a decision
 /// about a passphrase; restore is a decision about a *file*, made twice — once
@@ -379,7 +379,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 ///
 /// Every branch is a distinct piece of advice, which is the entire reason
 /// `weft_backup` returns typed failures rather than one exception: "you picked
-/// the wrong file", "update Braid", "check the passphrase" and "this copy is
+/// the wrong file", "update Sennit", "check the passphrase" and "this copy is
 /// damaged, try another" are four different next actions, and a single
 /// "could not restore" would be none of them.
 String _describeFailure(BuildContext context, Object error) {
@@ -759,7 +759,7 @@ class _RestoreModeDialogState extends State<_RestoreModeDialog> {
             // leaves the foreground at the filled button's default, which is
             // `onPrimary` — a colour chosen to sit on the seed, not on error.
             // On the error container it lands as dark red on light red, which
-            // is the one button in Braid that deletes messages rendered in the
+            // is the one button in Sennit that deletes messages rendered in the
             // lowest contrast on the screen.
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
@@ -799,7 +799,7 @@ class _RestoreSummaryDialog extends StatelessWidget {
             Text(l10n.backupRestoreSummarySkipped(outcome.skippedExisting)),
           if (outcome.mediaWritten > 0)
             Text(l10n.backupRestoreSummaryMedia(outcome.mediaWritten)),
-          // Said out loud rather than swallowed. An archive from a newer Braid
+          // Said out loud rather than swallowed. An archive from a newer Sennit
           // carrying something this build cannot store is a real gap, and a
           // user who believes they have a complete copy when they do not is
           // exactly who this feature exists to protect.

@@ -19,7 +19,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Braid</string>
+	<string>Sennit</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,31 +29,31 @@
 	<!-- Both are required to exist before iOS will let the picker open at all;
 	     the strings are what the permission prompt shows the user. -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Braid needs your photo library so you can send photos and videos in a conversation.</string>
+	<string>Sennit needs your photo library so you can send photos and videos in a conversation.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Braid needs the camera so you can take a photo and send it in a conversation.</string>
+	<string>Sennit needs the camera so you can take a photo and send it in a conversation.</string>
 	<!-- Calling. Without this key the app is *terminated* the first time WebRTC
 	     opens a capture device — not refused, not prompted: killed — so its
 	     absence is a crash on the first call rather than a call with no sound.
 	     The camera description above already covers a video call. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Braid shares your position only when you tap "share location" in a chat.</string>
-	<!-- Neither of the next two is a permission Braid asks for. App Store
+	<string>Sennit shares your position only when you tap "share location" in a chat.</string>
+	<!-- Neither of the next two is a permission Sennit asks for. App Store
 	     Connect scans the binary for the APIs behind them — geolocator links
 	     the "always" location call, add_2_calendar links EventKit — and
 	     refuses a build whose Info.plist has no sentence for an API it can
 	     see, used or not: the first TestFlight upload failed processing on
 	     the calendar one. The sentences say what the app does do. -->
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Braid shares your position only when you tap "share location" in a chat. It never follows it in the background.</string>
+	<string>Sennit shares your position only when you tap "share location" in a chat. It never follows it in the background.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Braid adds an event to your calendar only when you ask it to, for a date mentioned in a chat.</string>
+	<string>Sennit adds an event to your calendar only when you ask it to, for a date mentioned in a chat.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Braid shows your address book names for people instead of the names messaging networks assign them. Contacts are matched on this device and never uploaded.</string>
+	<string>Sennit shows your address book names for people instead of the names messaging networks assign them. Contacts are matched on this device and never uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Braid needs the microphone so you can talk in a voice or video call.</string>
+	<string>Sennit needs the microphone so you can talk in a voice or video call.</string>
 	<key>CFBundleName</key>
-	<string>braid</string>
+	<string>sennit</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

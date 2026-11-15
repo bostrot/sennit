@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fills a Matrix account with conversations for app-store review.
 
-App reviewers open Braid to whatever the account holds. An empty inbox
+App reviewers open Sennit to whatever the account holds. An empty inbox
 reads as a broken app and gives them nothing to evaluate, so the review
 account needs to look like someone actually uses it — and to resemble the
 store screenshots, which reviewers compare against.
@@ -237,7 +237,7 @@ def main() -> None:
     them = Client(server, partner, partner_password)
     print(f"signed in as {me.user_id} and {them.user_id}")
 
-    me.set_display_name("Braid Demo")
+    me.set_display_name("Sennit Demo")
     them.set_display_name("Anna Maven")
 
     existing = {}

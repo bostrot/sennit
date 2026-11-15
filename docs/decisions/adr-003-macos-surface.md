@@ -19,7 +19,7 @@ related:
 
 ## Context
 
-Braid's macOS build was the phone app in a window. A 76pt icon rail, a 28pt
+Sennit's macOS build was the phone app in a window. A 76pt icon rail, a 28pt
 headline that scrolled away, a row of pill filter chips, 74pt conversation rows
 with 46pt avatars, a purple floating action button in the bottom-right corner,
 bottom sheets sliding up from the dock, message bubbles run to the full width of
@@ -86,7 +86,7 @@ surfaces no "reduce transparency" flag; of the switches it does surface, that
 is the one whose intent a material with unknowable contrast behind it would
 defeat. `mac_window_high_contrast.png` pins it.
 
-**A `cookies` login step is a dead end.** Braid embeds no browser. The step is
+**A `cookies` login step is a dead end.** Sennit embeds no browser. The step is
 explained and the user is sent to the bridge's management chat, which can do
 the same job. See `bridge_login_flow.dart`.
 

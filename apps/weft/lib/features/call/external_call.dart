@@ -4,7 +4,7 @@ import '../../app/localisation.dart';
 
 /// Where a bridged conversation's call actually happens.
 ///
-/// Braid's own calls ride Matrix, and a bridged contact's ghost will never
+/// Sennit's own calls ride Matrix, and a bridged contact's ghost will never
 /// answer an `m.call.invite` — the call has to happen in the network's own
 /// app. This resolves the deep link that gets the user there: the contact in
 /// WhatsApp, the number in Signal, and failing anything better, the dialler.
