@@ -1,0 +1,38 @@
+name: Store products
+
+# Creates the Braid Pro in-app product in Google Play and App Store Connect,
+# with the credentials the deploy workflows already use. Run by hand, and
+# safe to run again: tooling/store/iap_products.py only creates what is
+# missing. Leave "apply" off to see what it would do.
+
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: Which store
+        type: choice
+        options: [all, play, appstore]
+        default: all
+      apply:
+        description: Create what is missing (off = report only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  products:
+    name: Braid Pro in the stores
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check, and create when asked
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+          STORE: ${{ inputs.store }}
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+        run: python3 tooling/store/iap_products.py "$STORE" $APPLY
