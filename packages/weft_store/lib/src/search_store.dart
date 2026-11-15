@@ -39,59 +39,12 @@ class SearchStore implements SearchBackend {
     required String chatId,
     String chatTitle = '',
   }) {
-    final text = plainTextOf(message);
-
-    _raw.execute(
-      '''
-      INSERT INTO search_message
-        (event_id, room_id, chat_id, network, sender_id, timestamp, kind, body,
-         has_media, sender_name, chat_title)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(event_id, room_id) DO UPDATE SET
-        chat_id     = excluded.chat_id,
-        body        = excluded.body,
-        kind        = excluded.kind,
-        has_media   = excluded.has_media,
-        sender_name = excluded.sender_name,
-        chat_title  = excluded.chat_title
-      ''',
-      [
-        message.eventId,
-        message.roomId,
-        chatId,
-        message.network.id,
-        message.senderId,
-        message.timestamp.millisecondsSinceEpoch,
-        message.kind.name,
-        text,
-        message.attachmentUrl != null ? 1 : 0,
-        message.senderName,
-        chatTitle,
-      ],
-    );
-
-    final rowId =
-        _raw.select(
-              'SELECT rowid FROM search_message WHERE event_id = ? AND room_id = ?',
-              [message.eventId, message.roomId],
-            ).first['rowid']
-            as int;
-
-    // The body may have changed, so any existing vector is stale.
-    _raw.execute('DELETE FROM search_embedding WHERE message_rowid = ?', [
-      rowId,
-    ]);
-    _raw.execute(
-      '''
-      INSERT INTO embedding_queue (message_rowid, enqueued_at) VALUES (?, ?)
-      ON CONFLICT(message_rowid) DO UPDATE SET
-        attempts    = 0,
-        last_error  = NULL,
-        enqueued_at = excluded.enqueued_at
-      ''',
-      [rowId, DateTime.now().millisecondsSinceEpoch],
-    );
-    return rowId;
+    final writer = _IndexWriter(_raw);
+    try {
+      return writer.write(message, chatId: chatId, chatTitle: chatTitle);
+    } finally {
+      writer.dispose();
+    }
   }
 
   void indexMessages(
@@ -99,11 +52,16 @@ class SearchStore implements SearchBackend {
     required String chatId,
     String chatTitle = '',
   }) {
-    _db.transaction(() {
-      for (final message in messages) {
-        indexMessage(message, chatId: chatId, chatTitle: chatTitle);
-      }
-    });
+    final writer = _IndexWriter(_raw);
+    try {
+      _db.transaction(() {
+        for (final message in messages) {
+          writer.write(message, chatId: chatId, chatTitle: chatTitle);
+        }
+      });
+    } finally {
+      writer.dispose();
+    }
   }
 
   void removeMessage({required String eventId, required String roomId}) {
@@ -391,4 +349,128 @@ String? toFtsMatchQuery(String input, {bool prefixLastToken = true}) {
     );
   }
   return quoted.join(' ');
+}
+
+/// The statements one pass of indexing runs, prepared once for the pass.
+///
+/// The chat view files every message it has loaded, and it has loaded most of
+/// them before: reopening a conversation hands back the same page it indexed
+/// on the last visit. Written unconditionally, each of those was an upsert
+/// that re-fired the FTS triggers, a deleted embedding and a fresh place in
+/// the embedding queue — so every visit to a conversation re-embedded it from
+/// the top, on a device that was trying to scroll. And each of the four
+/// statements per message was compiled again for each message.
+///
+/// So the row is read first. Unchanged, it is left exactly as it is; changed
+/// only in what it is filed under, it is re-filed and keeps its embedding;
+/// only new or reworded text is embedded again.
+class _IndexWriter {
+  _IndexWriter(Database db)
+    : _existing = db.prepare(
+        'SELECT rowid, chat_id, kind, body, has_media, sender_name, chat_title '
+        'FROM search_message WHERE event_id = ? AND room_id = ?',
+      ),
+      _upsert = db.prepare('''
+        INSERT INTO search_message
+          (event_id, room_id, chat_id, network, sender_id, timestamp, kind,
+           body, has_media, sender_name, chat_title)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(event_id, room_id) DO UPDATE SET
+          chat_id     = excluded.chat_id,
+          body        = excluded.body,
+          kind        = excluded.kind,
+          has_media   = excluded.has_media,
+          sender_name = excluded.sender_name,
+          chat_title  = excluded.chat_title
+      '''),
+      _dropEmbedding = db.prepare(
+        'DELETE FROM search_embedding WHERE message_rowid = ?',
+      ),
+      _enqueue = db.prepare('''
+        INSERT INTO embedding_queue (message_rowid, enqueued_at) VALUES (?, ?)
+        ON CONFLICT(message_rowid) DO UPDATE SET
+          attempts    = 0,
+          last_error  = NULL,
+          enqueued_at = excluded.enqueued_at
+      '''),
+      _enqueueIfMissing = db.prepare('''
+        INSERT INTO embedding_queue (message_rowid, enqueued_at)
+        SELECT ?1, ?2
+        WHERE NOT EXISTS
+          (SELECT 1 FROM search_embedding WHERE message_rowid = ?1)
+        ON CONFLICT(message_rowid) DO NOTHING
+      ''');
+
+  final PreparedStatement _existing;
+  final PreparedStatement _upsert;
+  final PreparedStatement _dropEmbedding;
+  final PreparedStatement _enqueue;
+  final PreparedStatement _enqueueIfMissing;
+
+  int write(
+    WeftMessage message, {
+    required String chatId,
+    required String chatTitle,
+  }) {
+    final text = plainTextOf(message);
+    final hasMedia = message.attachmentUrl != null ? 1 : 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final rows = _existing.select([message.eventId, message.roomId]);
+    final row = rows.isEmpty ? null : rows.first;
+    final sameText = row != null && row['body'] == text;
+
+    if (sameText &&
+        row['chat_id'] == chatId &&
+        row['kind'] == message.kind.name &&
+        row['has_media'] == hasMedia &&
+        row['sender_name'] == message.senderName &&
+        row['chat_title'] == chatTitle) {
+      final rowId = row['rowid'] as int;
+      // Nothing to write — but a row that was never embedded, because the
+      // model arrived after the message did, still gets its turn. A row
+      // already waiting keeps its place and its attempt count.
+      _enqueueIfMissing.execute([rowId, now]);
+      return rowId;
+    }
+
+    _upsert.execute([
+      message.eventId,
+      message.roomId,
+      chatId,
+      message.network.id,
+      message.senderId,
+      message.timestamp.millisecondsSinceEpoch,
+      message.kind.name,
+      text,
+      hasMedia,
+      message.senderName,
+      chatTitle,
+    ]);
+    // Asked rather than taken from `last_insert_rowid`, which an update does
+    // not move and the FTS triggers do.
+    final rowId =
+        row?['rowid'] as int? ??
+        _existing.select([message.eventId, message.roomId]).first['rowid']
+            as int;
+
+    if (sameText) {
+      // Re-filed under a new chat or title; the words, and so the vector, are
+      // the ones already stored.
+      _enqueueIfMissing.execute([rowId, now]);
+      return rowId;
+    }
+
+    _dropEmbedding.execute([rowId]);
+    _enqueue.execute([rowId, now]);
+    return rowId;
+  }
+
+  void dispose() {
+    _existing.close();
+    _upsert.close();
+    _dropEmbedding.close();
+    _enqueue.close();
+    _enqueueIfMissing.close();
+  }
 }

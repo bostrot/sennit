@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_search/weft_search.dart';
@@ -400,6 +402,74 @@ void main() {
       ], 'query');
 
       expect(results, hasLength(1));
+    });
+  });
+
+  group('re-indexing what is already there', () {
+    void embedAll() {
+      for (final item in store.nextEmbeddingBatch(limit: 100)) {
+        store.saveEmbedding(
+          rowId: item.rowId,
+          vector: Int8List(4),
+          model: 'test',
+        );
+      }
+    }
+
+    test('an unchanged message keeps its embedding and is not re-queued', () {
+      final message = msg(r'$a', 'see you at six');
+      store.indexMessages([message], chatId: 'chat', chatTitle: 'Peer');
+      embedAll();
+      expect(store.pendingEmbeddingCount, 0);
+
+      store.indexMessages([message], chatId: 'chat', chatTitle: 'Peer');
+
+      expect(store.pendingEmbeddingCount, 0);
+      expect(
+        db.raw.select('SELECT COUNT(*) AS c FROM search_embedding').first['c'],
+        1,
+      );
+    });
+
+    test('an edited message is re-queued and loses its old embedding', () {
+      store.indexMessages([msg(r'$a', 'see you at six')], chatId: 'chat');
+      embedAll();
+
+      store.indexMessages([msg(r'$a', 'see you at seven')], chatId: 'chat');
+
+      expect(store.pendingEmbeddingCount, 1);
+      expect(
+        db.raw.select('SELECT COUNT(*) AS c FROM search_embedding').first['c'],
+        0,
+      );
+      expect(store.indexedCount, 1);
+    });
+
+    test('a message re-filed under a merged chat keeps its embedding', () async {
+      final message = msg(r'$a', 'see you at six');
+      store.indexMessages([message], chatId: '!room:example.org');
+      embedAll();
+
+      store.indexMessages([message], chatId: 'merged:1', chatTitle: 'Anna');
+
+      expect(store.pendingEmbeddingCount, 0);
+      final row = db.raw.select(
+        'SELECT chat_id, chat_title FROM search_message',
+      );
+      expect(row.single['chat_id'], 'merged:1');
+      expect(row.single['chat_title'], 'Anna');
+      // And the new title is searchable, which is what the FTS trigger is for.
+      expect(await store.keywordSearch('Anna'), hasLength(1));
+    });
+
+    test('a message that was never embedded is still offered for it', () {
+      final message = msg(r'$a', 'see you at six');
+      store.indexMessages([message], chatId: 'chat');
+      db.raw.execute('DELETE FROM embedding_queue');
+
+      store.indexMessages([message], chatId: 'chat');
+
+      expect(store.pendingEmbeddingCount, 1);
     });
   });
 }
