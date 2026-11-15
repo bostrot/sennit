@@ -134,7 +134,11 @@ final notificationDismisserProvider =
 /// only make this rebuild for no gain.
 final conversationClearerProvider = Provider<ConversationClearer>((ref) {
   return ConversationClearer(
-    dismissChat: ref.watch(notificationDismisserProvider),
+    // Read at call time, like the list below. Watching it rebuilt this
+    // provider when `main` filled the dismisser in, and [ReadElsewhereWatcher]
+    // was left holding the disposed instance — whose every republish threw.
+    dismissChat: (chatId) async =>
+        ref.read(notificationDismisserProvider)?.call(chatId),
     republish: () async {
       // The list as it is *now*, deliberately re-read at call time. A snapshot
       // captured earlier is one taken before the read was recorded, and

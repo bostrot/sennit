@@ -1521,6 +1521,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // Read once for the whole list rather than per bubble: it is a settings
     // lookup, and the ticks under a hundred messages ask the same question.
     final receiptsEnabled = ref.watch(sendReadReceiptsProvider);
+    // Watched here and not in the item builder, which runs during layout —
+    // after this build has already closed the subscriptions it did not renew.
+    // Watched there, the service was dropped and picked up again on every
+    // rebuild of the conversation.
+    final transcripts = ref.watch(transcriptionServiceProvider);
     final grouping = _threadGrouping(chat);
     // What the list actually draws. In the room it is the flat timeline with
     // thread replies folded away behind their roots' indicators; in a thread it
@@ -1664,12 +1669,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             var message = visible[i];
                             // Transcripts arrive after the event was mapped; overlay the
                             // session cache so a finished transcription shows in place.
-                            final cachedTranscript = ref
-                                .watch(transcriptionServiceProvider)
-                                .cached(
-                                  message.eventId,
-                                  roomId: message.roomId,
-                                );
+                            // Only a clip can have one, and the lookup behind
+                            // a cache miss is a database read.
+                            final cachedTranscript = message.canTranscribe
+                                ? transcripts.cached(
+                                    message.eventId,
+                                    roomId: message.roomId,
+                                  )
+                                : null;
                             if (cachedTranscript != null &&
                                 message.transcript == null) {
                               message = message.copyWith(

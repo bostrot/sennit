@@ -3,7 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
-import 'package:weft_store/weft_store.dart' show StoredTranscript;
+import 'package:weft_store/weft_store.dart'
+    show StoredTranscript, TranscriptStore;
 import 'package:weft_transcribe/weft_transcribe.dart';
 
 import 'search_providers.dart';
@@ -16,9 +17,19 @@ import 'stores.dart';
 /// note findable by its spoken words — and kept in a per-session cache the
 /// chat view reads for display.
 class TranscriptionService {
-  TranscriptionService(this._ref);
+  TranscriptionService(this._ref, {TranscriptStore? transcripts})
+    : _transcripts = transcripts;
 
   final Ref _ref;
+
+  /// Where finished transcripts are kept, or null while the stores are still
+  /// opening.
+  ///
+  /// Handed in by the provider rather than looked up in [cached]. `cached` runs
+  /// once per bubble per frame, and a `ref.watch` outside a provider's build is
+  /// never deduplicated: each call left one more subscription on the stores
+  /// behind, and every rebuild of a chat then walked all of them.
+  final TranscriptStore? _transcripts;
 
   /// eventId → transcript, for bubbles already on screen.
   final Map<String, Transcript> _cache = {};
@@ -38,7 +49,7 @@ class TranscriptionService {
     if (hot != null) return hot;
     if (roomId == null) return null;
 
-    final stored = storesOrNull(_ref)?.transcripts.byEvent(eventId, roomId);
+    final stored = _transcripts?.byEvent(eventId, roomId);
     if (stored == null) return null;
     return _cache[eventId] = Transcript(
       text: stored.text,
@@ -199,7 +210,8 @@ class TranscriptionService {
 }
 
 final transcriptionServiceProvider = Provider<TranscriptionService>(
-  TranscriptionService.new,
+  (ref) =>
+      TranscriptionService(ref, transcripts: storesOrNull(ref)?.transcripts),
 );
 
 /// Bumped when a transcript lands so open chat views refresh.
