@@ -8,6 +8,7 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
 
 import '../../app/a11y.dart';
+import '../../app/billing_providers.dart';
 import '../../app/build_info.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
@@ -15,6 +16,7 @@ import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
 import '../../services/backup/backup_service.dart' show kBraidVersion;
+import '../../services/billing/entitlements.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
@@ -26,6 +28,7 @@ import 'devices_screen.dart';
 import 'link_previews_screen.dart';
 import 'mcp_screen.dart';
 import 'notifications_screen.dart';
+import 'pro_screen.dart';
 import 'security_screen.dart';
 import 'shortcuts_sheet.dart';
 import 'sms_screen.dart';
@@ -50,6 +53,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final pro = ref.watch(proControllerProvider);
 
     void push(Widget screen) {
       Navigator.of(
@@ -57,18 +61,24 @@ class SettingsScreen extends ConsumerWidget {
       ).push(MaterialPageRoute<void>(builder: (_) => screen));
     }
 
+    // A row for a paid feature leads to the Pro screen until it is unlocked,
+    // rather than into a screen whose settings would do nothing.
     Widget tile({
       required IconData icon,
       required String title,
       required String subtitle,
       required VoidCallback onTap,
+      ProFeature? feature,
     }) {
+      final locked = feature != null && !pro.unlocks(feature);
       return ListTile(
         leading: Icon(icon),
         title: Text(title),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: onTap,
+        trailing: locked
+            ? const ProBadge()
+            : const Icon(Icons.chevron_right_rounded),
+        onTap: locked ? () => pushProScreen(context) : onTap,
       );
     }
 
@@ -146,6 +156,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.auto_awesome_outlined,
               title: l10n.settingsAiTitle,
               subtitle: l10n.settingsAiSubtitle,
+              feature: ProFeature.aiReplies,
               onTap: () => push(const AiSettingsScreen()),
             ),
             const _AgendaToggle(),
@@ -191,16 +202,27 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.home_outlined,
               title: l10n.settingsIntegrationsTitle,
               subtitle: l10n.settingsIntegrationsSubtitle,
+              feature: ProFeature.integrations,
               onTap: () => push(const IntegrationsScreen()),
             ),
             tile(
               icon: Icons.terminal_rounded,
               title: l10n.settingsMcpTitle,
               subtitle: l10n.settingsMcpSubtitle,
+              feature: ProFeature.mcpServer,
               onTap: () => push(const McpScreen()),
             ),
 
             header(l10n.settingsSectionAbout),
+            if (pro.charges)
+              tile(
+                icon: Icons.workspace_premium_outlined,
+                title: l10n.proTitle,
+                subtitle: pro.owned()
+                    ? l10n.proSettingsSubtitleOwned
+                    : l10n.proSettingsSubtitle,
+                onTap: () => pushProScreen(context),
+              ),
             tile(
               icon: Icons.info_outline_rounded,
               title: l10n.settingsAboutTitle,

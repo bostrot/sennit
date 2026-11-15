@@ -104,7 +104,8 @@ jobs:
           ../../tooling/scripts/build_info.sh > "$RUNNER_TEMP/build_info.json"
           flutter build ios --release --config-only --no-codesign \
             --build-number="$(git rev-list --count HEAD)" \
-            --dart-define-from-file="$RUNNER_TEMP/build_info.json"
+            --dart-define-from-file="$RUNNER_TEMP/build_info.json" \
+            --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
         working-directory: apps/weft
 
       - name: Unlock the signing keychain

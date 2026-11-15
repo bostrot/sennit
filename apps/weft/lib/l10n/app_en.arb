@@ -7293,5 +7293,138 @@
   "chatInviteClashKeep": "Keep this time",
   "@chatInviteClashKeep": {
     "description": "Dialog button: use the busy time anyway. Keep under ~24 chars."
+  },
+  "proTitle": "Braid Pro",
+  "@proTitle": {
+    "description": "Title of the Braid Pro screen and its row in Settings. 'Braid Pro' is the paid tier's product name and is never translated."
+  },
+  "proBadge": "Pro",
+  "@proBadge": {
+    "description": "Small badge on a settings row whose feature needs Braid Pro. Product name; keep it 'Pro'. Keep under ~6 chars."
+  },
+  "proSettingsSubtitle": "AI features and integrations",
+  "@proSettingsSubtitle": {
+    "description": "Subtitle under 'Braid Pro' in Settings while it is not bought: what Pro covers. Keep under ~60 chars."
+  },
+  "proSettingsSubtitleOwned": "Unlocked. Thank you!",
+  "@proSettingsSubtitleOwned": {
+    "description": "Subtitle under 'Braid Pro' in Settings once it is bought. Keep under ~60 chars."
+  },
+  "proIntro": "Braid Pro unlocks everything that works with AI or with your other services. Chats, bridges and backups stay free.",
+  "@proIntro": {
+    "description": "Opening paragraph of the Braid Pro screen: what it unlocks and what stays free."
+  },
+  "proFeatureAi": "Auto-replies, reply suggestions and the to-do assistant",
+  "@proFeatureAi": {
+    "description": "List item on the Braid Pro screen: the AI writing features."
+  },
+  "proFeatureSearch": "Search by meaning, not just by words",
+  "@proFeatureSearch": {
+    "description": "List item on the Braid Pro screen: semantic search. Keyword search stays free."
+  },
+  "proFeatureTranscription": "Voice-note transcription",
+  "@proFeatureTranscription": {
+    "description": "List item on the Braid Pro screen: turning voice notes into text."
+  },
+  "proFeatureMcp": "An MCP server for your own agents",
+  "@proFeatureMcp": {
+    "description": "List item on the Braid Pro screen. 'MCP' is a protocol name and is never translated; 'agents' means the reader's own AI programs."
+  },
+  "proFeatureIntegrations": "Home Assistant, paperless-ngx and a shared calendar",
+  "@proFeatureIntegrations": {
+    "description": "List item on the Braid Pro screen: the integrations. Product names stay as they are."
+  },
+  "proBuyLifetime": "Buy once · {price}",
+  "@proBuyLifetime": {
+    "description": "Button: buy Braid Pro with a single payment, followed by the store's price.",
+    "placeholders": {
+      "price": {
+        "type": "String",
+        "description": "The price, already formatted by the store in the user's currency.",
+        "example": "€19.99"
+      }
+    }
+  },
+  "proBuyMonthly": "Monthly · {price}",
+  "@proBuyMonthly": {
+    "description": "Button: subscribe to Braid Pro monthly, followed by the store's monthly price.",
+    "placeholders": {
+      "price": {
+        "type": "String",
+        "description": "The monthly price, already formatted by the store in the user's currency.",
+        "example": "€2.99"
+      }
+    }
+  },
+  "proSubscriptionNote": "You can cancel the subscription at any time in your store account.",
+  "@proSubscriptionNote": {
+    "description": "Small print under the purchase buttons when a subscription is offered."
+  },
+  "proOwnedLifetime": "You own Braid Pro. Thank you!",
+  "@proOwnedLifetime": {
+    "description": "Shown on the Braid Pro screen after a one-time purchase."
+  },
+  "proOwnedMonthly": "Your Braid Pro subscription is active. Thank you!",
+  "@proOwnedMonthly": {
+    "description": "Shown on the Braid Pro screen while a monthly subscription is active."
+  },
+  "proIncluded": "Everything is included in this build of Braid.",
+  "@proIncluded": {
+    "description": "Shown on the Braid Pro screen in a build that does not charge, such as one built from source."
+  },
+  "proStoreUnavailable": "The store can’t be reached right now.",
+  "@proStoreUnavailable": {
+    "description": "Shown when Google Play or the App Store did not answer, so no prices or purchase sheet can be shown."
+  },
+  "proTryAgain": "Try again",
+  "@proTryAgain": {
+    "description": "Button under proStoreUnavailable: ask the store again. Keep under ~24 chars."
+  },
+  "proRestore": "Restore purchases",
+  "@proRestore": {
+    "description": "Button: ask the store for purchases made earlier, e.g. on another phone or before a reinstall. Keep under ~30 chars."
+  },
+  "proRestoreRequested": "Asked the store for your earlier purchases.",
+  "@proRestoreRequested": {
+    "description": "Toast after tapping 'Restore purchases'. Anything found unlocks on its own."
+  },
+  "proPending": "Waiting for the store to confirm your purchase…",
+  "@proPending": {
+    "description": "Shown while a purchase is pending, e.g. waiting for a parent's approval or a slow payment method."
+  },
+  "proFailed": "The purchase didn’t go through: {error}",
+  "@proFailed": {
+    "description": "Shown when the store reported an error for a purchase.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "description": "The store's own error message.",
+        "example": "BillingResponse.itemUnavailable"
+      }
+    }
+  },
+  "proBuyDirect": "Buy Braid Pro",
+  "@proBuyDirect": {
+    "description": "Button in a build downloaded from the release page: opens the checkout web page in the browser. Keep under ~28 chars."
+  },
+  "proLicenseNote": "One payment, no subscription. Your licence key arrives by email and works on all your devices.",
+  "@proLicenseNote": {
+    "description": "Small print under the buy button: what happens after paying on the web."
+  },
+  "proLicenseLabel": "Licence key",
+  "@proLicenseLabel": {
+    "description": "Label of the text field where a licence key bought on the web is pasted. Keep under ~24 chars."
+  },
+  "proLicenseActivate": "Activate",
+  "@proLicenseActivate": {
+    "description": "Button next to the licence key field: check the key and unlock Braid Pro. Keep under ~20 chars."
+  },
+  "proLicenseInvalid": "That key isn’t a valid Braid Pro licence. Check it against the email.",
+  "@proLicenseInvalid": {
+    "description": "Error under the licence key field: the key is mistyped, unknown or was deactivated."
+  },
+  "proLicenseUnreachable": "The key couldn’t be checked right now. Try again when you’re online.",
+  "@proLicenseUnreachable": {
+    "description": "Error under the licence key field: the licence service did not answer, so nothing is known about the key."
   }
 }

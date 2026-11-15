@@ -8,6 +8,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import 'app/auto_reply_providers.dart';
+import 'app/billing_providers.dart';
 import 'app/intents.dart';
 import 'app/design_strings.dart';
 import 'app/localisation.dart';
@@ -462,6 +463,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           // itself must not quietly stop doing so because this device does not
           // do notifications.
           ref.read(retentionSweeperProvider)?.start();
+          // Every launch, so a purchase that finished while the app was
+          // closed is acknowledged and a live subscription re-confirmed.
+          unawaited(ref.read(proControllerProvider.notifier).start());
         // Both signed-out states take the out-of-app copies away. `softLoggedOut`
         // is the server having invalidated the token, and until the user
         // re-auths this device is exactly as signed out as the other one —

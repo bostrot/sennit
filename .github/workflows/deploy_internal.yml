@@ -27,6 +27,9 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.44.0'
 
+# The build sells Braid Pro through Play only once the BRAID_STORE_EDITION
+# repository variable says `store`; see release.yml.
+
 jobs:
   build:
     name: Build and upload the App Bundle
@@ -163,7 +166,7 @@ jobs:
         # code and the second is refused, which is the right answer to
         # uploading the same build twice. Needs the full history: see
         # `fetch-depth: 0` above.
-        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)" --dart-define-from-file="$RUNNER_TEMP/build_info.json"
+        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)" --dart-define-from-file="$RUNNER_TEMP/build_info.json" --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
         working-directory: apps/weft
 
       - name: Upload to Play Store
