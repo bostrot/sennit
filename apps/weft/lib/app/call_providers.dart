@@ -138,8 +138,13 @@ final callAvailabilityProvider = Provider.family<CallAvailability, String>((
   ref,
   chatId,
 ) {
-  final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
-  final chat = chats.firstWhereOrNull((c) => c.id == chatId);
+  // The one conversation, and only when it changes: the whole inbox re-emits
+  // after every sync, and this walked the identity graph for each of them.
+  final chat = ref
+      .watch(
+        chatsProvider.select((chats) => ChatContent.find(chats.value, chatId)),
+      )
+      ?.chat;
   if (chat == null) {
     return const CallBlocked(
       CallBlocker.unknownPeer,

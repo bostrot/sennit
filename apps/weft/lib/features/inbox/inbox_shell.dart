@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart' show DateFormat;
+import 'package:intl/intl.dart' show DateFormat, Intl;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
@@ -40,6 +40,9 @@ Future<void> showChatContextMenu(
 ) async {
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final repository = ref.read(chatRepositoryProvider);
+  // The menu's words, in the reader's language: these seven were English
+  // literals, in an app that is otherwise translated into six.
+  final l10n = context.l10n;
 
   PopupMenuItem<String> item(
     String value,
@@ -68,25 +71,29 @@ Future<void> showChatContextMenu(
       // First, because it is the one verb here that changes nothing — and the
       // reason it exists is that every other way of looking at a conversation
       // marks it read.
-      item('peek', Icons.visibility_outlined, 'Peek'),
+      item('peek', Icons.visibility_outlined, l10n.inboxMenuPeek),
       if (chat.unreadCount > 0)
-        item('read', Icons.mark_email_read_outlined, 'Mark read')
+        item('read', Icons.mark_email_read_outlined, l10n.inboxMarkRead)
       else
-        item('unread', Icons.mark_email_unread_outlined, 'Mark unread'),
+        item('unread', Icons.mark_email_unread_outlined, l10n.inboxMarkUnread),
       if (chat.muted)
-        item('unmute', Icons.notifications_active_outlined, 'Unmute')
+        item('unmute', Icons.notifications_active_outlined, l10n.commonUnmute)
       else
-        item('mute', Icons.notifications_off_outlined, 'Mute'),
+        item('mute', Icons.notifications_off_outlined, l10n.commonMute),
       if (chat.archived)
-        item('unarchive', Icons.unarchive_outlined, 'Unarchive')
+        item('unarchive', Icons.unarchive_outlined, l10n.inboxUnarchive)
       else
-        item('archive', Icons.archive_outlined, 'Archive'),
-      item('label', Icons.label_outline_rounded, 'Labels…'),
-      item('select', Icons.check_circle_outline_rounded, 'Select'),
+        item('archive', Icons.archive_outlined, l10n.inboxArchive),
+      item('label', Icons.label_outline_rounded, l10n.inboxMenuLabels),
+      item(
+        'select',
+        Icons.check_circle_outline_rounded,
+        l10n.inboxMenuSelectChat,
+      ),
       item(
         'delete',
         Icons.delete_outline_rounded,
-        'Delete',
+        l10n.commonDelete,
         color: Theme.of(context).colorScheme.error,
       ),
     ],
@@ -155,9 +162,150 @@ String? formatInboxTime(
   if (ts == null) return null;
   final delta = now.difference(ts);
   if (delta.inMinutes < 1) return justNow;
-  if (delta.inHours < 24) return DateFormat.Hm().format(ts);
-  if (delta.inDays < 7) return DateFormat.E().format(ts);
-  return DateFormat.yMd().format(ts);
+  final formats = _InboxTimeFormats.current();
+  if (delta.inHours < 24) return formats.clock.format(ts);
+  if (delta.inDays < 7) return formats.weekday.format(ts);
+  return formats.date.format(ts);
+}
+
+/// The three formatters [formatInboxTime] chooses between, built once per
+/// locale rather than once per row per frame.
+///
+/// A `DateFormat` parses its pattern and looks up its locale's symbols when
+/// it is constructed, and the label is asked for by every visible row on
+/// every rebuild. Keyed on `Intl`'s current locale, which is the one a bare
+/// `DateFormat.Hm()` would have read, so switching language still reformats.
+class _InboxTimeFormats {
+  _InboxTimeFormats._(this.locale)
+    : clock = DateFormat.Hm(),
+      weekday = DateFormat.E(),
+      date = DateFormat.yMd();
+
+  final String locale;
+  final DateFormat clock;
+  final DateFormat weekday;
+  final DateFormat date;
+
+  static _InboxTimeFormats? _cached;
+
+  static _InboxTimeFormats current() {
+    final locale = Intl.getCurrentLocale();
+    final cached = _cached;
+    if (cached != null && cached.locale == locale) return cached;
+    return _cached = _InboxTimeFormats._(locale);
+  }
+}
+
+/// Remembers the widget built for each conversation's row.
+///
+/// Flutter skips a subtree whose widget is the *same object* it already has,
+/// and only then. A list rebuilt because one conversation moved hands every
+/// visible row a new widget — equal in every field, but new — and so rebuilds
+/// all of them: a dozen rows of a hundred widgets each, for one changed badge.
+/// Handing back the widget from last time, when nothing it was built from has
+/// changed, is what makes the list's rebuild cost the rows that differ.
+///
+/// [inputs] is everything the row is built from besides the chat — a record,
+/// so it compares by value. Anything the builder closes over must be in it or
+/// be stable for the life of the list, and must not be the row's own
+/// `BuildContext`: the widget is reused after that element is gone. Its
+/// position is deliberately not an input — see [indexOf].
+class ChatRowMemo {
+  final Map<String, (Chat, Object, Widget)> _rows = {};
+
+  /// Where the row keyed [key] is in [chats] now, for a list's
+  /// `findChildIndexCallback`. Rows are keyed `ValueKey(chat.id)`.
+  int? indexOf(Key key, List<Chat> chats, {int offset = 0}) {
+    if (key is! ValueKey<String>) return null;
+    if (!identical(chats, _indexedChats)) {
+      _indexedChats = chats;
+      _indexById = {for (var i = 0; i < chats.length; i++) chats[i].id: i};
+    }
+    final index = _indexById[key.value];
+    return index == null ? null : index + offset;
+  }
+
+  List<Chat>? _indexedChats;
+  Map<String, int> _indexById = const {};
+
+  Widget row(Chat chat, Object inputs, Widget Function() build) {
+    final cached = _rows[chat.id];
+    if (cached != null &&
+        cached.$2 == inputs &&
+        cached.$1.sameContentAs(chat)) {
+      return cached.$3;
+    }
+    // Bounded by forgetting everything now and then rather than by tracking
+    // use: a row that is asked for again is rebuilt once, which is what
+    // happened on every build before there was a memo at all.
+    if (_rows.length > 400) _rows.clear();
+    final built = build();
+    _rows[chat.id] = (chat, inputs, built);
+    return built;
+  }
+}
+
+/// An inbox row that keeps *itself* current.
+///
+/// Three things on a row change without the conversation changing: whether
+/// someone in it is typing, whether its person is online, and what "12:04"
+/// has become now that a minute has passed. None of them is in the [Chat], so
+/// the list used to pick them up the only way it could — by rebuilding every
+/// visible row after every sync. This asks the same three questions on the
+/// same heartbeat, one row at a time, and rebuilds the row whose answer moved.
+class LiveChatTile extends ConsumerWidget {
+  const LiveChatTile({
+    super.key,
+    required this.chat,
+    required this.onTap,
+    this.selected = false,
+    this.onLongPress,
+    this.avatarHeaders,
+    this.leading,
+    this.checked,
+  });
+
+  final Chat chat;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool selected;
+  final Map<String, String>? avatarHeaders;
+  final Widget? leading;
+  final bool? checked;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final justNow = context.l10n.inboxTimeNow;
+    final now = ref.watch(clockProvider);
+    // Selected *off* the chat list so it is re-asked whenever the repository
+    // has synced; the list itself is not what is being read.
+    final (typing, online, timeLabel) = ref.watch(
+      chatsProvider.select((_) {
+        final repository = ref.read(chatRepositoryProvider);
+        return (
+          repository.typingIn(chat.id).isNotEmpty,
+          repository.presenceFor(chat.id)?.online ?? false,
+          formatInboxTime(
+            chat.lastMessage?.timestamp,
+            now: now(),
+            justNow: justNow,
+          ),
+        );
+      }),
+    );
+    return ChatTile(
+      chat: chat,
+      avatarHeaders: avatarHeaders,
+      typing: typing,
+      online: online,
+      selected: selected,
+      checked: checked,
+      leading: leading,
+      onLongPress: onLongPress,
+      timeLabel: timeLabel,
+      onTap: onTap,
+    );
+  }
 }
 
 /// The app's home: network rail, inbox, and — when there's room — the open
@@ -174,14 +322,11 @@ class InboxShell extends ConsumerWidget {
     // be a worse description of both.
     if (context.isMac) return const MacInboxShell();
 
-    final repository = ref.watch(chatRepositoryProvider);
     // Not used here — *held* here: the scheduler's timer only runs while
     // something watches it, and the shell is alive as long as the app is.
     ref.watch(messageSchedulerProvider);
     // Same shape: keeps address-book names applied while the app shows chats.
     ref.watch(contactNamesSyncProvider);
-    final filter = ref.watch(networkFilterProvider);
-    final unread = ref.watch(unreadByNetworkProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
 
     final wide = MediaQuery.sizeOf(context).width >= kTwoPaneBreakpoint;
@@ -213,14 +358,20 @@ class InboxShell extends ConsumerWidget {
             FocusTraversalOrder(
               order: const NumericFocusOrder(1),
               child: FocusTraversalGroup(
-                child: NetworkRail(
-                  networks: repository.availableNetworks,
-                  selected: filter,
-                  unreadByNetwork: unread,
-                  onToggle: (n) =>
-                      ref.read(networkFilterProvider.notifier).toggle(n),
-                  onShowAll: () =>
-                      ref.read(networkFilterProvider.notifier).clear(),
+                // The rail watches for itself. Its badges move with every
+                // message that arrives anywhere, and read from this build
+                // they took the whole shell — on a two-pane window, the open
+                // conversation included — round with them.
+                child: Consumer(
+                  builder: (context, ref, _) => NetworkRail(
+                    networks: ref.watch(availableNetworksProvider),
+                    selected: ref.watch(networkFilterProvider),
+                    unreadByNetwork: ref.watch(unreadByNetworkProvider),
+                    onToggle: (n) =>
+                        ref.read(networkFilterProvider.notifier).toggle(n),
+                    onShowAll: () =>
+                        ref.read(networkFilterProvider.notifier).clear(),
+                  ),
                 ),
               ),
             ),
@@ -253,7 +404,7 @@ class InboxShell extends ConsumerWidget {
               ),
             ),
             if (wide) ...[
-              VerticalDivider(width: 1, color: context.palette.border),
+              VerticalDivider(width: 1, color: context.palette.divider),
               Expanded(
                 flex: 3,
                 child: FocusTraversalOrder(
@@ -273,11 +424,18 @@ class InboxShell extends ConsumerWidget {
   }
 }
 
-class _InboxPane extends ConsumerWidget {
+class _InboxPane extends ConsumerStatefulWidget {
   const _InboxPane();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_InboxPane> createState() => _InboxPaneState();
+}
+
+class _InboxPaneState extends ConsumerState<_InboxPane> {
+  final _rows = ChatRowMemo();
+
+  @override
+  Widget build(BuildContext context) {
     final chats = ref.watch(visibleChatsProvider);
     final filter = ref.watch(networkFilterProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
@@ -310,148 +468,161 @@ class _InboxPane extends ConsumerWidget {
             // title, the stories and the filter rows ride away with the list
             // (they were a fixed third of a phone's height), while search
             // floats back in with the first downward gesture.
-            child: CustomScrollView(
-              slivers: [
-                if (!selecting) ...[
-                  SliverToBoxAdapter(child: _InboxHeader(activeFilter: filter)),
-                  SliverAppBar(
-                    floating: true,
-                    snap: true,
-                    automaticallyImplyLeading: false,
-                    backgroundColor: context.colors.surface,
-                    surfaceTintColor: Colors.transparent,
-                    titleSpacing: WeftSpace.lg,
-                    title: const _SearchField(),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(top: WeftSpace.md),
-                      child: StatusBar(),
+            child: _InboxEntrance(
+              child: CustomScrollView(
+                slivers: [
+                  if (!selecting) ...[
+                    SliverToBoxAdapter(
+                      child: _InboxHeader(activeFilter: filter),
                     ),
-                  ),
-                  SliverToBoxAdapter(child: _FilterRows(activeFilter: filter)),
-                  // Under the filters and above the conversations, so it is
-                  // the first row of the list rather than a fifth thing in the
-                  // header — and so a request cannot be filtered away by a
-                  // rail selection the user made for another purpose.
-                  const SliverToBoxAdapter(child: RequestsEntry()),
-                ],
-                if (chats.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyInbox(),
-                  )
-                else
-                  SliverPadding(
-                    // Both layouts, because both float a compose button over
-                    // this list: one pane hands it to `Scaffold` above, two
-                    // panes position it into the pane's own `Stack` at the same
-                    // 16pt inset. The second is easy to miss precisely because
-                    // it is not in the `floatingActionButton` slot — and it
-                    // covers the last conversation just as completely.
-                    padding: const EdgeInsetsDirectional.only(
-                      bottom: WeftSpace.fabClearance,
+                    SliverAppBar(
+                      floating: true,
+                      snap: true,
+                      automaticallyImplyLeading: false,
+                      backgroundColor: context.colors.surface,
+                      surfaceTintColor: Colors.transparent,
+                      titleSpacing: WeftSpace.lg,
+                      title: const _SearchField(),
                     ),
-                    sliver: SliverList.builder(
-                      itemCount: chats.length,
-                      itemBuilder: (context, i) {
-                        final chat = chats[i];
-                        final picked = selection.contains(chat.id);
-                        return _StaggeredIn(
-                          index: i,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.translucent,
-                            // Silent to a screen reader, for the reason
-                            // `mac_shell.dart` gives: a right-click-only
-                            // detector exports an unnamed tappable node the
-                            // size of the row, over the named one.
-                            excludeFromSemantics: true,
-                            onSecondaryTapUp: context.hasPointer
-                                ? (details) => unawaited(
-                                    showChatContextMenu(
-                                      context,
-                                      ref,
-                                      chat,
-                                      details.globalPosition,
-                                    ),
-                                  )
-                                : null,
-                            child: ChatTile(
-                              chat: chat,
-                              avatarHeaders: mediaHeaders,
-                              typing: ref
-                                  .read(chatRepositoryProvider)
-                                  .typingIn(chat.id)
-                                  .isNotEmpty,
-                              online:
-                                  ref
-                                      .read(chatRepositoryProvider)
-                                      .presenceFor(chat.id)
-                                      ?.online ??
-                                  false,
-                              selected:
-                                  picked || (wide && chat.id == selectedChatId),
-                              // The tick's state has to reach the row's merged
-                              // node: the `Checkbox` below is inside it and
-                              // therefore silent, which is an improvement on
-                              // announcing "checkbox" with no conversation name.
-                              checked: selecting ? picked : null,
-                              leading: selecting
-                                  ? Checkbox(
-                                      value: picked,
-                                      onChanged: (_) => ref
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsetsDirectional.only(top: WeftSpace.md),
+                        child: StatusBar(),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _FilterRows(activeFilter: filter),
+                    ),
+                    // Under the filters and above the conversations, so it is
+                    // the first row of the list rather than a fifth thing in the
+                    // header — and so a request cannot be filtered away by a
+                    // rail selection the user made for another purpose.
+                    const SliverToBoxAdapter(child: RequestsEntry()),
+                  ],
+                  if (chats.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyInbox(),
+                    )
+                  else
+                    SliverPadding(
+                      // Both layouts, because both float a compose button over
+                      // this list: one pane hands it to `Scaffold` above, two
+                      // panes position it into the pane's own `Stack` at the same
+                      // 16pt inset. The second is easy to miss precisely because
+                      // it is not in the `floatingActionButton` slot — and it
+                      // covers the last conversation just as completely.
+                      padding: const EdgeInsetsDirectional.only(
+                        bottom: WeftSpace.fabClearance,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: chats.length,
+                        // Rows are keyed by conversation and found by it, so
+                        // one that moves — a message arrives and its chat
+                        // jumps to the top — takes its element with it.
+                        // Without this the list matches rows by position, and
+                        // every row the jump displaced is handed another
+                        // conversation's widget and rebuilt from scratch.
+                        findChildIndexCallback: (key) =>
+                            _rows.indexOf(key, chats),
+                        // The row's own context is deliberately not used
+                        // below: a remembered row outlives the element that
+                        // first built it, and its callbacks must not.
+                        itemBuilder: (_, i) {
+                          final chat = chats[i];
+                          final picked = selection.contains(chat.id);
+                          final selected =
+                              picked || (wide && chat.id == selectedChatId);
+                          return _rows.row(
+                            chat,
+                            (picked, selected, selecting, wide, mediaHeaders),
+                            () => _StaggeredIn(
+                              key: ValueKey(chat.id),
+                              index: i,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                // Silent to a screen reader, for the reason
+                                // `mac_shell.dart` gives: a right-click-only
+                                // detector exports an unnamed tappable node the
+                                // size of the row, over the named one.
+                                excludeFromSemantics: true,
+                                onSecondaryTapUp: context.hasPointer
+                                    ? (details) => unawaited(
+                                        showChatContextMenu(
+                                          context,
+                                          ref,
+                                          chat,
+                                          details.globalPosition,
+                                        ),
+                                      )
+                                    : null,
+                                child: LiveChatTile(
+                                  chat: chat,
+                                  avatarHeaders: mediaHeaders,
+                                  selected: selected,
+                                  // The tick's state has to reach the row's merged
+                                  // node: the `Checkbox` below is inside it and
+                                  // therefore silent, which is an improvement on
+                                  // announcing "checkbox" with no conversation name.
+                                  checked: selecting ? picked : null,
+                                  leading: selecting
+                                      ? Checkbox(
+                                          value: picked,
+                                          onChanged: (_) => ref
+                                              .read(
+                                                chatSelectionProvider.notifier,
+                                              )
+                                              .toggle(chat.id),
+                                        )
+                                      : null,
+                                  // Hold to look, not to select. Reading a chat
+                                  // marks it read, and holding was the only
+                                  // gesture free to answer "who was that?"
+                                  // without spending the unread marker; picking
+                                  // several conversations is a rarer thing and now
+                                  // has a button of its own in the inbox menu.
+                                  onLongPress: selecting
+                                      ? () => ref
+                                            .read(
+                                              chatSelectionProvider.notifier,
+                                            )
+                                            .toggle(chat.id)
+                                      : () => unawaited(
+                                          showChatPreview(context, chat.id),
+                                        ),
+                                  onTap: () {
+                                    // While selecting, a tap toggles rather than opens
+                                    // — otherwise the mode is a trap you fall out of.
+                                    if (selecting) {
+                                      ref
                                           .read(chatSelectionProvider.notifier)
-                                          .toggle(chat.id),
-                                    )
-                                  : null,
-                              // Hold to look, not to select. Reading a chat
-                              // marks it read, and holding was the only
-                              // gesture free to answer "who was that?"
-                              // without spending the unread marker; picking
-                              // several conversations is a rarer thing and now
-                              // has a button of its own in the inbox menu.
-                              onLongPress: selecting
-                                  ? () => ref
-                                        .read(chatSelectionProvider.notifier)
-                                        .toggle(chat.id)
-                                  : () => unawaited(
-                                      showChatPreview(context, chat.id),
-                                    ),
-                              timeLabel: formatInboxTime(
-                                chat.lastMessage?.timestamp,
-                                now: ref.watch(clockProvider)(),
-                                justNow: context.l10n.inboxTimeNow,
+                                          .toggle(chat.id);
+                                      return;
+                                    }
+                                    ref
+                                        .read(selectedChatProvider.notifier)
+                                        .select(chat.id);
+                                    ref
+                                        .read(chatRepositoryProvider)
+                                        .markRead(chat.id);
+                                    if (!wide) {
+                                      unawaited(
+                                        pushChat(
+                                          Navigator.of(context),
+                                          chat.id,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
                               ),
-                              onTap: () {
-                                // While selecting, a tap toggles rather than opens
-                                // — otherwise the mode is a trap you fall out of.
-                                if (selecting) {
-                                  ref
-                                      .read(chatSelectionProvider.notifier)
-                                      .toggle(chat.id);
-                                  return;
-                                }
-                                ref
-                                    .read(selectedChatProvider.notifier)
-                                    .select(chat.id);
-                                ref
-                                    .read(chatRepositoryProvider)
-                                    .markRead(chat.id);
-                                if (!wide) {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => ChatView(chatId: chat.id),
-                                    ),
-                                  );
-                                }
-                              },
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -919,23 +1090,43 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-/// Fades and lifts list items in, capped so a long inbox doesn't take a second
-/// to finish assembling.
-class _StaggeredIn extends StatelessWidget {
-  const _StaggeredIn({required this.index, required this.child});
+/// Fades and lifts a row into place as the inbox first appears.
+///
+/// *As the inbox appears*, and not after. The animation runs when a row's
+/// element is created, and a lazy list creates one for every row that scrolls
+/// into view — so every conversation below the fold used to arrive
+/// transparent and twelve pixels low, on a 12-row delay, and spend a third of
+/// a second drifting into place while the list was already moving under the
+/// finger. That is a scroll that visibly lags its own content, and a
+/// `saveLayer` per half-faded row per frame to draw it.
+///
+/// The rows built in the list's first moments march in as before; a row built
+/// later simply is where it belongs.
+class _StaggeredIn extends StatefulWidget {
+  const _StaggeredIn({super.key, required this.index, required this.child});
 
   final int index;
   final Widget child;
 
   @override
+  State<_StaggeredIn> createState() => _StaggeredInState();
+}
+
+class _StaggeredInState extends State<_StaggeredIn> {
+  /// Decided once, when the row is created, and never revisited: a row that
+  /// arrived by scrolling must not start animating because the list rebuilt.
+  late final bool _animate = _InboxEntrance.of(context)?.admit() ?? false;
+
+  @override
   Widget build(BuildContext context) {
+    if (!_animate) return widget.child;
     // `context.motion`, not `WeftMotion`: the constants are the design
     // durations and this is the app's single most motion-y list. Under
     // `MediaQuery.disableAnimations` every duration below collapses to zero, so
     // the inbox appears rather than marching in — which is what the setting is
     // asking for.
     final motion = context.motion;
-    final delay = motion.stagger * (index.clamp(0, 12));
+    final delay = motion.stagger * (widget.index.clamp(0, 12));
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: motion.normal + delay,
@@ -947,9 +1138,49 @@ class _StaggeredIn extends StatelessWidget {
           child: child,
         ),
       ),
-      child: child,
+      child: widget.child,
     );
   }
+}
+
+/// The window in which rows of the inbox below it animate in.
+///
+/// Opens when the first row is built and closes a moment later, which is long
+/// enough to take in everything the first frame lays out and short enough
+/// that nothing a scroll reveals is inside it.
+class _InboxEntrance extends StatefulWidget {
+  const _InboxEntrance({required this.child});
+
+  final Widget child;
+
+  static _InboxEntranceState? of(BuildContext context) =>
+      context.findAncestorStateOfType<_InboxEntranceState>();
+
+  @override
+  State<_InboxEntrance> createState() => _InboxEntranceState();
+}
+
+class _InboxEntranceState extends State<_InboxEntrance> {
+  static const Duration _window = Duration(milliseconds: 120);
+
+  Timer? _closing;
+  bool _closed = false;
+
+  /// Whether a row created now is part of the entrance.
+  bool admit() {
+    if (_closed) return false;
+    _closing ??= Timer(_window, () => _closed = true);
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _closing?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _EmptyInbox extends StatelessWidget {

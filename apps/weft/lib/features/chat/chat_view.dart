@@ -66,6 +66,40 @@ import 'voice_recording_bar.dart';
 import 'sms_composer_bar.dart';
 import 'unverified_devices_banner.dart';
 
+/// The name a conversation's route goes by, so the navigator can be asked
+/// whether that conversation is already what is on screen.
+String chatRouteName(String chatId) => 'chat:$chatId';
+
+/// The route that shows one conversation full screen.
+Route<void> chatRoute(String chatId) => MaterialPageRoute<void>(
+  settings: RouteSettings(name: chatRouteName(chatId)),
+  builder: (_) => ChatView(chatId: chatId),
+);
+
+/// Opens [chatId] on [navigator] — unless it is already the screen on top.
+///
+/// Every door into a conversation used to push a new screen without looking:
+/// a second tap on an inbox row before the first had finished animating, a
+/// notification for the chat already open, a link to it. Each left another
+/// copy of the same conversation on the stack, and Back then had to be
+/// pressed once per copy before it went anywhere.
+Future<void> pushChat(NavigatorState navigator, String chatId) {
+  if (topRouteName(navigator) == chatRouteName(chatId)) return Future.value();
+  return navigator.push(chatRoute(chatId));
+}
+
+/// The name of the route [navigator] is showing, or null if it has none.
+String? topRouteName(NavigatorState navigator) {
+  String? name;
+  // Asks without popping: the predicate is offered the top route first, and
+  // saying yes to it ends the walk before anything is removed.
+  navigator.popUntil((route) {
+    name = route.settings.name;
+    return true;
+  });
+  return name;
+}
+
 /// One conversation — merged across networks or not.
 ///
 /// The timeline is driven by [MergedTimeline], so a merged chat and a plain one
@@ -185,15 +219,28 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// so a merge underneath an open chat re-points the view instead of
   /// stranding it on a spinner that never ends.
   String get _chatId {
-    final direct = ref
-        .read(chatsProvider)
-        .value
-        ?.where((c) => c.id == widget.chatId)
-        .firstOrNull;
-    if (direct != null) return widget.chatId;
-    return ref.read(chatRepositoryProvider).chatForRoom(widget.chatId)?.id ??
+    // Asked a dozen times per bubble per build, and each asking was a walk of
+    // the whole inbox. The answer can only move when the inbox does, so it is
+    // kept for as long as the list it was read from is the current one.
+    final chats = ref.read(chatsProvider).value;
+    final cached = _resolvedChatId;
+    if (cached != null &&
+        identical(chats, _resolvedChatIdFrom) &&
+        _resolvedChatIdFor == widget.chatId) {
+      return cached;
+    }
+    _resolvedChatIdFrom = chats;
+    _resolvedChatIdFor = widget.chatId;
+    final direct = chats?.where((c) => c.id == widget.chatId).firstOrNull;
+    if (direct != null) return _resolvedChatId = widget.chatId;
+    return _resolvedChatId =
+        ref.read(chatRepositoryProvider).chatForRoom(widget.chatId)?.id ??
         widget.chatId;
   }
+
+  String? _resolvedChatId;
+  String? _resolvedChatIdFor;
+  List<Chat>? _resolvedChatIdFrom;
 
   /// What the open timeline was built for, to notice when [_chatId] moves.
   String? _timelineChatId;
@@ -313,10 +360,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // fingerprint: someone starting to type changes no message.
     final typing = repository.typingIn(_chatId);
     final online = repository.presenceFor(_chatId)?.online ?? false;
-    if (!listEquals(typing, _typing) || online != _peerOnline) {
+    // Receipts too. The ticks and the per-topic unread counts are read
+    // straight off the repository while the list builds, and nothing about a
+    // receipt arriving changes a message or the conversation's row — so this
+    // is the only place that can notice one. It used to be noticed by
+    // accident: the screen watched the whole inbox and so rebuilt, bubbles and
+    // all, after every sync of every room.
+    final receipts = _receiptFingerprint(repository);
+    if (!listEquals(typing, _typing) ||
+        online != _peerOnline ||
+        receipts != _receipts) {
       setState(() {
         _typing = typing;
         _peerOnline = online;
+        _receipts = receipts;
       });
     }
     final timeline = _timeline;
@@ -325,6 +382,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (_viewFingerprint(next) == _viewFingerprint(_view)) return;
     setState(() => _view = next);
     _indexNewMessages(next.messages);
+  }
+
+  /// Where everyone — the local user included — has read up to, as one number.
+  int _receipts = 0;
+
+  int _receiptFingerprint(ChatRepository repository) {
+    var hash = 0;
+    for (final marker in repository.peerReadUpTo(_chatId)) {
+      hash = Object.hash(hash, marker.roomId, marker.userId, marker.eventId);
+    }
+    for (final marker in repository.ownReadUpTo(_chatId)) {
+      hash = Object.hash(hash, marker.roomId, marker.eventId, marker.at);
+    }
+    return hash;
   }
 
   @override
@@ -785,13 +856,32 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// this is where the whole merged candidate set is searched — and where an
   /// unpaginated target finally becomes a stub rather than nothing.
   ReplyPreview? _replyPreviewFor(WeftMessage message) {
-    if (message.replyToEventId == null) return null;
-    return message.replyPreview ??
-        resolveReplyTarget(
-          replyToEventId: message.replyToEventId,
-          loaded: _view.messages,
-        );
+    final targetId = message.replyToEventId;
+    if (targetId == null) return null;
+    final resolved = message.replyPreview;
+    if (resolved != null) return resolved;
+    // Looked up rather than searched for. A reply whose target is not loaded
+    // is the common unresolved case — someone answering last week's message —
+    // and finding that out meant reading the whole loaded history, for every
+    // such bubble, every time it was built.
+    final target = _loaded.byEventId[targetId.trim()];
+    return resolveReplyTarget(
+      replyToEventId: targetId,
+      loaded: target == null ? const [] : [target],
+    );
   }
+
+  /// The loaded messages, indexed. Rebuilt when [_view] is replaced and not
+  /// before: the list is immutable, so its identity is its version.
+  _LoadedIndex get _loaded {
+    final cached = _loadedIndex;
+    if (cached != null && identical(cached.messages, _view.messages)) {
+      return cached;
+    }
+    return _loadedIndex = _LoadedIndex(_view.messages);
+  }
+
+  _LoadedIndex? _loadedIndex;
 
   /// A sender id as a name, from whoever is already on screen.
   ///
@@ -1127,8 +1217,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// let one reader on three networks satisfy a group of three.
   int _readersOf(WeftMessage message) {
     final readers = <String>{};
-    for (final marker
-        in ref.read(chatRepositoryProvider).peerReadUpTo(_chatId)) {
+    final loaded = _loaded;
+    for (final marker in _peerMarkers) {
       if (marker.roomId != message.roomId) continue;
       if (marker.eventId == message.eventId) {
         readers.add(marker.userId);
@@ -1136,11 +1226,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       }
       // The receipt names some other event; if that event sits at or after
       // ours in the same room, ours has been read on the way past.
-      final receipted = _view.messages
-          .where(
-            (m) => m.eventId == marker.eventId && m.roomId == marker.roomId,
-          )
-          .firstOrNull;
+      final receipted = loaded.inRoom(marker.roomId, marker.eventId);
       if (receipted != null &&
           !receipted.timestamp.isBefore(message.timestamp)) {
         readers.add(marker.userId);
@@ -1149,21 +1235,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
     return readers.length;
   }
 
+  /// The other side's read receipts, as of the last build.
+  ///
+  /// Read once per build rather than once per tick mark: the repository
+  /// assembles the list from every member's receipt each time it is asked, and
+  /// in a group every one of the user's own bubbles asked three times. A
+  /// receipt that arrives later reaches the screen through [_syncRefresh],
+  /// which rebuilds — and so re-reads this — when the receipts move.
+  List<({String roomId, String userId, String eventId, DateTime at})>
+  _peerMarkers = const [];
+
   DateTime? _seenAt(WeftMessage message) {
     if (!message.isOwn) return null;
-    final newestOwn = _view.messages.where((m) => m.isOwn).firstOrNull;
-    if (newestOwn == null || newestOwn.eventId != message.eventId) return null;
-    for (final marker
-        in ref.read(chatRepositoryProvider).peerReadUpTo(_chatId)) {
+    final loaded = _loaded;
+    if (loaded.newestOwnEventId != message.eventId) return null;
+    for (final marker in _peerMarkers) {
       if (marker.roomId != message.roomId) continue;
       if (marker.eventId == message.eventId) return marker.at;
       // The receipt names some other event; if that event sits at or after
       // ours in the same room, ours has been read on the way.
-      final receipted = _view.messages
-          .where(
-            (m) => m.eventId == marker.eventId && m.roomId == marker.roomId,
-          )
-          .firstOrNull;
+      final receipted = loaded.inRoom(marker.roomId, marker.eventId);
       if (receipted != null &&
           !receipted.timestamp.isBefore(message.timestamp)) {
         return marker.at;
@@ -1358,14 +1449,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
             .read(chatRepositoryProvider)
             .chatForRoom(mention.targetId);
         if (chat == null) {
-          _showMessage('${mention.targetId} is not in your inbox.');
+          _showMessage(context.l10n.chatUnavailableNotInInbox);
           return;
         }
-        unawaited(
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chat.id)),
-          ),
-        );
+        unawaited(pushChat(Navigator.of(context), chat.id));
       case MentionKind.user:
       case MentionKind.roomWide:
         // Opening a DM from a mention needs the start-chat flow, which is the
@@ -1396,8 +1483,22 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final unavailable = _unavailable;
     if (unavailable != null) return _unavailableScaffold(context, unavailable);
 
-    final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
-    final chat = chats.where((c) => c.id == _chatId).firstOrNull;
+    // This conversation, and only when something about it has changed. The
+    // inbox re-emits after every sync of every room, and watching it whole
+    // rebuilt every bubble on screen each time — the scroll hitch a busy
+    // account had for as long as it was syncing. What else a sync can change
+    // here (who is typing, who has read what, the messages themselves) comes
+    // through [_syncRefresh], which is still on that heartbeat and rebuilds
+    // only when one of them did.
+    final chatId = _chatId;
+    final chat = ref
+        .watch(
+          chatsProvider.select(
+            (chats) => ChatContent.find(chats.value, chatId),
+          ),
+        )
+        ?.chat;
+    _peerMarkers = ref.read(chatRepositoryProvider).peerReadUpTo(chatId);
     // Uploads sit *below* the settled messages in a reversed list, which is the
     // bottom of the thread: a photo the user just picked belongs where the next
     // message would go, not above the history they were reading.
@@ -1475,9 +1576,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
                 // Absent while the key store is being read, which is the honest
                 // default: a warning that flashes in and out on every open would
                 // be trained away within a day.
-                trust:
-                    ref.watch(chatTrustProvider(_chatId)).value ??
-                    RoomTrust.none,
+                // The value, not the provider's state: the trust is re-asked
+                // on a timer, and "asking again" is not a reason to rebuild
+                // the conversation under the banner.
+                trust: ref.watch(
+                  chatTrustProvider(
+                    _chatId,
+                  ).select((trust) => trust.value ?? RoomTrust.none),
+                ),
                 onVerify: _verifyOwnDevice,
               ),
               Expanded(
@@ -1577,6 +1683,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             final older = olderIndex < visible.length
                                 ? visible[olderIndex]
                                 : null;
+                            final delivery = _effectiveDelivery(message, chat);
                             // One message, one line in anything copied out of
                             // a drag across several of them — the alternative
                             // is `Hello thereSee you at six`, which is what a
@@ -1599,16 +1706,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                     ),
                                     child: _MessageBubble(
                                       message: message,
-                                      delivery: _effectiveDelivery(
-                                        message,
-                                        chat,
-                                      ),
+                                      delivery: delivery,
                                       deliveryIsComplete:
                                           deliveryStateIsComplete(
-                                            state: _effectiveDelivery(
-                                              message,
-                                              chat,
-                                            ),
+                                            state: delivery,
                                             network: message.network,
                                             receiptsEnabled: receiptsEnabled,
                                           ),
@@ -1813,13 +1914,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           composing: _composerContext,
                           onCancelContext: _cancelComposerContext,
                           onSend: _send,
-                          onAttach: () => _attach(chat),
+                          onAttach: (anchor) => _attach(chat, anchor: anchor),
                           onPaste: () => unawaited(_paste(chat)),
                           sendOnEnter: ref.watch(sendOnEnterProvider),
                           onPickNetwork: _pickNetwork,
                           onRecordVoice: () =>
                               setState(() => _recording = true),
-                          onSendLater: () => _sendLater(chat),
                           inThread: rootId != null,
                         ),
                 ),
@@ -2307,12 +2407,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
     await _sendAttachments(confirmed);
   }
 
-  Future<void> _attach(Chat chat) async {
+  Future<void> _attach(Chat chat, {BuildContext? anchor}) async {
     final picker = ref.read(attachmentPickerProvider);
     final source = await showAttachmentSourceSheet(
       context,
       picker,
       paperless: ref.read(paperlessProvider) != null,
+      anchorContext: anchor,
     );
     if (source == null || !mounted) return;
 
@@ -2326,6 +2427,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
     }
     if (source == AttachmentPickSource.calendar) {
       await _createCalendarInvite(chat);
+      return;
+    }
+    if (source == AttachmentPickSource.sendLater) {
+      await _sendLater(chat);
       return;
     }
     if (source == AttachmentPickSource.paperless) {
@@ -3416,6 +3521,141 @@ class _MessageBubble extends StatelessWidget {
     final own = message.isOwn;
     final accent = palette.networkColor(message.network);
 
+    // Whether the words and the time share a line: only for a plain text
+    // body. Media, polls, invitations and voice notes have a shape of their
+    // own, and the time goes under them as it always has.
+    final inlineMeta =
+        content == null &&
+        !message.redacted &&
+        !rendersAsAttachment(message) &&
+        message.kind != MessageKind.location &&
+        message.calendarInvite == null &&
+        !(message.kind == MessageKind.poll && message.poll != null) &&
+        message.kind != MessageKind.voice;
+
+    final meta = Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Before the edited marker and before the
+        // clock, because it is the one fact about this
+        // bubble a reader could not work out for
+        // themselves: nobody typed it. Six months
+        // later, "did I say that or did the model" is
+        // not a question a transcript should leave
+        // open.
+        if (message.isAutoReply && !message.redacted) ...[
+          _AutoReplyMarker(own: own),
+          const SizedBox(width: WeftSpace.xs),
+        ],
+        if (message.isEdited && !message.redacted) ...[
+          _EditedMarker(message: message, own: own),
+          const SizedBox(width: WeftSpace.xs),
+        ],
+        // The time and the tick are one clause — "Sent
+        // 14:32, Read" — rather than a bare number followed
+        // by an unlabelled 13dp glyph whose only difference
+        // between delivered and read is its colour.
+        //
+        // And out of the selection: dragging across an
+        // exchange to paste it into a mail should give
+        // what was said, not `Hello there 13:56 See you
+        // at six 13:57`. The clock is chrome about the
+        // message, the same as the tick beside it, and
+        // the reader who wants it can see it on screen.
+        SelectionContainer.disabled(
+          child: Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: _metaLabel(context.l10n),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat.Hm().format(message.timestamp),
+                  style: context.text.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: palette.mutedOnBubble(own),
+                  ),
+                ),
+                if (own) ...[
+                  const SizedBox(width: WeftSpace.xxs),
+                  Tooltip(
+                    // The reason rides on the tooltip, not
+                    // on a second glyph. There is no mark
+                    // for "we are not being told" that a
+                    // reader would not have to be taught,
+                    // and a third tick shape would be one
+                    // more thing to learn in a vocabulary
+                    // whose whole value is that it is
+                    // already known.
+                    message: semanticsSentence([
+                      context.l10n.deliveryState(delivery),
+                      if (!deliveryIsComplete)
+                        context.l10n.deliveryUnknownReason,
+                    ]),
+                    // On a tap, not a hold. Holding a bubble is how its
+                    // actions are reached, and a hold that happened to land
+                    // on the tick raised this label instead and swallowed
+                    // the gesture. A pointer still gets it on hover.
+                    triggerMode: TooltipTriggerMode.tap,
+                    excludeFromSemantics: true,
+                    child: Icon(
+                      // The vocabulary everyone already
+                      // knows: one tick sent, two ticks
+                      // arrived, two blue ticks read. Every
+                      // state past sending used to draw the
+                      // same double tick in the same
+                      // colour, so the mark said only "not
+                      // failed" — and the one thing it is
+                      // looked at for is whether the other
+                      // side has seen it.
+                      switch (delivery) {
+                        DeliveryState.sending => Icons.schedule_rounded,
+                        DeliveryState.failed => Icons.error_outline_rounded,
+                        DeliveryState.sent => Icons.done_rounded,
+                        _ => Icons.done_all_rounded,
+                      },
+                      size: 13,
+                      color: switch (delivery) {
+                        // Corrected against the bubble it
+                        // sits on, not taken raw. In high
+                        // contrast `colorScheme.error` is
+                        // a near-white pink meant for a
+                        // dark surface, and the own bubble
+                        // there is near-white too — so the
+                        // one tick that says a message
+                        // never left was invisible at
+                        // 1.05:1. Found by the golden, not
+                        // by reading this line.
+                        DeliveryState.failed => WeftContrast.ensure(
+                          context.colors.error,
+                          palette.ownBubble,
+                          minRatio: WeftContrast.uiComponent,
+                        ),
+                        // Against the bubble, not the
+                        // page: the token is corrected for
+                        // the inbox row's background, and
+                        // in a dark theme that blue lands
+                        // on the own bubble's pale fill at
+                        // 1.3:1 — the most important of the
+                        // five marks, and the hardest to
+                        // see.
+                        DeliveryState.read => palette.readReceiptOn(
+                          palette.ownBubble,
+                        ),
+                        _ => palette.mutedOnBubble(true, alpha: 0.7),
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
     return AnimatedContainer(
       duration: WeftMotion.slow,
       curve: WeftMotion.standard,
@@ -3425,7 +3665,15 @@ class _MessageBubble extends StatelessWidget {
             : Colors.transparent,
         borderRadius: WeftRadius.allMd,
       ),
-      padding: EdgeInsets.only(top: groupedWithPrevious ? 2 : WeftSpace.sm),
+      // Held off the far edge on a phone, so the two sides of a conversation
+      // read as two sides: a bubble that runs the full width of the screen is
+      // told apart from its reply by colour alone. A Mac window already caps
+      // the reading column, and insetting it again would only narrow it.
+      padding: EdgeInsetsDirectional.only(
+        top: groupedWithPrevious ? 2 : WeftSpace.sm,
+        start: own && !context.isMac ? WeftSpace.huge : 0,
+        end: !own && !context.isMac ? WeftSpace.huge : 0,
+      ),
       child: Column(
         crossAxisAlignment: own
             ? CrossAxisAlignment.end
@@ -3452,12 +3700,21 @@ class _MessageBubble extends StatelessWidget {
                       : Consumer(
                           builder: (context, ref, _) => WeftAvatar(
                             label: message.senderName,
-                            imageUrl: ref
-                                .read(chatRepositoryProvider)
-                                .avatarUrlFor(
-                                  message.senderId,
-                                  roomId: message.roomId,
-                                ),
+                            // Asked again after each sync, and redrawn when
+                            // the answer changes. The repository may only be
+                            // *fetching* the picture the first time it is
+                            // asked, and nothing else tells this bubble when
+                            // it has arrived.
+                            imageUrl: ref.watch(
+                              chatsProvider.select(
+                                (_) => ref
+                                    .read(chatRepositoryProvider)
+                                    .avatarUrlFor(
+                                      message.senderId,
+                                      roomId: message.roomId,
+                                    ),
+                              ),
+                            ),
                             imageHeaders: ref.watch(mediaHeadersProvider),
                             size: 24,
                             // The bubble's own node already opens with the
@@ -3509,7 +3766,15 @@ class _MessageBubble extends StatelessWidget {
                       onLongPressHint: context.l10n.chatShowActionsHint,
                       borderRadius: WeftRadius.allLg,
                       child: Container(
-                        constraints: const BoxConstraints(maxWidth: 520),
+                        // Never shorter than a finger. With the time on
+                        // the text's own line a one-line message is 36
+                        // points tall, and the bubble is a long-press target:
+                        // under the 48 the touch guideline asks for. A
+                        // pointer needs no such floor.
+                        constraints: BoxConstraints(
+                          maxWidth: 520,
+                          minHeight: context.hasPointer ? 0 : kWeftMinTapTarget,
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: WeftSpace.md,
                           vertical: WeftSpace.sm,
@@ -3542,6 +3807,8 @@ class _MessageBubble extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
+                          // Centred in whatever the floor above adds.
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             if (showNetwork && !groupedWithPrevious) ...[
                               // Silent, all of it. The bubble's group node opens
@@ -3683,164 +3950,48 @@ class _MessageBubble extends StatelessWidget {
                                 onRetranscribe: onRetranscribe,
                               )
                             else
-                              RichTextView.message(
-                                message: message,
-                                baseStyle:
-                                    context.text.bodyMedium?.copyWith(
-                                      color: own
-                                          ? palette.ownBubbleText
-                                          : palette.peerBubbleText,
-                                    ) ??
-                                    TextStyle(
-                                      color: own
-                                          ? palette.ownBubbleText
-                                          : palette.peerBubbleText,
-                                    ),
-                                // Links and mention pills take the network's colour
-                                // on a peer bubble and the bubble's own ink on the
-                                // user's, where the accent would be invisible
-                                // against the primary fill it is derived from.
-                                accent: own ? palette.ownBubbleText : accent,
-                                onTapLink: onTapLink,
-                                onTapMention: onTapMention,
-                              ),
-                            const SizedBox(height: 2),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                // Before the edited marker and before the
-                                // clock, because it is the one fact about this
-                                // bubble a reader could not work out for
-                                // themselves: nobody typed it. Six months
-                                // later, "did I say that or did the model" is
-                                // not a question a transcript should leave
-                                // open.
-                                if (message.isAutoReply &&
-                                    !message.redacted) ...[
-                                  _AutoReplyMarker(own: own),
-                                  const SizedBox(width: WeftSpace.xs),
-                                ],
-                                if (message.isEdited && !message.redacted) ...[
-                                  _EditedMarker(message: message, own: own),
-                                  const SizedBox(width: WeftSpace.xs),
-                                ],
-                                // The time and the tick are one clause — "Sent
-                                // 14:32, Read" — rather than a bare number followed
-                                // by an unlabelled 13dp glyph whose only difference
-                                // between delivered and read is its colour.
-                                //
-                                // And out of the selection: dragging across an
-                                // exchange to paste it into a mail should give
-                                // what was said, not `Hello there 13:56 See you
-                                // at six 13:57`. The clock is chrome about the
-                                // message, the same as the tick beside it, and
-                                // the reader who wants it can see it on screen.
-                                SelectionContainer.disabled(
-                                  child: Semantics(
-                                    container: true,
-                                    excludeSemantics: true,
-                                    label: _metaLabel(context.l10n),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          DateFormat.Hm().format(
-                                            message.timestamp,
-                                          ),
-                                          style: context.text.labelSmall
-                                              ?.copyWith(
-                                                fontSize: 10,
-                                                color: palette.mutedOnBubble(
-                                                  own,
-                                                ),
-                                              ),
+                              // The time rides the last line of the words
+                              // when there is room beside them and drops
+                              // under, at the trailing edge, when there is
+                              // not. A line of its own under every message
+                              // made a one-word reply three rows tall, and a
+                              // thread mostly whitespace and timestamps.
+                              Wrap(
+                                alignment: WrapAlignment.end,
+                                crossAxisAlignment: WrapCrossAlignment.end,
+                                spacing: WeftSpace.sm,
+                                runSpacing: 0,
+                                children: [
+                                  RichTextView.message(
+                                    message: message,
+                                    baseStyle:
+                                        context.text.bodyMedium?.copyWith(
+                                          color: own
+                                              ? palette.ownBubbleText
+                                              : palette.peerBubbleText,
+                                        ) ??
+                                        TextStyle(
+                                          color: own
+                                              ? palette.ownBubbleText
+                                              : palette.peerBubbleText,
                                         ),
-                                        if (own) ...[
-                                          const SizedBox(width: WeftSpace.xxs),
-                                          Tooltip(
-                                            // The reason rides on the tooltip, not
-                                            // on a second glyph. There is no mark
-                                            // for "we are not being told" that a
-                                            // reader would not have to be taught,
-                                            // and a third tick shape would be one
-                                            // more thing to learn in a vocabulary
-                                            // whose whole value is that it is
-                                            // already known.
-                                            message: semanticsSentence([
-                                              context.l10n.deliveryState(
-                                                delivery,
-                                              ),
-                                              if (!deliveryIsComplete)
-                                                context
-                                                    .l10n
-                                                    .deliveryUnknownReason,
-                                            ]),
-                                            excludeFromSemantics: true,
-                                            child: Icon(
-                                              // The vocabulary everyone already
-                                              // knows: one tick sent, two ticks
-                                              // arrived, two blue ticks read. Every
-                                              // state past sending used to draw the
-                                              // same double tick in the same
-                                              // colour, so the mark said only "not
-                                              // failed" — and the one thing it is
-                                              // looked at for is whether the other
-                                              // side has seen it.
-                                              switch (delivery) {
-                                                DeliveryState.sending =>
-                                                  Icons.schedule_rounded,
-                                                DeliveryState.failed =>
-                                                  Icons.error_outline_rounded,
-                                                DeliveryState.sent =>
-                                                  Icons.done_rounded,
-                                                _ => Icons.done_all_rounded,
-                                              },
-                                              size: 13,
-                                              color: switch (delivery) {
-                                                // Corrected against the bubble it
-                                                // sits on, not taken raw. In high
-                                                // contrast `colorScheme.error` is
-                                                // a near-white pink meant for a
-                                                // dark surface, and the own bubble
-                                                // there is near-white too — so the
-                                                // one tick that says a message
-                                                // never left was invisible at
-                                                // 1.05:1. Found by the golden, not
-                                                // by reading this line.
-                                                DeliveryState.failed =>
-                                                  WeftContrast.ensure(
-                                                    context.colors.error,
-                                                    palette.ownBubble,
-                                                    minRatio: WeftContrast
-                                                        .uiComponent,
-                                                  ),
-                                                // Against the bubble, not the
-                                                // page: the token is corrected for
-                                                // the inbox row's background, and
-                                                // in a dark theme that blue lands
-                                                // on the own bubble's pale fill at
-                                                // 1.3:1 — the most important of the
-                                                // five marks, and the hardest to
-                                                // see.
-                                                DeliveryState.read =>
-                                                  palette.readReceiptOn(
-                                                    palette.ownBubble,
-                                                  ),
-                                                _ => palette.mutedOnBubble(
-                                                  true,
-                                                  alpha: 0.7,
-                                                ),
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
+                                    // Links and mention pills take the network's colour
+                                    // on a peer bubble and the bubble's own ink on the
+                                    // user's, where the accent would be invisible
+                                    // against the primary fill it is derived from.
+                                    accent: own
+                                        ? palette.ownBubbleText
+                                        : accent,
+                                    onTapLink: onTapLink,
+                                    onTapMention: onTapMention,
                                   ),
-                                ),
-                              ],
-                            ),
+                                  meta,
+                                ],
+                              ),
+                            if (!inlineMeta) ...[
+                              const SizedBox(height: 2),
+                              meta,
+                            ],
                           ],
                         ),
                       ),
@@ -4237,7 +4388,6 @@ class _Composer extends StatelessWidget {
     this.composing,
     this.onCancelContext,
     this.onRecordVoice,
-    this.onSendLater,
     this.inThread = false,
   });
 
@@ -4251,9 +4401,6 @@ class _Composer extends StatelessWidget {
   /// Switches the row into voice recording. Null hides the microphone —
   /// editing a message into a voice note is not a thing.
   final VoidCallback? onRecordVoice;
-
-  /// Long-press on Send: schedule this text instead of sending it now.
-  final VoidCallback? onSendLater;
 
   final Chat chat;
   final TextEditingController controller;
@@ -4274,7 +4421,9 @@ class _Composer extends StatelessWidget {
   final VoidCallback? onCancelContext;
 
   final VoidCallback onSend;
-  final VoidCallback onAttach;
+
+  /// Opens the attach menu; handed the button's context to anchor it to.
+  final ValueChanged<BuildContext> onAttach;
 
   /// ⌘V / Ctrl+V, which may be an image rather than text.
   final VoidCallback onPaste;
@@ -4327,7 +4476,10 @@ class _Composer extends StatelessWidget {
         // `border`, not `divider`: this bounds the composer rather than
         // separating two blocks of text, and a low-vision user relies on it to
         // find where the message goes.
-        border: Border(top: BorderSide(color: context.palette.border)),
+        // A hairline, not a rule: this separates two regions of one screen,
+        // and the heavier border token drew a hard line across the bottom of
+        // every conversation.
+        border: Border(top: BorderSide(color: context.palette.divider)),
       ),
       child: SafeArea(
         top: false,
@@ -4369,23 +4521,29 @@ class _Composer extends StatelessWidget {
                     ),
                     const SizedBox(width: WeftSpace.sm),
                   ],
-                  IconButton(
-                    icon: const Icon(Icons.add_rounded),
-                    iconSize: mac ? 17 : null,
-                    visualDensity: mac ? VisualDensity.compact : null,
-                    // Wider than the round send button on purpose. Squeezed to
-                    // 24 with no padding it stopped reading as a control at all
-                    // — a stray plus sign between the network chip and the
-                    // field, with nothing to hover.
-                    constraints: mac
-                        ? const BoxConstraints.tightFor(width: 28, height: 28)
-                        : null,
-                    padding: mac ? EdgeInsets.zero : null,
-                    tooltip: context.l10n.attachSheetTitle,
-                    // An edit replaces one event's text. There is no such thing
-                    // as editing a message into a photo, so the picker is closed
-                    // rather than left to fail somewhere further down.
-                    onPressed: editing ? null : onAttach,
+                  // In a `Builder` for its context: on a Mac the attach menu
+                  // is a popover, and it points at this button rather than
+                  // dropping from the top of the window, a screen's height
+                  // away from where the pointer is.
+                  Builder(
+                    builder: (button) => IconButton(
+                      icon: const Icon(Icons.add_rounded),
+                      iconSize: mac ? 17 : null,
+                      visualDensity: mac ? VisualDensity.compact : null,
+                      // Wider than the round send button on purpose. Squeezed to
+                      // 24 with no padding it stopped reading as a control at all
+                      // — a stray plus sign between the network chip and the
+                      // field, with nothing to hover.
+                      constraints: mac
+                          ? const BoxConstraints.tightFor(width: 28, height: 28)
+                          : null,
+                      padding: mac ? EdgeInsets.zero : null,
+                      tooltip: context.l10n.attachSheetTitle,
+                      // An edit replaces one event's text. There is no such thing
+                      // as editing a message into a photo, so the picker is closed
+                      // rather than left to fail somewhere further down.
+                      onPressed: editing ? null : () => onAttach(button),
+                    ),
                   ),
                   Expanded(
                     // The hint is the *only* place the composer's mode is stated
@@ -4487,32 +4645,30 @@ class _Composer extends StatelessWidget {
                           tooltip: context.l10n.chatRecordVoice,
                         );
                       }
-                      return GestureDetector(
-                        // Long-press for "send later" — the same spot WhatsApp
-                        // and Telegram hide it, and harmless to discover: a
-                        // long-press that does nothing was doing nothing anyway.
-                        onLongPress: editing ? null : onSendLater,
-                        child: Tooltip(
-                          message: editing
-                              ? context.l10n.chatSaveEdit
-                              : context.l10n.chatSendHoldToSchedule,
-                          // Hover still shows it; touch no longer does. A
-                          // `Tooltip` claims long presses by default, and as the
-                          // deeper widget it won the gesture arena against the
-                          // handler above — holding Send showed the tip that
-                          // says to hold Send, and scheduled nothing.
-                          triggerMode: TooltipTriggerMode.manual,
-                          child: IconButton.filled(
-                            onPressed: onSend,
-                            iconSize: mac ? 13 : 18,
-                            visualDensity: mac ? VisualDensity.compact : null,
-                            constraints: mac ? _macButton : null,
-                            padding: mac ? EdgeInsets.zero : null,
-                            icon: Icon(
-                              editing
-                                  ? Icons.check_rounded
-                                  : Icons.send_rounded,
-                            ),
+                      // A press on Send sends, however long it is held.
+                      // Holding it used to open the scheduler's date picker,
+                      // and half a second is not a deliberate act: a slow
+                      // press, a thumb that lingered, a click on a busy
+                      // machine all landed in a calendar with the message
+                      // unsent. Scheduling is "Send later" in the attach
+                      // menu, where it has a name.
+                      return Tooltip(
+                        message: editing
+                            ? context.l10n.chatSaveEdit
+                            : context.l10n.commonSend,
+                        // Hover shows it; a hold does not. A `Tooltip` claims
+                        // long presses by default and would win the press
+                        // from the button under it — the label would appear
+                        // and nothing would be sent.
+                        triggerMode: TooltipTriggerMode.manual,
+                        child: IconButton.filled(
+                          onPressed: onSend,
+                          iconSize: mac ? 13 : 18,
+                          visualDensity: mac ? VisualDensity.compact : null,
+                          constraints: mac ? _macButton : null,
+                          padding: mac ? EdgeInsets.zero : null,
+                          icon: Icon(
+                            editing ? Icons.check_rounded : Icons.send_rounded,
                           ),
                         ),
                       );
@@ -5363,4 +5519,45 @@ class _TypingDot extends StatelessWidget {
       shape: BoxShape.circle,
     ),
   );
+}
+
+/// The loaded history of one conversation, addressable by event.
+///
+/// Every lookup the thread makes per bubble — a reply's target, the event a
+/// read receipt names, the user's newest message — was a scan of the loaded
+/// list, and the list grows with every page scrolled back. A bubble in a busy
+/// group made dozens of them, so the cost of drawing one message rose with the
+/// number of messages loaded: the further back a reader went, the slower each
+/// frame got. One pass builds this instead, when the view is replaced.
+class _LoadedIndex {
+  _LoadedIndex(this.messages) {
+    for (final message in messages) {
+      // First wins, matching what a front-to-back search of the list found.
+      byEventId.putIfAbsent(message.eventId, () => message);
+      (_byRoom[message.roomId] ??= {}).putIfAbsent(
+        message.eventId,
+        () => message,
+      );
+      if (newestOwnEventId == null && message.isOwn) {
+        newestOwnEventId = message.eventId;
+      }
+    }
+  }
+
+  /// The list this was built from; its identity is what keeps the index valid.
+  final List<WeftMessage> messages;
+
+  /// Across every leg of a merged conversation.
+  final Map<String, WeftMessage> byEventId = {};
+
+  final Map<String, Map<String, WeftMessage>> _byRoom = {};
+
+  /// The newest message the local user sent, which is the only one a "Seen"
+  /// line is drawn under. The list is newest-first.
+  String? newestOwnEventId;
+
+  /// [eventId] as loaded in [roomId] specifically — a receipt belongs to the
+  /// room it was sent in, and a merged chat's other legs do not count.
+  WeftMessage? inRoom(String roomId, String eventId) =>
+      _byRoom[roomId]?[eventId];
 }

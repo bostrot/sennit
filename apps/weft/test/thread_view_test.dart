@@ -275,7 +275,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).last, 'on it');
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Send — hold to schedule'));
+      await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
 
       final call = repository.calls.last;

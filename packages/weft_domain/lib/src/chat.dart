@@ -30,6 +30,17 @@ class ChatSource {
   /// message marked Signal, Telegram and Instagram unread as well.
   final int unread;
 
+  /// Whether [other] is this leg in every respect, not merely the same room.
+  ///
+  /// `==` is identity — the room — which is what a set of legs wants. This is
+  /// the other question: has anything about the leg *changed*.
+  bool sameContentAs(ChatSource other) =>
+      other.roomId == roomId &&
+      other.network == network &&
+      other.handleId == handleId &&
+      other.muted == muted &&
+      other.unread == unread;
+
   @override
   bool operator ==(Object other) =>
       other is ChatSource && other.roomId == roomId;
@@ -202,6 +213,63 @@ class Chat {
   }
 
   static const Object _sentinel = Object();
+
+  /// Whether [other] is this conversation in every respect that can be drawn
+  /// or acted on, not merely the same conversation.
+  ///
+  /// `==` is identity — two snapshots of one chat are equal, which is what
+  /// keeps a selection or a lookup stable across syncs. That makes it the
+  /// wrong question for "does this row need redrawing", and every sync hands
+  /// out a fresh [Chat] per conversation whether or not anything moved: a
+  /// consumer comparing with `==` never redraws, and one comparing by
+  /// reference always does. This is the comparison in between, and it covers
+  /// **every** field — one left out is one that can change without the screen
+  /// noticing.
+  bool sameContentAs(Chat other) {
+    if (identical(this, other)) return true;
+    if (other.id != id ||
+        other.title != title ||
+        other.unreadCount != unreadCount ||
+        other.avatarUrl != avatarUrl ||
+        other.contactId != contactId ||
+        other.isGroup != isGroup ||
+        other.pinned != pinned ||
+        other.archived != archived ||
+        other.muted != muted ||
+        other.request != request ||
+        other.participantCount != participantCount ||
+        other._preferredSendNetwork != _preferredSendNetwork ||
+        other.sources.length != sources.length) {
+      return false;
+    }
+    for (var i = 0; i < sources.length; i++) {
+      if (!sources[i].sameContentAs(other.sources[i])) return false;
+    }
+    final last = lastMessage;
+    final otherLast = other.lastMessage;
+    if (identical(last, otherLast)) return true;
+    if (last == null || otherLast == null) return false;
+    // `WeftMessage ==` is the event plus everything that can change for it;
+    // the rest is what the inbox row also reads off a preview.
+    return last == otherLast &&
+        last.timestamp == otherLast.timestamp &&
+        last.kind == otherLast.kind &&
+        last.isOwn == otherLast.isOwn &&
+        last.network == otherLast.network &&
+        last.senderName == otherLast.senderName &&
+        last.replyToEventId == otherLast.replyToEventId;
+  }
+
+  /// Whether two inboxes hold the same conversations, in the same order, with
+  /// nothing about any of them changed.
+  static bool sameContentList(List<Chat> a, List<Chat> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!a[i].sameContentAs(b[i])) return false;
+    }
+    return true;
+  }
 
   @override
   bool operator ==(Object other) => other is Chat && other.id == id;

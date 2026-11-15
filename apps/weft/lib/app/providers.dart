@@ -1,5 +1,8 @@
+import 'dart:async';
+
+import 'package:collection/collection.dart' show ListEquality, MapEquality;
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform;
+    show TargetPlatform, defaultTargetPlatform, immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -154,6 +157,79 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
   return ref.watch(chatRepositoryProvider).watchChats();
 });
 
+/// One conversation, compared by what it says rather than by which one it is.
+///
+/// [chatsProvider] emits after every sync, and a busy account syncs several
+/// times a second: a typing notification in one room, a receipt in another.
+/// Nearly all of those change nothing about the conversation a given widget
+/// is drawing — but the list is a new list every time, so anything that
+/// watches it rebuilds every time. Measured on an inbox of two thousand
+/// conversations, that was a 10–19ms frame per sync on an M-series Mac, with
+/// nothing on screen different afterwards.
+///
+/// `ref.watch(chatsProvider.select(...))` is the cure, and [Chat] itself is
+/// the wrong thing to select: its `==` is the conversation's id, so a
+/// selected [Chat] never notifies at all, changed or not. This is the wrapper
+/// in between — equal exactly when [Chat.sameContentAs] says nothing moved.
+@immutable
+class ChatContent {
+  const ChatContent(this.chat);
+
+  final Chat chat;
+
+  /// The conversation called [chatId] in [chats], or null.
+  static ChatContent? find(List<Chat>? chats, String chatId) {
+    if (chats == null) return null;
+    for (final chat in chats) {
+      if (chat.id == chatId) return ChatContent(chat);
+    }
+    return null;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChatContent && other.chat.sameContentAs(chat);
+
+  @override
+  int get hashCode => chat.id.hashCode;
+}
+
+/// Hands back the previous value when the new one says the same thing.
+///
+/// A `Provider` notifies when its value is not `==` to the last one, and a
+/// list or a map built fresh on every run never is. Returning the *old*
+/// object for unchanged content is what lets a provider that recomputes on
+/// every sync stay silent on nearly all of them.
+///
+/// One per provider, held in a provider of its own so the memory belongs to
+/// the container rather than to the process — two `ProviderScope`s, or two
+/// tests, must not share a last value.
+class _Unchanging<T> {
+  _Unchanging(this._same);
+
+  final bool Function(T previous, T next) _same;
+  T? _last;
+  bool _has = false;
+
+  T call(T next) {
+    if (_has && _same(_last as T, next)) return _last as T;
+    _has = true;
+    return _last = next;
+  }
+}
+
+final _visibleChatsMemo = Provider(
+  (ref) => _Unchanging<List<Chat>>(Chat.sameContentList),
+);
+final _pendingRequestsMemo = Provider(
+  (ref) => _Unchanging<List<Chat>>(Chat.sameContentList),
+);
+final _unreadByNetworkMemo = Provider(
+  (ref) => _Unchanging<Map<ChatNetwork, int>>(
+    const MapEquality<ChatNetwork, int>().equals,
+  ),
+);
+
 /// Whether one conversation's encrypted rooms hold any unverified device.
 ///
 /// A family over the chat id rather than a field on [Chat], because it is the
@@ -164,6 +240,15 @@ final chatsProvider = StreamProvider<List<Chat>>((ref) {
 ///
 /// Failures resolve to [RoomTrust.none]. The banner is an advisory, and a
 /// key-store hiccup must not put a red bar over a chat that is fine.
+///
+/// Two clocks, neither of them the sync. The *rooms* are watched through a
+/// `select`, so a merge re-asks at once and the thousand syncs that touch
+/// nothing about this conversation's composition do not. The *devices* behind
+/// those rooms change with no word to the inbox at all — a contact signs in on
+/// a new phone — so the answer is also re-asked on a slow timer for as long as
+/// something is showing it. Watching the whole list instead walked every
+/// member's device keys in every encrypted leg after each sync: several times
+/// a second, in a group of hundreds, for a banner that changes once a month.
 final chatTrustProvider = FutureProvider.family<RoomTrust, String>((
   ref,
   chatId,
@@ -175,22 +260,28 @@ final chatTrustProvider = FutureProvider.family<RoomTrust, String>((
     return RoomTrust.none;
   }
 
-  final chat = ref
-      .watch(chatsProvider)
-      .value
-      ?.where((c) => c.id == chatId)
-      .firstOrNull;
-  if (chat == null) return RoomTrust.none;
+  final roomIds = ref.watch(
+    chatsProvider.select(
+      (chats) => ChatContent.find(chats.value, chatId)?.chat.roomIds.join('\n'),
+    ),
+  );
+  if (roomIds == null) return RoomTrust.none;
+
+  final refresh = Timer(_trustRefreshInterval, ref.invalidateSelf);
+  ref.onDispose(refresh.cancel);
 
   try {
     return await trustOfRooms([
-      for (final source in chat.sources)
-        ?session.client.getRoomById(source.roomId),
+      for (final roomId in roomIds.split('\n'))
+        ?session.client.getRoomById(roomId),
     ]);
   } catch (_) {
     return RoomTrust.none;
   }
 });
+
+/// How stale a conversation's device trust may get while it is on screen.
+const Duration _trustRefreshInterval = Duration(seconds: 10);
 
 /// Uploads in flight for one chat, keyed by chat id.
 ///
@@ -265,6 +356,26 @@ final sendOnEnterProvider = Provider<bool>((ref) {
 /// goldens would settle — and shipped it, so every real message in the inbox
 /// was newer than "now" and every conversation was labelled "Now".
 final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+/// The networks the account has conversations on, for the rail and the
+/// sidebar.
+///
+/// `ChatRepository.availableNetworks` is a plain getter, so nothing announces
+/// that a bridge's first room has arrived. The rail used to find out by being
+/// rebuilt after every sync along with everything else; now that the shells
+/// only rebuild for a reason, this is the reason — asked on the same heartbeat,
+/// and silent unless the answer changed.
+final availableNetworksProvider = Provider<List<ChatNetwork>>((ref) {
+  ref.watch(chatsProvider);
+  return ref.read(_availableNetworksMemo)(
+    ref.watch(chatRepositoryProvider).availableNetworks,
+  );
+});
+
+final _availableNetworksMemo = Provider(
+  (ref) =>
+      _Unchanging<List<ChatNetwork>>(const ListEquality<ChatNetwork>().equals),
+);
 
 /// Networks selected in the left rail. Empty means "show everything".
 class NetworkFilterNotifier extends Notifier<Set<ChatNetwork>> {
@@ -476,13 +587,17 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
   );
 
   // Pinned first, then most recent activity.
-  return [...filtered]..sort((a, b) {
-    if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-    final at = a.lastMessage?.timestamp;
-    final bt = b.lastMessage?.timestamp;
-    if (at == null || bt == null) return 0;
-    return bt.compareTo(at);
-  });
+  final sorted = [...filtered]
+    ..sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      final at = a.lastMessage?.timestamp;
+      final bt = b.lastMessage?.timestamp;
+      if (at == null || bt == null) return 0;
+      return bt.compareTo(at);
+    });
+  // The same list object when nothing in it moved, so the inbox is rebuilt by
+  // a sync that changed a row and not by every sync there is.
+  return ref.read(_visibleChatsMemo)(sorted);
 });
 
 /// Conversations waiting for the user to accept or decline them.
@@ -512,7 +627,7 @@ final pendingRequestsProvider = Provider<List<Chat>>((ref) {
     if (at == null || bt == null) return 0;
     return bt.compareTo(at);
   });
-  return List.unmodifiable(requests);
+  return ref.read(_pendingRequestsMemo)(List.unmodifiable(requests));
 });
 
 /// Unread totals per network, for the rail badges.
@@ -534,11 +649,13 @@ final unreadByNetworkProvider = Provider<Map<ChatNetwork, int>>((ref) {
       ? null
       : ref.watch(statusChatProvider)?.id;
 
-  return unreadByNetwork([
-    for (final chat in chats)
-      if (!chat.archived &&
-          !service.contains(chat.id) &&
-          chat.id != statusChatId)
-        chat,
-  ]);
+  return ref.read(_unreadByNetworkMemo)(
+    unreadByNetwork([
+      for (final chat in chats)
+        if (!chat.archived &&
+            !service.contains(chat.id) &&
+            chat.id != statusChatId)
+          chat,
+    ]),
+  );
 });

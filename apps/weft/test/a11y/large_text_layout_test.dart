@@ -256,7 +256,10 @@ void main() {
     await tester.tap(find.byType(ChatTile).first);
     await tester.pumpAndSettle();
 
-    await tester.longPress(find.byType(WeftFocusable).last);
+    // One that can actually be pressed: the topmost bubble built is usually
+    // half under the conversation's bar, and a press at its centre lands on
+    // the bar instead.
+    await tester.longPress(find.byType(WeftFocusable).hitTestable().last);
     await tester.pumpAndSettle();
 
     expectNoOverflow(tester, 'the message actions sheet');

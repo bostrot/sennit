@@ -168,6 +168,14 @@ abstract final class WeftSettings {
   /// of the time. Merged chats with a visible leg stay visible.
   static const String inboxHiddenFromAll = 'inbox.hidden_from_all';
 
+  /// Rooms whose message request the user accepted, as `{"rooms": [...]}`.
+  ///
+  /// Accepting an *invitation* is recorded by the homeserver — the room is
+  /// joined. Accepting a stranger's conversation on a bridged network changes
+  /// nothing the server knows about, so without this the answer lived only in
+  /// memory and the request was back in the list on the next launch.
+  static const String acceptedRequests = 'requests.accepted';
+
   /// Whether the first-start setup flow has run. It runs once per install —
   /// including once on the update that introduced it, which is deliberate:
   /// existing installs get the same defaults offered the same way.
