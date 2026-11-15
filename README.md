@@ -16,6 +16,7 @@
 <p align="center">
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
+  <a href="#install">Install</a> ·
   <a href="#getting-started">Getting started</a> ·
   <a href="#building">Building</a> ·
   <a href="#architecture">Architecture</a> ·
@@ -85,6 +86,67 @@ message that ever touches infrastructure you don't own.
 | Mobile | Merged conversation | Media |
 |:---:|:---:|:---:|
 | ![Mobile inbox](docs/images/inbox-mobile.png) | ![Merged chat](docs/images/chat-light.png) | ![Photos and video in a chat, dark](docs/images/chat-media-dark.png) |
+
+## Install
+
+Desktop builds are attached to every
+[GitHub release](https://github.com/bostrot/sennit/releases/latest). The
+one-liners below fetch the latest one; set `VERSION=1.0.6` (or
+`$env:VERSION = '1.0.6'` on Windows) first to pin a release. Prefer to read
+before you pipe? The scripts live in [`tooling/install/`](tooling/install/).
+
+<details>
+<summary><b>macOS</b> (Apple silicon and Intel)</summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bostrot/sennit/main/tooling/install/install.sh | sh
+```
+
+Installs the app into `/Applications` (or `~/Applications` if that isn't
+writable). To do it by hand, download `*-macos.zip` from the release, unzip
+it and drag the app into Applications.
+
+</details>
+
+<details>
+<summary><b>Windows</b> (x64)</summary>
+
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/bostrot/sennit/main/tooling/install/install.ps1 | iex
+```
+
+Installs for the current user into `%LOCALAPPDATA%\Programs` and adds a
+Start menu shortcut — no admin rights needed. To do it by hand, download
+`*-windows-x64.zip`, extract it anywhere and run `weft.exe`.
+
+</details>
+
+<details>
+<summary><b>Linux</b> (arm64)</summary>
+
+Releases currently ship an arm64 build only; on x64,
+[build from source](#building) for now.
+
+Install the runtime libraries first:
+
+```bash
+sudo apt install libgtk-3-0 libsecret-1-0 libsqlite3-0     # Debian / Ubuntu
+sudo dnf install gtk3 libsecret sqlite-libs                # Fedora
+```
+
+Then:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bostrot/sennit/main/tooling/install/install.sh | sh
+```
+
+Installs into `~/.local/share`, links the binary into `~/.local/bin` and adds
+a desktop entry to your app launcher. To do it by hand, download
+`*-linux-<arch>.tar.gz`, extract it and run `./weft`.
+
+</details>
 
 ## Getting started
 
