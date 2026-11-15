@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_mcp/weft_mcp.dart';
@@ -6,6 +8,8 @@ import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../data/chat_repository.dart';
+import '../services/billing/entitlements.dart';
+import 'billing_providers.dart';
 import 'providers.dart';
 import 'search_providers.dart';
 import 'stores.dart';
@@ -219,6 +223,9 @@ class McpService {
   }
 
   Future<int> start() async {
+    if (!_ref.read(proControllerProvider).unlocks(ProFeature.mcpServer)) {
+      throw const ProFeatureLocked(ProFeature.mcpServer);
+    }
     final port = _settings.getInt(WeftSettings.mcpPort) ?? 0;
     final bound = await _server.start(port: port);
     _settings.setInt(WeftSettings.mcpPort, bound);
@@ -251,6 +258,11 @@ class McpService {
 
 final mcpServiceProvider = Provider<McpService>((ref) {
   final service = McpService(ref);
+  // A server already running when Pro lapses stops with it, rather than
+  // serving agents until the next launch.
+  ref.listen(proControllerProvider, (_, next) {
+    if (!next.unlocks(ProFeature.mcpServer)) unawaited(service.stop());
+  });
   ref.onDispose(service.dispose);
   return service;
 });

@@ -1,0 +1,549 @@
+{
+  "name": "Braid Licensing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "braid/stripe-events",
+        "options": {}
+      },
+      "id": "3babb346-dcac-5d60-9265-a596bd149287",
+      "name": "Stripe events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1600,
+        0
+      ],
+      "webhookId": "101b74cf-ad98-5ee9-8763-77c51691722d",
+      "notes": "Point a Stripe webhook endpoint here with checkout.session.completed and checkout.session.async_payment_succeeded."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e1",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "checkout.session.completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "e2",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "checkout.session.async_payment_succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "708f2af1-4d7a-5508-a6df-d3b4bb1f86c3",
+      "name": "Checkout event",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1380,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.stripe.com/v1/checkout/sessions/{{ $json.body.data.object.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "expand[]",
+              "value": "line_items"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c262c259-e61d-53a9-8251-4d4d810b0098",
+      "name": "Re-fetch session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1160,
+        0
+      ],
+      "credentials": {
+        "stripeApi": {
+          "id": "YgOHiL5LMVAGtRJ2",
+          "name": "Stripe PROD account"
+        }
+      },
+      "notes": "The posted event is unsigned and so untrusted; only what Stripe itself returns for the session id is used."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p1",
+              "leftValue": "={{ $json.payment_status }}",
+              "rightValue": "paid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "p2",
+              "leftValue": "={{ $json.metadata?.app ?? '' }}",
+              "rightValue": "braid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "15e056cf-eba0-5ad4-8a65-8be20e0b34ad",
+      "name": "Paid Braid sale",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -940,
+        0
+      ],
+      "notes": "Every checkout on the Stripe account reaches this endpoint. Only sessions from the Braid payment link, which carries metadata app=braid, get a licence."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "KtezufTapmW8EZuS",
+          "mode": "list",
+          "cachedResultName": "braid-licenses"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "0ee6c333-28a2-5893-86b4-6e225301caea",
+      "name": "Existing licence",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        0
+      ],
+      "alwaysOutputData": true,
+      "notes": "A Stripe retry of the same event must not mint a second key: the row for this session, if there is one, is what Build licence keeps."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns a *verified* Stripe Checkout session into a licence row.\n//\n// This file is the body of the \"Build licence\" Code node in\n// braid-licensing.workflow.json, verbatim — licence_test.js fails if the two\n// drift. It also loads as a CommonJS module so the logic runs under\n// `node --test`.\n//\n// The event body that reached the webhook is not trusted. The node before\n// this one re-fetched the session straight from the Stripe API with our own\n// key, and the IF after it dropped anything that is not paid or is not a\n// Braid sale. So everything below reads from the re-fetched session, never\n// from the posted payload. \"Existing licence\" then looked the session up in\n// the licence table: a row that is already there means Stripe delivered this\n// event before (it retries on anything but a 2xx) and the customer may\n// already hold that key — so it is kept, never rotated.\n\n// Crockford-ish alphabet: no I, O, 0 or 1, so a key read off a screen and\n// typed into the app cannot be ambiguous.\nconst ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';\n\nfunction block(n) {\n  let bytes = null;\n  try {\n    bytes = globalThis.crypto.getRandomValues(new Uint8Array(n));\n  } catch (e) {\n    bytes = null;\n  }\n  let out = '';\n  for (let i = 0; i < n; i++) {\n    const v = bytes ? bytes[i] : Math.floor(Math.random() * 256);\n    out += ALPHABET[v % ALPHABET.length];\n  }\n  return out;\n}\n\n// The shape the app accepts: see `normalizeLicenseKey` in\n// apps/weft/lib/services/billing/license_client.dart.\nfunction newKey() {\n  return ['BRAID', block(5), block(5), block(5), block(5)].join('-');\n}\n\nfunction sessionLicence(session, existing) {\n  const kept = existing && existing.license_key;\n  const details = session.customer_details || {};\n  return {\n    // Stored lower-case so lookups are case-insensitive; the email and the\n    // app upper-case it.\n    license_key: String(kept || newKey()).toLowerCase(),\n    // Whether this event had been seen before; the email is only sent once.\n    resent: !!kept,\n    email: session.customer_email || details.email || '',\n    stripe_id: session.customer || '',\n    session_id: session.id,\n    plan: 'pro',\n  };\n}\n\n// --- n8n Code node entry point -------------------------------------------\n// Present only inside n8n; under `node` this falls through to the export.\nif (typeof $input !== 'undefined') {\n  const session = $('Re-fetch session').item.json;\n  return [{ json: sessionLicence(session, $input.first().json || {}) }];\n}\n\nmodule.exports = { sessionLicence, newKey, ALPHABET };\n"
+      },
+      "id": "ca1b23c2-593c-513a-8b95-272e8c3f77a9",
+      "name": "Build licence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "KtezufTapmW8EZuS",
+          "mode": "list",
+          "cachedResultName": "braid-licenses"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "license_key": "={{ $json.license_key }}",
+            "active": true,
+            "plan": "={{ $json.plan }}",
+            "session_id": "={{ $json.session_id }}",
+            "stripe_id": "={{ $json.stripe_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "license_key",
+              "displayName": "license_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "active",
+              "displayName": "active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "plan",
+              "displayName": "plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "stripe_id",
+              "displayName": "stripe_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "509e9c66-8c46-57f6-827d-805715d9f105",
+      "name": "Save licence",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Writes the licence email.\n//\n// This file is the body of the \"Compose licence email\" Code node in\n// braid-licensing.workflow.json, verbatim — licence_test.js fails if the two\n// drift. Everything comes from Build licence, which read the re-fetched,\n// verified Stripe session; Save licence has just stored the same row. Plain\n// HTML with inline styles so every mail client renders it.\nfunction compose(licence) {\n  const key = String(licence.license_key || '').toUpperCase();\n  const to = String(licence.email || '').trim();\n  const esc = (s) => String(s).replace(/[&<>\"']/g, (c) => ({\n    '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;',\n  }[c]));\n\n  const html = `<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Your Braid Pro licence key</title>\n</head>\n<body style=\"margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;\">\n  <div style=\"display:none;max-height:0;overflow:hidden;\">Your Braid Pro licence key is inside.</div>\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f3f4f6;padding:32px 16px;\">\n    <tr><td align=\"center\">\n      <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #e5e7eb;overflow:hidden;\">\n        <tr><td style=\"padding:28px 32px 0 32px;font-size:18px;font-weight:600;color:#111827;\">Braid</td></tr>\n        <tr><td style=\"padding:20px 32px 0 32px;\">\n          <h1 style=\"margin:0;font-size:26px;line-height:1.25;font-weight:600;letter-spacing:-0.01em;color:#111827;\">You&rsquo;re all set</h1>\n          <p style=\"margin:14px 0 0 0;font-size:16px;line-height:1.6;color:#4b5563;\">Thank you for buying Braid Pro. Your licence never expires and covers every device you use yourself. Here is your key:</p>\n        </td></tr>\n        <tr><td style=\"padding:24px 32px 0 32px;\">\n          <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;\">\n            <tr><td style=\"padding:18px 20px;\">\n              <p style=\"margin:0 0 8px 0;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;\">Your licence key</p>\n              <p style=\"margin:0;font-family:SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;font-size:18px;line-height:1.5;letter-spacing:0.02em;color:#111827;word-break:break-all;\">${esc(key)}</p>\n            </td></tr>\n          </table>\n        </td></tr>\n        <tr><td style=\"padding:24px 32px 0 32px;\">\n          <p style=\"margin:0 0 10px 0;font-size:15px;font-weight:600;color:#111827;\">How to activate</p>\n          <ol style=\"margin:0;padding-left:20px;font-size:15px;line-height:1.7;color:#4b5563;\">\n            <li>Open Braid and go to <strong style=\"color:#111827;\">Settings</strong>.</li>\n            <li>Open <strong style=\"color:#111827;\">Braid Pro</strong>.</li>\n            <li>Paste the key and press <strong style=\"color:#111827;\">Activate</strong>.</li>\n          </ol>\n          <p style=\"margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#6b7280;\">The key is for Braid downloaded from the release page. Braid from Google Play or the App Store sells Pro through the store instead.</p>\n        </td></tr>\n        <tr><td style=\"padding:28px 32px 28px 32px;\">\n          <p style=\"margin:0;font-size:13px;line-height:1.6;color:#6b7280;\">Keep this email — it is your proof of purchase. Questions or a lost key: reply to this email or write to <a href=\"mailto:license@bostrot.com\" style=\"color:#4f46e5;text-decoration:none;\">license@bostrot.com</a>.</p>\n        </td></tr>\n      </table>\n      <p style=\"margin:18px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;\">Sent by Eric Trenkel &middot; Braid</p>\n    </td></tr>\n  </table>\n</body>\n</html>`;\n\n  const text = [\n    'Thank you for buying Braid Pro.',\n    '',\n    `Your licence key: ${key}`,\n    '',\n    'How to activate: open Braid, go to Settings, open \"Braid Pro\", paste the key and press Activate.',\n    'The key is for Braid downloaded from the release page; it never expires and covers every device you use yourself.',\n    '',\n    'Keep this email as your proof of purchase. Questions or a lost key: license@bostrot.com',\n  ].join('\\n');\n\n  return {\n    to,\n    subject: 'Your Braid Pro licence key',\n    html,\n    text,\n    // Nothing to send to, or already sent: the row is saved either way.\n    skip: !to || licence.resent === true,\n  };\n}\n\n// --- n8n Code node entry point -------------------------------------------\n// Present only inside n8n; under `node` this falls through to the export.\nif (typeof $input !== 'undefined') {\n  return [{ json: compose($('Build licence').item.json) }];\n}\n\nmodule.exports = { compose };\n"
+      },
+      "id": "b26877b3-04a0-5695-97ca-2806bdc84fed",
+      "name": "Compose licence email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7fcd587b-146a-5090-8726-4791230a58d6",
+      "name": "Send it?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "Eric from Braid <eric@bostrot.com>",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.text }}",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "license@bostrot.com"
+        }
+      },
+      "id": "dd3b291a-19a7-501d-96b1-49e8316a88aa",
+      "name": "Send licence email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        380,
+        0
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "6Al7qoq3cTMXlrHX",
+          "name": "Protonmail Bostrot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "braid/validate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "270e3299-cec4-5583-b589-1cd50d8b2916",
+      "name": "Validate licence",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1600,
+        360
+      ],
+      "webhookId": "65a4e8f0-6165-5266-8326-cdcd40a88b9a",
+      "notes": "GET ?license=BRAID-… — the app asks once on activation and about monthly afterwards. The request carries nothing but the key."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "KtezufTapmW8EZuS",
+          "mode": "list",
+          "cachedResultName": "braid-licenses"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "license_key",
+              "keyValue": "={{ String($json.query.license ?? '').trim().toLowerCase() || '-' }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "2e655fbc-1051-5278-a196-ce96f3699225",
+      "name": "Find licence",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1380,
+        360
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { valid: !!$json.license_key && ($json.active === true || $json.active === 'true') }.toJsonString() }}",
+        "options": {}
+      },
+      "id": "f265a2d8-52c2-5e54-87ba-c1a9890b3fef",
+      "name": "Respond verdict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -1160,
+        360
+      ],
+      "notes": "To revoke a licence after a refund, untick `active` on its row in the braid-licenses table."
+    }
+  ],
+  "connections": {
+    "Stripe events": {
+      "main": [
+        [
+          {
+            "node": "Checkout event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkout event": {
+      "main": [
+        [
+          {
+            "node": "Re-fetch session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-fetch session": {
+      "main": [
+        [
+          {
+            "node": "Paid Braid sale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paid Braid sale": {
+      "main": [
+        [
+          {
+            "node": "Existing licence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing licence": {
+      "main": [
+        [
+          {
+            "node": "Build licence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build licence": {
+      "main": [
+        [
+          {
+            "node": "Save licence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save licence": {
+      "main": [
+        [
+          {
+            "node": "Compose licence email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose licence email": {
+      "main": [
+        [
+          {
+            "node": "Send it?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send it?": {
+      "main": [
+        [
+          {
+            "node": "Send licence email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate licence": {
+      "main": [
+        [
+          {
+            "node": "Find licence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find licence": {
+      "main": [
+        [
+          {
+            "node": "Respond verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

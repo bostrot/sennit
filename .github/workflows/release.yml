@@ -14,6 +14,20 @@ on:
 
 env:
   FLUTTER_VERSION: '3.44.0'
+  # Which edition each build is: docs/decisions/adr-004-braid-pro.md.
+  #
+  # What goes on the release page sells Braid Pro by licence key — once
+  # there is a checkout to send people to. Until the BRAID_CHECKOUT_URL
+  # repository variable is set, those builds stay the community edition,
+  # because a build that locks features with nowhere to buy them is worse
+  # than one that gives them away.
+  DIRECT_DEFINES: >-
+    --dart-define=BRAID_EDITION=${{ vars.BRAID_CHECKOUT_URL != '' && 'direct' || 'community' }}
+    --dart-define=BRAID_CHECKOUT_URL=${{ vars.BRAID_CHECKOUT_URL }}
+  # What goes to Play and the App Store sells it in the store, once the
+  # BRAID_STORE_EDITION repository variable says `store` — which it should
+  # only say when the products exist in both consoles.
+  STORE_DEFINES: --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
 
 jobs:
   verify:
@@ -121,9 +135,9 @@ jobs:
           EOF
       - run: flutter pub get
         working-directory: apps/weft
-      - run: flutter build apk --release
+      - run: flutter build apk --release ${{ env.DIRECT_DEFINES }}
         working-directory: apps/weft
-      - run: flutter build appbundle --release
+      - run: flutter build appbundle --release ${{ env.STORE_DEFINES }}
         working-directory: apps/weft
       - name: Collect artifacts
         run: |
@@ -153,7 +167,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - run: flutter pub get
         working-directory: apps/weft
-      - run: flutter build linux --release
+      - run: flutter build linux --release ${{ env.DIRECT_DEFINES }}
         working-directory: apps/weft
       - name: Collect artifacts
         run: |
@@ -185,7 +199,7 @@ jobs:
           cache: true
       - run: flutter pub get
         working-directory: apps/weft
-      - run: flutter build windows --release
+      - run: flutter build windows --release ${{ env.DIRECT_DEFINES }}
         working-directory: apps/weft
       - name: Collect artifacts
         shell: pwsh
@@ -220,7 +234,7 @@ jobs:
         # then seal the whole bundle ad hoc below; the Developer ID step
         # re-signs on top when the secrets exist.
         run: |
-          flutter build macos --release --config-only
+          flutter build macos --release --config-only ${{ env.DIRECT_DEFINES }}
           xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
             -configuration Release -derivedDataPath build/macos \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
@@ -347,7 +361,7 @@ jobs:
             > ~/Library/MobileDevice/Provisioning\ Profiles/braid.mobileprovision
       - name: Build a signed IPA
         if: env.HAS_SIGNING == 'true'
-        run: flutter build ipa --release
+        run: flutter build ipa --release ${{ env.STORE_DEFINES }}
         working-directory: apps/weft
       - name: Build an unsigned IPA
         if: env.HAS_SIGNING != 'true'
@@ -356,7 +370,7 @@ jobs:
         # every watchOS-only API. A generic iOS destination lets each target
         # pick its own SDK, exactly as an Xcode archive would.
         run: |
-          (cd apps/weft && flutter build ios --release --config-only --no-codesign)
+          (cd apps/weft && flutter build ios --release --config-only --no-codesign ${{ env.STORE_DEFINES }})
           xcodebuild -workspace apps/weft/ios/Runner.xcworkspace \
             -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' \

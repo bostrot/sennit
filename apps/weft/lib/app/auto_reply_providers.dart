@@ -8,7 +8,9 @@ import 'package:weft_store/weft_store.dart';
 
 import '../data/auto_reply_transport.dart';
 import '../services/ai/auto_reply_service.dart';
+import '../services/billing/entitlements.dart';
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
+import 'billing_providers.dart';
 import 'calendar_providers.dart';
 import 'labels.dart';
 import 'providers.dart';
@@ -119,6 +121,9 @@ final autoReplyLogProvider =
 /// restart.
 final autoReplyEndpointProvider = Provider<AutoReplyEndpoint?>((ref) {
   ref.watch(settingsRevisionProvider);
+  // The one gate for every LLM path that reads this: auto-replies and the
+  // to-do assistant both go quiet without an endpoint.
+  if (!proUnlocked(ref, ProFeature.aiReplies)) return null;
   final WeftStores stores;
   try {
     stores = ref.read(storesProvider);

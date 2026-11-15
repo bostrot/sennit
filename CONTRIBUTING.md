@@ -20,6 +20,13 @@ For manual testing you need a Matrix homeserver; a Docker Compose stack with
 Synapse and a mock bridge lives in `tooling/docker/` — no real accounts or
 bridges required.
 
+A build from source is the community edition, with every feature unlocked.
+The published builds sell the AI features and integrations as Braid Pro: the
+Play and App Store builds as an in-app purchase
+(`--dart-define=BRAID_EDITION=store`), the release-page builds by licence key
+(`--dart-define=BRAID_EDITION=direct`). A new AI or integration feature needs
+a `ProFeature` gate in its provider. See `docs/decisions/adr-004-braid-pro.md`.
+
 ## Making changes
 
 1. **Find the right layer.** Business rules go in `packages/weft_domain`,
@@ -62,6 +69,13 @@ opening anything.
 
 For large features, open an issue first so we can agree on the shape before
 you invest the time.
+
+## Licence of contributions
+
+Braid is AGPL-3.0, and it is also published on the App Store and Google Play.
+Opening a pull request means you agree to the short
+[contributor licence agreement](CLA.md), which is what lets your code ship
+there too. You keep your copyright.
 
 ## License
 

@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/agenda/ics_calendar.dart';
+import '../services/billing/entitlements.dart';
+import 'billing_providers.dart';
 import 'stores.dart';
 
 /// The shared calendar the user added on the integrations screen, or null.
@@ -10,6 +12,7 @@ import 'stores.dart';
 /// changed address must not keep answering from the old calendar.
 final icsCalendarProvider = Provider<IcsCalendar?>((ref) {
   ref.watch(settingsRevisionProvider);
+  if (!proUnlocked(ref, ProFeature.integrations)) return null;
   final uri = icsUriFrom(storesOrNull(ref)?.calendarIcsUrl);
   if (uri == null) return null;
   final calendar = IcsCalendar(url: uri);

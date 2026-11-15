@@ -79,6 +79,8 @@ const Set<String> _neverTranslated = {
   'UnifiedPush',
   'Sam',
   'Original',
+  // The paid tier's name, like Braid itself.
+  'Pro',
 };
 
 /// French: a non-breaking space belongs before each of these.

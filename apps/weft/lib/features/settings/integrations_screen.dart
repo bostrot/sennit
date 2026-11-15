@@ -4,10 +4,12 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/billing_providers.dart';
 import '../../app/calendar_providers.dart';
 import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../services/agenda/ics_calendar.dart';
+import '../../services/billing/entitlements.dart';
 import '../../services/integrations/home_assistant.dart';
 import '../../services/integrations/paperless.dart';
 import 'settings_section.dart';
@@ -15,6 +17,7 @@ import 'settings_section.dart';
 /// The Home Assistant client as settings describe it, or null when unset.
 final homeAssistantProvider = Provider<HomeAssistantClient?>((ref) {
   ref.watch(settingsRevisionProvider);
+  if (!proUnlocked(ref, ProFeature.integrations)) return null;
   final stores = storesOrNull(ref);
   if (stores == null) return null;
 
@@ -32,6 +35,7 @@ final homeAssistantProvider = Provider<HomeAssistantClient?>((ref) {
 /// Same shape for paperless-ngx.
 final paperlessProvider = Provider<PaperlessClient?>((ref) {
   ref.watch(settingsRevisionProvider);
+  if (!proUnlocked(ref, ProFeature.integrations)) return null;
   final stores = storesOrNull(ref);
   if (stores == null) return null;
 

@@ -11,6 +11,7 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/conversation_context.dart';
+import '../services/billing/entitlements.dart';
 import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
     show NotificationDismisser;
@@ -24,6 +25,7 @@ import 'localisation.dart';
 import 'providers.dart';
 import 'snapshot_providers.dart';
 import 'session_providers.dart';
+import 'billing_providers.dart';
 import 'stores.dart';
 import 'calendar_providers.dart';
 
@@ -262,6 +264,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     } on Object {
       return const [];
     }
+    if (!proUnlockedNow(ref, ProFeature.aiReplies)) return const [];
     final settings = stores.settings;
     if (!settings.getBool(WeftSettings.notifySmartReplies, fallback: true)) {
       debugPrint('weft: smart replies: the setting is off');

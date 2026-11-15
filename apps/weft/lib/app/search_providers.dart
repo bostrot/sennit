@@ -4,9 +4,11 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../features/settings/models_screen.dart';
+import '../services/billing/entitlements.dart';
 import '../services/models/model_catalog.dart';
 import '../services/search/local_embedding_provider.dart';
 import '../services/transcription/local_whisper_provider.dart';
+import 'billing_providers.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';
 import 'stores.dart';
@@ -16,6 +18,8 @@ import 'stores.dart';
 /// keyword-only, which needs no endpoint at all.
 final embeddingProviderProvider = Provider<EmbeddingProvider?>((ref) {
   ref.watch(settingsRevisionProvider);
+  // Without it, search is keyword-only — which is the free tier.
+  if (!proUnlocked(ref, ProFeature.semanticSearch)) return null;
   final stores = ref.watch(storesProvider);
   final settings = stores.settings;
 
@@ -99,6 +103,7 @@ final transcriptionProviderProvider = FutureProvider<TranscriptionProvider?>((
   ref,
 ) async {
   ref.watch(settingsRevisionProvider);
+  if (!proUnlocked(ref, ProFeature.transcription)) return null;
   final stores = ref.watch(storesProvider);
   final settings = stores.settings;
 

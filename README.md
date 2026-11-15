@@ -19,6 +19,7 @@
   <a href="#getting-started">Getting started</a> ·
   <a href="#building">Building</a> ·
   <a href="#architecture">Architecture</a> ·
+  <a href="#braid-pro">Braid Pro</a> ·
   <a href="#license">License</a>
 </p>
 
@@ -143,6 +144,22 @@ The pure-Dart packages carry the bulk of the test suite — merge scoring,
 timeline interleaving, notification policy — and run without a device.
 Golden tests pin every screen in light, dark and accessibility variants.
 
+## Braid Pro
+
+All of Braid is in this repository, and a build from source has every feature
+switched on. The builds published on Google Play, the App Store and the
+release page are free for messaging — every network, merged chats, calls, SMS,
+keyword search, backups — and sell the parts that take the most work to build
+and keep working as **Braid Pro**, a single payment with no subscription:
+
+- AI auto-replies, reply suggestions and the to-do assistant
+- semantic search and voice-note transcription
+- the MCP server
+- the Home Assistant, paperless-ngx and shared-calendar integrations
+
+Buying Pro is what pays for the project. If you would rather build it
+yourself, that is what the licence is for.
+
 ## Contributing
 
 Issues and pull requests are welcome — see
@@ -154,3 +171,6 @@ Issues and pull requests are welcome — see
 [AGPL-3.0](LICENSE). You can self-host, modify and redistribute Braid
 freely; if you offer a modified Braid to others over a network, share your
 changes the same way.
+
+The licence covers the code, not the name: a fork you publish needs its own
+name and icon. See [TRADEMARKS.md](TRADEMARKS.md).
