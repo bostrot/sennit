@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cut a release: write the version into pubspec.yaml, commit, tag.
+# Cut a release: write the version into pubspec.yaml and into the constant a
+# backup archive records, commit, tag.
 #
 #   tooling/scripts/release.sh 1.2.0
 #   git push && git push origin v1.2.0     # this triggers the Release workflow
@@ -17,6 +18,7 @@ VERSION="${1:?usage: release.sh <version, e.g. 1.2.0>}"
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 PUBSPEC="$REPO/apps/weft/pubspec.yaml"
+BACKUP="$REPO/apps/weft/lib/services/backup/backup_service.dart"
 
 if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
   echo "the working tree is not clean — commit or stash first" >&2
@@ -32,7 +34,14 @@ grep -q "^version: $VERSION+$BUILD$" "$PUBSPEC" || {
   exit 1
 }
 
-git -C "$REPO" add "$PUBSPEC"
+# backup_version_test.dart holds this constant to the pubspec version.
+perl -pi -e "s/^const String kSennitVersion = '.*';/const String kSennitVersion = '$VERSION';/" "$BACKUP"
+grep -q "^const String kSennitVersion = '$VERSION';$" "$BACKUP" || {
+  echo "failed to rewrite kSennitVersion in $BACKUP" >&2
+  exit 1
+}
+
+git -C "$REPO" add "$PUBSPEC" "$BACKUP"
 git -C "$REPO" commit -m "Release $VERSION"
 git -C "$REPO" tag "v$VERSION"
 

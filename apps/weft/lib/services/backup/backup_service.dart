@@ -362,4 +362,4 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 /// only ever shown back to the user in a support conversation. It is checked
 /// against `pubspec.yaml` by `backup_version_test.dart`, so it cannot drift
 /// silently.
-const String kSennitVersion = '1.0.5';
+const String kSennitVersion = '1.0.6';
