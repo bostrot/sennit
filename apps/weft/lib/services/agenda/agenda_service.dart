@@ -5,8 +5,10 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../../app/auto_reply_providers.dart';
 import '../../app/search_providers.dart';
 import '../../app/stores.dart';
+import '../ai/event_title.dart';
 import 'event_detector.dart';
 
 /// Decides which messages deserve an "add to calendar" chip.
@@ -69,6 +71,35 @@ class AgendaService {
     } finally {
       _inFlight.remove(message.eventId);
     }
+  }
+
+  /// Titles the model has already been asked for, so a second tap on the
+  /// same chip opens the calendar at once.
+  final Map<String, String> _titles = {};
+
+  /// What to call [candidate] in a calendar.
+  ///
+  /// The configured LLM names it when there is one; without one, or when it
+  /// fails, the rule-made [AgendaCandidate.title] stands. Asked only here —
+  /// on the tap, not at detection — so a message leaves the device because
+  /// its chip was used, never merely because it was scrolled past.
+  Future<String> titleFor(
+    WeftMessage message,
+    AgendaCandidate candidate,
+  ) async {
+    final known = _titles[message.eventId];
+    if (known != null) return known;
+    final endpoint = _ref.read(autoReplyEndpointProvider);
+    if (endpoint == null) return candidate.title;
+
+    final title = await suggestEventTitle(
+      baseUrl: endpoint.baseUrl,
+      model: endpoint.model,
+      apiKey: endpoint.apiKey,
+      message: message.body,
+    );
+    if (title == null) return candidate.title;
+    return _titles[message.eventId] = title;
   }
 
   Future<AgendaCandidate?> _examine(WeftMessage message) async {

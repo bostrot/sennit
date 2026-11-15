@@ -81,4 +81,29 @@ void main() {
       expect(hit.hasTime, isFalse);
     });
   });
+
+  group('titles', () {
+    test('the date and time are cut out of the title', () {
+      expect(detect('Zahnarzt am Dienstag um 14:30')!.title, 'Zahnarzt');
+      expect(detect('dinner on friday at 19:30?')!.title, 'Dinner');
+      expect(detect('let\'s meet tomorrow at 5 pm')!.title, 'Let\'s meet');
+      expect(detect('Abgabe ist am 30.06.')!.title, 'Abgabe');
+      expect(detect('the deadline is on May 12')!.title, 'The deadline');
+      expect(
+        detect('Kino mit Anna übermorgen um 20 Uhr, okay?')!.title,
+        'Kino mit Anna, okay',
+      );
+    });
+
+    test('words on both sides of the date are kept', () {
+      expect(
+        detect('Meeting on Monday at 10:00 with the design team')!.title,
+        'Meeting with the design team',
+      );
+    });
+
+    test('a message that is all date keeps its own words', () {
+      expect(agendaTitleFor('Morgen um 9?'), 'Morgen um 9?');
+    });
+  });
 }

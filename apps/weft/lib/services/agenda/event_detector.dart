@@ -28,7 +28,7 @@ class AgendaCandidate {
   /// the semantic assist — agrees the message is about an event.
   final bool keywordMatched;
 
-  /// The message trimmed to an event-title length.
+  /// The message with its date and time cut out — see [agendaTitleFor].
   final String title;
 }
 
@@ -223,13 +223,97 @@ AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
   // layer up — the semantic assist agreeing.
   if (hour == null && !keyword && !explicitDate) return null;
 
-  var title = text.trim().replaceAll(RegExp(r'\s+'), ' ');
-  if (title.length > 80) title = '${title.substring(0, 77)}…';
-
   return AgendaCandidate(
     start: DateTime(date.year, date.month, date.day, hour ?? 9, minute),
     hasTime: hour != null,
     keywordMatched: keyword,
-    title: title,
+    title: agendaTitleFor(text),
   );
+}
+
+// Letter-aware word edges: `\b` is ASCII-only, so it sees no boundary in
+// front of "übermorgen" and one in the middle of "März".
+const _edgeBefore = r'(?<![\p{L}\p{N}])';
+const _edgeAfter = r'(?![\p{L}\p{N}])';
+
+/// The little words that lead into a date or a time and mean nothing once it
+/// is gone: "on", "next", "am", "um", "bis zum"…
+const _leadIns =
+    '(?:(?:on|at|by|until|till|this|next|around|the|am|um|ab|bis|gegen|'
+    'diesen|nächsten|kommenden|den|vom|zum)\\s+)*';
+
+final _whenPatterns =
+    [
+          // 14:30, 14:30 Uhr, 5 pm, 14 Uhr
+          '\\d{1,2}:\\d{2}(?:\\s?(?:uhr|am|pm|h))?',
+          '\\d{1,2}\\s?(?:am|pm|uhr)',
+          // 12.5., 12.05.2026
+          '\\d{1,2}\\.\\d{1,2}\\.(?:\\d{2,4})?',
+          // 12 May, 12. Mai 2026, May 12th
+          for (final months in [_monthsEn, _monthsDe]) ...[
+            '\\d{1,2}\\.?\\s+(?:${months.join('|')})(?:,?\\s+\\d{4})?',
+            '(?:${months.join('|')})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?',
+          ],
+          // tomorrow, heute Abend, next friday morning
+          '(?:day after tomorrow|übermorgen|tomorrow|morgen|today|tonight|heute|'
+              '${_weekdaysEn.join('|')}|${_weekdaysDe.join('|')})'
+              '(?:\\s+(?:morning|afternoon|evening|night|früh|vormittag|nachmittag|'
+              'abend|nacht))?',
+        ]
+        .map(
+          (when) => RegExp(
+            '$_edgeBefore$_leadIns(?:$when)$_edgeAfter',
+            caseSensitive: false,
+            unicode: true,
+          ),
+        )
+        .toList(growable: false);
+
+/// What is left dangling at either end once the date is cut out of a
+/// sentence: "Abgabe ist", "and dinner", "the deadline is on".
+final _danglingStart = RegExp(
+  '^(?:and|und|oder|or|but|aber|also|then|dann|so)\\s+',
+  caseSensitive: false,
+);
+final _danglingEnd = RegExp(
+  '\\s+(?:is|are|will be|ist|sind|wird|wäre|on|at|by|am|um|bis|for|für|'
+  'and|und|or|oder|the|der|die|das|dann|then)\$',
+  caseSensitive: false,
+);
+
+/// A calendar title for the message [text]: what it says with the "when"
+/// taken out, since the event's own date already carries that.
+///
+/// "Zahnarzt am Dienstag um 14:30" is "Zahnarzt". Rules only, so it is the
+/// title when no model is configured and the fallback when one fails; a
+/// message that is nothing *but* a date keeps its own words, because any
+/// title beats an empty one.
+String agendaTitleFor(String text) {
+  final whole = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  var title = whole;
+  for (final when in _whenPatterns) {
+    title = title.replaceAll(when, ' ');
+  }
+  title = title
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'\s+(?=[,.;:!?])'), '');
+  final edges = RegExp(r'^[\s,.;:!?–—-]+|[\s,.;:!?–—-]+$');
+  while (true) {
+    final trimmed = title
+        .replaceAll(edges, '')
+        .replaceFirst(_danglingStart, '')
+        .replaceFirst(_danglingEnd, '');
+    if (trimmed == title) break;
+    title = trimmed;
+  }
+
+  // Too little survived to name anything — "Morgen um 9?" is all date.
+  if (RegExp(r'\p{L}', unicode: true).allMatches(title).length < 3) {
+    title = whole;
+  } else {
+    title = title[0].toUpperCase() + title.substring(1);
+  }
+  if (title.length > 80) title = '${title.substring(0, 77)}…';
+  return title;
 }

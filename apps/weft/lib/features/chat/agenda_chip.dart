@@ -29,6 +29,10 @@ class AgendaChip extends ConsumerStatefulWidget {
 class _AgendaChipState extends ConsumerState<AgendaChip> {
   AgendaCandidate? _candidate;
 
+  /// True while the title is being fetched and the calendar opened — the
+  /// model can take seconds, and a chip that looks idle gets tapped twice.
+  bool _adding = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,8 +57,11 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
 
   Future<void> _add() async {
     final candidate = _candidate!;
+    final title = await ref
+        .read(agendaServiceProvider)
+        .titleFor(widget.message, candidate);
     await addToDeviceCalendar(
-      title: candidate.title,
+      title: title,
       start: candidate.start,
       allDay: !candidate.hasTime,
     );
@@ -78,11 +85,16 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         child: ActionChip(
-          avatar: Icon(
-            Icons.event_rounded,
-            size: 16,
-            color: context.colors.primary,
-          ),
+          avatar: _adding
+              ? const SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  Icons.event_rounded,
+                  size: 16,
+                  color: context.colors.primary,
+                ),
           label: Text(context.l10n.chatAgendaAddToCalendar(_when)),
           labelStyle: context.text.labelSmall,
           materialTapTargetSize: MaterialTapTargetSize.padded,
@@ -93,12 +105,16 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
   }
 
   Future<void> _run() async {
+    if (_adding) return;
+    setState(() => _adding = true);
     try {
       await _add();
     } on Exception catch (e) {
       if (mounted) {
         showWeftMessage(context, context.l10n.chatAgendaCalendarFailed('$e'));
       }
+    } finally {
+      if (mounted) setState(() => _adding = false);
     }
   }
 }
