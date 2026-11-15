@@ -1247,6 +1247,8 @@
   "integrationsCalendarRead": "{count, plural, other{已读取日历：{count} 个日程。}}",
   "integrationsCalendarFailed": "无法读取日历——请检查地址。",
   "integrationsCalendarInvalid": "这不是网址——应以 https:// 或 webcal:// 开头。",
+  "integrationsCalendarAdd": "添加其他日历",
+  "integrationsCalendarRemove": "移除此日历",
   "chatInviteBusyAllDay": "全天",
   "chatInviteFreeAllDay": "你的日历当天全天空闲",
   "chatInviteBusyHeader": "忙碌：{spans}",

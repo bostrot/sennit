@@ -73,9 +73,12 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
   /// Shown in full rather than as a "keep the current one" blank like the
   /// tokens: an address is something people paste, check and correct, and
   /// clearing it is how the calendar is removed.
-  late final _calendarUrl = TextEditingController(
-    text: ref.read(storesProvider).calendarIcsUrl ?? '',
-  );
+  ///
+  /// One field per calendar, and always at least one to paste into.
+  late final List<TextEditingController> _calendarUrls = [
+    for (final line in _storedCalendarLines())
+      TextEditingController(text: line),
+  ];
   late bool _calendarForAi = _settings.getBool(
     WeftSettings.calendarForAi,
     fallback: true,
@@ -83,9 +86,22 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
 
   String? _haStatus;
   String? _paperlessStatus;
-  String? _calendarStatus;
-  bool _calendarOk = false;
+
+  /// The last test's verdict on each calendar field, by its controller — a
+  /// field added or removed since must not inherit its neighbour's.
+  final Map<TextEditingController, ({String text, bool ok})> _calendarStatus =
+      {};
   bool _busy = false;
+
+  List<String> _storedCalendarLines() {
+    final lines = [
+      for (final line in (ref.read(storesProvider).calendarIcsUrl ?? '').split(
+        '\n',
+      ))
+        if (line.trim().isNotEmpty) line.trim(),
+    ];
+    return lines.isEmpty ? [''] : lines;
+  }
 
   @override
   void dispose() {
@@ -94,7 +110,7 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
       _haToken,
       _paperlessUrl,
       _paperlessToken,
-      _calendarUrl,
+      ..._calendarUrls,
     ]) {
       controller.dispose();
     }
@@ -111,9 +127,16 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
     if (_paperlessToken.text.isNotEmpty) {
       await stores.setPaperlessToken(_paperlessToken.text.trim());
     }
-    final calendarUrl = _calendarUrl.text.trim();
-    if (calendarUrl != (stores.calendarIcsUrl ?? '')) {
-      await stores.setCalendarIcsUrl(calendarUrl.isEmpty ? null : calendarUrl);
+    // As typed, one per line, so an address that is not one yet is still
+    // there to be corrected; only the fetchable ones are ever asked.
+    final calendarUrls = [
+      for (final field in _calendarUrls)
+        if (field.text.trim().isNotEmpty) field.text.trim(),
+    ].join('\n');
+    if (calendarUrls != (stores.calendarIcsUrl ?? '')) {
+      await stores.setCalendarIcsUrl(
+        calendarUrls.isEmpty ? null : calendarUrls,
+      );
     }
     _settings.setBool(WeftSettings.calendarForAi, value: _calendarForAi);
     ref.read(settingsRevisionProvider.notifier).bump();
@@ -125,35 +148,49 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
       _busy = true;
       _haStatus = null;
       _paperlessStatus = null;
-      _calendarStatus = null;
+      _calendarStatus.clear();
     });
     await _save();
 
     final ha = ref.read(homeAssistantProvider);
     final paperless = ref.read(paperlessProvider);
-    final calendar = ref.read(icsCalendarProvider);
+    final shared = ref.read(icsCalendarProvider);
     final haOk = ha == null ? null : await ha.probe();
     final paperlessOk = paperless == null ? null : await paperless.probe();
-    int? calendarEvents;
-    if (calendar != null) {
-      try {
-        calendarEvents = (await calendar.load(force: true)).length;
-      } on IcsFetchException catch (error) {
-        debugPrint('weft: calendar test failed: $error');
-      }
-    }
+
+    // Each address on its own, through the very calendars the app will ask —
+    // so the copy this test fetched is the one the next reply is written
+    // from, and a dead link is named rather than failing all of them.
+    final calendars = {
+      if (shared is IcsCalendarGroup)
+        for (final calendar in shared.calendars) calendar.url: calendar,
+    };
+    final events = <TextEditingController, int?>{};
+    await Future.wait([
+      for (final field in _calendarUrls)
+        if (calendars[icsUriFrom(field.text)] case final calendar?)
+          () async {
+            try {
+              events[field] = (await calendar.load(force: true)).length;
+            } on IcsFetchException catch (error) {
+              debugPrint('weft: calendar test failed: $error');
+              events[field] = null;
+            }
+          }(),
+    ]);
     if (!mounted) return;
     final l10n = context.l10n;
     setState(() {
       _busy = false;
-      _calendarOk = calendarEvents != null;
-      _calendarStatus = calendar == null
-          ? (_calendarUrl.text.trim().isEmpty
-                ? null
-                : l10n.integrationsCalendarInvalid)
-          : calendarEvents == null
-          ? l10n.integrationsCalendarFailed
-          : l10n.integrationsCalendarRead(calendarEvents);
+      for (final field in _calendarUrls) {
+        if (field.text.trim().isEmpty) continue;
+        final count = events[field];
+        _calendarStatus[field] = !events.containsKey(field)
+            ? (text: l10n.integrationsCalendarInvalid, ok: false)
+            : count == null
+            ? (text: l10n.integrationsCalendarFailed, ok: false)
+            : (text: l10n.integrationsCalendarRead(count), ok: true);
+      }
       _haStatus = switch (haOk) {
         null => 'Not configured.',
         true => 'Connected.',
@@ -224,13 +261,28 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
               title: context.l10n.integrationsCalendarTitle,
               subtitle: context.l10n.integrationsCalendarSubtitle,
             ),
-            _field(
-              _calendarUrl,
-              context.l10n.integrationsCalendarUrlField,
-              hint: 'webcal://calendar.example/basic.ics',
+            for (final field in _calendarUrls) ...[
+              _field(
+                field,
+                context.l10n.integrationsCalendarUrlField,
+                hint: 'webcal://calendar.example/basic.ics',
+                // The last field stays: clearing it is how the last calendar
+                // is removed, and there must be somewhere to paste the next.
+                onRemove: _calendarUrls.length > 1
+                    ? () => _removeCalendar(field)
+                    : null,
+              ),
+              if (_calendarStatus[field] case final status?)
+                _status(status.text, ok: status.ok),
+            ],
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: _busy ? null : _addCalendar,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(context.l10n.integrationsCalendarAdd),
+              ),
             ),
-            if (_calendarStatus != null)
-              _status(_calendarStatus!, ok: _calendarOk),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _calendarForAi,
@@ -272,11 +324,25 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
     ),
   );
 
+  void _addCalendar() =>
+      setState(() => _calendarUrls.add(TextEditingController()));
+
+  void _removeCalendar(TextEditingController field) {
+    setState(() {
+      _calendarUrls.remove(field);
+      _calendarStatus.remove(field);
+    });
+    // After the frame that stops showing it — a controller disposed while its
+    // field is still mounted throws.
+    WidgetsBinding.instance.addPostFrameCallback((_) => field.dispose());
+  }
+
   Widget _field(
     TextEditingController controller,
     String label, {
     String? hint,
     bool secret = false,
+    VoidCallback? onRemove,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: WeftSpace.md),
@@ -285,7 +351,17 @@ class _IntegrationsScreenState extends ConsumerState<IntegrationsScreen> {
         obscureText: secret,
         autocorrect: false,
         keyboardType: TextInputType.url,
-        decoration: InputDecoration(labelText: label, hintText: hint),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          suffixIcon: onRemove == null
+              ? null
+              : IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: context.l10n.integrationsCalendarRemove,
+                ),
+        ),
       ),
     );
   }

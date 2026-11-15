@@ -7224,7 +7224,7 @@
       }
     }
   },
-  "integrationsCalendarTitle": "Shared calendar",
+  "integrationsCalendarTitle": "Shared calendars",
   "@integrationsCalendarTitle": {
     "description": "Heading of the integrations section where the user adds a calendar subscription address (ICS/webcal)."
   },
@@ -7266,6 +7266,14 @@
   "integrationsCalendarInvalid": "That is not a web address — it should start with https:// or webcal://.",
   "@integrationsCalendarInvalid": {
     "description": "Status line when the text in the calendar field cannot be a calendar URL. 'https://' and 'webcal://' stay as they are."
+  },
+  "integrationsCalendarAdd": "Add another calendar",
+  "@integrationsCalendarAdd": {
+    "description": "Button under the calendar address fields that adds an empty field for one more calendar subscription. Keep under ~30 chars."
+  },
+  "integrationsCalendarRemove": "Remove this calendar",
+  "@integrationsCalendarRemove": {
+    "description": "Tooltip and screen-reader label of the small X button inside a calendar address field, which removes that calendar from the list."
   },
   "chatInviteBusyAllDay": "all day",
   "@chatInviteBusyAllDay": {

@@ -48,8 +48,9 @@ class WeftStores {
   String? paperlessToken;
   String? llmApiKey;
 
-  /// The shared calendar's address. Held with the secrets because a private
-  /// ICS address carries its access token in the URL.
+  /// The shared calendars' addresses, one per line — see `icsUrisFrom`. Held
+  /// with the secrets because a private ICS address carries its access token
+  /// in the URL.
   String? calendarIcsUrl;
 
   /// Test construction: everything in memory, no platform channels.

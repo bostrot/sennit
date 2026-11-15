@@ -85,9 +85,9 @@ class SecretStore {
   static const String llmApiKey = 'llm_api_key';
   static const String paperlessToken = 'paperless_token';
 
-  /// A shared calendar's ICS address. A secret because a private address is
-  /// one: Google's, iCloud's and Nextcloud's carry the token that grants read
-  /// access in the URL itself.
+  /// The shared calendars' ICS addresses, one per line. A secret because a
+  /// private address is one: Google's, iCloud's and Nextcloud's carry the
+  /// token that grants read access in the URL itself.
   static const String calendarIcsUrl = 'calendar_ics_url';
 
   Future<String?> read(String key) => _storage.read(key: key);

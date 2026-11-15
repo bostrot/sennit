@@ -6,18 +6,21 @@ import '../services/billing/entitlements.dart';
 import 'billing_providers.dart';
 import 'stores.dart';
 
-/// The shared calendar the user added on the integrations screen, or null.
+/// The shared calendars the user added on the integrations screen, answering
+/// as one, or null when there are none.
 ///
-/// Rebuilt when settings are saved, which drops the copy held in memory — a
+/// Rebuilt when settings are saved, which drops the copies held in memory — a
 /// changed address must not keep answering from the old calendar.
-final icsCalendarProvider = Provider<IcsCalendar?>((ref) {
+final icsCalendarProvider = Provider<SharedCalendar?>((ref) {
   ref.watch(settingsRevisionProvider);
   if (!proUnlocked(ref, ProFeature.integrations)) return null;
-  final uri = icsUriFrom(storesOrNull(ref)?.calendarIcsUrl);
-  if (uri == null) return null;
-  final calendar = IcsCalendar(url: uri);
-  ref.onDispose(calendar.dispose);
-  return calendar;
+  final uris = icsUrisFrom(storesOrNull(ref)?.calendarIcsUrl);
+  if (uris.isEmpty) return null;
+  final calendars = IcsCalendarGroup([
+    for (final uri in uris) IcsCalendar(url: uri),
+  ]);
+  ref.onDispose(calendars.dispose);
+  return calendars;
 });
 
 /// The calendar section for an AI prompt about [transcript], or null.

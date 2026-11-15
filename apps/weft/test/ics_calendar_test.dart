@@ -427,6 +427,89 @@ void main() {
     });
   });
 
+  group('icsUrisFrom', () {
+    test('one address per line, the unusable and the repeated left out', () {
+      expect(
+        icsUrisFrom(
+          'webcal://cal.example/work.ics\n'
+          'not a url\n'
+          '\n'
+          ' https://cal.example/home.ics \n'
+          'https://cal.example/work.ics',
+        ),
+        [
+          Uri.parse('https://cal.example/work.ics'),
+          Uri.parse('https://cal.example/home.ics'),
+        ],
+      );
+    });
+
+    test('a single stored address still reads as one calendar', () {
+      expect(icsUrisFrom('https://cal.example/a.ics'), hasLength(1));
+      expect(icsUrisFrom(''), isEmpty);
+      expect(icsUrisFrom(null), isEmpty);
+    });
+  });
+
+  group('IcsCalendarGroup', () {
+    final work = calendar(
+      event('UID:a\r\nDTSTART:20261020T090000\r\nDTEND:20261020T100000\r\n'),
+    );
+    // The same UID as the work calendar's event, on purpose.
+    final home = calendar(
+      '${event('UID:a\r\nDTSTART:20261020T093000\r\nDTEND:20261020T110000\r\n')}'
+      '${event('UID:b\r\nDTSTART:20261021T180000\r\nDTEND:20261021T190000\r\n')}',
+    );
+
+    IcsCalendar cal(String name, http.Client client) => IcsCalendar(
+      url: Uri.parse('https://cal.example/$name.ics'),
+      client: client,
+    );
+    http.Client serving(String feed) =>
+        MockClient((_) async => http.Response(feed, 200));
+
+    test('busy in any calendar is busy, merged across them', () async {
+      final group = IcsCalendarGroup([
+        cal('work', serving(work)),
+        cal('home', serving(home)),
+      ]);
+
+      expect((await group.load()).length, 3);
+      expect(
+        await group.busyBetween(DateTime(2026, 10, 20), DateTime(2026, 10, 22)),
+        [
+          BusyBlock(
+            start: DateTime(2026, 10, 20, 9),
+            end: DateTime(2026, 10, 20, 11),
+          ),
+          BusyBlock(
+            start: DateTime(2026, 10, 21, 18),
+            end: DateTime(2026, 10, 21, 19),
+          ),
+        ],
+      );
+    });
+
+    test('one unreadable calendar fails the answer, not half of it', () async {
+      final group = IcsCalendarGroup([
+        cal('work', serving(work)),
+        cal('home', MockClient((_) async => http.Response('gone', 404))),
+      ]);
+
+      await expectLater(group.load(), throwsA(isA<IcsFetchException>()));
+      // …and so the AI is told nothing rather than "free at all other times".
+      expect(
+        await calendarContextFor(
+          calendar: group,
+          enabled: true,
+          transcript: const ['Grace: are you free on Tuesday?'],
+          clock: () => DateTime(2026, 10, 17, 12),
+        ),
+        isNull,
+      );
+    });
+  });
+
   group('IcsCalendar', () {
     final feed = calendar(
       event('UID:a\r\nDTSTART:20261020T090000Z\r\nDTEND:20261020T100000Z\r\n'),

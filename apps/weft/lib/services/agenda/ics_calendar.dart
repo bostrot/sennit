@@ -64,14 +64,73 @@ Uri? icsUriFrom(String? raw) {
   };
 }
 
+/// Every fetchable address in [raw], which holds one per line.
+///
+/// What the settings screen stores: a line that is not an address is skipped
+/// rather than refused, so a typo in the second calendar does not take the
+/// first one away, and an address pasted twice is fetched once.
+List<Uri> icsUrisFrom(String? raw) {
+  final uris = <Uri>[];
+  for (final line in (raw ?? '').split('\n')) {
+    final uri = icsUriFrom(line);
+    if (uri != null && !uris.contains(uri)) uris.add(uri);
+  }
+  return uris;
+}
+
+/// The user's shared calendars as the rest of the app asks about them: one
+/// answer about when they are busy, however many addresses are behind it.
+abstract interface class SharedCalendar {
+  /// The events, fetched when the copy in memory is missing or old. Throws
+  /// [IcsFetchException] when they cannot be had.
+  Future<IcsEventSet> load({bool force = false});
+
+  /// Busy blocks overlapping [from]…[to], merged where they touch.
+  Future<List<BusyBlock>> busyBetween(DateTime from, DateTime to);
+
+  void dispose();
+}
+
+/// Several calendars answering as one — work and private, say.
+///
+/// All of them or none: a calendar that cannot be read fails the whole
+/// answer, because "free at every other time" said from half the picture is
+/// a promise nobody made. Each calendar still falls back to its own last good
+/// copy first, so it takes one that has never been read to get there, and the
+/// settings screen's test says which one that is.
+class IcsCalendarGroup implements SharedCalendar {
+  IcsCalendarGroup(Iterable<IcsCalendar> calendars)
+    : calendars = List.unmodifiable(calendars);
+
+  final List<IcsCalendar> calendars;
+
+  @override
+  Future<IcsEventSet> load({bool force = false}) async => IcsEventSet.merged(
+    await Future.wait([
+      for (final calendar in calendars) calendar.load(force: force),
+    ]),
+  );
+
+  @override
+  Future<List<BusyBlock>> busyBetween(DateTime from, DateTime to) async =>
+      mergeBusy((await load()).busyBetween(from, to));
+
+  @override
+  void dispose() {
+    for (final calendar in calendars) {
+      calendar.dispose();
+    }
+  }
+}
+
 /// A shared calendar, fetched from its ICS address and held for a while.
 ///
-/// Read-only, and only ever the one URL the user typed: Sennit never writes to
+/// Read-only, and only ever the URL the user typed: Sennit never writes to
 /// this calendar and never asks anything else about it. Fetched on demand
 /// rather than polled, because the questions arrive rarely — an auto-reply
 /// about meeting up, an invitation being composed — and a calendar refreshed
 /// every few minutes for nobody is traffic on someone's phone plan.
-class IcsCalendar {
+class IcsCalendar implements SharedCalendar {
   IcsCalendar({
     required this.url,
     http.Client? client,
@@ -102,6 +161,7 @@ class IcsCalendar {
   /// A failed refresh answers from the last good copy when there is one: a
   /// server that hiccups should not make the user look free all afternoon.
   /// Without one, the failure is thrown — see [IcsFetchException].
+  @override
   Future<IcsEventSet> load({bool force = false}) {
     final fetchedAt = _fetchedAt;
     if (!force &&
@@ -141,10 +201,11 @@ class IcsCalendar {
     }
   }
 
-  /// Busy blocks overlapping [from]…[to], merged where they touch.
+  @override
   Future<List<BusyBlock>> busyBetween(DateTime from, DateTime to) async =>
       mergeBusy((await load()).busyBetween(from, to));
 
+  @override
   void dispose() {
     if (_ownsClient) _client.close();
   }
@@ -192,9 +253,19 @@ List<BusyBlock> mergeBusy(Iterable<BusyBlock> blocks) {
 /// window asks for, so a calendar with a daily stand-up since 2019 costs the
 /// same to hold as one without.
 class IcsEventSet {
-  IcsEventSet._(this._events, this._overridden);
+  IcsEventSet._(this._events, this._overridden) : _parts = const [];
+
+  /// Several calendars' events as one set. Kept side by side rather than
+  /// poured together: two calendars may use the same UID for different
+  /// things, and one's overrides must not cut instances out of the other's
+  /// series.
+  IcsEventSet.merged(Iterable<IcsEventSet> sets)
+    : _events = const [],
+      _overridden = const {},
+      _parts = List.unmodifiable(sets);
 
   final List<_IcsEvent> _events;
+  final List<IcsEventSet> _parts;
 
   /// Recurrence instances replaced by an event of their own, by UID, as local
   /// epoch milliseconds of the instance they replace.
@@ -202,7 +273,8 @@ class IcsEventSet {
 
   /// How many events the calendar holds — recurring ones counted once. For
   /// the settings screen's "found N events".
-  int get length => _events.length;
+  int get length =>
+      _parts.fold(_events.length, (sum, part) => sum + part.length);
 
   /// Every block overlapping [from]…[to], unmerged and unsorted.
   List<BusyBlock> busyBetween(DateTime from, DateTime to) {
@@ -216,6 +288,9 @@ class IcsEventSet {
             : const {},
         into: out,
       );
+    }
+    for (final part in _parts) {
+      out.addAll(part.busyBetween(from, to));
     }
     return out;
   }
@@ -902,7 +977,7 @@ final _schedulingCjk = RegExp(
 /// cannot be read — every AI feature must still answer without it, and none
 /// of them may wait on a slow calendar server for long.
 Future<String?> calendarContextFor({
-  required IcsCalendar? calendar,
+  required SharedCalendar? calendar,
   required bool enabled,
   required List<String> transcript,
   DateTime Function()? clock,
