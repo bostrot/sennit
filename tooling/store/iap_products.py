@@ -141,13 +141,18 @@ def play_token():
 
 def play(apply):
     token = play_token()
-    existing = call('GET', f'{PLAY}/onetimeproducts/{PRODUCT_ID}', token)
+    # The API is inconsistent: only PATCH lives at `onetimeproducts`; GET and
+    # the purchase-option calls are at `oneTimeProducts` and 404 otherwise.
+    existing = call('GET', f'{PLAY}/oneTimeProducts/{PRODUCT_ID}', token)
     if existing is not None:
         options = [
             (o.get('purchaseOptionId'), o.get('state'))
             for o in existing.get('purchaseOptions', [])
         ]
         print(f'play: {PRODUCT_ID} exists, purchase options {options}')
+        inactive = [i for i, state in options if state != 'ACTIVE']
+        if inactive and apply:
+            play_activate(token, inactive)
         return
 
     units, cents = PRICE_EUR.split('.')
@@ -192,13 +197,17 @@ def play(apply):
     })
     call('PATCH', f'{PLAY}/onetimeproducts/{PRODUCT_ID}?{query}', token, body=product)
     print(f'play: created {PRODUCT_ID}')
-    call('POST', f'{PLAY}/onetimeproducts/{PRODUCT_ID}/purchaseOptions:batchUpdateStates',
+    play_activate(token, ['lifetime'])
+
+
+def play_activate(token, option_ids):
+    call('POST', f'{PLAY}/oneTimeProducts/{PRODUCT_ID}/purchaseOptions:batchUpdateStates',
          token, body={'requests': [{'activatePurchaseOptionRequest': {
              'packageName': PACKAGE,
              'productId': PRODUCT_ID,
-             'purchaseOptionId': 'lifetime',
-         }}]})
-    print('play: activated the purchase option')
+             'purchaseOptionId': option_id,
+         }} for option_id in option_ids]})
+    print(f'play: activated purchase options {option_ids}')
 
 
 # --- App Store Connect ------------------------------------------------------
