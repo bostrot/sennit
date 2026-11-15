@@ -534,6 +534,21 @@
     "description": "Tooltip in the selection toolbar: marks the selected conversations as unread. Keep under ~16 chars.",
     "maxLength": 32
   },
+  "inboxMenuPeek": "Peek",
+  "@inboxMenuPeek": {
+    "description": "Item in a conversation's right-click menu: opens the conversation in a preview that does not mark it read. Keep under ~16 chars.",
+    "maxLength": 32
+  },
+  "inboxMenuSelectChat": "Select",
+  "@inboxMenuSelectChat": {
+    "description": "Item in a conversation's right-click menu: starts selecting conversations, with this one picked. Keep under ~16 chars.",
+    "maxLength": 32
+  },
+  "inboxMenuLabels": "Labels…",
+  "@inboxMenuLabels": {
+    "description": "Item in a conversation's right-click menu: opens the sheet for adding or removing the conversation's labels. The ellipsis says a sheet follows. Keep under ~16 chars.",
+    "maxLength": 32
+  },
   "commonMute": "Mute",
   "@commonMute": {
     "description": "Tooltip on the button that silences a conversation's notifications. Keep under ~12 chars.",
@@ -954,6 +969,10 @@
   "attachSourceCalendar": "Calendar entry",
   "@attachSourceCalendar": {
     "description": "Row in the attach sheet that proposes a meeting time to the conversation. Keep under ~22 chars."
+  },
+  "attachSourceSendLater": "Send later",
+  "@attachSourceSendLater": {
+    "description": "Row in the attach sheet that schedules the message typed in the composer for a later time. Keep under ~22 chars."
   },
   "attachSourcePaperless": "Paperless document",
   "@attachSourcePaperless": {
@@ -2096,9 +2115,9 @@
       }
     }
   },
-  "chatWriteBeforeSchedule": "Write the message first, then hold Send to schedule it.",
+  "chatWriteBeforeSchedule": "Write the message first, then choose Send later.",
   "@chatWriteBeforeSchedule": {
-    "description": "Toast shown when Send is held with an empty composer. 'Send' names the button. Says what to do rather than what went wrong."
+    "description": "Toast shown when 'Send later' is chosen with an empty composer. 'Send later' names the row in the attach menu and must match attachSourceSendLater. Says what to do rather than what went wrong."
   },
   "chatTimeAlreadyPast": "That time is already past.",
   "@chatTimeAlreadyPast": {
@@ -2379,10 +2398,6 @@
   "@chatSaveEdit": {
     "description": "Tooltip on the send button while a message is being edited: commits the new text rather than sending anything new. Keep under ~18 chars.",
     "maxLength": 36
-  },
-  "chatSendHoldToSchedule": "Send — hold to schedule",
-  "@chatSendHoldToSchedule": {
-    "description": "Tooltip on the send button, naming the hidden long-press that schedules the message for later. Hover shows it; touch does not."
   },
   "chatEditingYourMessage": "Editing your message",
   "@chatEditingYourMessage": {

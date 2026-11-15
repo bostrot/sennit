@@ -112,6 +112,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       _handleFingerprints[handle.id] = handleFingerprint(_asPersisted(handle));
     }
     _sendNetworks.addAll(_store?.loadSendNetworks() ?? const {});
+    final accepted = _settings?.getJson(
+      WeftSettings.acceptedRequests,
+    )?['rooms'];
+    if (accepted is List) {
+      _acceptedRequests.addAll(accepted.whereType<String>());
+    }
     _resolveMediaSupport();
     _rebuild();
     _syncSub = _session.client.onSync.stream.listen((_) => _scheduleRebuild());
@@ -165,6 +171,16 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   final _chatsController = StreamController<List<Chat>>.broadcast();
   List<Chat> _chats = const [];
+
+  /// [_chats] by conversation id and by room id.
+  ///
+  /// Nearly every question asked of this class starts with "which chat is
+  /// this", and it is asked per visible row and per bubble: who is typing, is
+  /// the peer online, who has read what. Answered by scanning the inbox, each
+  /// of those cost the length of the inbox — a few thousand comparisons, a few
+  /// dozen times a frame. Rebuilt with the list, in [_rebuild].
+  Map<String, Chat> _chatById = const {};
+  Map<String, Chat> _chatByRoomId = const {};
 
   /// Coalesces the initial-sync storm: sync can tick many times a second
   /// while a large account catches up, and every tick used to rebuild every
@@ -367,18 +383,17 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   @override
-  Chat? chatForRoom(String roomId) =>
-      _chats.where((c) => c.roomIds.contains(roomId)).firstOrNull;
+  Chat? chatForRoom(String roomId) => _chatByRoomId[roomId];
 
   @override
   Future<MergedTimeline> timelineFor(String chatId) async {
     final existing = _timelines[chatId];
     if (existing != null) return existing;
 
-    final chat = _chats.firstWhere(
-      (c) => c.id == chatId,
-      orElse: () => throw ArgumentError.value(chatId, 'chatId', 'Unknown chat'),
-    );
+    final chat = _chatById[chatId];
+    if (chat == null) {
+      throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
+    }
 
     // Opened concurrently: a merged chat spans several rooms, and opening them
     // one after another would make a three-network conversation three times
@@ -465,7 +480,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     String body, {
     ChatNetwork? via,
   }) async {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) {
       throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
     }
@@ -745,7 +760,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   @override
   List<String> typingIn(String chatId) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return const [];
     final names = <String>[];
     for (final source in chat.sources) {
@@ -770,7 +785,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // signal than a read receipt — it says a person is at the keyboard, right
     // now, because of your message — and a user drafting a reply to a stranger
     // and thinking better of it would have told them everything.
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat?.isPendingRequest ?? false) return;
 
     final source = _sendSource(chatId);
@@ -782,7 +797,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   @override
   ({bool online, DateTime? lastActiveAt})? presenceFor(String chatId) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null || chat.isGroup) return null;
     bool online = false;
     DateTime? lastActive;
@@ -812,7 +827,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   @override
   List<({String roomId, String userId, String eventId, DateTime at})>
   peerReadUpTo(String chatId) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return const [];
 
     final bots = <String>{};
@@ -849,7 +864,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   List<({String roomId, String eventId, DateTime at})> ownReadUpTo(
     String chatId,
   ) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return const [];
 
     final markers = <({String roomId, String eventId, DateTime at})>[];
@@ -1050,7 +1065,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     String chatId,
     ChatRequestAction action,
   ) async {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     final current = chat?.request;
     if (chat == null || !isPendingRequest(current)) return current;
 
@@ -1061,6 +1076,9 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // reads as the tap having done nothing.
     for (final source in chat.sources) {
       _answeredRequests[source.roomId] = next;
+    }
+    if (next == ChatRequestState.accepted) {
+      _rememberAccepted([for (final source in chat.sources) source.roomId]);
     }
     _rebuild();
 
@@ -1084,8 +1102,27 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
           });
         }
       }
-      if (plan.join) {
+      // Only an invitation is joined. A bridged stranger's room already is,
+      // and asking again is a round trip that can only fail.
+      if (plan.join && room.membership != sdk.Membership.join) {
         await room.join();
+      }
+      if (next == ChatRequestState.accepted) {
+        // And where the account's other devices can see it. Best effort: this
+        // device already has its own record, and a homeserver that refuses a
+        // custom account-data type must not turn Accept into an error.
+        final userId = _client.userID;
+        if (userId != null) {
+          await _client
+              .setAccountDataPerRoom(userId, room.id, kRequestAcceptedType, {
+                'accepted': true,
+              })
+              .catchError((Object error) {
+                debugPrint(
+                  'weft: could not record ${room.id} accepted: $error',
+                );
+              });
+        }
       }
       if (plan.leave) {
         await room.leave();
@@ -1191,10 +1228,10 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// leg resolves to a thread in the system provider and has no homeserver to
   /// look it up on.
   ChatSource _sendSource(String chatId, {ChatNetwork? via}) {
-    final chat = _chats.firstWhere(
-      (c) => c.id == chatId,
-      orElse: () => throw ArgumentError.value(chatId, 'chatId', 'Unknown chat'),
-    );
+    final chat = _chatById[chatId];
+    if (chat == null) {
+      throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
+    }
     return sendSourceFor(chat, via: via);
   }
 
@@ -1311,7 +1348,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   Iterable<sdk.Room> _roomsOf(String chatId) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return const [];
     return chat.roomIds.map(_client.getRoomById).whereType<sdk.Room>();
   }
@@ -1576,7 +1613,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// which rooms a chat id covers, and a share in flight across that change
   /// should follow the chat the user is looking at.
   List<UploadTask> _uploadsForChat(String chatId, List<UploadTask> tasks) {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     // An unmerged chat's id *is* its room id, which is what keeps this working
     // for a chat the inbox has not rebuilt yet.
     final rooms = chat?.roomIds ?? [chatId];
@@ -1619,7 +1656,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // their conversation even when the caller did not pass one.
     final title = chatTitle.isNotEmpty
         ? chatTitle
-        : _chats.where((c) => c.id == chatId).firstOrNull?.title ?? '';
+        : _chatById[chatId]?.title ?? '';
     // Redacted events carry no text and must not linger in the index.
     for (final m in messages.where((m) => m.redacted)) {
       store.removeMessage(eventId: m.eventId, roomId: m.roomId);
@@ -1673,7 +1710,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   @override
   Future<void> markUnread(String chatId) async {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return;
     for (final source in chat.sources) {
       if (source.network == ChatNetwork.sms) continue;
@@ -1692,7 +1729,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   @override
   Future<void> markRead(String chatId) async {
-    final chat = _chats.where((c) => c.id == chatId).firstOrNull;
+    final chat = _chatById[chatId];
     if (chat == null) return;
 
     // A request the user has not answered stays unread on the wire, however
@@ -1853,9 +1890,36 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       byRoom[chat.id] = chat;
     }
 
-    _chats = _applyMerges(byRoom);
+    // A conversation nothing happened to keeps the object it had. The list is
+    // still a new list — it is the heartbeat every open screen listens for —
+    // but a consumer comparing two inboxes then gets to say "same row" by
+    // identity for all but the handful that moved, instead of comparing
+    // fifteen fields for each of a few thousand.
+    final previous = _chatById;
+    final chats = <Chat>[];
+    final byId = <String, Chat>{};
+    final byRoomId = <String, Chat>{};
+    for (final built in _applyMerges(byRoom)) {
+      final before = previous[built.id];
+      final chat = before != null && before.sameContentAs(built)
+          ? before
+          : built;
+      chats.add(chat);
+      byId[chat.id] = chat;
+      for (final source in chat.sources) {
+        byRoomId.putIfAbsent(source.roomId, () => chat);
+      }
+    }
+    _chats = chats;
+    _chatById = byId;
+    _chatByRoomId = byRoomId;
     if (!_chatsController.isClosed) _chatsController.add(_chats);
   }
+
+  /// Runs one rebuild now, for a benchmark or a test that cannot wait out the
+  /// debounce.
+  @visibleForTesting
+  void debugRebuild() => _rebuild();
 
   /// The peer's human name, resolved the same way for titles and handles.
   ///
@@ -1974,7 +2038,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         // persisted, rather than left for the scorer to re-derive each pass —
         // and `normalizePhone` returns null for anything implausible, so a
         // Signal account id or a Discord snowflake simply doesn't set it.
-        phoneE164: normalizePhone(_remoteIdFor(peerId, network)),
+        phoneE164: _phoneOf(peerId, network),
       );
       _graph.upsertHandle(handle);
       // Written to SQLite only when something actually changed: the graph
@@ -2007,12 +2071,50 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// this, and reports whether it wrote.
   bool _persistHandle(NetworkHandle handle) {
     final persisted = _asPersisted(handle);
+    // The handle this run last compared, field for field, before any string
+    // is built: the fingerprint below is a JSON encoding of ten values, and
+    // on a rebuild where nothing moved it was encoded for every conversation
+    // only to equal the one already held. The fingerprint stays the
+    // authority on what the database says — this only spares asking it a
+    // question whose answer cannot have changed.
+    final last = _lastPersisted[handle.id];
+    if (last != null && _sameRow(last, persisted)) return false;
+    _lastPersisted[handle.id] = persisted;
+
     final fingerprint = handleFingerprint(persisted);
     if (_handleFingerprints[handle.id] == fingerprint) return false;
     _handleFingerprints[handle.id] = fingerprint;
     _store?.upsertHandle(persisted);
     return true;
   }
+
+  final Map<String, NetworkHandle> _lastPersisted = {};
+
+  /// Whether two handles would be stored as the same row — the fields
+  /// [handleFingerprint] covers, compared directly.
+  static bool _sameRow(NetworkHandle a, NetworkHandle b) =>
+      a.network == b.network &&
+      a.remoteId == b.remoteId &&
+      a.matrixUserId == b.matrixUserId &&
+      a.roomId == b.roomId &&
+      a.displayName == b.displayName &&
+      a.avatarUrl == b.avatarUrl &&
+      a.phoneE164 == b.phoneE164 &&
+      a.email == b.email &&
+      a.avatarDHash == b.avatarDHash &&
+      a.unifiedContactId == b.unifiedContactId;
+
+  /// The phone number a ghost's localpart carries, if it carries one.
+  ///
+  /// A pure function of the user id and the network, so it is worked out once
+  /// per peer rather than once per peer per sync.
+  String? _phoneOf(String peerId, ChatNetwork network) {
+    final key = (peerId, network);
+    if (_phones.containsKey(key)) return _phones[key];
+    return _phones[key] = normalizePhone(_remoteIdFor(peerId, network));
+  }
+
+  final Map<(String, ChatNetwork), String?> _phones = {};
 
   /// Bridge ghosts encode the remote identifier in their localpart.
   static String _remoteIdFor(String matrixUserId, ChatNetwork network) {
@@ -2029,8 +2131,31 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     return underscore >= 0 ? localpart.substring(underscore + 1) : localpart;
   }
 
-  String? _thumbnail(String? mxc) =>
-      mxcToThumbnailUrl(_client, mxc, authenticatedMedia: _authenticatedMedia);
+  String? _thumbnail(String? mxc) {
+    if (mxc == null) return null;
+    // Remembered per mxc URI. Every conversation's picture is turned into a
+    // URL several times on every rebuild — once for the handle, once for the
+    // row, once more for a fetched profile — and each turn parses one `Uri`
+    // and builds another to arrive at the string it arrived at last time.
+    if (_thumbnailsFor != _authenticatedMedia) {
+      _thumbnailsFor = _authenticatedMedia;
+      _thumbnailUrls.clear();
+    }
+    return _thumbnailUrls.putIfAbsent(
+      mxc,
+      () => mxcToThumbnailUrl(
+        _client,
+        mxc,
+        authenticatedMedia: _authenticatedMedia,
+      ),
+    );
+  }
+
+  final Map<String, String?> _thumbnailUrls = {};
+
+  /// Which media endpoint [_thumbnailUrls] was built against; the probe can
+  /// change the answer once, early in a run.
+  bool? _thumbnailsFor;
 
   /// Per-room answers that are expensive to compute and effectively never
   /// change for a given room: which network it belongs to, whether it is a
@@ -2117,9 +2242,17 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// "Anna (Signal)" — which is redundant in a UI that already labels every
   /// chat with its network glyph, and noise in a merged conversation.
   static String _stripNetworkTag(String name) {
+    final known = _untagged[name];
+    if (known != null) return known;
     final stripped = name.replaceFirst(_networkTag, '').trim();
-    return stripped.isEmpty ? name : stripped;
+    final result = stripped.isEmpty ? name : stripped;
+    // The same few thousand names, asked about on every rebuild. Dropped
+    // wholesale when it grows, so a renamed contact cannot leak for ever.
+    if (_untagged.length > 8192) _untagged.clear();
+    return _untagged[name] = result;
   }
+
+  static final Map<String, String> _untagged = {};
 
   /// What the inbox calls this room.
   ///
@@ -2331,11 +2464,11 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   /// Whether this room is a chat request, and what the user has said about it.
   ///
-  /// An answered request is *not* remembered here. Accepting one leaves an
-  /// ordinary joined room and declining leaves the room outright, so the
-  /// membership the next sync reports is already the answer — a second record
-  /// of it would only be something to keep in step, and would resurrect a
-  /// declined request if it ever fell out of step.
+  /// A *declined* request is not remembered: declining leaves the room, so
+  /// the membership the next sync reports is already the answer. An accepted
+  /// *invitation* is the same — it is a joined room. The one answer the room
+  /// cannot carry is accepting a conversation that was never an invitation,
+  /// which is what [_acceptedRequests] and the room's account data are for.
   ///
   /// A room the user is still deciding about is held in [_answeredRequests] for
   /// the seconds between the tap and the membership change arriving. Without it
@@ -2345,6 +2478,18 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     final answered = _answeredRequests[room.id];
     if (answered != null) return answered;
     if (room.membership == sdk.Membership.leave) return null;
+    // Accepted on an earlier run, or on another device. An invitation that
+    // was accepted is a joined room and needs no record; a bridged stranger's
+    // conversation was joined all along, so nothing about the room changes
+    // when the user says yes to it — and until they reply or read it, every
+    // witness [_hasOwnMessage] has says they never have. Without this the
+    // request came back after every restart.
+    if (room.membership != sdk.Membership.invite &&
+        (_acceptedRequests.contains(room.id) ||
+            room.roomAccountData[kRequestAcceptedType]?.content['accepted'] ==
+                true)) {
+      return null;
+    }
 
     final peer = _peerOf(room);
     return isChatRequest(
@@ -2417,6 +2562,19 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// Requests answered this session, held until the membership change lands.
   final Map<String, ChatRequestState> _answeredRequests = {};
 
+  /// Rooms whose request was accepted, on this run or any before it; see
+  /// [WeftSettings.acceptedRequests].
+  final Set<String> _acceptedRequests = {};
+
+  void _rememberAccepted(Iterable<String> roomIds) {
+    final before = _acceptedRequests.length;
+    _acceptedRequests.addAll(roomIds);
+    if (_acceptedRequests.length == before) return;
+    _settings?.setJson(WeftSettings.acceptedRequests, {
+      'rooms': _acceptedRequests.toList()..sort(),
+    });
+  }
+
   /// Folds each merged contact's DM rooms into a single [Chat].
   List<Chat> _applyMerges(Map<String, Chat> byRoom) {
     final out = <Chat>[];
@@ -2470,6 +2628,10 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     return out;
   }
 }
+
+/// Room account data marking a message request as accepted, so the account's
+/// other devices stop offering it too.
+const String kRequestAcceptedType = 'com.bostrot.weft.request_accepted';
 
 /// Everything [IdentityStore.upsertHandle] would put in the row, as one string.
 ///

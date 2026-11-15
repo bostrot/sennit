@@ -51,6 +51,13 @@ enum AttachmentPickSource {
 
   /// A photo taken now. Mobile only — [AttachmentPicker.supports] says so.
   camera,
+
+  /// Not an attachment at all: sends what is typed in the composer at a time
+  /// the user picks. Chat-view handled. It lives in this menu because the
+  /// only other door to it was holding the Send button, and a Send that opens
+  /// a calendar when pressed a moment too long is a Send that cannot be
+  /// trusted.
+  sendLater,
 }
 
 /// Picks files to send, in whatever way the platform actually does that.
@@ -160,6 +167,7 @@ class PlatformAttachmentPicker implements AttachmentPicker {
       AttachmentPickSource.location ||
       AttachmentPickSource.poll ||
       AttachmentPickSource.paperless ||
+      AttachmentPickSource.sendLater ||
       AttachmentPickSource.calendar => throw UnsupportedError(
         'Sent as an event, not picked as a file',
       ),

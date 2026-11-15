@@ -11,11 +11,15 @@ import '../../services/attachments/attachment_picker.dart';
 /// Rows the platform cannot honour are not shown at all — a camera row on a Mac
 /// mini is a button that can only disappoint.
 ///
+/// [anchorContext] is the button it was opened from; on a Mac the menu is a
+/// popover pointing at it.
+///
 /// Returns null when the user dismissed it.
 Future<AttachmentPickSource?> showAttachmentSourceSheet(
   BuildContext context,
   AttachmentPicker picker, {
   bool paperless = false,
+  BuildContext? anchorContext,
 }) {
   final l10n = context.l10n;
   final rows = [
@@ -49,6 +53,11 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
       icon: Icons.event_outlined,
       label: l10n.attachSourceCalendar,
     ),
+    (
+      source: AttachmentPickSource.sendLater,
+      icon: Icons.schedule_send_rounded,
+      label: l10n.attachSourceSendLater,
+    ),
     if (paperless)
       (
         source: AttachmentPickSource.paperless,
@@ -59,6 +68,7 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
 
   return showWeftPanel<AttachmentPickSource>(
     context: context,
+    anchorContext: anchorContext,
     showDragHandle: true,
     builder: (context) => SafeArea(
       // Scrollable now that the list has grown past three rows: on a short
