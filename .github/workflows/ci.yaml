@@ -27,12 +27,59 @@ concurrency:
 # pushes. They only need Flutter, not Xcode. The `android` label picks the
 # Mac runner with room for an SDK; the other one has none.
 
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
 env:
   FLUTTER_VERSION: "3.44.0"
 
+# A pull request from a fork never reaches those machines. The repository is
+# public, a self-hosted runner outlives the job, and a fork's workflow run
+# executes whatever the fork put in the tree — on a machine that also holds
+# the release signing setup. So every self-hosted job below skips a fork's
+# pull request, and `fork-pr` runs the checks that need no particular host on
+# a GitHub-hosted runner, which is free for a public repository and thrown
+# away afterwards. The golden and integration suites run once the change is
+# on a branch of this repository.
+
 jobs:
+  fork-pr:
+    name: Analyze & unit tests (fork)
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-flutter
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - name: Check formatting
+        run: git ls-files '*.dart' -z | xargs -0 dart format --output=none --set-exit-if-changed
+      - name: Generate localisations
+        run: cd apps/weft && flutter gen-l10n
+      - run: flutter analyze
+      - name: Lint the translations
+        run: dart run tooling/scripts/l10n_lint.dart
+      - name: Test the pure-Dart packages
+        run: |
+          set -e
+          for pkg in packages/*/; do
+            if [ -d "$pkg/test" ] && ! grep -q 'sdk: flutter' "$pkg/pubspec.yaml"; then
+              echo "::group::$pkg"
+              (cd "$pkg" && dart test --reporter expanded)
+              echo "::endgroup::"
+            fi
+          done
+
   analyze:
     name: Analyze & format
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +116,8 @@ jobs:
 
   unit:
     name: Unit tests (pure Dart)
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +148,8 @@ jobs:
     name: Widget & golden tests
     # macOS, not ubuntu: the golden files are rendered on macOS and font
     # rasterization differs per platform — Linux fails every golden on pixels.
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, macOS, ARM64, android]
     steps:
       - uses: actions/checkout@v4
@@ -140,6 +191,8 @@ jobs:
     name: Accessibility & RTL
     # Same macOS constraint as the widget job: the contrast sweep samples
     # rendered pixels, and Linux text rasterization shifts them.
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, macOS, ARM64, android]
     steps:
       - uses: actions/checkout@v4
@@ -193,6 +246,8 @@ jobs:
     # is the *phone* layout. The Mac window's layout is walked by running the
     # same file with `-d macos`, which needs a Mac and is a local and release
     # step rather than a per-push one; `docs/quality/ui-audit.md` records both.
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
@@ -236,6 +291,8 @@ jobs:
 
   integration:
     name: Integration tests (against Synapse)
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: [self-hosted, Linux, debian]
     steps:
       - uses: actions/checkout@v4
