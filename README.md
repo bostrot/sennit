@@ -78,13 +78,13 @@ message that ever touches infrastructure you don't own.
 
 ## Screenshots
 
-| Unified inbox | Dark | Mobile |
-|:---:|:---:|:---:|
-| ![Inbox, light](docs/images/inbox-light.png) | ![Inbox, dark](docs/images/inbox-dark.png) | ![Mobile inbox](docs/images/inbox-mobile.png) |
-
-| Conversations | Media |
+| Unified inbox | Dark |
 |:---:|:---:|
-| ![Chat](docs/images/chat-light.png) | ![Media](docs/images/chat-media-dark.png) |
+| ![Inbox with a merged conversation open, light](docs/images/inbox-light.png) | ![Inbox with a merged conversation open, dark](docs/images/inbox-dark.png) |
+
+| Mobile | Merged conversation | Media |
+|:---:|:---:|:---:|
+| ![Mobile inbox](docs/images/inbox-mobile.png) | ![Merged chat](docs/images/chat-light.png) | ![Photos and video in a chat, dark](docs/images/chat-media-dark.png) |
 
 ## Getting started
 
