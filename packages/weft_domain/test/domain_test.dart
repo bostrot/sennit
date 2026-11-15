@@ -96,6 +96,82 @@ void main() {
     });
   });
 
+  group('Chat.sameContentAs', () {
+    Chat base() => Chat(
+      id: 'c',
+      title: 'Anna',
+      sources: const [
+        ChatSource(roomId: '!wa', network: ChatNetwork.whatsapp, unread: 1),
+      ],
+      avatarUrl: 'https://hs/a',
+      lastMessage: msg(body: 'hello'),
+      unreadCount: 1,
+      participantCount: 1,
+    );
+
+    test('two snapshots of an untouched conversation are the same', () {
+      expect(base().sameContentAs(base()), isTrue);
+      // And `==` still means "the same conversation", whatever changed.
+      expect(base() == base().copyWith(title: 'Anna M.'), isTrue);
+    });
+
+    test('every field a row draws or acts on is covered', () {
+      final a = base();
+      final changed = <String, Chat>{
+        'title': a.copyWith(title: 'Anna M.'),
+        'unread': a.copyWith(unreadCount: 2),
+        'avatar': a.copyWith(avatarUrl: 'https://hs/b'),
+        'pinned': a.copyWith(pinned: true),
+        'archived': a.copyWith(archived: true),
+        'muted': a.copyWith(muted: true),
+        'request': a.copyWith(request: ChatRequestState.pending),
+        'participants': a.copyWith(participantCount: 2),
+        'send network': a.copyWith(preferredSendNetwork: ChatNetwork.whatsapp),
+        'preview': a.copyWith(lastMessage: msg(body: 'hello again')),
+        'leg unread': a.copyWith(
+          sources: const [
+            ChatSource(roomId: '!wa', network: ChatNetwork.whatsapp, unread: 2),
+          ],
+        ),
+        'leg muted': a.copyWith(
+          sources: const [
+            ChatSource(
+              roomId: '!wa',
+              network: ChatNetwork.whatsapp,
+              unread: 1,
+              muted: true,
+            ),
+          ],
+        ),
+        'a second leg': a.copyWith(
+          sources: const [
+            ChatSource(roomId: '!wa', network: ChatNetwork.whatsapp, unread: 1),
+            ChatSource(roomId: '!sg', network: ChatNetwork.signal),
+          ],
+        ),
+      };
+      for (final entry in changed.entries) {
+        expect(
+          a.sameContentAs(entry.value),
+          isFalse,
+          reason: '${entry.key} changed and went unnoticed',
+        );
+      }
+    });
+
+    test('a list is the same only with the same rows in the same order', () {
+      final a = base();
+      final b = Chat(id: 'd', title: 'Ben', sources: const []);
+      expect(Chat.sameContentList([a, b], [base(), b]), isTrue);
+      expect(Chat.sameContentList([a, b], [b, a]), isFalse);
+      expect(Chat.sameContentList([a, b], [a]), isFalse);
+      expect(
+        Chat.sameContentList([a, b], [a.copyWith(unreadCount: 3), b]),
+        isFalse,
+      );
+    });
+  });
+
   group('ChatNetwork.fromBridgeProtocol', () {
     test('normalises the spellings bridges actually emit', () {
       for (final raw in [

@@ -153,7 +153,15 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             if (sidebarVisible) ...[
               FocusTraversalOrder(
                 order: const NumericFocusOrder(1),
-                child: FocusTraversalGroup(child: _sidebar(sidebarWidth)),
+                child: FocusTraversalGroup(
+                  // Its own subscriber, like the list beside it: what the
+                  // sidebar watches — unread totals, above all — moves far
+                  // more often than anything this build reads, and watching
+                  // it from here rebuilt the open conversation along with it.
+                  child: Consumer(
+                    builder: (context, ref, _) => _sidebar(ref, sidebarWidth),
+                  ),
+                ),
               ),
               _Splitter(
                 onDrag: (delta) => setState(() {
@@ -166,7 +174,11 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             ],
             FocusTraversalOrder(
               order: const NumericFocusOrder(2),
-              child: FocusTraversalGroup(child: _list(listWidth)),
+              child: FocusTraversalGroup(
+                child: Consumer(
+                  builder: (context, ref, _) => _list(ref, listWidth),
+                ),
+              ),
             ),
             _Splitter(
               onDrag: (delta) => setState(() {
@@ -184,7 +196,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
                     color: context.colors.surface,
                     child: selectedChatId == null
                         ? const _MacEmptyDetail()
-                        : ChatView(chatId: selectedChatId),
+                        : _detailFor(selectedChatId),
                   ),
                 ),
               ),
@@ -197,8 +209,24 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
 
   // ------------------------------------------------------------- the sidebar
 
-  Widget _sidebar(double width) {
-    final repository = ref.watch(chatRepositoryProvider);
+  /// The open conversation, as the *same widget* for as long as it is the
+  /// same conversation.
+  ///
+  /// Flutter skips a subtree whose widget is identical to the one it already
+  /// has. Built inline, the detail pane was a new `ChatView` on every build of
+  /// this shell — every frame of a splitter drag, every sidebar toggle — and
+  /// each of those rebuilt the whole thread for a width change the layout pass
+  /// was going to handle on its own.
+  Widget _detailFor(String chatId) {
+    final cached = _detail;
+    if (cached != null && cached.chatId == chatId) return cached;
+    return _detail = ChatView(chatId: chatId);
+  }
+
+  ChatView? _detail;
+
+  Widget _sidebar(WidgetRef ref, double width) {
+    final networks = ref.watch(availableNetworksProvider);
     final filter = ref.watch(networkFilterProvider);
     final unread = ref.watch(unreadByNetworkProvider);
     final quick = ref.watch(inboxQuickFilterProvider);
@@ -288,7 +316,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
           onToggle: () =>
               setState(() => _networksExpanded = !_networksExpanded),
           children: [
-            for (final network in repository.availableNetworks)
+            for (final network in networks)
               MacSidebarRow(
                 leading: NetworkGlyph(network: network, size: 15),
                 label: network.label,
@@ -357,7 +385,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
 
   // ---------------------------------------------------- the conversation list
 
-  Widget _list(double width) {
+  Widget _list(WidgetRef ref, double width) {
     final chats = ref.watch(visibleChatsProvider);
     final selectedChatId = ref.watch(selectedChatProvider);
     final mediaHeaders = ref.watch(mediaHeadersProvider);
@@ -478,60 +506,65 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
     // exactly what someone scanning their conversations does not see. It draws
     // nothing at all when nothing is waiting.
     itemCount: chats.length + 1,
-    itemBuilder: (context, index) {
+    // Keyed and found by conversation, so a row that moves keeps its element
+    // and the rows it displaced are not rebuilt; see `ChatRowMemo.indexOf`.
+    findChildIndexCallback: (key) => _rows.indexOf(key, chats, offset: 1),
+    // The row's own context is not used below: a remembered row outlives the
+    // element that first built it, and its callbacks must not.
+    itemBuilder: (_, index) {
       if (index == 0) return const RequestsEntry();
       final i = index - 1;
       final chat = chats[i];
       final picked = selection.contains(chat.id);
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        // Silent to a screen reader. A `GestureDetector` that declares any tap
-        // recogniser exports a tappable node, and a right-click-only one
-        // exports it with nothing to say — an unnamed control the width of the
-        // row, sitting over the named one. The route walk found ten of them on
-        // the Mac inbox and nine more in a conversation. The menu itself loses
-        // nothing: every verb in it is reachable from the row's own actions,
-        // and a pointer is the only thing that can raise it.
-        excludeFromSemantics: true,
-        onSecondaryTapUp: (details) => unawaited(
-          showChatContextMenu(context, ref, chat, details.globalPosition),
-        ),
-        child: ChatTile(
-          chat: chat,
-          avatarHeaders: mediaHeaders,
-          typing: ref.read(chatRepositoryProvider).typingIn(chat.id).isNotEmpty,
-          online:
-              ref.read(chatRepositoryProvider).presenceFor(chat.id)?.online ??
-              false,
-          selected: picked || chat.id == selectedChatId,
-          checked: selection.isEmpty ? null : picked,
-          leading: selection.isEmpty
-              ? null
-              : Checkbox(
-                  value: picked,
-                  onChanged: (_) =>
-                      ref.read(chatSelectionProvider.notifier).toggle(chat.id),
-                ),
-          timeLabel: formatInboxTime(
-            chat.lastMessage?.timestamp,
-            now: ref.watch(clockProvider)(),
-            justNow: context.l10n.inboxTimeNow,
+      final selected = picked || chat.id == selectedChatId;
+      return _rows.row(
+        chat,
+        (picked, selected, selection.isEmpty, mediaHeaders),
+        () => GestureDetector(
+          key: ValueKey(chat.id),
+          behavior: HitTestBehavior.translucent,
+          // Silent to a screen reader. A `GestureDetector` that declares any tap
+          // recogniser exports a tappable node, and a right-click-only one
+          // exports it with nothing to say — an unnamed control the width of the
+          // row, sitting over the named one. The route walk found ten of them on
+          // the Mac inbox and nine more in a conversation. The menu itself loses
+          // nothing: every verb in it is reachable from the row's own actions,
+          // and a pointer is the only thing that can raise it.
+          excludeFromSemantics: true,
+          onSecondaryTapUp: (details) => unawaited(
+            showChatContextMenu(context, ref, chat, details.globalPosition),
           ),
-          // Hold to look without spending the unread marker. The phone's
-          // long-press enters selection, which is a thumb's idiom; a pointer
-          // has a right-click menu for that and nothing else bound to holding.
-          onLongPress: () => unawaited(_peek(chat.id)),
-          onTap: () {
-            if (selection.isNotEmpty) {
-              ref.read(chatSelectionProvider.notifier).toggle(chat.id);
-              return;
-            }
-            ref.read(selectedChatProvider.notifier).select(chat.id);
-          },
+          child: LiveChatTile(
+            chat: chat,
+            avatarHeaders: mediaHeaders,
+            selected: selected,
+            checked: selection.isEmpty ? null : picked,
+            leading: selection.isEmpty
+                ? null
+                : Checkbox(
+                    value: picked,
+                    onChanged: (_) => ref
+                        .read(chatSelectionProvider.notifier)
+                        .toggle(chat.id),
+                  ),
+            // Hold to look without spending the unread marker. The phone's
+            // long-press enters selection, which is a thumb's idiom; a pointer
+            // has a right-click menu for that and nothing else bound to holding.
+            onLongPress: () => unawaited(_peek(chat.id)),
+            onTap: () {
+              if (selection.isNotEmpty) {
+                ref.read(chatSelectionProvider.notifier).toggle(chat.id);
+                return;
+              }
+              ref.read(selectedChatProvider.notifier).select(chat.id);
+            },
+          ),
         ),
       );
     },
   );
+
+  final _rows = ChatRowMemo();
 }
 
 /// The draggable boundary between two panes.

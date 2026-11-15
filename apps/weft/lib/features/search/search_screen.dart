@@ -441,9 +441,7 @@ class _ChatResultTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final headers = ref.watch(mediaHeadersProvider);
     void open() {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chat.id)),
-      );
+      unawaited(pushChat(Navigator.of(context), chat.id));
     }
 
     return Semantics(

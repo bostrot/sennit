@@ -133,11 +133,8 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                   size: 40,
                 ),
                 title: Text(chat.title),
-                onTap: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ChatView(chatId: chat.id),
-                  ),
-                ),
+                onTap: () =>
+                    Navigator.of(context).pushReplacement(chatRoute(chat.id)),
               ),
             if (fromBook.isNotEmpty)
               _header(context, l10n.newChatFromAddressBook),
@@ -320,11 +317,7 @@ Future<void> _newDirectChat(BuildContext context, WidgetRef ref) async {
     try {
       final chatId = await repository.createDirectChat(identifier);
       if (chatId == null || !context.mounted) return;
-      unawaited(
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chatId)),
-        ),
-      );
+      unawaited(pushChat(Navigator.of(context), chatId));
     } on Object catch (error) {
       if (context.mounted) {
         showWeftMessage(context, context.l10n.newChatFailed('$error'));
@@ -448,11 +441,7 @@ Future<void> _newGroup(BuildContext context, WidgetRef ref) async {
   try {
     final chatId = await repository.createGroupChat(result.$1, result.$2);
     if (chatId == null || !context.mounted) return;
-    unawaited(
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chatId))),
-    );
+    unawaited(pushChat(Navigator.of(context), chatId));
   } on Object catch (error) {
     if (context.mounted) {
       showWeftMessage(context, context.l10n.newGroupFailed('$error'));

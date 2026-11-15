@@ -394,9 +394,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
 
     switch (link) {
       case OpenChatLink(:final chatId):
-        navigator.push(
-          MaterialPageRoute<void>(builder: (_) => ChatView(chatId: chatId)),
-        );
+        _openChat(navigator, chatId);
       case OpenSearchLink(:final query):
         navigator.push(
           MaterialPageRoute<void>(
@@ -418,6 +416,41 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       case OpenInboxLink():
         navigator.popUntil((route) => route.isFirst);
     }
+  }
+
+  /// Goes to a conversation a notification or a link named.
+  ///
+  /// *Goes to*, not *adds*. This used to push a new screen on every tap, on
+  /// top of whatever was there: a notification for the chat already open put
+  /// a second copy over the first, three notifications in an afternoon left
+  /// three conversations stacked, and Back had to be pressed once for each
+  /// before the inbox came back. Now the conversation is what Back leaves to
+  /// the inbox from, however it was reached — and where there is a detail
+  /// pane, it opens *in* the pane instead of over the whole window.
+  void _openChat(NavigatorState navigator, String chatId) {
+    // The inbox may know this room by another name: a merged contact's rooms
+    // answer to `merged:<contact>`, and the screen on top was opened as that.
+    var id = chatId;
+    try {
+      id = ref.read(chatRepositoryProvider).chatForRoom(chatId)?.id ?? chatId;
+    } on Object {
+      // No repository yet — a cold start. The conversation screen waits for
+      // the inbox on its own and re-resolves the id when it arrives.
+    }
+
+    final twoPane =
+        weftSurface == WeftSurface.mac ||
+        MediaQuery.sizeOf(navigator.context).width >= kTwoPaneBreakpoint;
+    if (twoPane) {
+      navigator.popUntil((route) => route.isFirst);
+      ref.read(selectedChatProvider.notifier).select(id);
+      return;
+    }
+
+    final top = topRouteName(navigator);
+    if (top == chatRouteName(id) || top == chatRouteName(chatId)) return;
+    navigator.popUntil((route) => route.isFirst);
+    unawaited(navigator.push(chatRoute(id)));
   }
 
   /// A share that arrived before the app was ready for it.

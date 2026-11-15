@@ -10,14 +10,13 @@ import 'package:weft_design/weft_design.dart';
 import 'support/recording_repository.dart';
 import 'package:weft/app/localisation.dart';
 
-/// Holding Send opens the scheduler.
+/// Send sends; scheduling is asked for by name.
 ///
-/// The affordance is invisible — nothing on screen says "hold me" except the
-/// tooltip — so nothing but a test notices when it stops working. It did stop:
-/// the button carries a tooltip, Flutter's `Tooltip` claims long presses by
-/// default, and being the deeper widget it won the gesture arena against the
-/// composer's own long-press handler. The hold showed the tooltip and
-/// scheduled nothing.
+/// Holding Send used to open the scheduler's date picker. Half a second is
+/// not a deliberate act — a slow press landed in a calendar with the message
+/// unsent — so the hold is gone and "Send later" is a row in the attach menu.
+/// Both halves are pinned here: a press of any length sends, and the row
+/// reaches the picker.
 void main() {
   const mergedChat = 'merged:anna';
 
@@ -47,18 +46,39 @@ void main() {
 
   Finder sendButton() => find.byIcon(Icons.send_rounded);
 
-  testWidgets('holding Send offers a time to send it at', (tester) async {
+  testWidgets('holding Send sends, and opens no picker', (tester) async {
     await pump(tester);
 
-    await tester.enterText(find.byType(TextField).last, 'Later, not now');
+    await tester.enterText(find.byType(TextField).last, 'Held a moment');
     await tester.pumpAndSettle();
 
     await tester.longPress(sendButton());
     await tester.pumpAndSettle();
 
-    // The date step of the picker, not a tooltip.
+    expect(find.byType(DatePickerDialog), findsNothing);
+    expect(
+      repository.calls.where((c) => c.method == 'send').map((c) => c.body),
+      contains('Held a moment'),
+    );
+  });
+
+  testWidgets('"Send later" in the attach menu offers a time to send it at', (
+    tester,
+  ) async {
+    await pump(tester);
+    final l10n = tester.element(find.byType(ChatView)).l10n;
+
+    await tester.enterText(find.byType(TextField).last, 'Later, not now');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip(l10n.attachSheetTitle));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.attachSourceSendLater));
+    await tester.pumpAndSettle();
+
+    // The date step of the picker, with the message still unsent.
     expect(find.byType(DatePickerDialog), findsOneWidget);
-    expect(find.byType(Tooltip).hitTestable(), findsWidgets);
+    expect(repository.calls.where((c) => c.method == 'send'), isEmpty);
   });
 
   testWidgets('an empty composer offers the microphone, not Send', (
@@ -66,9 +86,7 @@ void main() {
   ) async {
     await pump(tester);
 
-    // Nothing to schedule and nothing to send: the row is a record button,
-    // which is also why `_sendLater`'s empty-text guard never fires in
-    // practice.
+    // Nothing to send: the row is a record button.
     expect(sendButton(), findsNothing);
     expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
   });
