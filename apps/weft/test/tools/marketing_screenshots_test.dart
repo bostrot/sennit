@@ -48,25 +48,35 @@ void main() {
     WeftThemeMode mode = WeftThemeMode.light,
     String? chatToOpen,
   }) async {
-    await pumpWeft(
-      tester,
-      RepaintBoundary(child: child),
-      size: logical,
-      mode: mode,
-    );
-    await tester.pumpAndSettle();
+    // Shadows as shadows. The test binding paints every shadow as a solid
+    // black box so that goldens do not depend on a blur — which is why the
+    // compose button in the published store screenshots wore a thick black
+    // frame. Put back before the test body ends, which is when the framework
+    // checks that it was.
+    debugDisableShadows = false;
+    try {
+      await pumpWeft(
+        tester,
+        RepaintBoundary(child: child),
+        size: logical,
+        mode: mode,
+      );
+      await tester.pumpAndSettle();
 
-    final boundary = tester.renderObject<RenderRepaintBoundary>(
-      find.byType(RepaintBoundary).first,
-    );
-    await tester.runAsync(() async {
-      final image = await boundary.toImage(pixelRatio: scale);
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      final file = File('$outDir/$name.png')..createSync(recursive: true);
-      file.writeAsBytesSync(bytes!.buffer.asUint8List());
-      expect(image.width, (logical.width * scale).round(), reason: name);
-      expect(image.height, (logical.height * scale).round(), reason: name);
-    });
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byType(RepaintBoundary).first,
+      );
+      await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: scale);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        final file = File('$outDir/$name.png')..createSync(recursive: true);
+        file.writeAsBytesSync(bytes!.buffer.asUint8List());
+        expect(image.width, (logical.width * scale).round(), reason: name);
+        expect(image.height, (logical.height * scale).round(), reason: name);
+      });
+    } finally {
+      debugDisableShadows = true;
+    }
   }
 
   // 6.9" iPhone: 440×956 points at 3× — 1320×2868.
