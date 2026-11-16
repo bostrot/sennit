@@ -3,7 +3,7 @@
 *Published at <https://erictrenkel.com/apps/braid/privacy.html> — that
 hosted copy is the one the app stores link to.*
 
-*Effective: 15 November 2026*
+*Effective: 16 November 2026*
 
 Sennit is a self-hosted messenger. It is designed so that the developer of
 Sennit **cannot** see your data — there is no Sennit cloud, no account with us,
@@ -71,6 +71,33 @@ developer, and there is no service in the middle.
 - No conversation receives more than three automatic replies an hour,
   whatever your rules say. This limit is not adjustable.
 
+## SMS (Android only)
+
+On Android, Sennit can be your default messaging app. This is optional and
+off until you choose Sennit in Android's own "Default SMS app" dialog; until
+then Sennit cannot read or send text messages at all.
+
+- **What it reads.** While it holds that role, Sennit reads, receives and
+  sends the SMS and MMS on your phone so they appear in the same inbox as
+  your other conversations.
+- **Where they go.** Nowhere new. Text messages stay in Android's message
+  store on your device and travel over your carrier, as they do with any
+  SMS app. Sennit does not upload them to your Matrix homeserver, to a
+  bridge, or to the developer.
+- **On-device use.** Their text is added to the local search index, and a
+  number that also has a chat on another network can be shown as one
+  conversation. Both happen on the device.
+- **Features you switch on.** If you configure a remote AI endpoint and use
+  it on a text conversation — an auto-reply rule that covers SMS, for
+  example — the content you asked it to process goes to that endpoint, as
+  described above. A backup file you create may include your text messages;
+  it is encrypted on your device as described under *Backups*.
+- **SMS is not encrypted.** Your carrier and the recipient's carrier can
+  read every text message. Sennit cannot change that, and says so above the
+  composer whenever a message will go out as SMS.
+- Choosing another default messaging app in Android's settings ends
+  Sennit's access immediately.
+
 ## What stays on your device
 
 - Message history, search indexes and media caches, stored locally.
@@ -104,7 +131,8 @@ There is no Sennit cloud to upload it to.
 Sennit asks for permissions only when a feature needs them: microphone for
 voice messages and calls, camera for photos and QR device verification,
 contacts for local name matching, location only when you explicitly share
-it into a chat, and notifications. Denying a permission disables only the
+it into a chat, notifications, and — on Android, only if you make Sennit
+your default messaging app — SMS. Denying a permission disables only the
 feature that wanted it.
 
 ## Your rights
