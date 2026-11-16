@@ -29,6 +29,11 @@ import 'session_providers.dart';
 final callServiceProvider = Provider<CallService?>((ref) {
   if (kDemoMode) return null;
 
+  // Watched, so the service is built the moment the login is usable. Reading
+  // `session.isInitialized` here instead computed once during startup, before
+  // the stored login was restored, and left calling off for the whole run.
+  if (!ref.watch(sessionSignedInProvider)) return null;
+
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;
 
@@ -37,8 +42,8 @@ final callServiceProvider = Provider<CallService?>((ref) {
   try {
     signalling = MatrixCallSignalling.forClient(client);
   } on CallSignallingException {
-    // Not signed in yet. The auth gate makes this transient, and a null service
-    // is what every surface already handles.
+    // Signed in by the session's account, but the client has no user or
+    // device id. A null service is what every surface already handles.
     return null;
   }
 

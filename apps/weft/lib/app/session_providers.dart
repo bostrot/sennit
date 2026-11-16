@@ -102,3 +102,25 @@ final sessionStateProvider = StreamProvider<WeftSessionState>((ref) async* {
   yield await ref.watch(sessionBootstrapProvider.future);
   yield* session.states;
 });
+
+/// Whether the client holds a usable login right now.
+///
+/// For providers that build something on top of the signed-in client — the
+/// call layer is one. They must watch this, not read `session.isInitialized`:
+/// that field turns true when the SDK's `Client` is constructed, which is
+/// before a stored login has been restored, and Riverpod never recomputes a
+/// provider because a field changed on an object it already returned. A
+/// provider that looked once in that window stayed null for the whole run.
+///
+/// A bool rather than the state itself so that moving between two signed-in
+/// states (verifying this device, say) does not rebuild — and so tear down —
+/// whatever was built on it.
+final sessionSignedInProvider = Provider<bool>((ref) {
+  return switch (ref.watch(sessionStateProvider).value) {
+    WeftSessionState.unverified || WeftSessionState.ready => true,
+    null ||
+    WeftSessionState.loggedOut ||
+    WeftSessionState.connecting ||
+    WeftSessionState.softLoggedOut => false,
+  };
+});
