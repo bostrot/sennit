@@ -129,7 +129,10 @@ Without these, the workflow produces an **unsigned** IPA for sideloading
 
 `deploy_testflight.yml` archives `main` and uploads it to App Store Connect as
 an internal-only TestFlight build, on the same trigger as the Play upload: a
-version bump on `main`, or a manual run. It signs with an **App Store Connect API key** rather than a
+version bump on `main`, or a manual run. An internal-only build cannot be
+attached to an App Store version; for the build that goes to review, run the
+workflow by hand with `app_store` ticked
+(`gh workflow run deploy_testflight.yml -f app_store=true`). It signs with an **App Store Connect API key** rather than a
 checked-in certificate and profiles: with the key, `xcodebuild` registers the
 App IDs and creates the certificate and the profiles for all seven targets
 itself.

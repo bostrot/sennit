@@ -49,11 +49,15 @@ void main() {
     expect(workflow, contains('exit 1'));
   });
 
-  test('the build stays internal', () {
+  test('the build stays internal unless a manual run asks otherwise', () {
     expect(
       workflow,
-      contains('<key>testFlightInternalTestingOnly</key><true/>'),
+      contains(
+        '<key>testFlightInternalTestingOnly</key>'
+        "<\${{ inputs.app_store && 'false' || 'true' }}/>",
+      ),
     );
+    expect(workflow, contains('default: false'));
     expect(workflow, contains('<key>destination</key><string>upload</string>'));
   });
 

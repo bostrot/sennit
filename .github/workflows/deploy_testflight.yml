@@ -21,6 +21,11 @@ on:
     paths:
       - 'apps/weft/pubspec.yaml'
   workflow_dispatch:
+    inputs:
+      app_store:
+        description: Upload a build that can be submitted to the App Store
+        type: boolean
+        default: false
 
 # Two archives of one commit carry one build number, and App Store Connect
 # refuses the second.
@@ -159,6 +164,9 @@ jobs:
         # `destination: upload` makes the export the upload.
         # `testFlightInternalTestingOnly` keeps the build out of external
         # testing and the App Store, which is what "internal" means here.
+        # App Store Connect will not let such a build be attached to a
+        # version, so the one that goes to review is a manual run with
+        # `app_store` ticked. A push never sets it.
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -170,7 +178,7 @@ jobs:
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key><string>automatic</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
-            <key>testFlightInternalTestingOnly</key><true/>
+            <key>testFlightInternalTestingOnly</key><${{ inputs.app_store && 'false' || 'true' }}/>
           </dict>
           </plist>
           EOF
