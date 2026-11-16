@@ -7,7 +7,7 @@ and what was noticed but not done.
 
 ## Shipped
 
-- 2026-11-16 · User experience · A jump-to-latest button appears in a chat once you scroll up into older messages · PRLINK
+- 2026-11-16 · User experience · A jump-to-latest button appears in a chat once you scroll up into older messages · https://github.com/bostrot/sennit/pull/3
 
 ## Lessons from reviews
 
