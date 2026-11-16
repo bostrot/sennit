@@ -13,6 +13,7 @@ import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../services/attachments/video_poster.dart';
 import 'auto_reply_transport.dart';
 import 'chat_repository.dart';
 import 'profile_lookups.dart';
@@ -51,6 +52,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     SettingsStore? settings,
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
+    VideoPosterLoader videoPoster = extractVideoPoster,
     SmsChatRepository? sms,
     void Function(List<UploadTask> tasks)? onUploads,
   }) : _store = store,
@@ -59,6 +61,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
        _retention = retention,
        _transportOverride = transport,
        _readBytes = readBytes,
+       _videoPoster = videoPoster,
        _sms = sms,
        _onUploads = onUploads {
     // Rehydrate: stored handles and decisions rebuild the same partition the
@@ -155,6 +158,9 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   final RetentionStore? _retention;
 
   final AttachmentBytesLoader _readBytes;
+
+  /// One frame of a video being sent, for its preview.
+  final VideoPosterLoader _videoPoster;
 
   /// SMS, when this device has it and Sennit holds the role. Null everywhere
   /// else, which is the state every path below has to work in anyway.
@@ -1526,11 +1532,20 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     final bytes = await _readBytes(plan.source);
 
     if (!_thumbnails.containsKey(taskId)) {
-      _thumbnails[taskId] = await _transport.uploadThumbnail(
+      // Without a picture to scale down there is no preview, and the send
+      // goes ahead without one.
+      final preview = await previewSourceFor(
         plan,
-        sourceBytes: bytes,
-        uploadId: taskId,
+        fileBytes: bytes,
+        poster: _videoPoster,
       );
+      _thumbnails[taskId] = preview == null
+          ? null
+          : await _transport.uploadThumbnail(
+              plan,
+              sourceBytes: preview,
+              uploadId: taskId,
+            );
     }
 
     return _transport.preparePayload(bytes, encrypted: plan.encrypted);
