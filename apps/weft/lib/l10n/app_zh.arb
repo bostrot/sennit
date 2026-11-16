@@ -350,6 +350,7 @@
   "chatLinkNoHandler": "此设备上没有应用可以打开该链接。",
   "chatConfirmLinkTitle": "打开此链接？",
   "chatConfirmLinkBody": "此链接的文字与其实际地址不一致。",
+  "chatJumpToLatest": "跳到最新消息",
   "chatLoadingOlder": "正在加载更早的消息",
   "chatLoadOlder": "加载更早的消息",
   "chatBeginningOfConversation": "对话的开始",

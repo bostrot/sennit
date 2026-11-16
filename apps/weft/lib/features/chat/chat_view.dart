@@ -53,6 +53,7 @@ import 'attachment_source_sheet.dart';
 import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
+import 'jump_to_latest_button.dart';
 import 'link_preview_card.dart';
 import 'media_gallery.dart';
 import 'media_viewer.dart';
@@ -173,6 +174,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   final _scroll = ScrollController();
 
+  /// Whether the reader has scrolled far enough from the newest message for
+  /// the jump-to-latest button to be worth showing. A notifier rather than
+  /// `setState`: it is decided on every scroll frame, and only the button
+  /// depends on it.
+  final _awayFromLatest = ValueNotifier<bool>(false);
+
   /// Keys for built bubbles, so a jump can scroll to one that is on screen.
   final Map<String, GlobalKey> _messageKeys = {};
 
@@ -284,6 +291,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // touching it in a way that happened to call [_refresh].
     ref.listenManual(chatsProvider, (_, _) => _syncRefresh());
     _composer.addListener(_onComposerChanged);
+    _scroll.addListener(_onScrolled);
     _open();
   }
 
@@ -417,7 +425,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composerFocus.dispose();
     _composer.dispose();
     _scroll.dispose();
+    _awayFromLatest.dispose();
     super.dispose();
+  }
+
+  void _onScrolled() {
+    if (!_scroll.hasClients) return;
+    _awayFromLatest.value = isAwayFromLatest(_scroll.position);
   }
 
   Future<void> _open() async {
@@ -1617,6 +1631,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
                     // window from looking like a stretched phone screen.
                     child: _ReadingColumn(
                       enabled: context.isMac,
+                      // Part of the reading column, so on a wide window the
+                      // button sits at the edge of the messages rather than
+                      // out at the edge of the glass.
+                      overlay: JumpToLatestButton(
+                        visible: _awayFromLatest,
+                        onPressed: () => unawaited(
+                          scrollToLatest(
+                            _scroll,
+                            duration: context.motion.normal,
+                          ),
+                        ),
+                      ),
                       child: _selectableMessages(
                         ListView.builder(
                           controller: _scroll,
@@ -5362,18 +5388,38 @@ const BoxConstraints _macButton = BoxConstraints.tightFor(
 /// A pass-through when [enabled] is false, so the phone's full-bleed timeline
 /// is untouched and there is no second layout to keep in step with this one.
 class _ReadingColumn extends StatelessWidget {
-  const _ReadingColumn({required this.enabled, required this.child});
+  const _ReadingColumn({
+    required this.enabled,
+    this.overlay,
+    required this.child,
+  });
 
   final bool enabled;
+
+  /// Floats over the bottom trailing corner of [child], on both surfaces.
+  final Widget? overlay;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled) return child;
+    final overlay = this.overlay;
+    final column = overlay == null
+        ? child
+        : Stack(
+            children: [
+              child,
+              PositionedDirectional(
+                end: WeftSpace.lg,
+                bottom: WeftSpace.md,
+                child: overlay,
+              ),
+            ],
+          );
+    if (!enabled) return column;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: MacMetrics.readingColumn),
-        child: child,
+        child: column,
       ),
     );
   }
