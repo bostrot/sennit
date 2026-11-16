@@ -107,15 +107,15 @@ enum WeftWidgetState: Hashable {
 /// entries, with "Home screen" as the only edit — it is the platform's own name
 /// for the surface, and it is capitalised differently on each.
 enum WeftWidgetStrings {
-  static let signedOutTitle = "Sign in to Weft"
-  static let signedOutBody = "Open Weft and sign in to see your conversations here."
+  static let signedOutTitle = "Sign in to Sennit"
+  static let signedOutBody = "Open Sennit and sign in to see your conversations here."
 
   static let disabledTitle = "Widgets are off"
   static let disabledBody =
-    "Open Weft and turn on Home Screen widgets under Widgets & watch."
+    "Open Sennit and turn on Home Screen widgets under Widgets & watch."
 
-  static let staleTitle = "Open Weft on your phone"
-  static let staleBody = "This is out of date. Open Weft to refresh it."
+  static let staleTitle = "Open Sennit on your phone"
+  static let staleBody = "This is out of date. Open Sennit to refresh it."
 
   static let emptyTitle = "No conversations"
   static let emptyBody =
@@ -125,9 +125,9 @@ enum WeftWidgetStrings {
   static let unreadLabel = "unread"
   static let merged = "Merged conversation"
 
-  static let inboxDisplayName = "Weft conversations"
+  static let inboxDisplayName = "Sennit conversations"
   static let inboxDescription = "Your most recent conversations. Tap one to open it."
-  static let unreadDisplayName = "Weft unread"
+  static let unreadDisplayName = "Sennit unread"
   static let unreadDescription =
     "How many unread messages you have, across every conversation."
 

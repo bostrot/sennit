@@ -3,7 +3,7 @@
 *Published at <https://erictrenkel.com/apps/braid/privacy.html> — that
 hosted copy is the one the app stores link to.*
 
-*Effective: 25 August 2026*
+*Effective: 15 November 2026*
 
 Sennit is a self-hosted messenger. It is designed so that the developer of
 Sennit **cannot** see your data — there is no Sennit cloud, no account with us,
@@ -13,7 +13,24 @@ and no telemetry.
 
 Nothing. The app contains no analytics, no crash reporting service, no
 advertising SDKs, and no tracking of any kind. The developer operates no
-server that the app talks to.
+server that your messages or contacts ever reach. The one exception, licence
+checks in builds downloaded outside the app stores, is described under
+*Sennit Pro* below.
+
+## Sennit Pro
+
+Sennit Pro is an optional one-time purchase.
+
+- **From the App Store or Google Play:** Apple or Google handle the payment
+  and tell the app whether you own Pro. The developer receives the store's
+  usual sales reports, which contain no messages, contacts or other content
+  from the app.
+- **Builds downloaded from the project's release page:** you buy a licence
+  key through Stripe. Stripe processes the payment, and the developer keeps
+  your email address and licence key to deliver and support the licence.
+  When you enter the key, the app sends **the key and nothing else** — no
+  device id, account or app data — to the developer's licence service to
+  check that it is valid.
 
 ## Where your data goes
 

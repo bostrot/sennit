@@ -94,14 +94,14 @@ enum WeftWatchState: Hashable {
 /// single switch. The two places they differ are the two places the fact
 /// differs: this surface is the watch, and its off-switch is spelled "Watch".
 enum WeftWatchStrings {
-  static let signedOutTitle = "Sign in to Weft"
-  static let signedOutBody = "Open Weft on your phone and sign in."
+  static let signedOutTitle = "Sign in to Sennit"
+  static let signedOutBody = "Open Sennit on your phone and sign in."
 
   static let disabledTitle = "Watch is off"
-  static let disabledBody = "Open Weft on your phone and turn on Watch under Widgets & watch."
+  static let disabledBody = "Open Sennit on your phone and turn on Watch under Widgets & watch."
 
-  static let staleTitle = "Open Weft on your phone"
-  static let staleBody = "This is out of date. Open Weft to refresh it."
+  static let staleTitle = "Open Sennit on your phone"
+  static let staleBody = "This is out of date. Open Sennit to refresh it."
 
   static let emptyTitle = "No conversations"
   static let emptyBody =
@@ -114,7 +114,7 @@ enum WeftWatchStrings {
   static let replySending = "Sending…"
   static let replySent = "Sent"
 
-  static let complicationDisplayName = "Weft unread"
+  static let complicationDisplayName = "Sennit unread"
   static let complicationDescription =
     "How many unread messages you have, across every conversation."
 
@@ -151,17 +151,17 @@ enum WeftWatchStrings {
   static func replyFailure(_ failure: String?) -> String {
     switch failure {
     case WeftWatchProtocol.failureUnknownChat:
-      return "That conversation is no longer in Weft."
+      return "That conversation is no longer in Sennit."
     case WeftWatchProtocol.failureNotSignedIn:
       return "Not sent. Nobody is signed in on your phone."
     case WeftWatchProtocol.failureSendFailed:
-      return "Not sent. Open Weft on your phone to try again."
+      return "Not sent. Open Sennit on your phone to try again."
     case WeftWatchProtocol.failureTimedOut:
       return "Not sent. Your phone did not answer."
     case WeftWatchProtocol.failureOverflowed:
       return "Not sent. Too many replies at once."
     case WeftWatchProtocol.failureAppNotRunning:
-      return "Not sent. Open Weft on your phone."
+      return "Not sent. Open Sennit on your phone."
     default:
       return "Not sent"
     }
