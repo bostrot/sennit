@@ -2785,6 +2785,16 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize =>
       Size.fromHeight(mac ? MacMetrics.toolbarHeight : 64);
 
+  /// Who this conversation is with: the contact profile, with what has been
+  /// shared in it.
+  void _openProfile(BuildContext context) => unawaited(
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ContactProfileScreen(chatId: chat.id),
+      ),
+    ),
+  );
+
   /// One toolbar verb, in whichever button this surface uses.
   Widget _action({
     required IconData icon,
@@ -2800,33 +2810,28 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       toolbarHeight: 64,
       backgroundColor: context.colors.surfaceContainerLowest,
-      // The title is one thing — who this conversation is with, and on what —
-      // so it is one node, marked as the screen's heading. Three nodes read in
-      // isolation ("Anna", "Merged · WhatsApp, Signal", and an avatar reading
-      // "AK") is the same failure the inbox row had.
-      title: Row(
-        children: [
-          // The avatar is a *button* now — it opens the contact profile — so
-          // it stands outside the merged heading with its own 48dp target
-          // and its own name, instead of turning the whole title row into
-          // one enormous 40dp-tall tappable.
-          Semantics(
-            button: true,
-            label: context.l10n.chatContactDetails,
-            child: Consumer(
-              builder: (context, ref, _) => InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ContactProfileScreen(chatId: chat.id),
-                  ),
-                ),
-                child: SizedBox(
+      // The whole title — face, name and subtitle — opens the contact
+      // profile, the way every messenger's header does; only the actions on
+      // the trailing edge are something else. One node, marked as the
+      // screen's heading, with the profile as what pressing it does: three
+      // nodes read in isolation ("Anna", "Merged · WhatsApp, Signal", and an
+      // avatar reading "AK") is the same failure the inbox row had.
+      title: MergeSemantics(
+        child: Semantics(
+          header: true,
+          button: !preview,
+          hint: preview ? null : context.l10n.chatContactDetails,
+          child: InkWell(
+            borderRadius: WeftRadius.allSm,
+            onTap: preview ? null : () => _openProfile(context),
+            child: Row(
+              children: [
+                SizedBox(
                   width: 48,
                   height: 48,
                   child: Center(
-                    child: ExcludeSemantics(
-                      child: WeftAvatar(
+                    child: Consumer(
+                      builder: (context, ref, _) => WeftAvatar(
                         label: chat.title,
                         imageUrl: chat.avatarUrl,
                         imageHeaders: ref.watch(mediaHeadersProvider),
@@ -2843,77 +2848,72 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: WeftSpace.sm),
-          Expanded(
-            child: MergeSemantics(
-              child: Semantics(
-                header: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      chat.title,
-                      style: context.text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (typing.isNotEmpty)
+                const SizedBox(width: WeftSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
-                        chat.isGroup
-                            ? context.l10n.chatTypingNames(
-                                typing.join(', '),
-                                typing.length,
-                              )
-                            : context.l10n.chatTypingShort,
-                        style: context.text.labelSmall?.copyWith(
-                          color: context.colors.primary,
-                          fontWeight: FontWeight.w600,
+                        chat.title,
+                        style: context.text.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                      )
-                    else if (chat.isMerged)
-                      Text(
-                        _withOnline(
-                          context,
-                          context.l10n.chatMergedNetworks(
-                            chat.networks.map((n) => n.label).join(', '),
+                      ),
+                      if (typing.isNotEmpty)
+                        Text(
+                          chat.isGroup
+                              ? context.l10n.chatTypingNames(
+                                  typing.join(', '),
+                                  typing.length,
+                                )
+                              : context.l10n.chatTypingShort,
+                          style: context.text.labelSmall?.copyWith(
+                            color: context.colors.primary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          online: online,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else if (chat.isMerged)
+                        Text(
+                          _withOnline(
+                            context,
+                            context.l10n.chatMergedNetworks(
+                              chat.networks.map((n) => n.label).join(', '),
+                            ),
+                            online: online,
+                          ),
+                          style: context.text.labelSmall?.copyWith(
+                            color: context.palette.mergedAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else
+                        Text(
+                          _withOnline(
+                            context,
+                            chat.networks.firstOrNull?.label ?? '',
+                            online: online,
+                          ),
+                          style: context.text.labelSmall?.copyWith(
+                            color: online
+                                ? context.palette.online
+                                : context.colors.onSurfaceVariant,
+                            fontWeight: online ? FontWeight.w600 : null,
+                          ),
                         ),
-                        style: context.text.labelSmall?.copyWith(
-                          color: context.palette.mergedAccent,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    else
-                      Text(
-                        _withOnline(
-                          context,
-                          chat.networks.firstOrNull?.label ?? '',
-                          online: online,
-                        ),
-                        style: context.text.labelSmall?.copyWith(
-                          color: online
-                              ? context.palette.online
-                              : context.colors.onSurfaceVariant,
-                          fontWeight: online ? FontWeight.w600 : null,
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
       actions: _actions(context),
     );
@@ -3065,13 +3065,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: MouseRegion(
               cursor: SystemMouseCursors.basic,
               child: GestureDetector(
-                onTap: preview
-                    ? null
-                    : () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ContactProfileScreen(chatId: chat.id),
-                        ),
-                      ),
+                onTap: preview ? null : () => _openProfile(context),
                 child: ExcludeSemantics(
                   child: WeftAvatar(
                     label: chat.title,
@@ -3087,29 +3081,37 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
         ),
-        titleWidget: MergeSemantics(
-          child: Semantics(
-            header: true,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chat.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall,
-                ),
-                if (subtitle.isNotEmpty)
+        // The name opens the profile as well as the face beside it: the
+        // whole title is one target on every other surface, and a click on
+        // the name that did nothing would be the odd one out. The avatar
+        // stays the screen reader's button, so this one adds no node.
+        titleWidget: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: preview ? null : () => _openProfile(context),
+          child: MergeSemantics(
+            child: Semantics(
+              header: true,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    subtitle,
+                    chat.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: context.text.labelSmall?.copyWith(
-                      color: subtitleColor,
-                    ),
+                    style: context.text.titleSmall,
                   ),
-              ],
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.labelSmall?.copyWith(
+                        color: subtitleColor,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

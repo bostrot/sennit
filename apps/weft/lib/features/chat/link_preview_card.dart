@@ -178,7 +178,7 @@ class LinkPreviewCardBody extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (preview.imageUrl != null) ...[
-                    _Thumbnail(mxc: preview.imageUrl!, image: image),
+                    LinkPreviewThumbnail(mxc: preview.imageUrl!, image: image),
                     const SizedBox(width: WeftSpace.sm),
                   ],
                   Flexible(
@@ -265,13 +265,20 @@ class LinkPreviewCardBody extends StatelessWidget {
 /// A failed load falls back to a blank tile rather than a broken-image glyph.
 /// The homeserver may not serve thumbnails, the media may have expired, the
 /// token may have rotated — none of which is something the reader can act on.
-class _Thumbnail extends ConsumerWidget {
-  const _Thumbnail({required this.mxc, this.image});
+///
+/// Public because the chat info screen's list of shared links shows the same
+/// picture beside each row, through the same gate.
+class LinkPreviewThumbnail extends ConsumerWidget {
+  const LinkPreviewThumbnail({
+    super.key,
+    required this.mxc,
+    this.image,
+    this.size = 56,
+  });
 
   final String mxc;
   final ImageProvider? image;
-
-  static const double _size = 56;
+  final double size;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -281,8 +288,8 @@ class _Thumbnail extends ConsumerWidget {
     return ClipRRect(
       borderRadius: WeftRadius.allXs,
       child: SizedBox(
-        width: _size,
-        height: _size,
+        width: size,
+        height: size,
         child: Image(
           image: provider,
           fit: BoxFit.cover,

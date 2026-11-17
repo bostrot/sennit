@@ -10,13 +10,15 @@ import '../../app/retention_providers.dart';
 import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
+import 'shared_media.dart';
 
 /// Who this conversation is with, across every network at once.
 ///
-/// Opened by tapping the avatar in a chat's app bar: the identity card
-/// (name, Matrix id, phone), one row per network handle, and the knobs that
-/// belong to the *person* rather than to any single message — send network,
-/// labels, mute, archive, and the way into merge management.
+/// Opened by tapping the title of a chat's app bar: the identity card
+/// (name, Matrix id, phone), what has been shared in the conversation, one row
+/// per network handle, and the knobs that belong to the *person* rather than
+/// to any single message — send network, labels, mute, archive, and the way
+/// into merge management.
 class ContactProfileScreen extends ConsumerWidget {
   const ContactProfileScreen({super.key, required this.chatId});
 
@@ -107,6 +109,7 @@ class ContactProfileScreen extends ConsumerWidget {
                 title: Text(id),
                 subtitle: Text(context.l10n.contactMatrixUser),
               ),
+            SharedContentSections(chatId: chat.id),
             if (handles.isNotEmpty) ...[
               _SectionHeader(context.l10n.contactOnTheseNetworks),
               for (final handle in handles)

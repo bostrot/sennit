@@ -2180,7 +2180,7 @@
   },
   "chatContactDetails": "Contact details",
   "@chatContactDetails": {
-    "description": "Screen-reader-only label for the avatar in a conversation's title bar, which is a button opening the contact's profile. Keep under ~22 chars.",
+    "description": "Screen-reader-only text for a conversation's title bar (avatar, name and subtitle), which is a button opening the contact's profile; on desktop it labels the avatar. Keep under ~22 chars.",
     "maxLength": 40
   },
   "chatTypingShort": "typing…",
@@ -6044,6 +6044,41 @@
   "contactForThisContact": "For this contact",
   "@contactForThisContact": {
     "description": "Section heading in the contact profile, above the settings that apply to this person only. Keep under ~28 chars."
+  },
+  "contactMedia": "Media",
+  "@contactMedia": {
+    "description": "Section heading in the chat info screen above a row of thumbnails of the photos and videos shared in this conversation, and the title of the screen showing all of them as a grid. Keep under ~20 chars."
+  },
+  "contactLinks": "Links",
+  "@contactLinks": {
+    "description": "Section heading in the chat info screen above the web links people sent in this conversation, and the title of the screen listing all of them. Keep under ~20 chars."
+  },
+  "contactSeeAll": "See all",
+  "@contactSeeAll": {
+    "description": "Small button at the end of a section heading in the chat info screen (Media, Links) that opens the full list. Keep under ~14 chars.",
+    "maxLength": 24
+  },
+  "contactSeeAllMedia": "{count, plural, =1{See 1 photo or video} other{See all {count} photos and videos}}",
+  "@contactSeeAllMedia": {
+    "description": "Screen-reader-only label of the 'See all' button beside the Media heading in the chat info screen; says what the button opens.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many photos and videos were found in the conversation.",
+        "example": "24"
+      }
+    }
+  },
+  "contactSeeAllLinks": "{count, plural, =1{See 1 link} other{See all {count} links}}",
+  "@contactSeeAllLinks": {
+    "description": "Screen-reader-only label of the 'See all' button beside the Links heading in the chat info screen; says what the button opens.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many distinct links were found in the conversation.",
+        "example": "7"
+      }
+    }
   },
   "notificationActionReply": "Reply",
   "@notificationActionReply": {

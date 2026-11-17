@@ -418,7 +418,7 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                   // caption line reading "Video" is indistinguishable from a
                   // still at a glance, which is the one thing the badge exists to
                   // prevent.
-                  if (isVideo) const _PlayBadge(),
+                  if (isVideo) const PlayBadge(),
                 ],
               ),
             ),
@@ -565,22 +565,26 @@ class AttachmentCaption extends StatelessWidget {
 ///
 /// Its own scrim disc rather than a bare icon: a white glyph vanishes on a
 /// bright frame and a dark one vanishes on a night shot.
-class _PlayBadge extends StatelessWidget {
-  const _PlayBadge();
+class PlayBadge extends StatelessWidget {
+  const PlayBadge({super.key, this.size = 48});
+
+  /// The disc's diameter. The glyph inside keeps the same proportion, so a
+  /// badge on a thumbnail is the bubble's badge made smaller, not a new one.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: Container(
-        width: 48,
-        height: 48,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: context.colors.scrim.withValues(alpha: 0.55),
           shape: BoxShape.circle,
         ),
-        child: const Icon(
+        child: Icon(
           Icons.play_arrow_rounded,
-          size: 30,
+          size: size * 0.625,
           color: Colors.white,
         ),
       ),

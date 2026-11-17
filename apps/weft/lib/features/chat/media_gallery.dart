@@ -169,11 +169,10 @@ class MediaGallery extends StatelessWidget {
           runSpacing: gap,
           children: [
             for (var i = 0; i < shown.length; i++)
-              _GalleryTile(
+              MediaTile(
                 key: ValueKey(mediaHeroTag(shown[i])),
                 message: shown[i],
-                position: i + 1,
-                total: items.length,
+                label: context.l10n.chatGalleryItem(i + 1, items.length),
                 more: i == shown.length - 1 ? more : 0,
                 onOpen: onOpen == null ? null : () => onOpen!(shown[i]),
                 onActions: onActions == null
@@ -187,34 +186,44 @@ class MediaGallery extends StatelessWidget {
   }
 }
 
-class _GalleryTile extends ConsumerStatefulWidget {
-  const _GalleryTile({
+/// One square thumbnail of a photo or a video poster.
+///
+/// The album's tile, and the chat info screen's too: both are "a small square
+/// of this picture that opens it", and two of them would load, cache and hero
+/// the bytes two slightly different ways.
+class MediaTile extends ConsumerStatefulWidget {
+  const MediaTile({
     super.key,
     required this.message,
-    required this.position,
-    required this.total,
-    required this.more,
+    required this.label,
+    this.size = MediaGallery.tileSize,
+    this.more = 0,
     this.onOpen,
     this.onActions,
   });
 
   final WeftMessage message;
-  final int position;
-  final int total;
 
-  /// Photos past the fourth, counted on the last tile. Zero everywhere else.
+  /// What a screen reader says this tile is — "Photo 2 of 13", "Video". The
+  /// count and the loading state are added to it here.
+  final String label;
+
+  final double size;
+
+  /// Photos past the fourth, counted on an album's last tile. Zero everywhere
+  /// else.
   final int more;
 
   final VoidCallback? onOpen;
   final VoidCallback? onActions;
 
   @override
-  ConsumerState<_GalleryTile> createState() => _GalleryTileState();
+  ConsumerState<MediaTile> createState() => _MediaTileState();
 }
 
 /// Loads the same way a lone photo does, through the same cache, so a picture
 /// already seen in the viewer or in an earlier layout costs nothing here.
-class _GalleryTileState extends ConsumerState<_GalleryTile> {
+class _MediaTileState extends ConsumerState<MediaTile> {
   Uint8List? _bytes;
   bool _failed = false;
 
@@ -249,18 +258,22 @@ class _GalleryTileState extends ConsumerState<_GalleryTile> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    const size = MediaGallery.tileSize;
+    final size = widget.size;
+    final isVideo = widget.message.kind == MessageKind.video;
+    // A video with no poster still plays: the poster is the sender's client's
+    // courtesy, not the video. A photo with no bytes has nothing to open.
+    final openable = _bytes != null || (isVideo && _failed);
     return WeftFocusable(
       image: true,
-      button: _bytes != null && widget.onOpen != null,
-      onTap: _bytes == null ? null : widget.onOpen,
+      button: openable && widget.onOpen != null,
+      onTap: openable ? widget.onOpen : null,
       onLongPress: widget.onActions,
       label: semanticsSentence([
-        l10n.chatGalleryItem(widget.position, widget.total),
+        widget.label,
         if (widget.more > 0) l10n.chatGalleryMore(widget.more),
-        if (_failed)
+        if (_failed && !isVideo)
           l10n.attachmentCouldNotLoad
-        else if (_bytes == null)
+        else if (!_failed && _bytes == null)
           l10n.attachmentLoading,
       ]),
       borderRadius: WeftRadius.allSm,
@@ -284,9 +297,13 @@ class _GalleryTileState extends ConsumerState<_GalleryTile> {
                     errorBuilder: (_, _, _) => _placeholder(broken: true),
                   ),
                 ),
-                (_, true) => _placeholder(broken: true),
-                _ => _placeholder(broken: false),
+                (_, true) => _placeholder(broken: !isVideo),
+                _ => _placeholder(broken: false, loading: true),
               },
+              // Not while the spinner is up: two marks dead centre on one
+              // tile read as neither.
+              if (isVideo && (_bytes != null || _failed))
+                Center(child: PlayBadge(size: (size * 0.36).clamp(24, 48))),
               if (widget.more > 0)
                 IgnorePointer(
                   child: ColoredBox(
@@ -313,19 +330,24 @@ class _GalleryTileState extends ConsumerState<_GalleryTile> {
     );
   }
 
-  Widget _placeholder({required bool broken}) => ColoredBox(
-    color: context.colors.surfaceContainerHighest,
-    child: Center(
-      child: broken
-          ? Icon(
-              Icons.broken_image_outlined,
-              color: context.colors.onSurfaceVariant,
-            )
-          : const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-    ),
-  );
+  /// [broken] false and [loading] false is a video with no poster, which is
+  /// ordinary rather than a failure — the play badge over it says the rest.
+  Widget _placeholder({required bool broken, bool loading = false}) =>
+      ColoredBox(
+        color: context.colors.surfaceContainerHighest,
+        child: Center(
+          child: broken
+              ? Icon(
+                  Icons.broken_image_outlined,
+                  color: context.colors.onSurfaceVariant,
+                )
+              : loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+        ),
+      );
 }
