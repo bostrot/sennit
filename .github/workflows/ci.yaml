@@ -262,7 +262,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
-            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev
+            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
       - name: Walk every route
@@ -346,7 +347,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
-            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev
+            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
       # WEFT_DEMO is what `attachment_flow_test` drives the app in; the

@@ -350,6 +350,7 @@
   "chatLinkNoHandler": "Nada neste dispositivo abre esse link.",
   "chatConfirmLinkTitle": "Abrir este link?",
   "chatConfirmLinkBody": "O texto deste link não corresponde ao destino dele.",
+  "chatJumpToLatest": "Ir para as mais recentes",
   "chatLoadingOlder": "Carregando mensagens anteriores",
   "chatLoadOlder": "Carregar mensagens anteriores",
   "chatBeginningOfConversation": "Início da conversa",

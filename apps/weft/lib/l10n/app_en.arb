@@ -2095,6 +2095,11 @@
   "@chatLoadingOlder": {
     "description": "Screen-reader-only live label for the spinner that replaces the 'Load older messages' button once it is pressed. Without it the button simply disappears from under the reader."
   },
+  "chatJumpToLatest": "Jump to latest",
+  "@chatJumpToLatest": {
+    "description": "Tooltip and screen-reader label of the round arrow button that appears over a conversation once the reader has scrolled up into older messages. Pressing it scrolls back down to the newest message. Keep under ~28 chars.",
+    "maxLength": 40
+  },
   "chatLoadOlder": "Load older messages",
   "@chatLoadOlder": {
     "description": "Button at the top of the timeline that fetches more history from the server. Keep under ~26 chars.",

@@ -85,8 +85,9 @@ void main() {
     await tester.runAsync(() async {
       final image = await boundary.toImage();
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      File('../../tooling/store/graphics/feature_graphic.png')
-          .writeAsBytesSync(bytes!.buffer.asUint8List());
+      File(
+        '../../tooling/store/graphics/feature_graphic.png',
+      ).writeAsBytesSync(bytes!.buffer.asUint8List());
       expect(image.width, 1024);
       expect(image.height, 500);
     });
