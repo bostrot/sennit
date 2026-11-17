@@ -315,24 +315,28 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('the disabled in-chat search does not pretend to work', (
-      tester,
-    ) async {
-      await pumpChat(tester, [
-        seededMessage(eventId: r'$one', body: 'Where are we meeting?'),
-      ]);
+    testWidgets(
+      'the in-chat search is a named button, and opens a named field',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        await pumpChat(tester, [
+          seededMessage(eventId: r'$one', body: 'Where are we meeting?'),
+        ]);
 
-      // `onPressed: () {}` announced as an enabled button, took a tap and did
-      // nothing — indistinguishable, to a reader, from a tap that failed.
-      final button = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.search_rounded),
-      );
-      expect(button.onPressed, isNull);
-      expect(
-        find.byTooltip('Search in conversation — not available yet'),
-        findsOneWidget,
-      );
-    });
+        // It was a disabled placeholder whose only explanation was a tooltip —
+        // which a touch screen never shows.
+        final button = find.widgetWithIcon(IconButton, Icons.search_rounded);
+        expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+        expect(find.byTooltip('Search in chat'), findsOneWidget);
+
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        // Named whether or not anything has been typed; the hint goes at the
+        // first keystroke.
+        expect(find.bySemanticsLabel('Search in chat'), findsOneWidget);
+        handle.dispose();
+      },
+    );
   });
 
   group('rich content', () {

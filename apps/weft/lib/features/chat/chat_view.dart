@@ -17,6 +17,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
+import 'package:weft_search/weft_search.dart';
 
 import '../../app/a11y.dart';
 import '../../app/call_providers.dart';
@@ -26,6 +27,7 @@ import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
+import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
@@ -50,6 +52,7 @@ import 'agenda_chip.dart';
 import 'attachment_bubble.dart';
 import 'attachment_preview_sheet.dart';
 import 'attachment_source_sheet.dart';
+import 'chat_search.dart';
 import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
@@ -185,6 +188,30 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   /// Highlighted bubble, cleared shortly after the jump.
   String? _highlightEventId;
+
+  /// Whether the bar is this conversation's search rather than its name.
+  bool _searchOpen = false;
+
+  final _searchQuery = TextEditingController();
+  final _searchFocus = FocusNode(debugLabel: 'Sennit chat search');
+  Timer? _searchDebounce;
+
+  /// The answer to the query in [_searchQuery], newest first; null while
+  /// nothing has been asked, which the bar draws differently from "no matches".
+  List<String>? _searchMatches;
+
+  /// Which of [_searchMatches] is on screen. 0 is the newest.
+  int _searchPosition = 0;
+
+  bool _searchBusy = false;
+
+  /// Bumped per query, so an answer that arrives after the reader typed on
+  /// does not overwrite the newer one.
+  int _searchGeneration = 0;
+
+  /// Where the current match is highlighted — the match itself, or the root
+  /// of the thread it was folded into — so the highlight can go with it.
+  String? _searchTarget;
 
   /// What is selected across the thread, on a machine that can select.
   ///
@@ -409,7 +436,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
   @override
   void didUpdateWidget(ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.chatId != widget.chatId) _open();
+    if (oldWidget.chatId != widget.chatId) {
+      // A search is about the conversation it was typed in. On a two-pane
+      // window this state serves the next chat clicked, which the matches
+      // say nothing about.
+      _closeSearch();
+      _open();
+    }
   }
 
   @override
@@ -426,6 +459,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.dispose();
     _scroll.dispose();
     _awayFromLatest.dispose();
+    _searchDebounce?.cancel();
+    _searchQuery.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -648,26 +684,36 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// it. Bounded: a very old result stops after [maxRounds] of backfill rather
   /// than paging the whole conversation on one tap.
   Future<void> _jumpTo(String eventId, {int maxRounds = 40}) async {
+    if (!await _loadUntil(eventId, maxRounds: maxRounds)) return;
+    _showEvent(eventId);
+  }
+
+  /// Backfills until [eventId] is among the loaded messages, and says whether
+  /// it got there.
+  Future<bool> _loadUntil(String eventId, {int maxRounds = 40}) async {
     final timeline = _timeline;
-    if (timeline == null) return;
+    if (timeline == null) return false;
 
     var rounds = 0;
     while (!_view.messages.any((m) => m.eventId == eventId) &&
         timeline.hasMoreHistory &&
         rounds++ < maxRounds) {
       final next = await timeline.loadMoreUntilVisibleGrowth();
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _view = next);
     }
+    return mounted && _view.messages.any((m) => m.eventId == eventId);
+  }
 
-    if (!_view.messages.any((m) => m.eventId == eventId) || !mounted) return;
-
+  /// Scrolls a loaded [eventId] into view and highlights it — briefly, or for
+  /// as long as it stays the [hold]ing search match.
+  void _showEvent(String eventId, {bool hold = false}) {
     setState(() => _highlightEventId = eventId);
     // Scrolls to the widget itself rather than to an index: index-anchored
     // scrolling is what made the list snap back whenever an image finished
     // loading and changed a row's height.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      for (var attempt = 0; attempt < 10 && mounted; attempt++) {
+      for (var attempt = 0; attempt < 40 && mounted; attempt++) {
         final target = _messageKeys[eventId]?.currentContext;
         if (target != null && target.mounted) {
           await Scrollable.ensureVisible(
@@ -677,16 +723,201 @@ class _ChatViewState extends ConsumerState<ChatView> {
           );
           return;
         }
-        // Not built yet: let the list extend toward it and try again.
+        // Not built yet. The list builds only around what is on screen, so a
+        // bubble a dozen screens away has no widget to scroll to until the
+        // list is somewhere near it: move a screen toward it, or, with
+        // nowhere left to move, let the list extend.
+        if (_scrollToward(eventId)) {
+          await WidgetsBinding.instance.endOfFrame;
+          continue;
+        }
         await _loadOlder();
         await Future<void>.delayed(WeftMotion.fast);
       }
     });
+    if (hold) return;
     Future<void>.delayed(const Duration(seconds: 3), () {
       if (mounted && _highlightEventId == eventId) {
         setState(() => _highlightEventId = null);
       }
     });
+  }
+
+  /// The rows the list draws, newest first, as of the last build.
+  ///
+  /// Kept for [_scrollToward], which runs between frames and has to know
+  /// which way an unbuilt row lies from the ones on screen.
+  List<WeftMessage> _drawn = const [];
+
+  /// Moves the list one screen toward [eventId], and says whether it moved.
+  bool _scrollToward(String eventId) {
+    if (!_scroll.hasClients) return false;
+    final at = _drawn.indexWhere((m) => m.eventId == eventId);
+    if (at < 0) return false;
+    var newestBuilt = -1;
+    for (final (i, message) in _drawn.indexed) {
+      if (_messageKeys[message.eventId]?.currentContext == null) continue;
+      newestBuilt = i;
+      break;
+    }
+    if (newestBuilt < 0) return false;
+    // Reversed: further down the list is further back in time.
+    final position = _scroll.position;
+    final step = position.viewportDimension * (at > newestBuilt ? 1 : -1);
+    final to = (position.pixels + step).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (to == position.pixels) return false;
+    position.jumpTo(to);
+    return true;
+  }
+
+  void _openSearch() => setState(() => _searchOpen = true);
+
+  void _closeSearch() {
+    if (!_searchOpen) return;
+    _searchDebounce?.cancel();
+    _searchGeneration++;
+    setState(() {
+      _searchOpen = false;
+      _searchQuery.clear();
+      _searchMatches = null;
+      _searchPosition = 0;
+      _searchBusy = false;
+      _dropSearchHighlight();
+    });
+  }
+
+  /// Takes down the highlight the last match left, inside a `setState`.
+  void _dropSearchHighlight() {
+    if (_searchTarget != null && _highlightEventId == _searchTarget) {
+      _highlightEventId = null;
+    }
+    _searchTarget = null;
+  }
+
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    // Debounced for the index's sake, which is SQLite on this isolate; the
+    // loaded messages alone would keep up with every keystroke.
+    _searchDebounce = Timer(const Duration(milliseconds: 250), _runSearch);
+  }
+
+  Future<void> _runSearch() async {
+    final query = _searchQuery.text;
+    final generation = ++_searchGeneration;
+    if (chatSearchTerms(query).isEmpty) {
+      setState(() {
+        _searchMatches = null;
+        _searchBusy = false;
+        _dropSearchHighlight();
+      });
+      return;
+    }
+    setState(() => _searchBusy = true);
+
+    final chatId = _chatId;
+    final chat = ref
+        .read(chatsProvider)
+        .value
+        ?.where((c) => c.id == chatId)
+        .firstOrNull;
+    final indexed = await _searchIndex(query, chat);
+    if (!mounted || generation != _searchGeneration) return;
+
+    final matches = chatSearchMatches(
+      query: query,
+      indexed: indexed,
+      loaded: _view.messages,
+      matchSenders: chat?.isGroup ?? false,
+    );
+    setState(() {
+      _searchMatches = matches;
+      _searchPosition = 0;
+      _searchBusy = false;
+      if (matches.isEmpty) _dropSearchHighlight();
+    });
+    if (matches.isNotEmpty) await _showSearchMatch();
+  }
+
+  /// This conversation's rows of the shared search index, keyword side only.
+  ///
+  /// Keywords alone, because stepping through a conversation is a find, not a
+  /// recommendation: a semantic neighbour holding none of the typed words
+  /// would be highlighted with nothing in it to explain why.
+  ///
+  /// Filed under the conversation's id, and also under each leg's room id —
+  /// which is what a row written before the person was merged is still filed
+  /// under until the timeline next passes over it.
+  Future<List<SearchResult>> _searchIndex(String query, Chat? chat) async {
+    final SearchEngine engine;
+    try {
+      engine = ref.read(searchEngineProvider);
+    } on Object {
+      // No stores opened — a test, or the demo — and so no index. The loaded
+      // messages are still searched.
+      return const [];
+    }
+    try {
+      return await engine.search(
+        SearchQuery(
+          text: query,
+          mode: SearchMode.keyword,
+          chatIds: {
+            _chatId,
+            widget.chatId,
+            ...?chat?.sources.map((s) => s.roomId),
+          },
+          limit: 500,
+        ),
+      );
+    } on Object catch (error) {
+      debugPrint('weft: in-chat search failed: $error');
+      return const [];
+    }
+  }
+
+  void _stepSearch(int delta) {
+    final matches = _searchMatches;
+    if (matches == null) return;
+    final next = _searchPosition + delta;
+    if (next < 0 || next >= matches.length) return;
+    setState(() => _searchPosition = next);
+    unawaited(_showSearchMatch());
+  }
+
+  /// Brings the current match into view, paging history back to it if the
+  /// index found it further back than the timeline has loaded.
+  Future<void> _showSearchMatch() async {
+    final matches = _searchMatches;
+    if (matches == null || matches.isEmpty) return;
+    final eventId = matches[_searchPosition];
+    final generation = _searchGeneration;
+    if (!await _loadUntil(eventId)) {
+      if (mounted && generation == _searchGeneration) {
+        _showMessage(context.l10n.chatSearchNotLoaded);
+      }
+      return;
+    }
+    if (!mounted || !_searchOpen || generation != _searchGeneration) return;
+    // A reply folded into a thread has no bubble in the room's list; its
+    // thread's root, with the indicator leading to it, is where it lives.
+    final message = _view.messages.firstWhere((m) => m.eventId == eventId);
+    final rootId = message.threadRootId;
+    final chat = ref
+        .read(chatsProvider)
+        .value
+        ?.where((c) => c.id == _chatId)
+        .firstOrNull;
+    final target =
+        rootId != null &&
+            chat != null &&
+            !_threadGrouping(chat).messages.any((m) => m.eventId == eventId)
+        ? rootId
+        : eventId;
+    _searchTarget = target;
+    _showEvent(target, hold: true);
   }
 
   DateTime _lastLoadOlderAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -1555,6 +1786,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
           ).reversed.toList(growable: false);
     // Photos sent as a batch fold into one album bubble, drawn by the row of
     // the batch's newest photo; the rows of the others draw nothing.
+    _drawn = visible;
     final galleries = galleryLayout(
       visible,
       standsAlone: (m) => rootId == null && grouping.threadFor(m) != null,
@@ -1574,15 +1806,30 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // of those is about the conversation rather than about the topic the
       // reader has opened — a call started from inside "Bugs" is a call to the
       // whole group, which is not what the button appears to offer there.
-      appBar: rootId == null
-          ? _ChatAppBar(
+      appBar: rootId != null
+          ? _ThreadAppBar(chat: chat, title: _threadTitleFor(rootId, grouping))
+          : _searchOpen
+          ? ChatSearchBar(
+              mac: context.isMac,
+              controller: _searchQuery,
+              focusNode: _searchFocus,
+              matchSenders: chat.isGroup,
+              matches: _searchMatches,
+              position: _searchPosition,
+              searching: _searchBusy,
+              onChanged: _onSearchChanged,
+              onOlder: () => _stepSearch(1),
+              onNewer: () => _stepSearch(-1),
+              onClose: _closeSearch,
+            )
+          : _ChatAppBar(
               chat: chat,
               mac: context.isMac,
               typing: _typing,
               online: _peerOnline,
               preview: widget.preview,
-            )
-          : _ThreadAppBar(chat: chat, title: _threadTitleFor(rootId, grouping)),
+              onSearch: _openSearch,
+            ),
       body: _escapeCancels(
         // Ordered rather than reading order: the timeline comes before the
         // composer whichever way the text runs, and the banner above them both
@@ -1963,31 +2210,44 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
   }
 
-  /// [child] with Escape wired to leaving reply or edit mode.
+  /// [child] with Escape wired to leaving reply or edit mode, or else to
+  /// closing the conversation's search — as Back on a phone is too.
   ///
   /// Here rather than in the app-wide map, and *disabled* rather than absent
   /// when there is no mode to leave. Escape belongs to whatever is on top: a
   /// dialog over a conversation with a reply half-typed has to close on the
   /// first press, and an action that reports itself disabled lets `Shortcuts`
   /// pass the key on to the `DismissIntent` that does it.
+  ///
+  /// Back closes a search before it closes the conversation. A reader who has
+  /// stepped a month into the history and presses Back means "stop
+  /// searching", and leaving the conversation instead loses their place in it.
   Widget _escapeCancels({required Widget child}) {
-    return Shortcuts(
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.escape):
-            CancelComposerContextIntent(),
+    return PopScope(
+      canPop: !_searchOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closeSearch();
       },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          CancelComposerContextIntent:
-              WeftGuardedAction<CancelComposerContextIntent>(
-                onInvoke: _cancelComposerContext,
-                // Disabled rather than absent: with nothing to cancel the key
-                // has to reach the `DismissIntent` above, or a dialog over a
-                // conversation would need two presses to close.
-                enabled: () => _composerContext != null,
-              ),
+      child: Shortcuts(
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.escape):
+              CancelComposerContextIntent(),
         },
-        child: child,
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            CancelComposerContextIntent:
+                WeftGuardedAction<CancelComposerContextIntent>(
+                  onInvoke: () => _composerContext != null
+                      ? _cancelComposerContext()
+                      : _closeSearch(),
+                  // Disabled rather than absent: with nothing to cancel the
+                  // key has to reach the `DismissIntent` above, or a dialog
+                  // over a conversation would need two presses to close.
+                  enabled: () => _composerContext != null || _searchOpen,
+                ),
+          },
+          child: child,
+        ),
       ),
     );
   }
@@ -2759,11 +3019,15 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.typing = const [],
     this.online = false,
     this.preview = false,
+    this.onSearch,
   });
 
   /// A preview's bar names the conversation and offers nothing: a peek that
   /// can start a call is not a peek.
   final bool preview;
+
+  /// Turns the bar into this conversation's search.
+  final VoidCallback? onSearch;
 
   final Chat chat;
 
@@ -2997,15 +3261,12 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               MaterialPageRoute<void>(builder: (_) => const MergeScreen()),
             ),
           ),
-          // Disabled rather than inert. `onPressed: () {}` is a button that
-          // announces itself as enabled, takes a tap and does nothing — which a
-          // reader has no way to distinguish from a tap that failed. There is no
-          // in-conversation search yet; the tooltip says so and the button says
-          // so by being unavailable. Search across every chat is on the inbox.
+          // Within this conversation; search across every chat is on the
+          // inbox.
           _action(
-            tooltip: context.l10n.chatSearchUnavailable,
+            tooltip: context.l10n.chatSearch,
             icon: Icons.search_rounded,
-            onPressed: null,
+            onPressed: onSearch,
           ),
         ];
 
