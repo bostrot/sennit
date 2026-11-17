@@ -18,11 +18,10 @@ import 'support/support.dart';
 ///    ("Messages become searchable as their chats are opened"). The first
 ///    scenario asserts the *before* as well as the after, because a search that
 ///    finds a never-opened chat would mean something else is writing the index.
-/// 2. **Nothing embeds it either, until someone asks.** `EmbeddingBackfill` is
-///    constructed by a provider and drained from exactly one place: the
-///    "Backfill now" button on this screen. There is no background drain, so the
-///    semantic scenario presses the button, which is also the only way a user
-///    gets one.
+/// 2. **Embedding follows indexing on its own.** `EmbeddingBackfill` starts
+///    with the session and drains a couple of seconds after anything is
+///    indexed, so the semantic scenario presses nothing: it waits for the stub
+///    to be called, which is also all a user does.
 /// 3. **A `uniqueBody` is not searchable.** `toFtsMatchQuery` strips `-` out of
 ///    every query token while FTS5 tokenised the indexed body *on* it, so the
 ///    literal string a test just sent comes back with nothing. Every marker here
@@ -177,22 +176,15 @@ void main() {
       await awaitBubble($, 'the shingles need replacing $marker');
       await $.tap(find.byTooltip('Back'));
 
-      await _openSearch($);
-      // The notice is the queue saying it has work: indexing enqueues an
-      // embedding per message and nothing in Weft drains the queue on its own.
-      await pumpUntil(
-        $,
-        () => showing(find.text('Backfill now')),
-        within: kSyncDeadline,
-        reason: 'the screen to offer to embed what is pending',
-      );
-      await $.tap(find.text('Backfill now'));
+      // Nothing pressed: opening the chat indexed the message, and indexing is
+      // what wakes the backfill.
       await pumpUntil(
         $,
         () => stub.embedded > 0,
         within: kSyncDeadline,
-        reason: 'the backfill to reach the embedding endpoint',
+        reason: 'the backfill to reach the embedding endpoint by itself',
       );
+      await _openSearch($);
 
       // Not one word in common with the message.
       //

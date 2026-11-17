@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:sqlite3/sqlite3.dart';
@@ -14,6 +15,12 @@ class SearchStore implements SearchBackend {
   final WeftDatabase _db;
 
   Database get _raw => _db.raw;
+
+  final _queued = StreamController<void>.broadcast();
+
+  /// Fires after a write that may have put messages in the embedding queue,
+  /// so a backfill can start without polling for work.
+  Stream<void> get embeddingQueued => _queued.stream;
 
   // -------------------------------------------------------------- indexing
 
@@ -44,6 +51,7 @@ class SearchStore implements SearchBackend {
       return writer.write(message, chatId: chatId, chatTitle: chatTitle);
     } finally {
       writer.dispose();
+      _queued.add(null);
     }
   }
 
@@ -61,6 +69,7 @@ class SearchStore implements SearchBackend {
       });
     } finally {
       writer.dispose();
+      _queued.add(null);
     }
   }
 
@@ -74,9 +83,30 @@ class SearchStore implements SearchBackend {
   int get indexedCount =>
       _raw.select('SELECT COUNT(*) AS c FROM search_message').first['c'] as int;
 
+  /// Messages the backfill will still embed: the same rows
+  /// [nextEmbeddingBatch] can hand out, counted.
+  ///
+  /// Not the raw queue length. Rows that ran out of attempts and rows with no
+  /// words in them stay queued — an edit re-arms them — but no drain will ever
+  /// take them, and counting them kept "still being embedded" on screen for a
+  /// queue that had long been drained.
   int get pendingEmbeddingCount =>
-      _raw.select('SELECT COUNT(*) AS c FROM embedding_queue').first['c']
+      _raw.select('''
+            SELECT COUNT(*) AS c
+            FROM embedding_queue q
+            JOIN search_message m ON m.rowid = q.message_rowid
+            WHERE $_embeddable
+            ''').first['c']
           as int;
+
+  /// Which queued rows a backfill can do anything with. A blank body has
+  /// nothing to embed, and an OpenAI-shaped endpoint rejects the whole batch
+  /// it arrives in — taking 31 healthy messages down with it.
+  static const _embeddable =
+      "q.attempts < $maxEmbeddingAttempts AND trim(m.body) != ''";
+
+  /// Failures after which a row stops being handed out.
+  static const maxEmbeddingAttempts = 5;
 
   // ------------------------------------------------------------- embeddings
 
@@ -91,7 +121,7 @@ class SearchStore implements SearchBackend {
           SELECT q.message_rowid AS rowid, m.body AS body
           FROM embedding_queue q
           JOIN search_message m ON m.rowid = q.message_rowid
-          WHERE q.attempts < 5
+          WHERE $_embeddable
           ORDER BY q.attempts ASC, q.enqueued_at ASC
           LIMIT ?
           ''',
@@ -152,6 +182,7 @@ class SearchStore implements SearchBackend {
         [DateTime.now().millisecondsSinceEpoch],
       );
     });
+    _queued.add(null);
   }
 
   @override

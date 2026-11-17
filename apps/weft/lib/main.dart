@@ -16,6 +16,7 @@ import 'app/menus.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
 import 'app/retention_providers.dart';
+import 'app/search_providers.dart';
 import 'app/session_providers.dart';
 import 'app/share_providers.dart';
 import 'app/shortcuts.dart';
@@ -106,6 +107,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _inboxSurfaces?.close();
+    _embeddingBackfill?.close();
     super.dispose();
   }
 
@@ -133,6 +135,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   /// subscription starts when the session becomes ready and is closed when it
   /// stops being.
   ProviderSubscription<AsyncValue<List<Chat>>>? _inboxSurfaces;
+
+  /// Keeps the search backfill running for as long as there is a session.
+  ProviderSubscription<EmbeddingBackfill?>? _embeddingBackfill;
 
   /// Clears a conversation the user read somewhere else.
   ///
@@ -496,6 +501,13 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           // itself must not quietly stop doing so because this device does not
           // do notifications.
           ref.read(retentionSweeperProvider)?.start();
+          // Held, not read once: a listener is what makes the backfill rebuild
+          // — and so start — the moment a model or an endpoint is switched on,
+          // rather than the next time something happens to ask for it.
+          _embeddingBackfill ??= ref.listenManual(
+            embeddingBackfillProvider,
+            (_, _) {},
+          );
           // Every launch, so a purchase that finished while the app was
           // closed is acknowledged and a live subscription re-confirmed.
           unawaited(ref.read(proControllerProvider.notifier).start());
@@ -508,6 +520,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // costs a re-auth nothing.
         case WeftSessionState.loggedOut || WeftSessionState.softLoggedOut:
           _stopInboxSurfaces();
+          _embeddingBackfill?.close();
+          _embeddingBackfill = null;
         case _:
           break;
       }
