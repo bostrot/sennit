@@ -1074,8 +1074,6 @@
   "backgroundWorkBackingUp": "Fazendo backup das conversas",
   "backgroundWorkRestoring": "Restaurando um backup",
   "backgroundWorkSendingAttachments": "{count, plural, =1{Enviando 1 anexo} other{Enviando {count} anexos}}",
-  "backgroundWorkIndexingSearch": "Preparando mensagens para busca",
-  "backgroundWorkMessagesLeft": "{count, plural, =1{Falta 1 mensagem} other{Faltam {count} mensagens}}",
   "backgroundWorkMore": "{count, plural, =1{+1 tarefa} other{+{count} tarefas}}",
   "notificationChannelGroupMessages": "Mensagens",
   "notificationChannelGroupDescription": "Um canal por rede, para ajustar cada um separadamente.",

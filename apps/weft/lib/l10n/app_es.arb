@@ -1073,8 +1073,6 @@
   "backgroundWorkBackingUp": "Haciendo copia de tus chats",
   "backgroundWorkRestoring": "Restaurando una copia",
   "backgroundWorkSendingAttachments": "{count, plural, =1{Enviando 1 adjunto} other{Enviando {count} adjuntos}}",
-  "backgroundWorkIndexingSearch": "Preparando mensajes para buscar",
-  "backgroundWorkMessagesLeft": "{count, plural, =1{Queda 1 mensaje} other{Quedan {count} mensajes}}",
   "backgroundWorkMore": "{count, plural, =1{+1 tarea más} other{+{count} tareas más}}",
   "notificationChannelGroupMessages": "Mensajes",
   "notificationChannelGroupDescription": "Un canal por red, para poder ajustar cada uno por separado.",

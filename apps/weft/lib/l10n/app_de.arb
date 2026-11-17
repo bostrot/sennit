@@ -1073,8 +1073,6 @@
   "backgroundWorkBackingUp": "Chats werden gesichert",
   "backgroundWorkRestoring": "Backup wird wiederhergestellt",
   "backgroundWorkSendingAttachments": "{count, plural, =1{1 Anhang wird gesendet} other{{count} Anhänge werden gesendet}}",
-  "backgroundWorkIndexingSearch": "Nachrichten werden durchsuchbar gemacht",
-  "backgroundWorkMessagesLeft": "{count, plural, =1{Noch 1 Nachricht} other{Noch {count} Nachrichten}}",
   "backgroundWorkMore": "{count, plural, =1{+1 weitere Aufgabe} other{+{count} weitere Aufgaben}}",
   "notificationChannelGroupMessages": "Nachrichten",
   "notificationChannelGroupDescription": "Ein Kanal pro Netzwerk, damit sich jeder einzeln einstellen lässt.",

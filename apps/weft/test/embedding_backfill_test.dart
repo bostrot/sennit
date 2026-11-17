@@ -1,8 +1,11 @@
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/search_providers.dart';
 import 'package:weft/app/stores.dart';
+import 'package:weft/services/background/background_work.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_search/weft_search.dart';
 
@@ -153,12 +156,153 @@ void main() {
     expect(patient.pending, 0);
     expect(patient.pausedReason, isNull);
   });
+
+  // The backgrounded process is the one the built-in connection posts
+  // notifications from. Indexing there is nobody's search and everybody's
+  // battery, and it once took the whole process down with it.
+  group('in the background', () {
+    late ValueNotifier<bool> foreground;
+    late EmbeddingBackfill gated;
+
+    setUp(() {
+      foreground = ValueNotifier(true);
+      gated = EmbeddingBackfill(
+        store: stores.search,
+        provider: provider,
+        foreground: foreground,
+        settle: const Duration(milliseconds: 1),
+        firstRetry: const Duration(milliseconds: 20),
+        maxRetry: const Duration(milliseconds: 20),
+      );
+    });
+
+    tearDown(() {
+      gated.dispose();
+      foreground.dispose();
+    });
+
+    test('nothing drains, and coming back catches up', () async {
+      foreground.value = false;
+      for (var i = 0; i < 40; i++) {
+        index('\$$i', 'message $i');
+      }
+
+      gated.start();
+      index(r'$late', 'arrived while away');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(provider.calls, 0);
+      expect(gated.running, isFalse);
+
+      foreground.value = true;
+      await until(() => gated.pending == 0 && !gated.running);
+      expect(provider.embedded, 41);
+    });
+
+    test('a drain under way stops after the batch it is on', () async {
+      for (var i = 0; i < 100; i++) {
+        index('\$$i', 'message $i');
+      }
+      provider.onEmbed = () => foreground.value = false;
+
+      gated.start();
+      await until(() => provider.calls == 1 && !gated.running);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(provider.calls, 1, reason: 'no batch after the app left');
+      expect(gated.pending, 68);
+
+      provider.onEmbed = null;
+      foreground.value = true;
+      await until(() => gated.pending == 0 && !gated.running);
+    });
+
+    test('a retry after an endpoint failure waits for the app', () async {
+      index(r'$1', 'hello');
+      provider.failNext(
+        // No failure kind: a socket that never connected, as in Doze.
+        const EmbeddingException('unreachable'),
+        times: 1,
+      );
+
+      gated.start();
+      await until(() => gated.pausedReason != null);
+      foreground.value = false;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(provider.calls, 1, reason: 'the retry timer must not fire');
+
+      foreground.value = true;
+      await until(() => gated.pending == 0);
+      expect(gated.pausedReason, isNull);
+    });
+  });
+
+  test('an unreachable endpoint never starts a foreground service', () async {
+    // The crash this guards: a backlog of 100 or more used to begin a
+    // background-work job before the first request, and an endpoint that
+    // failed at once ended it again — on Android, a foreground service
+    // stopped before it could call startForeground, which kills the app.
+    for (var i = 0; i < 150; i++) {
+      index('\$$i', 'message $i');
+    }
+    provider.failNext(
+      // No failure kind: a socket that never connected, as in Doze.
+      const EmbeddingException('unreachable'),
+      times: 1000,
+    );
+    final host = _RecordingHost();
+    final foreground = ValueNotifier(true);
+    addTearDown(foreground.dispose);
+    final container = ProviderContainer(
+      overrides: [
+        storesProvider.overrideWithValue(stores),
+        embeddingProviderProvider.overrideWithValue(provider),
+        backgroundWorkProvider.overrideWithValue(BackgroundWork(host: host)),
+        appInForegroundProvider.overrideWithValue(foreground),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final provided = container.read(embeddingBackfillProvider)!;
+    await until(() => provided.pausedReason != null);
+
+    expect(host.shown, isEmpty);
+  });
+
+  testWidgets('the app counts as in front until it is hidden', (tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final foreground = container.read(appInForegroundProvider);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    expect(foreground.value, isTrue);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    expect(foreground.value, isTrue);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    expect(foreground.value, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    expect(foreground.value, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    expect(foreground.value, isTrue);
+  });
+}
+
+class _RecordingHost implements BackgroundWorkHost {
+  final shown = <BackgroundWorkStatus>[];
+
+  @override
+  Future<void> show(BackgroundWorkStatus status) async => shown.add(status);
+
+  @override
+  Future<void> stop() async {}
 }
 
 class _ScriptedProvider implements EmbeddingProvider {
   final _inner = const HashingEmbeddingProvider(dimensions: 16);
 
   int embedded = 0;
+  int calls = 0;
+  void Function()? onEmbed;
   String? rejects;
   bool rejectsAll = false;
   EmbeddingException? _failure;
@@ -177,6 +321,8 @@ class _ScriptedProvider implements EmbeddingProvider {
 
   @override
   Future<List<Int8List>> embed(List<String> texts) async {
+    calls++;
+    onEmbed?.call();
     if (_failures > 0) {
       _failures--;
       throw _failure!;

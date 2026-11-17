@@ -1074,8 +1074,6 @@
   "backgroundWorkBackingUp": "正在备份聊天",
   "backgroundWorkRestoring": "正在恢复备份",
   "backgroundWorkSendingAttachments": "{count, plural, other{正在发送 {count} 个附件}}",
-  "backgroundWorkIndexingSearch": "正在为消息建立搜索索引",
-  "backgroundWorkMessagesLeft": "{count, plural, other{还剩 {count} 条消息}}",
   "backgroundWorkMore": "{count, plural, other{另有 {count} 项任务}}",
   "notificationChannelGroupMessages": "消息",
   "notificationChannelGroupDescription": "每个网络一个通道，可以分别调整。",

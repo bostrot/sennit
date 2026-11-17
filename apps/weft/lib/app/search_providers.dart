@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
@@ -9,7 +10,6 @@ import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../features/settings/models_screen.dart';
 import '../services/billing/entitlements.dart';
-import '../services/background/background_work.dart';
 import '../services/models/model_catalog.dart';
 import '../services/search/local_embedding_provider.dart';
 import '../services/transcription/local_whisper_provider.dart';
@@ -143,7 +143,7 @@ final transcriptionProviderProvider = FutureProvider<TranscriptionProvider?>((
   return provider;
 });
 
-/// Drains the embedding queue in the background, on its own.
+/// Drains the embedding queue on its own.
 ///
 /// Runs only while an embedding provider is configured; without one the queue
 /// simply accumulates, and enabling embeddings later backfills everything that
@@ -156,22 +156,33 @@ final transcriptionProviderProvider = FutureProvider<TranscriptionProvider?>((
 /// opened, and "Backfill will retry" after a 429 was a promise nobody kept.
 /// Choosing a model or an endpoint is the consent — the text leaves the device
 /// at that moment or never — so asking again per batch protected nothing.
+///
+/// Only while the app is in front. Search is read there and nowhere else, and
+/// the process a backgrounded Sennit lives in is the one the built-in
+/// connection posts notifications from. Draining there — and wrapping every
+/// drain of 100 or more in a foreground service — meant an endpoint the phone
+/// could not reach in Doze started that service and stopped it again within
+/// milliseconds, every retry, all night. Android crashes an app that stops a
+/// service before it was let call `startForeground`, and a process that crashes
+/// in the background does not get its connection back until it is opened.
 class EmbeddingBackfill extends ChangeNotifier {
   EmbeddingBackfill({
     required this.store,
     required this.provider,
-    this.work,
+    this.foreground,
     this.settle = const Duration(seconds: 2),
     this.firstRetry = const Duration(seconds: 30),
     this.maxRetry = const Duration(minutes: 30),
-  });
+  }) {
+    foreground?.addListener(_onForegroundChanged);
+  }
 
   final SearchStore store;
   final EmbeddingProvider provider;
 
-  /// Where a long drain shows its progress and keeps the process alive. Null
-  /// drains quietly.
-  final BackgroundWork? work;
+  /// Whether the app is in front, which is the only time a drain runs. Null
+  /// drains regardless — tests, and anything with no lifecycle to follow.
+  final ValueListenable<bool>? foreground;
 
   /// How long new work waits for more to arrive: opening a chat indexes a
   /// page of history at once, and one drain should take all of it.
@@ -179,10 +190,6 @@ class EmbeddingBackfill extends ChangeNotifier {
 
   final Duration firstRetry;
   final Duration maxRetry;
-
-  /// A backlog this size goes into the background-work notification. A few
-  /// new messages embed in well under a second and are not worth one.
-  static const backgroundThreshold = 100;
 
   bool _running = false;
   bool _again = false;
@@ -193,6 +200,8 @@ class EmbeddingBackfill extends ChangeNotifier {
   int _total = 0;
 
   int get pending => store.pendingEmbeddingCount;
+
+  bool get _inForeground => foreground?.value ?? true;
 
   /// Whether a drain is under way right now.
   bool get running => _running;
@@ -216,8 +225,11 @@ class EmbeddingBackfill extends ChangeNotifier {
   /// Asks for a drain after [delay] (default [settle]). A drain already
   /// running goes round again instead, and a pending retry after a failure is
   /// left alone — the endpoint asked for the wait; [retryNow] overrides it.
+  ///
+  /// In the background it does nothing: coming back to the front drains
+  /// whatever arrived meanwhile.
   void schedule([Duration? delay]) {
-    if (_disposed) return;
+    if (_disposed || !_inForeground) return;
     if (_running) {
       _again = true;
       return;
@@ -225,6 +237,27 @@ class EmbeddingBackfill extends ChangeNotifier {
     if (_pausedReason != null) return;
     _timer?.cancel();
     _timer = Timer(delay ?? settle, () => unawaited(_drain()));
+  }
+
+  /// Leaving stops the clock — a drain under way finishes its batch and goes
+  /// no further — and coming back picks up where it left off: a retry still
+  /// waits out its backoff, anything else drains now.
+  void _onForegroundChanged() {
+    if (_disposed) return;
+    _timer?.cancel();
+    if (!_inForeground) return;
+    if (_pausedReason != null) {
+      _retryAfter(_backoff ?? firstRetry);
+    } else {
+      schedule(Duration.zero);
+    }
+  }
+
+  void _retryAfter(Duration wait) {
+    _timer = Timer(wait, () {
+      _pausedReason = null;
+      unawaited(_drain());
+    });
   }
 
   /// Ends a pause early: the user saw why and wants another go now.
@@ -236,27 +269,20 @@ class EmbeddingBackfill extends ChangeNotifier {
   }
 
   Future<void> _drain() async {
-    if (_running || _disposed) return;
+    if (_running || _disposed || !_inForeground) return;
     _running = true;
     _total = pending;
     _notify();
-    final job = _total >= backgroundThreshold
-        ? work?.begin(weftPlatformL10n().backgroundWorkIndexingSearch)
-        : null;
     try {
       do {
         _again = false;
         await drainAll(
           onProgress: (remaining) {
             if (remaining > _total) _total = remaining;
-            job?.update(
-              detail: weftPlatformL10n().backgroundWorkMessagesLeft(remaining),
-              fraction: progress,
-            );
             _notify();
           },
         );
-      } while (_again && !_disposed);
+      } while (_again && !_disposed && _inForeground);
       _backoff = null;
       _pausedReason = null;
     } on Exception catch (e) {
@@ -271,14 +297,8 @@ class EmbeddingBackfill extends ChangeNotifier {
       // not JSON, say — is the endpoint's doing as well.
       _pausedReason = e is _EndpointUnavailable ? e.reason : '$e';
       _timer?.cancel();
-      if (!_disposed) {
-        _timer = Timer(wait, () {
-          _pausedReason = null;
-          unawaited(_drain());
-        });
-      }
+      if (!_disposed && _inForeground) _retryAfter(wait);
     } finally {
-      job?.end();
       _running = false;
       _notify();
     }
@@ -352,7 +372,7 @@ class EmbeddingBackfill extends ChangeNotifier {
 
   /// Keeps draining until the queue is empty or progress stops.
   Future<void> drainAll({void Function(int remaining)? onProgress}) async {
-    while (!_disposed) {
+    while (!_disposed && _inForeground) {
       final wrote = await drainOnce();
       onProgress?.call(pending);
       if (wrote == 0) return;
@@ -370,6 +390,7 @@ class EmbeddingBackfill extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    foreground?.removeListener(_onForegroundChanged);
     unawaited(_queued?.cancel());
     super.dispose();
   }
@@ -393,8 +414,34 @@ final embeddingBackfillProvider = Provider<EmbeddingBackfill?>((ref) {
   final backfill = EmbeddingBackfill(
     store: ref.watch(storesProvider).search,
     provider: provider,
-    work: ref.read(backgroundWorkProvider),
+    foreground: ref.watch(appInForegroundProvider),
   )..start();
   ref.onDispose(backfill.dispose);
   return backfill;
+});
+
+/// Whether the app is in front of the user, kept current as it comes and goes.
+///
+/// `inactive` counts as in front — a call banner or the notification shade
+/// pulled down over the app — and so does no state at all yet, which is an
+/// engine its activity has only just started. Hidden, paused and detached are
+/// the background.
+final appInForegroundProvider = Provider<ValueListenable<bool>>((ref) {
+  bool inFront(AppLifecycleState? state) => switch (state) {
+    null || AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+    AppLifecycleState.hidden ||
+    AppLifecycleState.paused ||
+    AppLifecycleState.detached => false,
+  };
+  final foreground = ValueNotifier(
+    inFront(WidgetsBinding.instance.lifecycleState),
+  );
+  final listener = AppLifecycleListener(
+    onStateChange: (state) => foreground.value = inFront(state),
+  );
+  ref.onDispose(() {
+    listener.dispose();
+    foreground.dispose();
+  });
+  return foreground;
 });

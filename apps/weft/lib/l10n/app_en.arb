@@ -6203,19 +6203,6 @@
       }
     }
   },
-  "backgroundWorkIndexingSearch": "Making messages searchable",
-  "@backgroundWorkIndexingSearch": {
-    "description": "Title of the progress notification shown while messages are embedded for search by meaning. Keep under ~40 chars."
-  },
-  "backgroundWorkMessagesLeft": "{count, plural, =1{1 message left} other{{count} messages left}}",
-  "@backgroundWorkMessagesLeft": {
-    "description": "Second line of the search-indexing progress notification. Keep under ~30 chars.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backgroundWorkMore": "{count, plural, =1{+1 more task} other{+{count} more tasks}}",
   "@backgroundWorkMore": {
     "description": "Small text beside the progress notification when more than one long task is running at once. Keep under ~20 chars.",
