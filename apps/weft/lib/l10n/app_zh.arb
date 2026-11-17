@@ -381,7 +381,7 @@
   "chatSearchClose": "关闭搜索",
   "chatSearchOlder": "上一个结果",
   "chatSearchNewer": "下一个结果",
-  "chatSearchPosition": "第 {position} 个，共 {total} 个",
+  "chatSearchPosition": "{position}/{total}",
   "chatSearchNoResults": "无结果",
   "chatSearchNotLoaded": "无法加载该消息。它可能在历史记录中太靠前了。",
   "chatMessagesFromDate": "{date} 的消息",
