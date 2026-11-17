@@ -145,6 +145,7 @@
   "macHideSidebar": "Seitenleiste ausblenden",
   "macShowSidebar": "Seitenleiste einblenden",
   "macSearchHint": "Suchen",
+  "macClearSearch": "Suche löschen",
   "macNewConversation": "Neue Unterhaltung",
   "macEmptyListTitle": "Keine Unterhaltungen",
   "macEmptyListBody": "Nichts passt zu dem, was die Seitenleiste zeigt.",

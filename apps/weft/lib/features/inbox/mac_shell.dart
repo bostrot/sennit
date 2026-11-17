@@ -477,6 +477,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
       MacSearchField(
         controller: _searchController,
         hintText: context.l10n.macSearchHint,
+        clearLabel: context.l10n.macClearSearch,
         width: 120,
         focusedWidth: 180,
         // Search has a screen of its own — filters, provenance,

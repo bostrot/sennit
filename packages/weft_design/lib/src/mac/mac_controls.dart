@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../surface.dart';
+import '../tap_target.dart';
 import '../theme.dart';
 import '../tokens.dart';
 
@@ -143,6 +144,7 @@ class MacSearchField extends StatefulWidget {
     super.key,
     required this.controller,
     this.hintText = 'Search',
+    this.clearLabel = 'Clear search',
     this.onChanged,
     this.onSubmitted,
     this.focusNode,
@@ -153,6 +155,11 @@ class MacSearchField extends StatefulWidget {
 
   final TextEditingController controller;
   final String hintText;
+
+  /// The clear button's tooltip and accessibility label. The default is for
+  /// tests; an app passes its own translation.
+  final String clearLabel;
+
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final FocusNode? focusNode;
@@ -204,6 +211,13 @@ class _MacSearchFieldState extends State<MacSearchField> {
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: _focused ? 0.10 : 0.07),
         borderRadius: BorderRadius.circular(MacMetrics.controlRadius - 1),
+      ),
+      // Painted over the field rather than inset into it. As a background
+      // border the ring took two points off every side on focus, which left
+      // the clear button 20 tall, under the 24 a pointer target needs, and
+      // nudged the glyph and the text sideways at the moment typing began.
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(MacMetrics.controlRadius - 1),
         border: Border.all(
           color: _focused ? palette.focusRing : Colors.transparent,
           width: _focused ? 2 : 0,
@@ -239,6 +253,7 @@ class _MacSearchFieldState extends State<MacSearchField> {
           ),
           if (widget.controller.text.isNotEmpty)
             _ClearButton(
+              label: widget.clearLabel,
               onPressed: () {
                 widget.controller.clear();
                 widget.onChanged?.call('');
@@ -252,20 +267,32 @@ class _MacSearchFieldState extends State<MacSearchField> {
 }
 
 class _ClearButton extends StatelessWidget {
-  const _ClearButton({required this.onPressed});
+  const _ClearButton({required this.label, required this.onPressed});
 
+  final String label;
   final VoidCallback onPressed;
 
+  /// The glyph stays the system's 13pt; the box around it is the field's full
+  /// height and as wide, so the target is 24 square where it used to be the
+  /// glyph alone — a 13pt circle at the end of a field is a hard thing to land
+  /// a pointer on, and a miss puts the caret in the text instead.
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: 'Clear search',
-    child: GestureDetector(
-      onTap: onPressed,
-      child: Icon(
-        Icons.cancel_rounded,
-        size: 13,
-        color: context.colors.onSurfaceVariant,
+  Widget build(BuildContext context) => Tooltip(
+    message: label,
+    waitDuration: kMacTooltipDelay,
+    child: Semantics(
+      button: true,
+      label: label,
+      child: WeftTapTarget(
+        minSize: const Size.square(MacMetrics.fieldHeight),
+        child: GestureDetector(
+          onTap: onPressed,
+          child: Icon(
+            Icons.cancel_rounded,
+            size: 13,
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
       ),
     ),
   );

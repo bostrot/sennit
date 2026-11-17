@@ -132,6 +132,38 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(MacSidebar), findsOneWidget);
     });
+
+    testWidgets('the search field clears in the reader\'s language', (
+      tester,
+    ) async {
+      await pumpWeft(
+        tester,
+        const InboxShell(),
+        surface: WeftSurface.mac,
+        variant: const WeftGoldenVariant(name: 'de', locale: Locale('de')),
+      );
+
+      await tester.enterText(find.byType(MacSearchField), 'Anna');
+      await tester.pump();
+
+      expect(find.byTooltip('Suche löschen'), findsOneWidget);
+      expect(find.byTooltip('Clear search'), findsNothing);
+
+      await tester.tap(find.byTooltip('Suche löschen'));
+      await tester.pump();
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byType(MacSearchField),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+    });
   });
 
   group('panels', () {

@@ -145,6 +145,7 @@
   "macHideSidebar": "Masquer la barre latérale",
   "macShowSidebar": "Afficher la barre latérale",
   "macSearchHint": "Rechercher",
+  "macClearSearch": "Effacer la recherche",
   "macNewConversation": "Nouvelle conversation",
   "macEmptyListTitle": "Aucune conversation",
   "macEmptyListBody": "Rien ne correspond à la sélection de la barre latérale.",
