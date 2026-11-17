@@ -259,7 +259,7 @@ and Mac window diffs reviewed by eye.
 
 ## Open
 
-### Medium — six controls smaller than the floor, all macOS, all icon-only
+### Medium — six controls smaller than the floor, all macOS, all icon-only (one since fixed)
 
 Every one is a glyph whose semantics node is the glyph rather than a padded
 button. None is on the touch shell, where `test/a11y/semantics_test.dart`
@@ -268,7 +268,7 @@ already holds the 48dp line.
 | # | Surface | Control | Size | Proposed |
 |---|---|---|---|---|
 | UI-04a | inbox | "Search" (Mac toolbar field) | 93 × 19 | field height to `MacMetrics.fieldHeight` |
-| UI-04b | chat | "Clear search" | 13 × 13 | wrap in `WeftTapTarget` |
+| UI-04b | chat | "Clear search" | 13 × 13 | **Fixed 2026-11-17**: `WeftTapTarget` at `MacMetrics.fieldHeight`, now 24 × 24 and named from the catalogue (`macClearSearch`) |
 | UI-04c | chat | "Attach" | 20 × 20 | wrap in `WeftTapTarget` |
 | UI-04d | chat | "Record voice message" | 16 × 16 | wrap in `WeftTapTarget` |
 | UI-05a | search | an unnamed 504 × 20 node | | the field's inner box; grows with UI-04a |

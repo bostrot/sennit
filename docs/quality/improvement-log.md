@@ -8,11 +8,17 @@ and what was noticed but not done.
 ## Shipped
 
 - 2026-11-16 · User experience · A jump-to-latest button appears in a chat once you scroll up into older messages · https://github.com/bostrot/sennit/pull/3
+- 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · https://github.com/bostrot/sennit/pull/4
 
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
   requests, open or closed, so there is nothing to learn from yet.
+- 2026-11-17 · No review comments yet; #3 was merged as opened. Practical
+  note: a CI job that fails on `main` fails on every PR too, so before
+  blaming a change, compare against the latest `main` run. Both #3 and #4
+  were held up by `main`'s own CI (missing FFmpeg headers on the Linux
+  runner, one unformatted file, one unused import), not by their changes.
 
 ## Ideas backlog
 
@@ -35,6 +41,11 @@ and what was noticed but not done.
   turn it back on choice in `inbox_shell.dart` and `contact_profile.dart`.
   Open question: a timed mute is Sennit's own while a plain one is a Matrix
   push rule, so the menu has to be clear about which it writes.
+  Found 2026-11-17: the inbox row's muted icon and the menu's Mute/Unmute
+  choice read only `chat.muted` (the push rule), so a timed mute set there
+  would leave the row looking unmuted and the menu offering "Mute" again.
+  Both need to read `notificationPolicyProvider` too — why it is more than a
+  menu entry.
 - **An unread divider.** Opening a chat with unread messages lands at the
   bottom with no mark of where the new ones begin. Needs the read marker at
   open time, before `_open` marks the chat read. Probably more than one run.
@@ -45,3 +56,15 @@ and what was noticed but not done.
   `didUpdateWidget` calls `_open` for the new chat on the same `State`, and
   nothing visibly resets `_scroll`. Not verified — worth a failing test before
   touching anything.
+- **The rest of UI-04 and UI-05.** The search field's text box is 19pt tall
+  inside its 24pt field (UI-04a, UI-05a/b); with the focus ring now painted
+  over the field rather than inset, the `TextField` can take the full
+  `MacMetrics.fieldHeight`. "Attach" and "Record voice message" (UI-04c/d) are
+  in `chat_view.dart`'s composer; #3 has merged, so that file is free now.
+- **Escape empties the Mac search field.** The system's search fields do it;
+  `MacSearchField` does not. Check first what Escape is already bound to in
+  `shortcuts.dart` so it does not also close the pane.
+- **A window per conversation on the Mac.** Element X for iOS added multiple
+  windows on Mac and iPad in 26.04.1
+  (https://newreleases.io/project/github/element-hq/element-x-ios/release/release%2F26.04.1).
+  Far more than a run; worth a design note first.

@@ -146,6 +146,7 @@
   "macHideSidebar": "隐藏边栏",
   "macShowSidebar": "显示边栏",
   "macSearchHint": "搜索",
+  "macClearSearch": "清除搜索",
   "macNewConversation": "新建对话",
   "macEmptyListTitle": "没有对话",
   "macEmptyListBody": "没有内容符合边栏当前的筛选。",

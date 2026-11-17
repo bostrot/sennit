@@ -740,6 +740,11 @@
   "@macSearchHint": {
     "description": "Placeholder in the small search field in the Mac list toolbar. The field is 120pt wide, so this must be one short word."
   },
+  "macClearSearch": "Clear search",
+  "@macClearSearch": {
+    "description": "Tooltip and screen-reader name of the small x button at the end of the Mac toolbar search field, shown once something is typed. Empties the field. Keep under ~20 chars.",
+    "maxLength": 40
+  },
   "macNewConversation": "New conversation",
   "@macNewConversation": {
     "description": "Tooltip on the compose button in the Mac list toolbar. Keep under ~20 chars.",
