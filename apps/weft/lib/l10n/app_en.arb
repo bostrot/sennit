@@ -5892,10 +5892,28 @@
     "description": "Screen-reader-only label for the spinner in the search screen's app bar. Keep under ~18 chars.",
     "maxLength": 36
   },
-  "searchBackfillNow": "Backfill now",
-  "@searchBackfillNow": {
-    "description": "Button that indexes every conversation at once rather than waiting for each to be opened. Keep under ~22 chars.",
-    "maxLength": 40
+  "searchIndexingProgress": "{count, plural, =1{Indexing 1 message for search by meaning. Until it finishes, results by meaning may be incomplete.} other{Indexing {count} messages for search by meaning. Until it finishes, results by meaning may be incomplete.}}",
+  "@searchIndexingProgress": {
+    "description": "Notice on the search screen while messages are being prepared for search by meaning in the background. It runs on its own; nothing to press. Keep under ~110 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchIndexingPaused": "{count, plural, =1{Indexing for search by meaning is paused and will try again on its own. 1 message is waiting.} other{Indexing for search by meaning is paused and will try again on its own. {count} messages are waiting.}}",
+  "@searchIndexingPaused": {
+    "description": "Notice on the search screen when the embedding model or endpoint failed (offline, rate limited, wrong key). The reason follows on the next line. Keep under ~110 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchIndexingRetry": "Retry now",
+  "@searchIndexingRetry": {
+    "description": "Button beside the paused-indexing notice that tries again immediately instead of waiting. Keep under ~16 chars.",
+    "maxLength": 32
   },
   "searchNotIndexedYet": "Messages become searchable as their chats are opened.",
   "@searchNotIndexedYet": {

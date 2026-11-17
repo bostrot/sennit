@@ -41,5 +41,5 @@ Marked with `// l10n-ignore:` at the call site. Not outstanding work: each is a 
 | `apps/weft/lib/features/settings/mcp_screen.dart` | 304 | `'$entry'` | a machine-readable audit line; its screen-reader label is translated. |
 | `apps/weft/lib/features/settings/pro_screen.dart` | 291 | `'BRAID-XXXXX-XXXXX-XXXXX-XXXXX'` | the shape of a licence key, not prose. |
 | `apps/weft/lib/features/settings/sms_screen.dart` | 292 | `'${context.l10n.smsRcsDialogBody(bridged ? context.l10n.smsRcsDialogBridgeClause : '')}.'` | an interpolation of strings already translated above. |
-| `apps/weft/lib/main.dart` | 527 | `'Sennit'` | the app's own name, never translated. |
+| `apps/weft/lib/main.dart` | 541 | `'Sennit'` | the app's own name, never translated. |
 | `apps/weft/lib/services/backup/backup_service.dart` | 69 | `'Sennit backup'` | the name of Sennit's own file format, as the system file dialog lists it. |

@@ -343,6 +343,37 @@ void main() {
       expect(batch, hasLength(1));
     });
 
+    test('the pending count is only what a backfill can still take', () {
+      final poison = store.indexMessage(msg(r'$bad', 'poison'), chatId: 'c1');
+      store.indexMessage(msg(r'$blank', '   '), chatId: 'c1');
+      store.indexMessage(msg(r'$good', 'fine'), chatId: 'c1');
+      for (var i = 0; i < SearchStore.maxEmbeddingAttempts; i++) {
+        store.recordEmbeddingFailure(poison, 'boom');
+      }
+
+      expect(
+        store.pendingEmbeddingCount,
+        1,
+        reason:
+            'an exhausted row and a blank one are never drained, so counting '
+            'them keeps "still being embedded" on screen forever',
+      );
+      expect(store.nextEmbeddingBatch().map((b) => b.body), ['fine']);
+    });
+
+    test('announces writes that may have queued embeddings', () async {
+      var announced = 0;
+      final sub = store.embeddingQueued.listen((_) => announced++);
+      addTearDown(sub.cancel);
+
+      store.indexMessage(msg(r'$1', 'one'), chatId: 'c1');
+      store.indexMessages([msg(r'$2', 'two')], chatId: 'c1');
+      store.reindexEmbeddings();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(announced, 3);
+    });
+
     test('editing a message invalidates its stale vector', () async {
       const provider = HashingEmbeddingProvider(dimensions: 32);
       final rowId = store.indexMessage(msg(r'$1', 'original'), chatId: 'c1');

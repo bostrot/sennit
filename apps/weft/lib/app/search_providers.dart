@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
@@ -5,6 +9,7 @@ import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../features/settings/models_screen.dart';
 import '../services/billing/entitlements.dart';
+import '../services/background/background_work.dart';
 import '../services/models/model_catalog.dart';
 import '../services/search/local_embedding_provider.dart';
 import '../services/transcription/local_whisper_provider.dart';
@@ -138,69 +143,258 @@ final transcriptionProviderProvider = FutureProvider<TranscriptionProvider?>((
   return provider;
 });
 
-/// Drains the embedding queue in the background.
+/// Drains the embedding queue in the background, on its own.
 ///
 /// Runs only while an embedding provider is configured; without one the queue
 /// simply accumulates, and enabling embeddings later backfills everything that
-/// was indexed in the meantime.
-class EmbeddingBackfill {
-  EmbeddingBackfill({required this.store, required this.provider});
+/// was indexed in the meantime. Once [start]ed it drains at launch, again
+/// shortly after anything new is indexed, and after a pause for any failure
+/// that was the endpoint's rather than a message's.
+///
+/// It used to drain only when someone pressed the button on the search
+/// screen, which nothing explained: the notice came back every time search was
+/// opened, and "Backfill will retry" after a 429 was a promise nobody kept.
+/// Choosing a model or an endpoint is the consent — the text leaves the device
+/// at that moment or never — so asking again per batch protected nothing.
+class EmbeddingBackfill extends ChangeNotifier {
+  EmbeddingBackfill({
+    required this.store,
+    required this.provider,
+    this.work,
+    this.settle = const Duration(seconds: 2),
+    this.firstRetry = const Duration(seconds: 30),
+    this.maxRetry = const Duration(minutes: 30),
+  });
 
   final SearchStore store;
   final EmbeddingProvider provider;
 
+  /// Where a long drain shows its progress and keeps the process alive. Null
+  /// drains quietly.
+  final BackgroundWork? work;
+
+  /// How long new work waits for more to arrive: opening a chat indexes a
+  /// page of history at once, and one drain should take all of it.
+  final Duration settle;
+
+  final Duration firstRetry;
+  final Duration maxRetry;
+
+  /// A backlog this size goes into the background-work notification. A few
+  /// new messages embed in well under a second and are not worth one.
+  static const backgroundThreshold = 100;
+
   bool _running = false;
+  bool _again = false;
+  bool _disposed = false;
+  Timer? _timer;
+  StreamSubscription<void>? _queued;
+  Duration? _backoff;
+  int _total = 0;
 
   int get pending => store.pendingEmbeddingCount;
 
-  /// Embeds one batch. Returns how many vectors were written, so callers can
-  /// loop until zero.
-  Future<int> drainOnce({int batchSize = 32}) async {
-    if (_running) return 0;
-    _running = true;
-    try {
-      final batch = store.nextEmbeddingBatch(limit: batchSize);
-      if (batch.isEmpty) return 0;
+  /// Whether a drain is under way right now.
+  bool get running => _running;
 
-      try {
-        final vectors = await provider.embed([for (final b in batch) b.body]);
-        for (var i = 0; i < batch.length; i++) {
-          store.saveEmbedding(
-            rowId: batch[i].rowId,
-            vector: vectors[i],
-            model: provider.modelId,
-          );
-        }
-        return batch.length;
-      } on EmbeddingException catch (e) {
-        // Attributed per row so a poison message sinks in the queue instead of
-        // blocking everything behind it.
-        final reason = weftPlatformL10n().embeddingFailure(e) ?? e.message;
-        for (final item in batch) {
-          store.recordEmbeddingFailure(item.rowId, reason);
-        }
-        return 0;
+  /// Why draining stopped and is waiting to try again, or null when it is not.
+  String? get pausedReason => _pausedReason;
+  String? _pausedReason;
+
+  /// How far through the current drain, 0..1, or null when not draining.
+  double? get progress {
+    if (!_running || _total == 0) return null;
+    return (1 - pending / _total).clamp(0.0, 1.0);
+  }
+
+  /// Drains now, and from then on whenever messages are indexed.
+  void start() {
+    _queued ??= store.embeddingQueued.listen((_) => schedule());
+    schedule(Duration.zero);
+  }
+
+  /// Asks for a drain after [delay] (default [settle]). A drain already
+  /// running goes round again instead, and a pending retry after a failure is
+  /// left alone — the endpoint asked for the wait; [retryNow] overrides it.
+  void schedule([Duration? delay]) {
+    if (_disposed) return;
+    if (_running) {
+      _again = true;
+      return;
+    }
+    if (_pausedReason != null) return;
+    _timer?.cancel();
+    _timer = Timer(delay ?? settle, () => unawaited(_drain()));
+  }
+
+  /// Ends a pause early: the user saw why and wants another go now.
+  Future<void> retryNow() {
+    _timer?.cancel();
+    _pausedReason = null;
+    _notify();
+    return _drain();
+  }
+
+  Future<void> _drain() async {
+    if (_running || _disposed) return;
+    _running = true;
+    _total = pending;
+    _notify();
+    final job = _total >= backgroundThreshold
+        ? work?.begin(weftPlatformL10n().backgroundWorkIndexingSearch)
+        : null;
+    try {
+      do {
+        _again = false;
+        await drainAll(
+          onProgress: (remaining) {
+            if (remaining > _total) _total = remaining;
+            job?.update(
+              detail: weftPlatformL10n().backgroundWorkMessagesLeft(remaining),
+              fraction: progress,
+            );
+            _notify();
+          },
+        );
+      } while (_again && !_disposed);
+      _backoff = null;
+      _pausedReason = null;
+    } on Exception catch (e) {
+      // Doubling, so a rate limit is honoured rather than argued with, and an
+      // endpoint that is down for the night costs a request every half hour.
+      final wait = _backoff = _backoff == null
+          ? firstRetry
+          : _backoff! * 2 > maxRetry
+          ? maxRetry
+          : _backoff! * 2;
+      // Anything that is not an [EmbeddingException] — a 200 whose body is
+      // not JSON, say — is the endpoint's doing as well.
+      _pausedReason = e is _EndpointUnavailable ? e.reason : '$e';
+      _timer?.cancel();
+      if (!_disposed) {
+        _timer = Timer(wait, () {
+          _pausedReason = null;
+          unawaited(_drain());
+        });
       }
     } finally {
+      job?.end();
       _running = false;
+      _notify();
     }
   }
+
+  /// Embeds one batch. Returns how many vectors were written, so callers can
+  /// loop until zero.
+  ///
+  /// A failure is held against the messages only when the endpoint answered
+  /// and said something was wrong with *them* — and then only against the ones
+  /// that still fail on their own. Everything else (no network, no model, a
+  /// 401, a 429, a 5xx) throws [_EndpointUnavailable] and costs no attempts:
+  /// counting those used to retire healthy messages for good after five bad
+  /// minutes of Wi-Fi.
+  Future<int> drainOnce({int batchSize = 32}) async {
+    final batch = store.nextEmbeddingBatch(limit: batchSize);
+    if (batch.isEmpty) return 0;
+
+    try {
+      return _save(
+        batch,
+        await provider.embed([for (final b in batch) b.body]),
+      );
+    } on EmbeddingException catch (e) {
+      if (!_blamesMessages(e)) throw _EndpointUnavailable(_reason(e));
+    }
+
+    var wrote = 0;
+    final rejected = <(int, String)>[];
+    for (final item in batch) {
+      try {
+        wrote += _save([item], await provider.embed([item.body]));
+      } on EmbeddingException catch (e) {
+        if (!_blamesMessages(e)) throw _EndpointUnavailable(_reason(e));
+        rejected.add((item.rowId, _reason(e)));
+      }
+    }
+    // Several messages and not one of them accepted is a wrong model name,
+    // not 32 poison messages — and blaming them would retire the whole
+    // history in five quick rounds.
+    if (wrote == 0 && batch.length > 1) {
+      throw _EndpointUnavailable(rejected.first.$2);
+    }
+    for (final (rowId, reason) in rejected) {
+      store.recordEmbeddingFailure(rowId, reason);
+    }
+    // A lone row that failed is still sinking — a nonzero return keeps the
+    // drain going until it has sunk past the attempt limit.
+    return wrote == 0 ? batch.length : wrote;
+  }
+
+  int _save(List<({int rowId, String body})> batch, List<Int8List> vectors) {
+    // A provider swapped out mid-batch — a model change — must not file its
+    // vectors under rows the new one has just re-queued.
+    if (_disposed) return 0;
+    for (var i = 0; i < batch.length; i++) {
+      store.saveEmbedding(
+        rowId: batch[i].rowId,
+        vector: vectors[i],
+        model: provider.modelId,
+      );
+    }
+    return batch.length;
+  }
+
+  static bool _blamesMessages(EmbeddingException e) =>
+      e.failure == EmbeddingFailure.other;
+
+  static String _reason(EmbeddingException e) =>
+      weftPlatformL10n().embeddingFailure(e) ?? e.message;
 
   /// Keeps draining until the queue is empty or progress stops.
   Future<void> drainAll({void Function(int remaining)? onProgress}) async {
-    while (true) {
+    while (!_disposed) {
       final wrote = await drainOnce();
       onProgress?.call(pending);
       if (wrote == 0) return;
+      // A breath between batches: on-device inference shares the UI isolate's
+      // event loop, and a frame should get in between every 32 messages.
+      await Future<void>.delayed(const Duration(milliseconds: 16));
     }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _timer?.cancel();
+    unawaited(_queued?.cancel());
+    super.dispose();
   }
 }
 
+/// The endpoint, not a message, is why a batch failed.
+class _EndpointUnavailable implements Exception {
+  const _EndpointUnavailable(this.reason);
+  final String reason;
+}
+
+/// The running backfill, rebuilt — and so restarted — whenever the embedding
+/// provider changes: switching the on-device model on is enough to start
+/// indexing, with no further button to find.
+///
+/// Something has to hold it for it to run at all: the app does from session
+/// start, and the search screen listens to it for progress.
 final embeddingBackfillProvider = Provider<EmbeddingBackfill?>((ref) {
   final provider = ref.watch(embeddingProviderProvider);
   if (provider == null) return null;
-  return EmbeddingBackfill(
+  final backfill = EmbeddingBackfill(
     store: ref.watch(storesProvider).search,
     provider: provider,
-  );
+    work: ref.read(backgroundWorkProvider),
+  )..start();
+  ref.onDispose(backfill.dispose);
+  return backfill;
 });

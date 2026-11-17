@@ -12,7 +12,6 @@ import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
 import '../../app/search_providers.dart';
-import '../../services/background/background_work.dart';
 import '../chat/chat_view.dart';
 
 /// Search across every conversation.
@@ -41,6 +40,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (widget.initialQuery?.trim().isNotEmpty ?? false) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _run());
     }
+    // Opening search is a good moment to catch up — someone is about to ask
+    // the index something. A backfill waiting out a failure keeps waiting.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(embeddingBackfillProvider)?.schedule(Duration.zero);
+    });
   }
 
   Timer? _debounce;
@@ -233,41 +237,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     'the search model under Settings → Endpoints → Local models '
                     'and switch it on, or configure an embedding endpoint.',
               )
-            else if (backfill != null && backfill.pending > 0)
-              _Notice(
-                icon: Icons.sync_rounded,
-                text:
-                    '${backfill.pending} messages still being embedded — '
-                    'semantic results may be incomplete.',
-                action: TextButton(
-                  onPressed: () async {
-                    final l10n = context.l10n;
-                    // Kept alive in the background: a long history takes
-                    // minutes to embed, and this is the button someone
-                    // presses before putting the phone down.
-                    await ref.read(backgroundWorkProvider).run(
-                      l10n.backgroundWorkIndexingSearch,
-                      (job) {
-                        final total = backfill.pending;
-                        return backfill.drainAll(
-                          onProgress: (remaining) {
-                            job.update(
-                              detail: l10n.backgroundWorkMessagesLeft(
-                                remaining,
-                              ),
-                              fraction: total > 0
-                                  ? 1 - remaining / total
-                                  : null,
-                            );
-                            if (mounted) setState(() {});
-                          },
-                        );
-                      },
-                    );
-                  },
-                  child: Text(context.l10n.searchBackfillNow),
-                ),
-              ),
+            else if (backfill != null)
+              _BackfillNotice(backfill: backfill),
             if (_searchedOnce)
               _ResultSummary(count: _results.length + _chatMatches().length),
             Expanded(child: _body()),
@@ -564,12 +535,61 @@ class _MethodTag extends StatelessWidget {
   }
 }
 
+/// What the embedding backfill is doing, while it has anything left to do.
+///
+/// Progress, not a request: the backfill runs on its own, so the only button
+/// is for the one state where waiting is the app's choice rather than the
+/// work's — a pause after the endpoint or model failed.
+class _BackfillNotice extends StatelessWidget {
+  const _BackfillNotice({required this.backfill});
+
+  final EmbeddingBackfill backfill;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: backfill,
+      builder: (context, _) {
+        final pending = backfill.pending;
+        if (pending == 0) return const SizedBox.shrink();
+        final reason = backfill.pausedReason;
+        if (reason != null) {
+          return _Notice(
+            icon: Icons.sync_problem_rounded,
+            text: '${context.l10n.searchIndexingPaused(pending)}\n$reason',
+            action: TextButton(
+              onPressed: () => unawaited(backfill.retryNow()),
+              child: Text(context.l10n.searchIndexingRetry),
+            ),
+          );
+        }
+        return _Notice(
+          icon: Icons.sync_rounded,
+          text: context.l10n.searchIndexingProgress(pending),
+          // Indeterminate until the first batch lands — the bar has nothing
+          // to measure before the drain has a total.
+          progress: backfill.progress,
+          showProgress: true,
+        );
+      },
+    );
+  }
+}
+
 class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.text, this.action});
+  const _Notice({
+    required this.icon,
+    required this.text,
+    this.action,
+    this.progress,
+    this.showProgress = false,
+  });
 
   final IconData icon;
   final String text;
   final Widget? action;
+  final double? progress;
+  final bool showProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -584,7 +604,18 @@ class _Notice extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: context.colors.onSurfaceVariant),
           const SizedBox(width: WeftSpace.sm),
-          Expanded(child: Text(text, style: context.text.bodySmall)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(text, style: context.text.bodySmall),
+                if (showProgress) ...[
+                  const SizedBox(height: WeftSpace.xs),
+                  LinearProgressIndicator(value: progress, minHeight: 2),
+                ],
+              ],
+            ),
+          ),
           ?action,
         ],
       ),
