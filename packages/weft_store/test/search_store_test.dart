@@ -141,6 +141,26 @@ void main() {
       );
       expect(restricted, hasLength(1));
     });
+
+    // One conversation's search reads the index through `restrictTo`. A word
+    // the rest of the index says more often must not push this chat's rows
+    // past the limit before the restriction is applied.
+    test('restricts before limiting, not after', () async {
+      for (var i = 0; i < 5; i++) {
+        store.indexMessage(msg('\$elsewhere$i', 'ok ok ok'), chatId: 'other');
+      }
+      final mine = store.indexMessage(
+        msg(r'$mine', 'ok then, a long sentence that dilutes the match'),
+        chatId: 'mine',
+      );
+
+      final hits = await store.keywordSearch(
+        'ok',
+        limit: 3,
+        restrictTo: {mine},
+      );
+      expect(hits.map((h) => h.id), [mine]);
+    });
   });
 
   group('FTS query sanitising', () {

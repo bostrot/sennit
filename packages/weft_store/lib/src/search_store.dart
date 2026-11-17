@@ -193,26 +193,37 @@ class SearchStore implements SearchBackend {
     final match = toFtsMatchQuery(query);
     if (match == null) return const [];
 
+    if (restrictTo != null && restrictTo.isEmpty) return const [];
+
+    // The restriction is applied in the query, not to its answer. Filtering
+    // the top [limit] of the whole index afterwards let a word that is common
+    // elsewhere crowd a filtered search out entirely: one conversation's
+    // search for "ok" would find nothing once two hundred rows elsewhere said
+    // it. [candidateRowIds] bounds the set, so it fits in one statement.
+    final restriction = restrictTo == null
+        ? ''
+        : 'AND rowid IN (${List.filled(restrictTo.length, '?').join(',')})';
+
     // bm25() is negative, better matches more so; negate to get a score where
     // larger is better, matching the rest of the ranking pipeline.
     final rows = _raw.select(
       '''
       SELECT rowid, -bm25(search_fts) AS score
       FROM search_fts
-      WHERE search_fts MATCH ?
+      WHERE search_fts MATCH ? $restriction
       ORDER BY bm25(search_fts)
       LIMIT ?
       ''',
-      [match, limit],
+      [match, ...?restrictTo, limit],
     );
 
-    final hits = <RankedHit>[];
-    for (final row in rows) {
-      final id = row['rowid'] as int;
-      if (restrictTo != null && !restrictTo.contains(id)) continue;
-      hits.add(RankedHit(id: id, score: (row['score'] as num).toDouble()));
-    }
-    return hits;
+    return [
+      for (final row in rows)
+        RankedHit(
+          id: row['rowid'] as int,
+          score: (row['score'] as num).toDouble(),
+        ),
+    ];
   }
 
   @override

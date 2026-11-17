@@ -2241,9 +2241,54 @@
     "description": "Tooltip on the merge button in a conversation that is not merged yet: offers to stitch it to another. The trailing ellipsis means a choice follows. Keep under ~20 chars.",
     "maxLength": 40
   },
-  "chatSearchUnavailable": "Search in conversation — not available yet",
-  "@chatSearchUnavailable": {
-    "description": "Tooltip on the deliberately disabled search button in a conversation's title bar. There is no in-conversation search yet, and the tooltip says so rather than the button pretending. Search across every chat lives on the inbox."
+  "chatSearch": "Search in chat",
+  "@chatSearch": {
+    "description": "Tooltip on the search button in a conversation's title bar, and the name of the search field it opens. Searches only this conversation; search across every chat lives on the inbox."
+  },
+  "chatSearchHint": "Search messages",
+  "@chatSearchHint": {
+    "description": "Placeholder in a one-to-one conversation's search field, before anything is typed."
+  },
+  "chatSearchHintGroup": "Search messages and names",
+  "@chatSearchHintGroup": {
+    "description": "Placeholder in a group conversation's search field, before anything is typed. In a group the sender's name is searched as well as the message text."
+  },
+  "chatSearchClose": "Close search",
+  "@chatSearchClose": {
+    "description": "Tooltip on the button that turns a conversation's search bar back into its title bar."
+  },
+  "chatSearchOlder": "Previous match",
+  "@chatSearchOlder": {
+    "description": "Tooltip on the up arrow in a conversation's search bar: moves to the next older message that matches."
+  },
+  "chatSearchNewer": "Next match",
+  "@chatSearchNewer": {
+    "description": "Tooltip on the down arrow in a conversation's search bar: moves to the next newer message that matches."
+  },
+  "chatSearchPosition": "{position} of {total}",
+  "@chatSearchPosition": {
+    "description": "Shown in a conversation's search bar: which match is on screen and how many there are. The newest match is 1. Keep it short: it sits beside two arrow buttons.",
+    "maxLength": 12,
+    "placeholders": {
+      "position": {
+        "type": "int",
+        "description": "Which match is on screen, counting from 1 at the newest.",
+        "example": "3"
+      },
+      "total": {
+        "type": "int",
+        "description": "How many messages in the conversation match.",
+        "example": "12"
+      }
+    }
+  },
+  "chatSearchNoResults": "No matches",
+  "@chatSearchNoResults": {
+    "description": "Shown in a conversation's search bar when nothing in the conversation contains the typed words. Keep it short: it sits beside two arrow buttons."
+  },
+  "chatSearchNotLoaded": "That message could not be loaded. It may be too far back in the history.",
+  "@chatSearchNotLoaded": {
+    "description": "Snackbar when a search match is known to exist but the conversation's history could not be paged back far enough to show it."
   },
   "chatMessagesFromDate": "Messages from {date}",
   "@chatMessagesFromDate": {
