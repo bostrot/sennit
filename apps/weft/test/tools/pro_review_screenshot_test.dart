@@ -7,7 +7,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
-import 'package:weft_store/weft_store.dart';
 
 import 'package:weft/app/billing_providers.dart';
 import 'package:weft/app/localisation.dart';
