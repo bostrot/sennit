@@ -162,7 +162,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
     watermark: null,
     hasMoreHistory: true,
   );
-  bool _loading = false;
+
+  /// The timeline a page of history is being fetched for, if any.
+  ///
+  /// The timeline rather than a flag: on two panes the same [State] serves
+  /// every chat the user clicks through, and a flag set by the chat they just
+  /// left kept the one they arrived in from loading anything until the old
+  /// page landed.
+  MergedTimeline? _loadingFor;
+
+  bool get _loading => _loadingFor != null && identical(_loadingFor, _timeline);
+
+  /// Bumped by every [_open], so an open that has been overtaken — a click on
+  /// the next conversation before this one's rooms had opened — can tell, and
+  /// leave the screen to the newer one.
+  int _openGeneration = 0;
+
+  /// Set when the view is pointed at a different conversation, so the open
+  /// that follows starts it at its newest message rather than at whatever
+  /// depth the reader had scrolled the previous one to.
+  bool _startAtNewest = false;
 
   /// Set when the chat cannot be opened at all; rendered instead of a timeline.
   String? _unavailable;
@@ -244,7 +263,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// wholesale meant re-writing every row on every page — synchronous SQLite
   /// on the UI thread, growing with scroll depth. That is what made scrolling
   /// progressively jankier the further back you went.
-  final Set<String> _indexed = {};
+  ///
+  /// Shared by every view rather than held per screen: the repository keeps a
+  /// conversation's timeline between visits, and a phone builds a new screen
+  /// for each one — so a per-screen set rewrote the whole loaded history every
+  /// time a chat was opened.
+  static final Set<String> _indexed = {};
 
   /// The conversation's *current* id, which is not always the one this view
   /// was opened with: merging the person folds their rooms into a
@@ -436,13 +460,25 @@ class _ChatViewState extends ConsumerState<ChatView> {
   @override
   void didUpdateWidget(ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.chatId != widget.chatId) {
-      // A search is about the conversation it was typed in. On a two-pane
-      // window this state serves the next chat clicked, which the matches
-      // say nothing about.
-      _closeSearch();
-      _open();
-    }
+    if (oldWidget.chatId == widget.chatId) return;
+    // A search is about the conversation it was typed in. On a two-pane
+    // window this state serves the next chat clicked, which the matches
+    // say nothing about.
+    _closeSearch();
+    // Another conversation in the same pane. Nothing of the last one may be
+    // drawn under this one's name while its rooms open: not its messages, not
+    // its spinner, and not its keys, which would otherwise pile up for every
+    // bubble of every chat clicked through.
+    _timeline = null;
+    _view = const MergedTimelineView(
+      messages: [],
+      watermark: null,
+      hasMoreHistory: true,
+    );
+    _messageKeys.clear();
+    _highlightEventId = null;
+    _startAtNewest = true;
+    _open();
   }
 
   @override
@@ -471,6 +507,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   Future<void> _open() async {
+    final generation = ++_openGeneration;
+    // Overtaken by a newer open, or gone. Checked after every wait: the rooms
+    // of a chat clicked a moment ago can take longer to open than those of
+    // the chat clicked after it, and the slow answer landing last put the
+    // wrong conversation under the newer one's name.
+    bool overtaken() => !mounted || generation != _openGeneration;
     // A chat id can name something that isn't there: deep links arrive from
     // outside the app's control, and a link may be stale, be for an account
     // that has since left the room, or simply be wrong. Failing here must be a
@@ -489,25 +531,36 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // first and blink them away a frame later. The sweeper returns
       // immediately for a chat with no policy, which is nearly every chat.
       await ref.read(retentionSweeperProvider)?.sweepChat(chatId);
-      if (!mounted) return;
+      if (overtaken()) return;
       _timelineEpoch = ref.read(chatRepositoryProvider).timelineEpoch;
       final timeline = await ref
           .read(chatRepositoryProvider)
           .timelineFor(chatId);
-      if (!mounted) return;
+      if (overtaken()) return;
       setState(() {
         _timeline = timeline;
         _unavailable = null;
         _view = timeline.view();
       });
+      if (_startAtNewest && _scroll.hasClients) _scroll.jumpTo(0);
+      _startAtNewest = false;
       // The one thing a preview must not do. Everything else about this
       // screen is the same in both modes, which is the point of the flag.
       if (!widget.preview) _readConversation(chatId);
-      await _loadOlder();
+      _indexNewMessages(_view.messages);
+      // Only what the screen is short of. This used to fetch a page on every
+      // open, and the repository keeps a timeline between visits — so each
+      // return to a chat pulled, mapped and indexed another thirty messages,
+      // and the chats people go back to most grew the heaviest to open.
+      // After a jump or a thread's root, which page the same timeline for
+      // themselves and must not race a second pager over it.
       if (widget.initialEventId != null) await _jumpTo(widget.initialEventId!);
+      if (overtaken()) return;
       await _reachThreadRoot();
+      if (overtaken()) return;
+      _topUpHistory();
     } on ArgumentError {
-      if (!mounted) return;
+      if (overtaken()) return;
       // Not gone — not *yet*. This is the cold-start case, and a notification
       // tap is how it is reached: the link routes straight here while the
       // inbox is still being folded together, so the conversation the link
@@ -523,14 +576,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // A conversation opened *over* this one while the wait ran — a merge
       // re-pointing the view, the desktop's second pane moving on — owns the
       // screen now, and this attempt has nothing left to say about it.
-      if (!mounted || _timelineChatId != chatId) return;
+      if (overtaken() || _timelineChatId != chatId) return;
       if (arrived) {
         await _open();
         return;
       }
       setState(() => _unavailable = context.l10n.chatUnavailableNotInInbox);
     } on StateError catch (e) {
-      if (!mounted) return;
+      if (overtaken()) return;
       setState(() => _unavailable = e.message);
     }
   }
@@ -638,11 +691,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
         timeline.hasMoreHistory &&
         rounds++ < maxRounds) {
       final next = await timeline.loadMoreUntilVisibleGrowth();
-      if (!mounted) return;
+      if (!mounted || !identical(timeline, _timeline)) return;
       setState(() => _view = next);
     }
 
-    if (!mounted || _view.messages.any((m) => m.eventId == rootId)) return;
+    if (!mounted || !identical(timeline, _timeline)) return;
+    if (_view.messages.any((m) => m.eventId == rootId)) return;
     setState(() => _unavailable = context.l10n.threadUnavailable);
   }
 
@@ -699,21 +753,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
         timeline.hasMoreHistory &&
         rounds++ < maxRounds) {
       final next = await timeline.loadMoreUntilVisibleGrowth();
-      if (!mounted) return false;
+      if (!mounted || !identical(timeline, _timeline)) return false;
       setState(() => _view = next);
+      _indexNewMessages(next.messages);
     }
-    return mounted && _view.messages.any((m) => m.eventId == eventId);
+    return mounted &&
+        identical(timeline, _timeline) &&
+        _view.messages.any((m) => m.eventId == eventId);
   }
 
   /// Scrolls a loaded [eventId] into view and highlights it — briefly, or for
   /// as long as it stays the [hold]ing search match.
   void _showEvent(String eventId, {bool hold = false}) {
+    final timeline = _timeline;
     setState(() => _highlightEventId = eventId);
     // Scrolls to the widget itself rather than to an index: index-anchored
     // scrolling is what made the list snap back whenever an image finished
     // loading and changed a row's height.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       for (var attempt = 0; attempt < 40 && mounted; attempt++) {
+        if (!identical(timeline, _timeline)) return;
         final target = _messageKeys[eventId]?.currentContext;
         if (target != null && target.mounted) {
           await Scrollable.ensureVisible(
@@ -926,17 +985,48 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final timeline = _timeline;
     if (timeline == null || _loading || !timeline.hasMoreHistory) return;
     _lastLoadOlderAt = DateTime.now();
-    setState(() => _loading = true);
+    final before = _view.messages.length;
+    setState(() => _loadingFor = timeline);
     // Keeps pulling until the visible list actually grows: one round can lower
     // the watermark without revealing anything, and a "load older" that appears
     // to do nothing is worse than a slightly slower one.
     final next = await timeline.loadMoreUntilVisibleGrowth();
+    // The pane moved on while the page was in flight. It belongs to a
+    // conversation nobody is looking at, and drawn or indexed here it would be
+    // filed under the one they are. The flag is still let go of, or coming
+    // back to that conversation would find it loading forever.
     if (!mounted) return;
+    if (!identical(timeline, _timeline)) {
+      if (identical(_loadingFor, timeline)) _loadingFor = null;
+      return;
+    }
     setState(() {
       _view = next;
-      _loading = false;
+      _loadingFor = null;
     });
     _indexNewMessages(next.messages);
+    // Still short of a screen above — a page of reactions and state events
+    // reveals little — so ask again, but only after a page that showed
+    // something: one that did not would ask forever.
+    if (next.messages.length > before) _topUpHistory();
+  }
+
+  /// Loads older history until about a screen of it sits above what is
+  /// showing, and no further.
+  ///
+  /// Asked after layout, because only then is it known how much the loaded
+  /// messages cover. The scroll listener keeps the same margin as the reader
+  /// moves up; this is what fills it when nothing has scrolled — on opening,
+  /// and after a page that fell short.
+  void _topUpHistory() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final position = _scroll.position;
+      if (!position.hasContentDimensions) return;
+      if (position.extentAfter < position.viewportDimension) {
+        unawaited(_loadOlder());
+      }
+    });
   }
 
   /// Announces a message that arrived while the conversation was open.
@@ -974,13 +1064,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// never lands in the middle of a scroll.
   void _indexNewMessages(List<WeftMessage> messages) {
     final fresh = messages
-        .where((m) => !_indexed.contains(m.eventId))
+        .where((m) => !_indexed.contains(_indexKey(m)))
         .toList(growable: false);
     if (fresh.isEmpty) return;
 
     for (final m in fresh) {
-      _indexed.add(m.eventId);
+      _indexed.add(_indexKey(m));
     }
+    // Taken now rather than when the write runs: by then the pane may show
+    // another conversation, and these rows are this one's.
+    final chatId = _chatId;
 
     // Auto-transcription rides the same "something new is on screen" moment.
     // The service applies its own gates — the setting, a configured or local
@@ -1007,14 +1100,19 @@ class _ChatViewState extends ConsumerState<ChatView> {
       final title = ref
           .read(chatsProvider)
           .value
-          ?.where((c) => c.id == _chatId)
+          ?.where((c) => c.id == chatId)
           .firstOrNull
           ?.title;
       ref
           .read(chatRepositoryProvider)
-          .indexMessages(_chatId, fresh, chatTitle: title ?? '');
+          .indexMessages(chatId, fresh, chatTitle: title ?? '');
     });
   }
+
+  /// What [_indexed] remembers a message by. A redaction is a change the
+  /// index has to hear about — it takes the row out — so it counts as new.
+  static String _indexKey(WeftMessage m) =>
+      m.redacted ? '${m.eventId}#redacted' : m.eventId;
 
   /// Re-reads the timeline after something changed underneath it.
   ///
@@ -1055,12 +1153,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// The loaded timeline split into room-level messages and the threads under
   /// them.
   ///
-  /// Derived on every build rather than cached beside [_view], because it is a
-  /// pure function of the view and the read markers and those move
-  /// independently: a receipt arriving from another device changes what is
-  /// unread without changing a single message, and a cache keyed on the view
-  /// would go on claiming three new replies in a topic the user has read
-  /// elsewhere.
+  /// Not cached beside [_view] alone, because it is a pure function of the
+  /// view and the read markers and those move independently: a receipt
+  /// arriving from another device changes what is unread without changing a
+  /// single message, and a cache keyed on the view would go on claiming three
+  /// new replies in a topic the user has read elsewhere. Kept per view *and*
+  /// marker instead — every typing notice and tick rebuilds this screen, and
+  /// regrouping the whole loaded history for each one was the part of the
+  /// build that grew with every page scrolled through.
   ///
   /// Flattened outright for a conversation on a network with no thread concept.
   /// A Signal chat can still carry `m.thread` relations — a Matrix user in the
@@ -1069,11 +1169,57 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// behind an indicator would put messages somewhere no participant on that
   /// network can reach.
   ThreadGrouping _threadGrouping(Chat chat) {
-    if (!chat.networks.any(networkSupportsThreads)) {
-      return ThreadGrouping.flatten(_view.messages);
+    final threaded = chat.networks.any(networkSupportsThreads);
+    final readUpTo = threaded ? _ownReadAt() : null;
+    final cached = _grouping;
+    if (cached != null &&
+        identical(cached.messages, _view.messages) &&
+        cached.threaded == threaded &&
+        cached.readUpTo == readUpTo) {
+      return cached.grouping;
     }
-    return groupThreads(messages: _view.messages, readUpTo: _ownReadAt());
+    final grouping = threaded
+        ? groupThreads(messages: _view.messages, readUpTo: readUpTo)
+        : ThreadGrouping.flatten(_view.messages);
+    _grouping = (
+      messages: _view.messages,
+      threaded: threaded,
+      readUpTo: readUpTo,
+      grouping: grouping,
+    );
+    return grouping;
   }
+
+  ({
+    List<WeftMessage> messages,
+    bool threaded,
+    DateTime? readUpTo,
+    ThreadGrouping grouping,
+  })?
+  _grouping;
+
+  /// The albums in [visible], kept for as long as [visible] is the list drawn.
+  GalleryLayout _galleriesFor(
+    List<WeftMessage> visible,
+    ThreadGrouping grouping,
+  ) {
+    final cached = _galleries;
+    if (cached != null &&
+        identical(cached.visible, visible) &&
+        identical(cached.grouping, grouping)) {
+      return cached.layout;
+    }
+    final rootId = widget.threadRootId;
+    final layout = galleryLayout(
+      visible,
+      standsAlone: (m) => rootId == null && grouping.threadFor(m) != null,
+    );
+    _galleries = (visible: visible, grouping: grouping, layout: layout);
+    return layout;
+  }
+
+  ({List<WeftMessage> visible, ThreadGrouping grouping, GalleryLayout layout})?
+  _galleries;
 
   /// The newest point this account has read to, across every leg.
   ///
@@ -1127,6 +1273,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   _LoadedIndex? _loadedIndex;
+
+  /// Where each message sits in the list being drawn, for the list's
+  /// `findChildIndexCallback`. Rebuilt when that list is replaced, which in
+  /// the room is not every build: a typing notice or a tick rebuilds the
+  /// screen and leaves the grouped messages alone.
+  _RowIndex _rowIndexFor(List<WeftMessage> visible) {
+    final cached = _rowIndex;
+    if (cached != null && identical(cached.messages, visible)) return cached;
+    return _rowIndex = _RowIndex(visible);
+  }
+
+  _RowIndex? _rowIndex;
 
   /// A sender id as a name, from whoever is already on screen.
   ///
@@ -1436,7 +1594,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// server echoes the event. The receipts are right here though, and without
   /// folding them in the two ticks meant "not failed" and nothing else, which
   /// is not what anyone looks at them for.
-  DeliveryState? _effectiveDelivery(WeftMessage message, Chat chat) {
+  DeliveryState? _effectiveDelivery(
+    WeftMessage message,
+    Chat chat, {
+    required bool receiptsEnabled,
+  }) {
     if (!message.isOwn) return message.deliveryState;
     return resolveDeliveryState(
       reported: message.deliveryState,
@@ -1446,7 +1608,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
       network: message.network,
       readerCount: _readersOf(message),
       peerCount: chat.peerCount,
-      receiptsEnabled: ref.watch(sendReadReceiptsProvider),
+      // Passed in rather than watched: this runs in the item builder, during
+      // layout, after the build that would have kept the subscription alive.
+      receiptsEnabled: receiptsEnabled,
     );
   }
 
@@ -1787,10 +1951,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // Photos sent as a batch fold into one album bubble, drawn by the row of
     // the batch's newest photo; the rows of the others draw nothing.
     _drawn = visible;
-    final galleries = galleryLayout(
-      visible,
-      standsAlone: (m) => rootId == null && grouping.threadFor(m) != null,
-    );
+    final galleries = _galleriesFor(visible, grouping);
+    final rowIndex = _rowIndexFor(visible);
 
     // After the frame rather than during it: an announcement is a platform call
     // and a build is not the place to make one, and the message being announced
@@ -1857,13 +2019,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   order: const NumericFocusOrder(1),
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (n) {
-                      // Reversed list: "extent after" is older history. The
-                      // cooldown matters: scroll notifications arrive per
-                      // frame, and re-triggering a backfill the instant the
-                      // previous one finished kept the list growing — and
-                      // rebuilding — for as long as the reader sat near the
-                      // old end, which read as the chat "lagging up".
-                      if (n.metrics.extentAfter < 600 &&
+                      // Reversed list: "extent after" is older history, and
+                      // the next page is asked for once less than a screen of
+                      // it is left. The cooldown matters: scroll notifications
+                      // arrive per frame, and re-triggering a backfill the
+                      // instant the previous one finished kept the list
+                      // growing — and rebuilding — for as long as the reader
+                      // sat near the old end, which read as the chat "lagging
+                      // up". Only the thread's own scrolling counts; a code
+                      // block or an album scrolled sideways inside a bubble is
+                      // not the reader heading for older messages.
+                      if (n.depth == 0 &&
+                          n.metrics.extentAfter < n.metrics.viewportDimension &&
                           !_loading &&
                           DateTime.now().difference(_lastLoadOlderAt) >
                               const Duration(milliseconds: 300)) {
@@ -1894,10 +2061,31 @@ class _ChatViewState extends ConsumerState<ChatView> {
                         ListView.builder(
                           controller: _scroll,
                           reverse: true,
+                          // Half a screen built past each edge — a screen of
+                          // bubbles in all beyond what is showing, which is
+                          // what a fling reaches before the next frame. More
+                          // is rows nobody sees decoded and laid out on every
+                          // open; the default's flat 250px was less than one
+                          // photo on a tall window.
+                          // ignore: deprecated_member_use
+                          cacheExtent: MediaQuery.sizeOf(context).height / 2,
                           padding: const EdgeInsets.symmetric(
                             horizontal: WeftSpace.lg,
                             vertical: WeftSpace.md,
                           ),
+                          // A message keeps its row when one arrives below
+                          // it. Every arrival moves every index by one, and
+                          // matched by position each row on screen was handed
+                          // its neighbour's message and rebuilt from scratch —
+                          // pictures, link cards and all.
+                          findChildIndexCallback: (key) {
+                            if (key is! ValueKey<String>) return null;
+                            final i = rowIndex.indexOf(key.value);
+                            if (i == null) return null;
+                            return (_typing.isEmpty ? 0 : 1) +
+                                uploads.length +
+                                i;
+                          },
                           itemCount:
                               (_typing.isEmpty ? 0 : 1) +
                               uploads.length +
@@ -1931,10 +2119,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             if (galleries.hidden.contains(i)) {
                               // Empty, but keyed: a reply chip that jumps to
                               // one of the album's photos still lands on it.
-                              return SizedBox.shrink(
-                                key: _messageKeys.putIfAbsent(
-                                  visible[i].eventId,
-                                  GlobalKey.new,
+                              return KeyedSubtree(
+                                key: ValueKey(visible[i].eventId),
+                                child: SizedBox.shrink(
+                                  key: _messageKeys.putIfAbsent(
+                                    visible[i].eventId,
+                                    GlobalKey.new,
+                                  ),
                                 ),
                               );
                             }
@@ -1963,13 +2154,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             final older = olderIndex < visible.length
                                 ? visible[olderIndex]
                                 : null;
-                            final delivery = _effectiveDelivery(message, chat);
+                            final delivery = _effectiveDelivery(
+                              message,
+                              chat,
+                              receiptsEnabled: receiptsEnabled,
+                            );
                             // One message, one line in anything copied out of
                             // a drag across several of them — the alternative
                             // is `Hello thereSee you at six`, which is what a
                             // `SelectionArea` does with two children left to
                             // itself.
                             return WeftSelectionLine(
+                              key: ValueKey(message.eventId),
                               child: Column(
                                 key: _messageKeys.putIfAbsent(
                                   message.eventId,
@@ -2286,7 +2482,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   Widget _historyFooter() {
-    if (_loading) {
+    // Before the timeline is open there is nothing for the button to load.
+    if (_loading || _timeline == null) {
       // A live region: the spinner replaces the "Load older messages" button
       // the reader just pressed, and without it the button simply disappears
       // from under them with nothing said.
@@ -5845,6 +6042,19 @@ class _TypingDot extends StatelessWidget {
 /// group made dozens of them, so the cost of drawing one message rose with the
 /// number of messages loaded: the further back a reader went, the slower each
 /// frame got. One pass builds this instead, when the view is replaced.
+/// Each drawn message's position, by event id.
+class _RowIndex {
+  _RowIndex(this.messages)
+    : _byEventId = {
+        for (var i = 0; i < messages.length; i++) messages[i].eventId: i,
+      };
+
+  final List<WeftMessage> messages;
+  final Map<String, int> _byEventId;
+
+  int? indexOf(String eventId) => _byEventId[eventId];
+}
+
 class _LoadedIndex {
   _LoadedIndex(this.messages) {
     for (final message in messages) {

@@ -48,8 +48,10 @@ void main() {
   );
   final mac = surfaceName == 'mac';
 
-  // Which act to run: `inbox`, `chat` (a freshly opened conversation) or
-  // `deep` (the same conversation with a long way of history already loaded).
+  // Which act to run: `inbox`, `chat` (a freshly opened conversation),
+  // `deep` (the same conversation with a long way of history already loaded)
+  // or `switch` (moving between conversations quickly, on timelines that are
+  // kept between visits as the Matrix repository keeps them).
   //
   // One per launch, and each kept under twenty seconds, for a reason that has
   // nothing to do with Braid: a Mac whose display is asleep or locked puts a
@@ -66,6 +68,7 @@ void main() {
   final runInbox = only == 'inbox';
   final runChat = only == 'chat';
   final runDeep = only == 'deep';
+  final runSwitch = only == 'switch';
 
   testWidgets('perf — $surfaceName/$only', (tester) async {
     expect(kDemoMode, isTrue, reason: 'Run with --dart-define=WEFT_DEMO=true');
@@ -76,7 +79,10 @@ void main() {
     );
     addTearDown(() => binding.setSurfaceSize(null));
 
-    final repository = LoadChatRepository(preloaded: runDeep ? 1500 : 0);
+    final repository = LoadChatRepository(
+      preloaded: runDeep ? 1500 : 0,
+      cachesTimelines: runSwitch,
+    );
     final container = ProviderContainer(
       overrides: [
         chatRepositoryProvider.overrideWithValue(repository),
@@ -201,6 +207,53 @@ void main() {
           }
         });
       }
+    }
+
+    if (runSwitch) {
+      // Driven through the app's own doors rather than by tapping rows: which
+      // rows are on screen depends on the window, and the cost being measured
+      // is the conversation's, not the tap's. Two panes select; one pane
+      // pushes a screen and goes back from it.
+      final navigator = tester.state<NavigatorState>(
+        find.byType(Navigator).first,
+      );
+      const group = LoadChatRepository.groupChatId;
+      final rows = [for (var i = 1; i <= 6; i++) '!load_$i:example.org'];
+      Future<void> open(String chatId) async {
+        if (mac) {
+          container.read(selectedChatProvider.notifier).select(chatId);
+          await _run(tester, const Duration(milliseconds: 150));
+        } else {
+          unawaited(pushChat(navigator, chatId));
+          await _run(tester, const Duration(milliseconds: 350));
+          navigator.pop();
+          await _run(tester, const Duration(milliseconds: 250));
+        }
+      }
+
+      // Back and forth between the busy group and one other conversation.
+      await measure('switch_back_and_forth', () async {
+        for (var i = 0; i < (mac ? 6 : 4); i++) {
+          await open(group);
+          await open(rows.first);
+        }
+      });
+
+      // Down the inbox one conversation after another.
+      await measure('switch_click_through', () async {
+        // One round on a phone, where each visit is a push and a pop: two
+        // would run the act past the point a hidden window is napped.
+        for (var round = 0; round < (mac ? 2 : 1); round++) {
+          for (final row in [group, ...rows]) {
+            await open(row);
+          }
+        }
+        await _run(tester, const Duration(milliseconds: 500));
+      });
+      // ignore: avoid_print
+      print(
+        'PERF ${jsonEncode({'scenario': '$surfaceName/switch_counts', 'pages': repository.pages, 'indexed': repository.indexed, 'indexed_wrong_chat': repository.indexedUnderWrongChat, 'group_loaded': repository.loadedIn(LoadChatRepository.groupChatId)})}',
+      );
     }
 
     heartbeat.cancel();

@@ -19,13 +19,18 @@ import 'package:weft_merge/weft_merge.dart';
 ///   not;
 /// - a timeline's `loaded` list is cached and identical between changes, as
 ///   `MatrixTimelineSource`'s is, rather than copied per read as the in-memory
-///   test source's is.
+///   test source's is;
+/// - with [cachesTimelines], a conversation's timeline is opened once and kept,
+///   starting from the page `Room.getTimeline` reads back from the local
+///   database — so a second visit finds whatever the first one loaded.
 class LoadChatRepository extends DemoChatRepository {
   LoadChatRepository({
     this.chatCount = 2000,
     this.groupMessages = 3000,
     this.groupMembers = 40,
     this.preloaded = 0,
+    this.cachesTimelines = false,
+    this.openDelays = const {},
   }) {
     _chats = [_groupChat(), for (var i = 1; i < chatCount; i++) _directChat(i)];
   }
@@ -38,6 +43,31 @@ class LoadChatRepository extends DemoChatRepository {
   /// the state a reader is in after scrolling a long way back, without the
   /// scrolling.
   final int preloaded;
+
+  /// Whether timelines are kept per conversation, as `MatrixChatRepository`
+  /// keeps them.
+  final bool cachesTimelines;
+
+  /// How long opening a conversation's rooms takes, by chat id — a cold room
+  /// read from disk. Absent means at once.
+  final Map<String, Duration> openDelays;
+
+  final Map<String, MergedTimeline> _timelines = {};
+  final Map<String, List<TimelineSource>> _openSources = {};
+
+  /// History pages requested from any room, the first read of a cached
+  /// timeline excepted.
+  int pages = 0;
+
+  /// Messages handed to the search index.
+  int indexed = 0;
+
+  /// Messages handed to the index under a conversation they are not part of.
+  int indexedUnderWrongChat = 0;
+
+  /// Messages loaded in [chatId]'s open timeline.
+  int loadedIn(String chatId) =>
+      _openSources[chatId]?.fold<int>(0, (n, s) => n + s.loaded.length) ?? 0;
 
   /// The busy group every chat scenario opens.
   static const String groupChatId = '!load_group:example.org';
@@ -227,7 +257,39 @@ class LoadChatRepository extends DemoChatRepository {
   }
 
   @override
+  void indexMessages(
+    String chatId,
+    List<WeftMessage> messages, {
+    String chatTitle = '',
+  }) {
+    indexed += messages.length;
+    final rooms = _chats.where((c) => c.id == chatId).firstOrNull?.roomIds;
+    indexedUnderWrongChat += messages
+        .where((m) => !(rooms?.contains(m.roomId) ?? false))
+        .length;
+  }
+
+  @override
   Future<MergedTimeline> timelineFor(String chatId) async {
+    final delay = openDelays[chatId];
+    if (delay != null) await Future<void>.delayed(delay);
+    if (!cachesTimelines) return _buildTimeline(chatId);
+    final cached = _timelines[chatId];
+    if (cached != null) return cached;
+    final fresh = _buildTimeline(chatId);
+    // What `getTimeline` reads back from the local database before any
+    // request reaches the homeserver.
+    for (final source in fresh.sources) {
+      await source.loadMore();
+    }
+    final sources = [
+      for (final source in fresh.sources) _CountingSource(source, this),
+    ];
+    _openSources[chatId] = sources;
+    return _timelines[chatId] = MergedTimeline(sources: sources);
+  }
+
+  MergedTimeline _buildTimeline(String chatId) {
     final chat = _chats.where((c) => c.id == chatId).firstOrNull;
     if (chat == null) {
       throw ArgumentError.value(chatId, 'chatId', 'Unknown chat');
@@ -305,6 +367,32 @@ class LoadChatRepository extends DemoChatRepository {
   ) => chatId == groupChatId
       ? [(roomId: groupChatId, eventId: '\$g_0', at: _now)]
       : const [];
+}
+
+/// Counts the pages a cached timeline asks for.
+class _CountingSource extends TimelineSource {
+  _CountingSource(this._inner, this._repository);
+
+  final TimelineSource _inner;
+  final LoadChatRepository _repository;
+
+  @override
+  String get roomId => _inner.roomId;
+
+  @override
+  ChatNetwork get network => _inner.network;
+
+  @override
+  List<WeftMessage> get loaded => _inner.loaded;
+
+  @override
+  bool get hasMore => _inner.hasMore;
+
+  @override
+  Future<int> loadMore({int count = 30}) {
+    _repository.pages++;
+    return _inner.loadMore(count: count);
+  }
 }
 
 /// A paginated source whose `loaded` list is stable between changes.

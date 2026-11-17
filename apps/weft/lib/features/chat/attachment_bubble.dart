@@ -11,6 +11,7 @@ library;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
@@ -318,8 +319,28 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     if (cached != null) {
       _bytes = cached;
     } else {
-      _load();
+      _loadWhenSettled();
     }
+  }
+
+  /// Starts the download once the list has stopped flinging past this row.
+  ///
+  /// A fling through history builds every row it crosses for a frame or two,
+  /// and each one used to start fetching — and, in an encrypted room,
+  /// decrypting — its full original on the spot, for a picture that was
+  /// gone before it arrived. The same rule `Image` applies to its own
+  /// decoding: while the scrollable says loading should wait, wait a frame
+  /// and ask again.
+  void _loadWhenSettled() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (Scrollable.recommendDeferredLoadingForContext(context)) {
+        SchedulerBinding.instance.scheduleFrame();
+        _loadWhenSettled();
+        return;
+      }
+      _load();
+    });
   }
 
   Future<void> _load() async {
