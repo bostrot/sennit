@@ -32,8 +32,8 @@ around **bridged messaging**: pair it with a homeserver you run and
 your contacts live on becomes one conversation list — end-to-end encrypted
 where the network allows it, and never routed through a third party.
 
-Think *Beeper, but yours*: no hosted middleman, no account with anyone, no
-message that ever touches infrastructure you don't own.
+No hosted middleman, no account with anyone, no message that ever touches
+infrastructure you don't own.
 
 ## Features
 
