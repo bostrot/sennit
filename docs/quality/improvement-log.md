@@ -8,7 +8,7 @@ and what was noticed but not done.
 ## Shipped
 
 - 2026-11-16 · User experience · A jump-to-latest button appears in a chat once you scroll up into older messages · https://github.com/bostrot/sennit/pull/3
-- 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · PR_LINK
+- 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · https://github.com/bostrot/sennit/pull/4
 
 ## Lessons from reviews
 
