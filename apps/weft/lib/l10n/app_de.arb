@@ -1337,5 +1337,21 @@
   "tourTodoBody": "Wenn dich jemand um etwas bittet oder du etwas versprichst, kann Sennit es notieren – und abhaken, sobald der Chat zeigt, dass es erledigt ist.",
   "tourTodoAction": "To-do-Liste öffnen",
   "settingsTourTitle": "Funktionstour",
-  "settingsTourSubtitle": "Ein kurzer Rundgang durch das, was Sennit kann"
+  "settingsTourSubtitle": "Ein kurzer Rundgang durch das, was Sennit kann",
+  "replyChipStubTitle": "Antwort auf eine Nachricht",
+  "replyChipStubBody": "Noch nicht geladen – tippe, um sie zu finden",
+  "replyChipUnknownSender": "Unbekannt",
+  "replyChipOnNetwork": "auf {network}",
+  "linkPreviewSemanticsRole": "Link",
+  "messageActionsSemantics": "Aktionen für die Nachricht von {sender}",
+  "messageActionsSemanticsOwn": "Aktionen für deine Nachricht",
+  "statusRingSemantics": "Status von {sender}",
+  "statusUpdateCount": "{count, plural, =1{1 Update} other{{count} Updates}}",
+  "statusLongPressHint": "Status dieser Person ausblenden",
+  "shareTargetBlocked": "kann das nicht empfangen: {reason}",
+  "shareTargetNoNetworkForFile": "Kein Netzwerk hier nimmt diese Datei an",
+  "autoReplyQuotedText": "„{text}“",
+  "mergeSuggestionSemantics": "{first} und {second} sind vielleicht dieselbe Person",
+  "mergeSuggestionConfidence": "{percent} % sicher",
+  "mergeSuggestionBecause": "weil: {reasons}"
 }

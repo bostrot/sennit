@@ -627,7 +627,7 @@ class _TargetList extends ConsumerWidget {
           enabled: false,
           selected: false,
           selecting: false,
-          reason: 'No network here takes this file',
+          reason: context.l10n.shareTargetNoNetworkForFile,
           onTap: () {},
           onToggle: () {},
         );
@@ -681,7 +681,7 @@ class _TargetTile extends ConsumerWidget {
       label: semanticsSentence([
         chat.title,
         chat.networks.map((n) => n.label).join(' and '),
-        reason == null ? null : 'cannot take this share: $reason',
+        reason == null ? null : context.l10n.shareTargetBlocked(reason!),
         reason != null ? null : subtitle,
       ]),
       excludeSemantics: true,

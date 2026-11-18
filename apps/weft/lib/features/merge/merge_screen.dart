@@ -229,7 +229,7 @@ class _SuggestionCard extends StatelessWidget {
             Semantics(
               container: true,
               excludeSemantics: true,
-              label: _proposalLabel(candidate),
+              label: _proposalLabel(context.l10n, candidate),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -415,13 +415,18 @@ String handleLabel(NetworkHandle handle) =>
     '${handle.displayName ?? handle.remoteId} on ${handle.network.label}';
 
 /// The suggestion as one sentence: who, how sure, and on what evidence.
-String _proposalLabel(MergeCandidate candidate) => semanticsSentence([
-  '${handleLabel(candidate.a)} and ${handleLabel(candidate.b)} may be the '
-      'same person',
-  '${(candidate.score * 100).round()}% confident',
-  if (candidate.signals.isNotEmpty)
-    'because ${candidate.signals.map((s) => s.explanation).join(', ')}',
-]);
+String _proposalLabel(AppL10n l10n, MergeCandidate candidate) =>
+    semanticsSentence([
+      l10n.mergeSuggestionSemantics(
+        handleLabel(candidate.a),
+        handleLabel(candidate.b),
+      ),
+      l10n.mergeSuggestionConfidence((candidate.score * 100).round()),
+      if (candidate.signals.isNotEmpty)
+        l10n.mergeSuggestionBecause(
+          candidate.signals.map((s) => s.explanation).join(', '),
+        ),
+    ]);
 
 /// A section title that a screen reader can jump between.
 ///

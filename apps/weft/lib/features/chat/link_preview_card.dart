@@ -21,6 +21,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
+import '../../app/localisation.dart';
 import '../../services/links/link_preview_service.dart';
 import 'attachment_bubble.dart';
 import 'rich_text_view.dart';
@@ -144,7 +145,7 @@ class LinkPreviewCardBody extends StatelessWidget {
       excludeSemantics: true,
       onTap: onTap,
       label: semanticsSentence([
-        'Link',
+        context.l10n.linkPreviewSemanticsRole,
         preview.siteName ?? preview.host ?? preview.url,
         preview.title,
         preview.description,

@@ -135,9 +135,12 @@ class _MessageActionsSheet extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: semanticsSentence([
-        'Actions for the message from',
-        message.isOwn ? 'you' : message.senderName,
-        message.redacted ? 'deleted' : replyPreviewText(message),
+        message.isOwn
+            ? context.l10n.messageActionsSemanticsOwn
+            : context.l10n.messageActionsSemantics(message.senderName),
+        message.redacted
+            ? context.l10n.chatMessageDeleted
+            : replyPreviewText(message),
       ]),
       child: SafeArea(
         top: false,

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/l10n_labels.dart';
+import '../../app/localisation.dart';
+
 /// The quoted context above a reply, as one tappable line.
 ///
 /// Two states, and the second is the reason this is a widget rather than a
@@ -33,6 +36,9 @@ class ReplyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final title = _title(l10n);
+    final body = _body(l10n);
     final palette = context.palette;
     final ink = own ? palette.ownBubbleText : palette.peerBubbleText;
     final bubble = own ? palette.ownBubble : palette.peerBubble;
@@ -69,10 +75,10 @@ class ReplyChip extends StatelessWidget {
       excludeSemantics: true,
       onTap: onTap,
       label: semanticsSentence([
-        preview.isStub ? 'Replying to a message' : 'Replying to $_title',
+        preview.isStub ? title : l10n.chatReplyingTo(title),
         if (preview.network != null && !preview.isStub)
-          'on ${preview.network!.label}',
-        preview.isStub ? 'not loaded yet' : _body,
+          l10n.replyChipOnNetwork(preview.network!.label),
+        body,
       ]),
       // Four dp short of the guideline on a one-line quote, and the chip is
       // the only way back to the message being answered — so it is the target
@@ -112,7 +118,7 @@ class ReplyChip extends StatelessWidget {
                         ],
                         Flexible(
                           child: Text(
-                            _title,
+                            title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: context.text.labelSmall?.copyWith(
@@ -126,7 +132,7 @@ class ReplyChip extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      _body,
+                      body,
                       maxLines: compact ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: context.text.bodySmall?.copyWith(
@@ -135,7 +141,9 @@ class ReplyChip extends StatelessWidget {
                           fill,
                           alpha: preview.isStub ? 0.55 : 0.8,
                         ),
-                        fontStyle: _placeholder ? FontStyle.italic : null,
+                        fontStyle: body != preview.body
+                            ? FontStyle.italic
+                            : null,
                       ),
                     ),
                   ],
@@ -148,31 +156,20 @@ class ReplyChip extends StatelessWidget {
     );
   }
 
-  String get _title {
-    if (preview.isStub) return 'Replying to a message';
+  String _title(AppL10n l10n) {
+    if (preview.isStub) return l10n.replyChipStubTitle;
     return preview.senderName?.trim().isNotEmpty ?? false
         ? preview.senderName!
-        : preview.senderId ?? 'Unknown';
+        : preview.senderId ?? l10n.replyChipUnknownSender;
   }
 
-  /// Whether the body line is stand-in text rather than the sender's words, so
-  /// it can be set in italics and never be mistaken for something they wrote.
-  bool get _placeholder => _body != preview.body;
-
-  String get _body {
-    if (preview.isStub) return 'Not loaded yet — tap to find it';
-    if (preview.redacted) return 'Message deleted';
+  /// The body line. When it differs from [ReplyPreview.body] it is stand-in
+  /// text rather than the sender's words, and is set in italics so it is never
+  /// mistaken for something they wrote.
+  String _body(AppL10n l10n) {
+    if (preview.isStub) return l10n.replyChipStubBody;
+    if (preview.redacted) return l10n.chatMessageDeleted;
     if (preview.body.isNotEmpty) return preview.body;
-    return switch (preview.kind) {
-      MessageKind.image => 'Photo',
-      MessageKind.video => 'Video',
-      MessageKind.voice => 'Voice message',
-      MessageKind.audio => 'Audio',
-      MessageKind.file => 'File',
-      MessageKind.sticker => 'Sticker',
-      MessageKind.location => 'Location',
-      MessageKind.poll => 'Poll',
-      _ => 'Message',
-    };
+    return l10n.messageKind(preview.kind ?? MessageKind.text);
   }
 }

@@ -228,7 +228,8 @@ class _AttemptLog extends ConsumerWidget {
             subtitle: Text(
               semanticsSentence([
                 l10n.autoReplyAttemptOutcome(attempt),
-                if (attempt.text != null) '“${attempt.text}”',
+                if (attempt.text != null)
+                  l10n.autoReplyQuotedText(attempt.text!),
               ]),
             ),
             // Only on failures another go can fix, and only with a service to

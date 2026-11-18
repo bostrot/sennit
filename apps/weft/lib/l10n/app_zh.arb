@@ -1338,5 +1338,21 @@
   "tourTodoBody": "有人拜托你做事，或你答应了什么，Sennit 都可以记下来，并在聊天显示已完成时自动勾掉。",
   "tourTodoAction": "打开待办清单",
   "settingsTourTitle": "功能导览",
-  "settingsTourSubtitle": "快速了解 Sennit 能做什么"
+  "settingsTourSubtitle": "快速了解 Sennit 能做什么",
+  "replyChipStubTitle": "回复一条消息",
+  "replyChipStubBody": "尚未加载，点按查找",
+  "replyChipUnknownSender": "未知",
+  "replyChipOnNetwork": "来自 {network}",
+  "linkPreviewSemanticsRole": "链接",
+  "messageActionsSemantics": "{sender} 的消息的操作",
+  "messageActionsSemanticsOwn": "你的消息的操作",
+  "statusRingSemantics": "{sender} 的动态",
+  "statusUpdateCount": "{count, plural, other{{count} 条更新}}",
+  "statusLongPressHint": "隐藏此人的动态",
+  "shareTargetBlocked": "无法接收此分享：{reason}",
+  "shareTargetNoNetworkForFile": "这里没有可接收此文件的网络",
+  "autoReplyQuotedText": "“{text}”",
+  "mergeSuggestionSemantics": "{first} 和 {second} 可能是同一个人",
+  "mergeSuggestionConfidence": "可信度 {percent}%",
+  "mergeSuggestionBecause": "原因：{reasons}"
 }
