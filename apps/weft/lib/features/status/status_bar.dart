@@ -85,11 +85,10 @@ class _StatusRing extends StatelessWidget {
       button: true,
       onTap: onTap,
       onLongPress: onLongPress,
-      onLongPressHint: 'hide this person\'s statuses',
+      onLongPressHint: context.l10n.statusLongPressHint,
       label: semanticsSentence([
-        'Status from ${entry.senderName}',
-        '${entry.messages.length} update'
-            '${entry.messages.length == 1 ? '' : 's'}',
+        context.l10n.statusRingSemantics(entry.senderName),
+        context.l10n.statusUpdateCount(entry.messages.length),
       ]),
       borderRadius: WeftRadius.allMd,
       child: Padding(

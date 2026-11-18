@@ -33,6 +33,7 @@
     "contactLinks": "'Links' is the German plural of 'Link'; 'Verknüpfungen' are shortcuts.",
     "devicesNameField": "'Name' is German.",
     "inboxLabelTooltip": "Same word as contactLabels, singular.",
+    "linkPreviewSemanticsRole": "'Link' is the ordinary German word for it.",
     "loginServerHeading": "'Server' is German.",
     "macSidebarLabels": "Same word as contactLabels.",
     "menuBridges": "Same word as commonBridges, with the menu ellipsis.",
@@ -92,6 +93,7 @@
     "chatTileOnline": "'online' is the ordinary Brazilian Portuguese word for it.",
     "contactLinks": "Brazilian messengers say 'Links'; 'Ligações' are phone calls.",
     "endpointsTitle": "Brazilian technical writing keeps 'endpoint'; the rest of this screen does too.",
+    "linkPreviewSemanticsRole": "Brazilian Portuguese says 'link'; 'ligação' is a phone call.",
     "richSpoiler": "Brazilian messengers say 'Spoiler'."
   },
   "zh": {}

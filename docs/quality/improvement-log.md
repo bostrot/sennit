@@ -9,6 +9,7 @@ and what was noticed but not done.
 
 - 2026-11-16 · User experience · A jump-to-latest button appears in a chat once you scroll up into older messages · https://github.com/bostrot/sennit/pull/3
 - 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · https://github.com/bostrot/sennit/pull/4
+- 2026-11-18 · Localization · Reply quotes, link cards, statuses and the message sheet are read out (and the quote drawn) in the app's language; the l10n audit now sees inside `semanticsSentence` · https://github.com/bostrot/sennit/pull/5
 
 ## Lessons from reviews
 
@@ -19,6 +20,11 @@ and what was noticed but not done.
   blaming a change, compare against the latest `main` run. Both #3 and #4
   were held up by `main`'s own CI (missing FFmpeg headers on the Linux
   runner, one unformatted file, one unused import), not by their changes.
+- 2026-11-18 · Still no review comments; #4 merged as opened, and nothing
+  has been closed unmerged. Before picking a backlog item, check it against
+  `main`: the "scroll offset kept on a chat switch" entry had already been
+  fixed by "Keep switching chats light" (`_startAtNewest` in
+  `didUpdateWidget`), so it is struck below.
 
 ## Ideas backlog
 
@@ -52,10 +58,9 @@ and what was noticed but not done.
 - **Copy a link to a message.** There is no `matrix.to` permalink anywhere in
   the app. Only meaningful for unbridged Matrix rooms, so the action would
   have to hide itself on a bridged leg.
-- **Switching chats on the two-pane desktop keeps the old scroll offset?**
-  `didUpdateWidget` calls `_open` for the new chat on the same `State`, and
-  nothing visibly resets `_scroll`. Not verified — worth a failing test before
-  touching anything.
+- ~~**Switching chats on the two-pane desktop keeps the old scroll offset?**~~
+  Already fixed on `main`: `didUpdateWidget` sets `_startAtNewest`, and
+  `_open` jumps to the newest message.
 - **The rest of UI-04 and UI-05.** The search field's text box is 19pt tall
   inside its 24pt field (UI-04a, UI-05a/b); with the focus ring now painted
   over the field rather than inset, the `TextField` can take the full
@@ -68,3 +73,21 @@ and what was noticed but not done.
   windows on Mac and iPad in 26.04.1
   (https://newreleases.io/project/github/element-hq/element-x-ios/release/release%2F26.04.1).
   Far more than a run; worth a design note first.
+- **The merged-chats screen is still half English.** The picker titles
+  ("Merge which conversation?"), every snack bar ("Merged … with …. They are
+  now one conversation.") and `handleLabel`'s "{name} on {network}" in
+  `features/merge/merge_screen.dart` are literals the audit cannot see, because
+  they reach the screen through a parameter (`_pickHandle(title)`,
+  `_decide(…, message)`) rather than a `Text`. The signal explanations behind
+  "because …" come from the domain in English too (`MergeSignal.explanation`)
+  and need a code-to-words mapping in `l10n_labels.dart`. Also: the audit's
+  `_isMachineValue` treats any lowercase single word (`'you'`, `'deleted'`) as
+  an identifier, which is how two of the action sheet's words slipped by.
+- **Share sheet leftovers.** `share_target_sheet.dart` still builds "Nothing to
+  send", "{n} files" and the network list joined with " and " by hand.
+- **Copy a link to a message — needs the other half first.** A copied
+  `matrix.to/#/!room/$event` link opens only the room in Sennit:
+  `links.dart` turns an event permalink into a room `RichMention` and drops
+  the event id, so `_openMention` cannot jump to the message. Making inbound
+  event links scroll to the message is the first run; the copy action is the
+  second.

@@ -62,6 +62,7 @@ const Set<String> _textConstructors = {'Text', 'SelectableText'};
 const Set<String> _textParameters = {
   // Semantics, and the two Flutter widgets that spell them differently.
   'label', 'hint', 'semanticsLabel', 'tooltip', 'message',
+  'onTapHint', 'onLongPressHint',
   // List rows, app bars, dialogs, sheets.
   'title', 'subtitle', 'confirmLabel', 'cancelLabel', 'actionLabel',
   // Text fields.
@@ -374,7 +375,29 @@ class _LiteralVisitor extends RecursiveAstVisitor<void> {
         _record(positional[at], '$name(...)');
       }
     }
+
+    // `label: semanticsSentence(['Replying to a message', ...])` is a label
+    // built from parts, and the parts are what a screen reader says. The
+    // `label:` rule above sees a call, not a literal, so without this every
+    // clause inside one was read out in English whatever the app's language.
+    if (name == 'semanticsSentence') {
+      final parts = node.argumentList.arguments.firstOrNull;
+      if (parts is ListLiteral) _recordElements(parts.elements);
+    }
     super.visitMethodInvocation(node);
+  }
+
+  void _recordElements(Iterable<CollectionElement> elements) {
+    for (final element in elements) {
+      switch (element) {
+        case Expression():
+          _record(element, 'semanticsSentence([...])');
+        case IfElement(:final thenElement, :final elseElement):
+          _recordElements([thenElement, ?elseElement]);
+        default:
+          break;
+      }
+    }
   }
 
   void _checkArguments(String constructor, ArgumentList arguments) {

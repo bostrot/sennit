@@ -1337,5 +1337,21 @@
   "tourTodoBody": "Quand quelqu’un vous demande quelque chose, ou que vous promettez quelque chose, Sennit peut le noter, puis le cocher lorsque la discussion montre que c’est fait.",
   "tourTodoAction": "Ouvrir la liste de tâches",
   "settingsTourTitle": "Visite des fonctions",
-  "settingsTourSubtitle": "Un rapide tour de ce que Sennit sait faire"
+  "settingsTourSubtitle": "Un rapide tour de ce que Sennit sait faire",
+  "replyChipStubTitle": "Réponse à un message",
+  "replyChipStubBody": "Pas encore chargé — touche pour le trouver",
+  "replyChipUnknownSender": "Inconnu",
+  "replyChipOnNetwork": "sur {network}",
+  "linkPreviewSemanticsRole": "Lien",
+  "messageActionsSemantics": "Actions pour le message de {sender}",
+  "messageActionsSemanticsOwn": "Actions pour ton message",
+  "statusRingSemantics": "Statut de {sender}",
+  "statusUpdateCount": "{count, plural, =1{1 mise à jour} other{{count} mises à jour}}",
+  "statusLongPressHint": "masquer les statuts de cette personne",
+  "shareTargetBlocked": "ne peut pas recevoir ce partage : {reason}",
+  "shareTargetNoNetworkForFile": "Aucun réseau ici n’accepte ce fichier",
+  "autoReplyQuotedText": "« {text} »",
+  "mergeSuggestionSemantics": "{first} et {second} sont peut-être la même personne",
+  "mergeSuggestionConfidence": "sûr à {percent} %",
+  "mergeSuggestionBecause": "car : {reasons}"
 }

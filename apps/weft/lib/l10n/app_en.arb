@@ -7744,5 +7744,135 @@
   "settingsTourSubtitle": "A short walk through what Sennit can do",
   "@settingsTourSubtitle": {
     "description": "Subtitle of the Feature tour settings row."
+  },
+  "replyChipStubTitle": "Replying to a message",
+  "@replyChipStubTitle": {
+    "description": "Title of the quote above a reply whose original message has not been loaded yet. Also the start of its screen-reader sentence."
+  },
+  "replyChipStubBody": "Not loaded yet — tap to find it",
+  "@replyChipStubBody": {
+    "description": "Body of the quote above a reply whose original message has not been loaded yet. Tapping the quote goes and finds it. Set in italics."
+  },
+  "replyChipUnknownSender": "Unknown",
+  "@replyChipUnknownSender": {
+    "description": "Name shown on the quote above a reply when the quoted message's sender is not known. One word."
+  },
+  "replyChipOnNetwork": "on {network}",
+  "@replyChipOnNetwork": {
+    "description": "Screen-reader clause on the quote above a reply in a merged chat: which messenger the quoted message was sent on. Follows 'Replying to Anna'.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's name. Never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "linkPreviewSemanticsRole": "Link",
+  "@linkPreviewSemanticsRole": {
+    "description": "First word of the screen-reader sentence for the preview card under a link in a message, before the site name and page title. One word."
+  },
+  "messageActionsSemantics": "Actions for the message from {sender}",
+  "@messageActionsSemantics": {
+    "description": "Screen-reader name of the sheet of actions on a message (reply, copy, delete…), so the reader knows which message they act on. Followed by the message text.",
+    "placeholders": {
+      "sender": {
+        "type": "String",
+        "description": "The sender's display name. Never translated.",
+        "example": "Anna"
+      }
+    }
+  },
+  "messageActionsSemanticsOwn": "Actions for your message",
+  "@messageActionsSemanticsOwn": {
+    "description": "Screen-reader name of the sheet of actions on one of the reader's own messages. Followed by the message text."
+  },
+  "statusRingSemantics": "Status from {sender}",
+  "@statusRingSemantics": {
+    "description": "Screen-reader name of one person's ring in the status bar above the inbox.",
+    "placeholders": {
+      "sender": {
+        "type": "String",
+        "description": "The person's display name. Never translated.",
+        "example": "Anna"
+      }
+    }
+  },
+  "statusUpdateCount": "{count, plural, =1{1 update} other{{count} updates}}",
+  "@statusUpdateCount": {
+    "description": "Screen-reader clause after 'Status from Anna': how many status updates the person has posted.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "statusLongPressHint": "hide this person''s statuses",
+  "@statusLongPressHint": {
+    "description": "Screen-reader hint for long-pressing a status ring. Read after the platform's own 'double-tap and hold to'. Lower case, a verb phrase."
+  },
+  "shareTargetBlocked": "can''t take this share: {reason}",
+  "@shareTargetBlocked": {
+    "description": "Screen-reader clause on a conversation in the share sheet that cannot receive what is being shared, followed by why.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "description": "Why, already translated: e.g. 'No network here takes this file'.",
+        "example": "No network here takes this file"
+      }
+    }
+  },
+  "shareTargetNoNetworkForFile": "No network here takes this file",
+  "@shareTargetNoNetworkForFile": {
+    "description": "Subtitle of a greyed-out conversation in the share sheet: none of the messengers it is on can send this kind of file."
+  },
+  "autoReplyQuotedText": "“{text}”",
+  "@autoReplyQuotedText": {
+    "description": "The text of an automatic reply, quoted, in the auto-reply activity list. Use the language's own quotation marks.",
+    "placeholders": {
+      "text": {
+        "type": "String",
+        "description": "The reply that was sent. Never translated.",
+        "example": "Back on Monday"
+      }
+    }
+  },
+  "mergeSuggestionSemantics": "{first} and {second} may be the same person",
+  "@mergeSuggestionSemantics": {
+    "description": "Screen-reader sentence for a suggestion on the merged-chats screen: two conversations that may be the same person on different messengers.",
+    "placeholders": {
+      "first": {
+        "type": "String",
+        "description": "A person and their messenger, e.g. 'Anna on WhatsApp'.",
+        "example": "Anna on WhatsApp"
+      },
+      "second": {
+        "type": "String",
+        "description": "The other person and messenger.",
+        "example": "Anna on Signal"
+      }
+    }
+  },
+  "mergeSuggestionConfidence": "{percent}% confident",
+  "@mergeSuggestionConfidence": {
+    "description": "Screen-reader clause after a merge suggestion: how sure the app is, as a percentage.",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "85"
+      }
+    }
+  },
+  "mergeSuggestionBecause": "because {reasons}",
+  "@mergeSuggestionBecause": {
+    "description": "Screen-reader clause after a merge suggestion: the evidence for it.",
+    "placeholders": {
+      "reasons": {
+        "type": "String",
+        "description": "The matching signals, joined with commas.",
+        "example": "same phone number"
+      }
+    }
   }
 }

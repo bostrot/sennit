@@ -1337,5 +1337,21 @@
   "tourTodoBody": "Cuando alguien te pide algo, o tú prometes algo, Sennit puede apuntarlo y tacharlo cuando el chat muestre que ya está hecho.",
   "tourTodoAction": "Abrir la lista de tareas",
   "settingsTourTitle": "Recorrido por las funciones",
-  "settingsTourSubtitle": "Un paseo breve por lo que Sennit sabe hacer"
+  "settingsTourSubtitle": "Un paseo breve por lo que Sennit sabe hacer",
+  "replyChipStubTitle": "Respuesta a un mensaje",
+  "replyChipStubBody": "Aún no se ha cargado; toca para buscarlo",
+  "replyChipUnknownSender": "Desconocido",
+  "replyChipOnNetwork": "en {network}",
+  "linkPreviewSemanticsRole": "Enlace",
+  "messageActionsSemantics": "Acciones para el mensaje de {sender}",
+  "messageActionsSemanticsOwn": "Acciones para tu mensaje",
+  "statusRingSemantics": "Estado de {sender}",
+  "statusUpdateCount": "{count, plural, =1{1 actualización} other{{count} actualizaciones}}",
+  "statusLongPressHint": "ocultar los estados de esta persona",
+  "shareTargetBlocked": "no puede recibir esto: {reason}",
+  "shareTargetNoNetworkForFile": "Ninguna red de aquí acepta este archivo",
+  "autoReplyQuotedText": "«{text}»",
+  "mergeSuggestionSemantics": "{first} y {second} pueden ser la misma persona",
+  "mergeSuggestionConfidence": "{percent} % de certeza",
+  "mergeSuggestionBecause": "porque: {reasons}"
 }
