@@ -25,9 +25,9 @@
 </p>
 
 <p align="center">
-  <a href="https://apps.apple.com/app/sennit-messenger/id6804951341"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="48" alt="Download on the App Store" /></a>
+  <a href="https://apps.apple.com/app/sennit-messenger/id6804951341"><img src="docs/images/badge-app-store.svg" height="48" alt="Download on the App Store" /></a>
   &nbsp;
-  <a href="https://play.google.com/store/apps/details?id=com.bostrot.weft"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="70" alt="Get it on Google Play" /></a>
+  <a href="https://play.google.com/store/apps/details?id=com.bostrot.weft"><img src="docs/images/badge-google-play.png" height="48" alt="Get it on Google Play" /></a>
 </p>
 
 ---
