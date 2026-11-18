@@ -210,8 +210,10 @@ jobs:
         # Gradle fell back to debug-signing names "Android Debug".
         run: |
           ls -l apps/weft/build/app/outputs/bundle/release/app-release.aab
+          # The fingerprint only: the log is public, the certificate's owner
+          # line need not be.
           keytool -printcert -jarfile apps/weft/build/app/outputs/bundle/release/app-release.aab \
-            | grep -E '^(Owner|Valid|\s+SHA256)' | head -3
+            | grep -E '^\s+SHA256' | head -1
           ! keytool -printcert -jarfile apps/weft/build/app/outputs/bundle/release/app-release.aab \
             | grep -q 'CN=Android Debug'
 
