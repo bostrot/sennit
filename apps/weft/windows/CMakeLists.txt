@@ -53,6 +53,11 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 add_subdirectory("runner")
 
 
+# ONNX Runtime for flutter_onnxruntime, from NuGet rather than the GitHub
+# release the plugin would fetch; see onnxruntime.cmake. Before the plugins,
+# because it puts the library where the plugin looks.
+include(onnxruntime.cmake)
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
