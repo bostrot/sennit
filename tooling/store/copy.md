@@ -77,7 +77,7 @@ inbox on your own Matrix server. No cloud between you and your messages.
 |---|---|
 | Support URL | https://erictrenkel.com/apps/sennit/ |
 | Marketing URL | https://erictrenkel.com/apps/sennit/ |
-| Privacy policy | https://erictrenkel.com/apps/braid/privacy.html |
+| Privacy policy | https://erictrenkel.com/apps/sennit/privacy.html |
 
 ## Categories
 
