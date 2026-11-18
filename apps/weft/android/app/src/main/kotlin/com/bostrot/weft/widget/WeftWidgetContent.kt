@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -36,6 +37,7 @@ import androidx.glance.unit.ColorProvider
 import com.bostrot.weft.MainActivity
 import com.bostrot.weft.R
 import com.bostrot.weft.snapshot.SnapshotRow
+import java.text.DateFormat
 
 /// The pieces both Weft widgets are built from.
 ///
@@ -236,12 +238,43 @@ fun WeftConversationRow(
                 )
             }
         }
-        if (row.unreadCount > 0) {
+        // When, beside the count. With names switched off the networks and
+        // this are all that tell two rows apart, and without it three chats on
+        // the same network read as one line written three times.
+        val time = row.timestampMillis?.let { rowTime(context, it) }
+        if (time != null || row.unreadCount > 0) {
             Spacer(modifier = GlanceModifier.width(WeftWidgetTokens.SPACE_SM))
-            WeftUnreadBadge(label = row.unreadLabel)
+            Column(horizontalAlignment = Alignment.End) {
+                if (time != null) {
+                    Text(
+                        text = time,
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontSize = WeftWidgetTokens.LABEL_SIZE,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+                if (row.unreadCount > 0) {
+                    if (time != null) {
+                        Spacer(modifier = GlanceModifier.height(WeftWidgetTokens.SPACE_XS))
+                    }
+                    WeftUnreadBadge(label = row.unreadLabel)
+                }
+            }
         }
     }
 }
+
+/// A clock time for today, a short date for anything older — in the device's
+/// own format, as the launcher's other widgets show it.
+private fun rowTime(context: Context, millis: Long): String =
+    DateUtils.formatSameDayTime(
+        millis,
+        System.currentTimeMillis(),
+        DateFormat.SHORT,
+        DateFormat.SHORT,
+    ).toString()
 
 /// The `99+` pill.
 ///
@@ -283,29 +316,43 @@ fun WeftUnreadBadge(label: String) {
 /// title further right than a plain one does.
 @Composable
 fun WeftNetworkDots(row: SnapshotRow, palette: Map<String, Int>) {
-    Column(
-        modifier = GlanceModifier.width(WeftWidgetTokens.DOT),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        for (network in row.networks.take(MAX_NETWORK_DOTS)) {
-            val brand = palette[network]
-            Box(
-                modifier = GlanceModifier
-                    .size(WeftWidgetTokens.DOT)
-                    .background(
-                        if (brand == null) {
-                            GlanceTheme.colors.onSurfaceVariant
-                        } else {
-                            ColorProvider(Color(brand))
-                        }
-                    )
-                    .cornerRadius(WeftWidgetTokens.DOT / 2),
-                content = {},
-            )
-            Spacer(modifier = GlanceModifier.height(2.dp))
+    // Two to a line. Stacked one above another, four dots and their gaps are
+    // taller than a single-line row, and a merged conversation's third and
+    // fourth networks were cut off at the bottom edge — a half-dot that read
+    // as a rendering fault. Two by two is as tall as two dots and the same
+    // width for every row, so titles still line up.
+    val networks = row.networks.take(MAX_NETWORK_DOTS)
+    Column(modifier = GlanceModifier.width(WeftWidgetTokens.DOT * 2 + DOT_GAP)) {
+        networks.chunked(2).forEachIndexed { line, pair ->
+            if (line > 0) Spacer(modifier = GlanceModifier.height(DOT_GAP))
+            Row {
+                pair.forEachIndexed { index, network ->
+                    if (index > 0) Spacer(modifier = GlanceModifier.width(DOT_GAP))
+                    WeftNetworkDot(brand = palette[network])
+                }
+            }
         }
     }
 }
+
+@Composable
+private fun WeftNetworkDot(brand: Int?) {
+    Box(
+        modifier = GlanceModifier
+            .size(WeftWidgetTokens.DOT)
+            .background(
+                if (brand == null) {
+                    GlanceTheme.colors.onSurfaceVariant
+                } else {
+                    ColorProvider(Color(brand))
+                }
+            )
+            .cornerRadius(WeftWidgetTokens.DOT / 2),
+        content = {},
+    )
+}
+
+private val DOT_GAP = 2.dp
 
 /// The intent a tap sends, on the path that already exists.
 ///

@@ -703,7 +703,7 @@
   "surfacesPreviewsSubtitle": "每段对话中最新消息的第一行。",
   "surfacesNamesTitle": "名称与头像",
   "surfacesNamesWarning": "开启后，与你交谈的人的名字和头像会显示在主屏幕上。",
-  "surfacesNamesSubtitle": "每段对话的对象、最后一条消息的发送者及其头像。关闭时，每一行都标记为「{redacted}」。",
+  "surfacesNamesSubtitle": "每个对话的对象、最后一条消息的发送者及其头像。关闭时，每行只显示其网络，例如「{redacted}」。",
   "surfacesNetworksSubtitle": "被排除的网络永远不会出现在小组件或手表上，无论上方开关如何设置。包含被排除网络的对话会被整体排除——没有「半行」的合并行可以显示。",
   "surfacesLeavesStoreTitle": "有哪些内容离开加密存储",
   "surfacesLeavesStoreSubtitle": "你自己的首条对话，按小组件行的方式绘制，并已应用上方的开关设置。这就是界面所能获得的全部内容。",

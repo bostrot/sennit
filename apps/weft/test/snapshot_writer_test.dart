@@ -71,11 +71,35 @@ void main() {
       // somebody opens the screen. The gate that opens when it cannot find its
       // own configuration is not a gate.
       final settings = SnapshotSettings.fromStore(stores.settings);
-      expect(settings, SnapshotSettings.off);
       expect(settings.anySurface, isFalse);
       expect(settings.policy.enabled, isFalse);
       expect(settings.allows(ChatNetwork.matrix), isFalse);
     });
+
+    test(
+      'switching a surface on shows names and messages unless told not to',
+      () {
+        // The first version wrote anonymous, wordless rows until two further
+        // switches were found and flipped — a widget of identical lines.
+        final fresh = SnapshotSettings.fromStore(stores.settings);
+        expect(fresh.includeSenderNames, isTrue);
+        expect(fresh.includePreviews, isTrue);
+
+        fresh.copyWith(widgets: true).writeTo(stores.settings);
+        final policy = SnapshotSettings.fromStore(stores.settings).policy;
+        expect(policy.includeSenderNames, isTrue);
+        expect(policy.includePreviews, isTrue);
+
+        // And a choice to hide them is kept.
+        SnapshotSettings.fromStore(
+          stores.settings,
+        ).copyWith(includeSenderNames: false).writeTo(stores.settings);
+        expect(
+          SnapshotSettings.fromStore(stores.settings).includeSenderNames,
+          isFalse,
+        );
+      },
+    );
 
     test('round-trips through a real settings store', () {
       const written = SnapshotSettings(
@@ -358,7 +382,8 @@ void main() {
       expect(json, isNot(contains('mxc://')));
       final snapshot = decoded(gateway.last);
       expect(snapshot.totalUnread, 5);
-      expect(snapshot.rows.single.title, kRedactedRowTitle);
+      // Its network, which its dots already show — never its name.
+      expect(snapshot.rows.single.title, 'WhatsApp');
       expect(snapshot.rows.single.unreadCount, 5);
     });
 

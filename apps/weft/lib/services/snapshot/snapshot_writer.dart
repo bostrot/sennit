@@ -51,8 +51,19 @@ class SnapshotSettings {
     return SnapshotSettings(
       widgets: settings.getBool(WeftSettings.snapshotWidgets),
       watch: settings.getBool(WeftSettings.snapshotWatch),
-      includePreviews: settings.getBool(WeftSettings.snapshotPreviews),
-      includeSenderNames: settings.getBool(WeftSettings.snapshotSenderNames),
+      // On unless the user has turned them off. The surfaces themselves stay
+      // off until switched on — that is the gate — but a widget the user has
+      // just asked for and that then shows a column of anonymous rows with no
+      // words in them is not a widget anyone keeps. The two switches below
+      // the surface toggles are how to take names or words back off.
+      includePreviews: settings.getBool(
+        WeftSettings.snapshotPreviews,
+        fallback: true,
+      ),
+      includeSenderNames: settings.getBool(
+        WeftSettings.snapshotSenderNames,
+        fallback: true,
+      ),
       excludedNetworks: {
         if (networks is List)
           for (final id in networks)

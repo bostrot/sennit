@@ -91,8 +91,9 @@ class SurfacesScreen extends ConsumerWidget {
                   warning: context.l10n.surfacesNamesWarning,
                 ),
                 subtitle: Text(
+                  // A row's networks are what it is called instead.
                   context.l10n.surfacesNamesSubtitle(
-                    context.l10n.snapshotRedactedRowTitle,
+                    ChatNetwork.whatsapp.label,
                   ),
                 ),
                 value: settings.includeSenderNames,
@@ -193,7 +194,7 @@ class _SnapshotRowPreview extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _WidgetRowCard(row: row),
+        _WidgetRowCard(row: row, hasName: policy.includeSenderNames),
         const SizedBox(height: WeftSpace.sm),
         Text(
           isPlaceholder
@@ -217,14 +218,16 @@ class _SnapshotRowPreview extends ConsumerWidget {
 /// formatted in Dart precisely so that a Glance composable and a SwiftUI view
 /// cannot disagree about it.
 class _WidgetRowCard extends StatelessWidget {
-  const _WidgetRowCard({required this.row});
+  const _WidgetRowCard({required this.row, required this.hasName});
 
   final SnapshotRow row;
+
+  /// Whether [row] carries the conversation's name, or only its networks.
+  final bool hasName;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final hasName = row.title != context.l10n.snapshotRedactedRowTitle;
 
     return Semantics(
       container: true,

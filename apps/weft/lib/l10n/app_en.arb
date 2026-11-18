@@ -4125,14 +4125,14 @@
   "@surfacesNamesWarning": {
     "description": "The red warning attached to the names-and-faces toggle."
   },
-  "surfacesNamesSubtitle": "Who each conversation is with, who sent the last message, and their picture. Off, every row is labelled “{redacted}”.",
+  "surfacesNamesSubtitle": "Who each conversation is with, who sent the last message, and their picture. Off, a row shows only its network, like “{redacted}”.",
   "@surfacesNamesSubtitle": {
-    "description": "Subtitle under the names-and-faces toggle, ending with what a row is called instead when it is off. The quotation marks are part of the string — use the language's own.",
+    "description": "Subtitle under the names-and-faces toggle, ending with what a row is called instead when it is off: its network's name. The quotation marks are part of the string — use the language's own.",
     "placeholders": {
       "redacted": {
         "type": "String",
-        "description": "The stand-in row title — the translation of 'Conversation'.",
-        "example": "Conversation"
+        "description": "A network's name, as an example of a row's title with names off. Not translated.",
+        "example": "WhatsApp"
       }
     }
   },

@@ -109,6 +109,10 @@ reason — see [Privacy](../../README.md#privacy):
 - **Off by default.** `SnapshotSettings.off` is what an unconfigured install
   reads as, and it is also what a *failed* settings read falls back to. A gate
   that opens when it cannot find its own configuration is not a gate.
+- **Useful once switched on.** Names and message previews default to on when a
+  surface is enabled: a widget of anonymous, wordless rows was the first
+  version, and it was useless. Both stay one switch away from off, and with
+  names off a row is titled by its networks rather than a shared placeholder.
 - **One plain sentence** saying what turning it on costs, before the switch, as
   a hint on the tile's own semantics node — `PrivacyNotice` and
   `PrivacyGatedTitle` from `settings_section.dart`, the same two widgets the

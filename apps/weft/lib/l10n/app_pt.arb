@@ -703,7 +703,7 @@
   "surfacesPreviewsSubtitle": "A primeira linha da mensagem mais recente de cada conversa.",
   "surfacesNamesTitle": "Nomes e rostos",
   "surfacesNamesWarning": "Ao ativar, os nomes e as fotos de perfil das pessoas com quem você fala vão para a tela de início.",
-  "surfacesNamesSubtitle": "Com quem é cada conversa, quem enviou a última mensagem e a foto dessa pessoa. Desativado, cada linha é rotulada como “{redacted}”.",
+  "surfacesNamesSubtitle": "Com quem é cada conversa, quem enviou a última mensagem e a sua foto. Desligado, cada linha mostra só a rede, como «{redacted}».",
   "surfacesNetworksSubtitle": "Uma rede excluída nunca chega a um widget ou a um relógio, independentemente das chaves acima. Uma conversa que inclua uma rede excluída fica de fora por inteiro — não existe metade de uma linha mesclada para mostrar.",
   "surfacesLeavesStoreTitle": "O que sai do armazenamento criptografado",
   "surfacesLeavesStoreSubtitle": "Sua própria conversa principal, desenhada como uma linha de widget a desenharia, com as chaves acima aplicadas. Isto é tudo o que uma superfície recebe.",

@@ -702,7 +702,7 @@
   "surfacesPreviewsSubtitle": "La primera línea del mensaje más reciente de cada conversación.",
   "surfacesNamesTitle": "Nombres y caras",
   "surfacesNamesWarning": "Al activarlo, los nombres y las fotos de perfil de las personas con las que hablas aparecen en tu pantalla de inicio.",
-  "surfacesNamesSubtitle": "Con quién es cada conversación, quién envió el último mensaje y su foto. Desactivado, cada fila se etiqueta como «{redacted}».",
+  "surfacesNamesSubtitle": "Con quién es cada conversación, quién envió el último mensaje y su foto. Desactivado, cada fila solo muestra su red, como «{redacted}».",
   "surfacesNetworksSubtitle": "Una red excluida nunca llega a un widget ni a un reloj, digan lo que digan los interruptores de arriba. Una conversación que incluya una red excluida se deja fuera entera: no existe media fila combinada que mostrar.",
   "surfacesLeavesStoreTitle": "Qué sale del almacén cifrado",
   "surfacesLeavesStoreSubtitle": "Tu propia conversación principal, dibujada como la dibujaría una fila de widget, con los interruptores de arriba aplicados. Esto es todo lo que se le entrega a una superficie.",

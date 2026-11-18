@@ -433,6 +433,21 @@ InboxSnapshot buildSnapshot({
   );
 }
 
+/// What a row is called when names are switched off: the networks it is on.
+///
+/// It used to be [kRedactedRowTitle] for every row, which kept names off the
+/// home screen and left a widget of identical lines — "Conversation",
+/// "Conversation", "Conversation" — that said nothing a reader could act on.
+/// The network is no secret here: the row's coloured dots already show it.
+/// [fallback] is for a conversation on no network the app knows.
+String redactedRowTitle(Chat chat, {String fallback = kRedactedRowTitle}) {
+  final networks = orderedNetworks(chat.networks.toSet())
+      .where((network) => network != ChatNetwork.unknown)
+      .map((network) => network.label)
+      .toList(growable: false);
+  return networks.isEmpty ? fallback : networks.join(' · ');
+}
+
 /// One chat as a row under [policy].
 ///
 /// Exposed because the surfaces settings screen shows a live preview of exactly
@@ -449,7 +464,9 @@ SnapshotRow buildSnapshotRow(
   final last = chat.lastMessage;
   return SnapshotRow(
     chatId: chat.id,
-    title: policy.includeSenderNames ? chat.title : redactedTitle,
+    title: policy.includeSenderNames
+        ? chat.title
+        : redactedRowTitle(chat, fallback: redactedTitle),
     link: chatDeepLink(chat.id),
     unreadCount: chat.unreadCount > 0 ? chat.unreadCount : 0,
     networks: orderedNetworks(chat.networks.toSet()),

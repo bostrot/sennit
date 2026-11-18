@@ -702,7 +702,7 @@
   "surfacesPreviewsSubtitle": "La première ligne du message le plus récent de chaque conversation.",
   "surfacesNamesTitle": "Noms et visages",
   "surfacesNamesWarning": "En activant cette option, les noms et les photos de profil des personnes à qui tu parles s’affichent sur ton écran d’accueil.",
-  "surfacesNamesSubtitle": "Avec qui est chaque conversation, qui a envoyé le dernier message, et sa photo. Désactivé, chaque ligne est intitulée « {redacted} ».",
+  "surfacesNamesSubtitle": "Avec qui est chaque conversation, qui a envoyé le dernier message, et sa photo. Désactivé, chaque ligne n’affiche que son réseau, comme « {redacted} ».",
   "surfacesNetworksSubtitle": "Un réseau exclu n’atteint jamais un widget ni une montre, quels que soient les interrupteurs ci-dessus. Une conversation qui comporte un réseau exclu est écartée en entier — il n’existe pas de moitié de ligne fusionnée à afficher.",
   "surfacesLeavesStoreTitle": "Ce qui quitte le stockage chiffré",
   "surfacesLeavesStoreSubtitle": "Ta propre conversation principale, dessinée comme une ligne de widget la dessine, avec les interrupteurs ci-dessus appliqués. C’est tout ce qui est confié à une surface.",

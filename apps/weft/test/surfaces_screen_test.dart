@@ -122,8 +122,16 @@ void main() {
       // effect is content leaving the encrypted store.
       final (:stores, :gateway, writer: _, :container) = await pump(tester);
 
-      expect(container.read(snapshotSettingsProvider), SnapshotSettings.off);
-      expect(persisted(stores), SnapshotSettings.off);
+      // Both surfaces off — the gate. What a row would show once one is
+      // switched on is already decided (names and words), and discloses
+      // nothing while nothing is written.
+      for (final settings in [
+        container.read(snapshotSettingsProvider),
+        persisted(stores),
+      ]) {
+        expect(settings.anySurface, isFalse);
+        expect(settings.policy.enabled, isFalse);
+      }
       expect(gateway.writes, isEmpty);
       for (final tile in tester.widgetList<SwitchListTile>(
         find.byType(SwitchListTile),
@@ -290,10 +298,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('What a row shows'), findsOneWidget);
-      // And they are off, so the first thing a watch is told is a count and
-      // nothing else.
-      expect(persisted(stores).includePreviews, isFalse);
-      expect(persisted(stores).includeSenderNames, isFalse);
+      // And they are on: a surface switched on shows who and what, and the two
+      // switches now on screen are how to take either back off.
+      expect(persisted(stores).includePreviews, isTrue);
+      expect(persisted(stores).includeSenderNames, isTrue);
     });
 
     testWidgets('previews and names persist independently', (tester) async {
@@ -404,6 +412,14 @@ void main() {
 
   group('the live preview', () {
     /// A chat with something to disclose in every field the policy gates.
+    /// [text] inside the example widget row, not elsewhere on the screen.
+    Finder inPreview(String text) => find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_WidgetRowCard',
+      ),
+      matching: find.text(text),
+    );
+
     Chat grace({int unreadCount = 3}) => snapshotChat(
       title: 'Grace',
       unreadCount: unreadCount,
@@ -422,7 +438,9 @@ void main() {
         settings: const SnapshotSettings(widgets: true),
       );
 
-      expect(find.text(kRedactedRowTitle), findsOneWidget);
+      // Called by its network, which its dots already show. Looked for inside
+      // the example row: the screen names every network again further down.
+      expect(inPreview('WhatsApp'), findsOneWidget);
       expect(find.text('Grace'), findsNothing);
       expect(find.textContaining('otter'), findsNothing);
       expect(find.text('No message text is written.'), findsOneWidget);
@@ -443,7 +461,7 @@ void main() {
 
         expect(find.text('Grace'), findsOneWidget);
         expect(find.text('Grace: the otter is loose'), findsOneWidget);
-        expect(find.text(kRedactedRowTitle), findsNothing);
+        expect(inPreview('WhatsApp'), findsNothing);
       },
     );
 

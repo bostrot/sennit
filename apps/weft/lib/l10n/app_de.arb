@@ -702,7 +702,7 @@
   "surfacesPreviewsSubtitle": "Die erste Zeile der neuesten Nachricht jeder Unterhaltung.",
   "surfacesNamesTitle": "Namen und Gesichter",
   "surfacesNamesWarning": "Wenn du das einschaltest, stehen die Namen und Profilbilder der Leute, mit denen du sprichst, auf deinem Startbildschirm.",
-  "surfacesNamesSubtitle": "Mit wem jede Unterhaltung ist, wer die letzte Nachricht geschickt hat, und deren Bild. Aus wird jede Zeile mit „{redacted}“ beschriftet.",
+  "surfacesNamesSubtitle": "Mit wem jede Unterhaltung ist, wer die letzte Nachricht geschickt hat, und deren Bild. Aus zeigt jede Zeile nur ihr Netzwerk, etwa „{redacted}“.",
   "surfacesNetworksSubtitle": "Ein ausgeschlossenes Netzwerk erreicht nie ein Widget oder eine Uhr, egal was die Schalter oben sagen. Eine Unterhaltung, die ein ausgeschlossenes Netzwerk enthält, bleibt ganz draußen — eine halbe zusammengeführte Zeile gibt es nicht.",
   "surfacesLeavesStoreTitle": "Was den verschlüsselten Speicher verlässt",
   "surfacesLeavesStoreSubtitle": "Deine eigene oberste Unterhaltung, so gezeichnet, wie eine Widget-Zeile sie zeichnet, mit den Schaltern oben angewendet. Mehr bekommt eine Oberfläche nicht.",

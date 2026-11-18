@@ -48,7 +48,7 @@ void main() {
 
       final row = snapshot.rows.single;
       expect(row.unreadCount, 3);
-      expect(row.title, kRedactedRowTitle);
+      expect(row.title, 'WhatsApp');
       expect(row.preview, isNull);
       expect(row.senderName, isNull);
       expect(row.avatarUrl, isNull);
@@ -156,7 +156,7 @@ void main() {
       ], policy: fullPolicy.copyWith(includeSenderNames: false));
 
       final row = snapshot.rows.single;
-      expect(row.title, kRedactedRowTitle);
+      expect(row.title, 'WhatsApp');
       expect(row.senderName, isNull);
       expect(row.avatarUrl, isNull);
       expect(row.toJson().toString(), isNot(contains('Grace')));
@@ -658,6 +658,40 @@ void main() {
         build([chat(lastMessage: msg(body: 'one'))]),
         isNot(build([chat(lastMessage: msg(body: 'two'))])),
       );
+    });
+  });
+
+  group('a row with names switched off', () {
+    const noNames = SnapshotPolicy(enabled: true);
+
+    test('is titled by its networks, not by a name', () {
+      final row = buildSnapshotRow(
+        chat(
+          title: 'Grace Hopper',
+          networks: const [ChatNetwork.signal, ChatNetwork.whatsapp],
+        ),
+        noNames,
+      );
+      // In the same order as the dots beside it.
+      expect(row.title, 'WhatsApp · Signal');
+      expect(row.toJson().toString(), isNot(contains('Grace')));
+    });
+
+    test('rows on different networks no longer read the same', () {
+      final titles = [
+        for (final network in const [ChatNetwork.whatsapp, ChatNetwork.signal])
+          buildSnapshotRow(chat(networks: [network]), noNames).title,
+      ];
+      expect(titles.toSet(), hasLength(2));
+    });
+
+    test('falls back to the stand-in when no network is known', () {
+      final row = buildSnapshotRow(
+        chat(networks: const [ChatNetwork.unknown]),
+        noNames,
+        redactedTitle: 'Unterhaltung',
+      );
+      expect(row.title, 'Unterhaltung');
     });
   });
 }
