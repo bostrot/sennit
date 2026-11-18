@@ -130,13 +130,20 @@ jobs:
           done
 
   widget:
-    name: Widget & golden tests
+    name: Widget & golden tests (${{ matrix.shard }}/3)
     # macOS on Apple silicon, not ubuntu: the golden files are rendered there
     # and font rasterization differs per platform — Linux fails every golden
     # on pixels.
+    #
+    # In three shards: the hosted Mac has three cores, and the app's suite
+    # alone took a quarter of an hour on one of them.
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
@@ -154,6 +161,7 @@ jobs:
       # would notice a token dropping below WCAG AA, i.e. exactly the regression
       # nobody sees by looking.
       - name: Test weft_matrix, weft_store, weft_design
+        if: matrix.shard == 1
         run: |
           set -e
           for pkg in weft_matrix weft_store weft_design; do
@@ -161,7 +169,7 @@ jobs:
             (cd "packages/$pkg" && flutter test)
             echo "::endgroup::"
           done
-      - run: flutter test
+      - run: flutter test --total-shards 3 --shard-index $(( ${{ matrix.shard }} - 1 ))
         working-directory: apps/weft
       # Goldens are font- and platform-sensitive; publishing the diff makes a
       # failure diagnosable without reproducing the runner locally.
@@ -169,7 +177,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: golden-failures
+          name: golden-failures-${{ matrix.shard }}
           path: apps/weft/test/**/failures/**
           if-no-files-found: ignore
 
