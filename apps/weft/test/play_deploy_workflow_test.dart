@@ -153,14 +153,25 @@ void main() {
     expect(upload, isNot(contains('HAS_SIGNING')));
   });
 
-  test('it runs only on the Mac runner, which can build Android', () {
+  test('it runs on hosted x64 Linux, which can build Android', () {
+    // Not linux-arm64, which has no gen_snapshot or aapt2, and not the
+    // hosted Mac, which has too little memory for the build.
     expect(
       RegExp(
         r'^    runs-on: (.*)$',
         multiLine: true,
       ).allMatches(workflow).map((m) => m.group(1)).toSet(),
-      // `android` and not just any Mac: the second Mac runner has no SDK.
-      {'[self-hosted, macOS, ARM64, android]'},
+      {'ubuntu-latest'},
+    );
+  });
+
+  test('a dry run builds and signs but never uploads', () {
+    expect(workflow, contains('dry_run:'));
+    expect(_input(upload, 'if'), contains('!inputs.dry_run'));
+    // The signing check and the build itself are not skipped by it.
+    expect(
+      _input(_step(workflow, 'Build App Bundle'), 'if'),
+      isNot(contains('dry_run')),
     );
   });
 
@@ -171,7 +182,7 @@ void main() {
     expect(release, contains(r'echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"'));
   });
 
-  test('the keystore does not outlive the job on the self-hosted runner', () {
+  test('the keystore does not outlive the job', () {
     final cleanup = _step(workflow, 'Remove the keystore from the runner');
     expect(_input(cleanup, 'if'), 'always()');
     expect(cleanup, contains('upload-keystore.jks'));
@@ -197,20 +208,21 @@ void main() {
     expect(release, isNot(contains('upload-google-play')));
   });
 
-  test(
-    'no release job waits on the offline Linux runner it cannot do without',
-    () {
-      // Everything needs `verify`, so it pinned the Android build to a runner
-      // that never came up. Only the Linux desktop build has to stay on Linux.
-      final jobs = RegExp(
-        r'^  ([a-z]+):\n(?:    .*\n|\n)*?    runs-on: (.*)$',
+  test('no workflow waits on a self-hosted runner', () {
+    // A job pinned to a runner that is not there queues forever, and every
+    // job that `needs` it with it — which is how the Play upload sat for two
+    // months. The repository is public, so hosted runners cost nothing.
+    final workflows = _repoFile(
+      '.github/workflows/ci.yaml',
+    ).parent.listSync().whereType<File>();
+    for (final file in workflows) {
+      final runsOn = RegExp(
+        r'^\s*runs-on: (.*)$',
         multiLine: true,
-      ).allMatches(release);
-      final onLinux = {
-        for (final m in jobs)
-          if (m.group(2)!.contains('Linux')) m.group(1),
-      };
-      expect(onLinux, {'linux'});
-    },
-  );
+      ).allMatches(file.readAsStringSync()).map((m) => m.group(1)!);
+      for (final labels in runsOn) {
+        expect(labels, isNot(contains('self-hosted')), reason: file.path);
+      }
+    }
+  });
 }

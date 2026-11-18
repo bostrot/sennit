@@ -31,10 +31,8 @@ env:
 
 jobs:
   verify:
-    # On the Mac rather than the Linux runner: every other job waits on this
-    # one, and the Linux box has been offline since September, which held
-    # the android job in the queue for good. It only reads pubspec.yaml.
-    runs-on: [self-hosted, macOS, ARM64]
+    # It only reads pubspec.yaml.
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -57,17 +55,13 @@ jobs:
 
   android:
     needs: verify
-    # A self-hosted Mac, not the Linux box the other jobs use. An Android
-    # release build cannot happen on linux-arm64 — Flutter's AOT host tooling
-    # (gen_snapshot) is published for linux-x64 only, and AGP resolves aapt2
-    # as com.android.tools.build:aapt2:<ver>:linux, which is x86_64 — while
-    # Apple silicon has both: Flutter ships macos-arm64 and Google ships
-    # darwin-aarch64 build-tools. The GitHub-hosted-only steps below are
-    # gated on runner.os so the job still works on ubuntu-latest if it ever
-    # goes back there.
-    #
-    # `android` picks the Mac with the toolchain — see deploy_internal.yml.
-    runs-on: [self-hosted, macOS, ARM64, android]
+    # x64 Linux. Not linux-arm64: Flutter's AOT host tooling (gen_snapshot)
+    # is published for linux-x64 only, and AGP resolves aapt2 as
+    # com.android.tools.build:aapt2:<ver>:linux, which is x86_64. Not the
+    # hosted Mac either: it has 7G of memory, and the build below needs more.
+    # The Linux-only steps are gated on runner.os so the job still works on a
+    # Mac with an Android SDK.
+    runs-on: ubuntu-latest
     env:
       HAS_SIGNING: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       VERSION: ${{ needs.verify.outputs.version }}
@@ -93,25 +87,34 @@ jobs:
         # both times as a bare "runner received a shutdown signal" ~35 minutes
         # into assembleRelease. Properties files take the last occurrence of a
         # key, so appending overrides for CI only; the swapfile absorbs the
-        # peak that remains.
+        # peak that remains. Not /swapfile: the image already swaps there.
         run: |
           printf '\norg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g\norg.gradle.workers.max=2\n' \
             >> apps/weft/android/gradle.properties
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile > /dev/null
-          sudo swapon /swapfile
+          sudo fallocate -l 8G /ci-swapfile
+          sudo chmod 600 /ci-swapfile
+          sudo mkswap /ci-swapfile > /dev/null
+          sudo swapon /ci-swapfile
           free -h | head -3
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
       - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Restore the Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-android-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: cargo-android-${{ runner.os }}-
       - name: Locate the Android SDK
-        # A self-hosted runner only carries ANDROID_HOME if its .env says so;
-        # the Android Studio default on a Mac is the fallback.
+        # The hosted image sets ANDROID_HOME; the Android Studio default on a
+        # Mac is the fallback.
         run: echo "ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}" >> "$GITHUB_ENV"
       - name: Put rustup's Rust ahead of Homebrew's
         # A Homebrew `rust` ships the std for the host only; when its rustc
@@ -151,7 +154,7 @@ jobs:
 
   linux:
     needs: verify
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
@@ -161,7 +164,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
-            libsqlite3-dev \
+            libsqlite3-dev libjpeg-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
       - uses: ./.github/actions/setup-flutter
         with:
@@ -173,10 +176,9 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          # Flutter writes the bundle under the host architecture's directory,
-          # and this runner is arm64 — build/linux/x64 no longer exists. Name
-          # the tarball for what was actually built rather than shipping an
-          # arm64 bundle inside a file that claims to be x64.
+          # Flutter writes the bundle under the host architecture's directory.
+          # Name the tarball for what was actually built, so a move to an
+          # arm64 runner cannot ship an arm64 bundle in a file that says x64.
           set -- apps/weft/build/linux/*/release/bundle
           bundle=$1
           arch=$(basename "$(dirname "$(dirname "$bundle")")")
@@ -395,7 +397,7 @@ jobs:
 
   publish:
     needs: [verify, android, linux, windows, macos, ios]
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:

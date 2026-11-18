@@ -26,6 +26,10 @@ on:
         description: Upload a build that can be submitted to the App Store
         type: boolean
         default: false
+      dry_run:
+        description: Archive and sign an IPA, but do not upload it
+        type: boolean
+        default: false
 
 # Two archives of one commit carry one build number, and App Store Connect
 # refuses the second.
@@ -40,13 +44,9 @@ env:
 jobs:
   build:
     name: Archive and upload to TestFlight
-    # Needs Xcode. A hosted macOS minute is billed as ten and an archive of
-    # this app takes a quarter of an hour, so the repository variable
-    # TESTFLIGHT_RUNS_ON points this at the self-hosted Mac that carries
-    # Xcode — its labels as JSON, e.g.
-    # ["self-hosted","macOS","ARM64","android"]. Without the variable it
-    # falls back to a hosted runner.
-    runs-on: ${{ fromJSON(vars.TESTFLIGHT_RUNS_ON || '"macos-15"') }}
+    # Needs Xcode, which the hosted image carries, and CocoaPods and rustup
+    # with it. Hosted minutes are free for a public repository.
+    runs-on: macos-15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,13 +72,10 @@ jobs:
             exit 1
           fi
 
-      - name: Put CocoaPods and rustup's Rust on PATH
-        # A self-hosted runner's PATH is whatever its service started with,
-        # which is neither Homebrew's `pod` nor rustup. ~/.cargo/bin goes in
-        # last so it ends up first: flutter_vodozemac needs rustup's
-        # toolchains, not a Homebrew rustc that only knows the host.
+      - name: Put rustup's Rust first on PATH
+        # flutter_vodozemac needs rustup's toolchains, not a Homebrew rustc
+        # that only knows the host. CocoaPods wants a UTF-8 locale.
         run: |
-          [ -d /opt/homebrew/bin ] && echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
           [ -d "$HOME/.cargo/bin" ] && echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
           echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
 
@@ -97,6 +94,17 @@ jobs:
         run: flutter pub get
         working-directory: apps/weft
 
+      - name: Restore the CocoaPods and Cargo caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/weft/ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ios-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
+          restore-keys: ios-${{ runner.arch }}-
+
       - name: Configure the build
         # The commit count, as on Play: one number for the same commit on
         # both stores, rising with every commit and needing no bump. The
@@ -113,20 +121,23 @@ jobs:
             --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
         working-directory: apps/weft
 
-      - name: Unlock the signing keychain
+      - name: Create the signing keychain
         # Automatic signing makes an Apple Development certificate the first
-        # time it archives on a machine and keeps its private key in the
-        # default keychain. A runner started as a service has no window to
-        # ask for the login keychain's password in, so the first attempt
-        # ended in "User interaction is not allowed" and left a certificate
-        # on the portal with no key anywhere. A self-hosted Mac therefore
-        # carries a keychain of its own, `ci.keychain-db`, set as the default,
-        # with its password beside it in ~/.ci-keychain-pass; a hosted runner
-        # has neither and its login keychain is already open.
+        # time it archives on a machine — every run, on a hosted runner — and
+        # keeps its private key in the default keychain. A keychain of the
+        # job's own, with a password it knows, is what lets codesign use that
+        # key without asking anyone.
         run: |
-          if [ -f "$HOME/.ci-keychain-pass" ]; then
-            security unlock-keychain -p "$(cat "$HOME/.ci-keychain-pass")" ci.keychain-db
-          fi
+          pass="$(uuidgen)"
+          echo "::add-mask::$pass"
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "$pass" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$pass" "$kc"
+          security list-keychains -d user | xargs security list-keychains -d user -s "$kc"
+          security default-keychain -s "$kc"
+          echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$pass" >> "$GITHUB_ENV"
 
       - name: Archive
         # xcodebuild and not `flutter build ipa`: the tool passes
@@ -134,10 +145,9 @@ jobs:
         # — see release.yml's ios job. A generic iOS destination lets each
         # target pick its own.
         #
-        # Twice, if the first fails on a self-hosted Mac: a key Xcode has only
-        # just created is not yet one codesign may use without asking, and
-        # the partition list that allows it can only be set once the key
-        # exists. Every later run finds it already set.
+        # Twice, if the first fails: a key Xcode has only just created is not
+        # yet one codesign may use without asking, and the partition list
+        # that allows it can only be set once the key exists.
         run: |
           archive() {
             xcodebuild archive \
@@ -153,11 +163,9 @@ jobs:
               -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
           }
           allow_codesign() {
-            [ -f "$HOME/.ci-keychain-pass" ] || return 1
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
-              -k "$(cat "$HOME/.ci-keychain-pass")" ci.keychain-db > /dev/null
+              -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
           }
-          allow_codesign || true
           archive || { allow_codesign && archive; }
 
       - name: Upload to TestFlight
@@ -167,6 +175,9 @@ jobs:
         # App Store Connect will not let such a build be attached to a
         # version, so the one that goes to review is a manual run with
         # `app_store` ticked. A push never sets it.
+        #
+        # A dry run exports the signed IPA to the runner instead, which
+        # signs it exactly as the upload would and sends nothing.
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -174,7 +185,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
+            <key>destination</key><string>${{ inputs.dry_run && 'export' || 'upload' }}</string>
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key><string>automatic</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
@@ -190,8 +201,21 @@ jobs:
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
             -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          ls -l "$RUNNER_TEMP/export"
+
+      - name: Revoke the certificate this run made
+        # Its private key leaves with the runner, and the portal only takes so
+        # many: see tooling/store/revoke_keychain_certificates.py.
+        if: always() && env.KEYCHAIN != ''
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+        run: python3 tooling/store/revoke_keychain_certificates.py "$KEYCHAIN"
 
       - name: Remove the key from the runner
-        # A self-hosted workspace outlives the job; the key must not.
+        # A hosted runner is discarded anyway; a reused machine is not.
         if: always()
-        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/ExportOptions.plist"
+        run: |
+          rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/ExportOptions.plist"
+          [ -z "${KEYCHAIN:-}" ] || security delete-keychain "$KEYCHAIN" || true

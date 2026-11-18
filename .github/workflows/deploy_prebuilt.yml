@@ -1,13 +1,13 @@
 name: Publish a prebuilt bundle to Play Store Internal
 
-# The Play upload without the build. deploy_internal.yml builds the bundle and
-# needs the one runner that can — a Mac with the Android SDK, the NDK and
-# rustup — and while that runner is not there, a bundle built and signed on a
-# workstation has no way onto the store short of dragging it into the Console.
+# The Play upload without the build. When deploy_internal.yml cannot build —
+# a toolchain the hosted image dropped, a build that will not fit — a bundle
+# built and signed on a workstation has no way onto the store short of
+# dragging it into the Console.
 #
 # This takes such a bundle from a *draft* release of this repository and hands
 # it to the same action with the same service account. Uploading is plain
-# Node, so it runs on the Linux runner.
+# Node, so any Linux runner will do.
 #
 #   gh release create play-1.0.1 --draft --title play-1.0.1 --notes "" \
 #     apps/weft/build/app/outputs/bundle/release/app-release.aab
@@ -32,7 +32,7 @@ permissions:
 jobs:
   upload:
     name: Upload the App Bundle
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     steps:
       - name: The Play service account must exist
         env:

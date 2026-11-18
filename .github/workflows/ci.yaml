@@ -10,22 +10,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# The Linux jobs run on the self-hosted `debian` runner rather than
-# ubuntu-latest. GitHub-hosted minutes are unavailable on this account — every
-# hosted job now ends in seconds with "the job was not started because recent
-# account payments have failed or your spending limit needs to be increased" —
-# and a self-hosted runner is not billed.
-#
-# That runner is arm64 (Apple Virtualization guest), which is why these jobs
-# install Flutter through .github/actions/setup-flutter instead of
-# subosito/flutter-action: there is no linux-arm64 Flutter archive to download.
-# See that action for the detail.
-#
-# The macOS jobs run on the self-hosted Mac for the same reason, and a
-# sharper one: a hosted macOS minute is billed as ten, so the two of them
-# cost about eighty minutes a push — a month's allowance in under forty
-# pushes. They only need Flutter, not Xcode. The `android` label picks the
-# Mac runner with room for an SDK; the other one has none.
+# Every job runs on a GitHub-hosted runner, which is free for a public
+# repository and thrown away afterwards. The Linux jobs use ubuntu-latest
+# (x64); the widget and accessibility jobs use macos-15 (Apple silicon), the
+# platform the golden files are rendered on. Flutter comes from
+# .github/actions/setup-flutter on all of them, so one pinned SDK and one
+# cache scheme serve every job.
 
 # Nothing here writes to the repository.
 permissions:
@@ -34,14 +24,9 @@ permissions:
 env:
   FLUTTER_VERSION: "3.44.0"
 
-# A pull request from a fork never reaches those machines. The repository is
-# public, a self-hosted runner outlives the job, and a fork's workflow run
-# executes whatever the fork put in the tree — on a machine that also holds
-# the release signing setup. So every self-hosted job below skips a fork's
-# pull request, and `fork-pr` runs the checks that need no particular host on
-# a GitHub-hosted runner, which is free for a public repository and thrown
-# away afterwards. The golden and integration suites run once the change is
-# on a branch of this repository.
+# A pull request from a fork runs `fork-pr` only: the checks that need no
+# particular host. The golden, route-walk and integration suites run once the
+# change is on a branch of this repository, where a maintainer has read it.
 
 jobs:
   fork-pr:
@@ -80,7 +65,7 @@ jobs:
     name: Analyze & format
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
@@ -118,7 +103,7 @@ jobs:
     name: Unit tests (pure Dart)
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
@@ -145,12 +130,20 @@ jobs:
           done
 
   widget:
-    name: Widget & golden tests
-    # macOS, not ubuntu: the golden files are rendered on macOS and font
-    # rasterization differs per platform — Linux fails every golden on pixels.
+    name: Widget & golden tests (${{ matrix.shard }}/3)
+    # macOS on Apple silicon, not ubuntu: the golden files are rendered there
+    # and font rasterization differs per platform — Linux fails every golden
+    # on pixels.
+    #
+    # In three shards: the hosted Mac has three cores, and the app's suite
+    # alone took a quarter of an hour on one of them.
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, macOS, ARM64, android]
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
@@ -168,6 +161,7 @@ jobs:
       # would notice a token dropping below WCAG AA, i.e. exactly the regression
       # nobody sees by looking.
       - name: Test weft_matrix, weft_store, weft_design
+        if: matrix.shard == 1
         run: |
           set -e
           for pkg in weft_matrix weft_store weft_design; do
@@ -175,7 +169,7 @@ jobs:
             (cd "packages/$pkg" && flutter test)
             echo "::endgroup::"
           done
-      - run: flutter test
+      - run: flutter test --total-shards 3 --shard-index $(( ${{ matrix.shard }} - 1 ))
         working-directory: apps/weft
       # Goldens are font- and platform-sensitive; publishing the diff makes a
       # failure diagnosable without reproducing the runner locally.
@@ -183,7 +177,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: golden-failures
+          name: golden-failures-${{ matrix.shard }}
           path: apps/weft/test/**/failures/**
           if-no-files-found: ignore
 
@@ -193,7 +187,7 @@ jobs:
     # rendered pixels, and Linux text rasterization shifts them.
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, macOS, ARM64, android]
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
@@ -248,12 +242,22 @@ jobs:
     # step rather than a per-push one; `docs/quality/ui-audit.md` records both.
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      # vodozemac is Rust, built from source for the Linux desktop target by
+      # cargokit with the rustup toolchain the hosted image carries.
+      - name: Restore the Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
       # A real engine on a real desktop target, which is what `integration_test`
       # requires — `flutter test` refuses to run a file under `integration_test/`
       # without a device.
@@ -262,7 +266,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
-            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
+            libsqlite3-dev libjpeg-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get
@@ -294,18 +298,28 @@ jobs:
     name: Integration tests (against Synapse)
     # Never a fork's pull request: see the note above `jobs:`.
     if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
-    runs-on: [self-hosted, Linux, debian]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-      # A self-hosted runner outlives the job, and so did the homeserver: the
-      # container is `restart: unless-stopped`, `up --wait` is satisfied by one
-      # that is already running, and the next run then signed Alice and Bob in
-      # to every room the runs before it had made. A hosted runner hid this by
-      # being new each time. The tree is removed as root because Synapse writes
-      # its database and media store as a user that is nobody here.
+      # vodozemac is Rust, built from source for the Linux desktop target by
+      # cargokit with the rustup toolchain the hosted image carries.
+      - name: Restore the Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ runner.arch }}-
+      # A no-op on a fresh hosted runner. Kept because a reused machine — a
+      # self-hosted runner, a local `act` run — outlives the job, and so does
+      # the homeserver: the container is `restart: unless-stopped`, `up --wait`
+      # is satisfied by one already running, and Alice and Bob then sign in to
+      # every room the runs before had made. The tree is removed as root
+      # because Synapse writes it as a user that is nobody here.
       - name: Start from a clean homeserver
         run: |
           docker compose -f tooling/docker/compose.yaml down --volumes --remove-orphans || true
@@ -347,7 +361,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev \
-            libsqlite3-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
+            libsqlite3-dev libjpeg-dev xvfb gnome-keyring dbus-x11 pulseaudio libpulse-dev \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev
       - run: flutter config --enable-linux-desktop
       - run: flutter pub get

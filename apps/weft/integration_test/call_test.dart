@@ -127,9 +127,13 @@ void main() {
         await aliceRoom.enableEncryption();
         await bob.client.joinRoomById(roomId);
         final bobRoom = await _awaitRoom(bob.client, roomId);
-        expect(aliceRoom.encrypted, isTrue);
-        // `m.room.encryption` is a state event and reaches bob through /sync
-        // like any other, so it is not there the instant he has joined.
+        // `m.room.encryption` is a state event and reaches both sides through
+        // /sync like any other — alice's own included, so it is not there the
+        // instant `enableEncryption` returns, nor the instant bob has joined.
+        await _awaitCondition(
+          () => aliceRoom.encrypted,
+          'alice never saw the room turn encrypted',
+        );
         await _awaitCondition(
           () => bobRoom.encrypted,
           'bob never saw the room turn encrypted',
