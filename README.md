@@ -24,6 +24,12 @@
   <a href="#license">License</a>
 </p>
 
+<p align="center">
+  <a href="https://apps.apple.com/app/sennit-messenger/id6804951341"><img src="docs/images/badge-app-store.svg" height="48" alt="Download on the App Store" /></a>
+  &nbsp;
+  <a href="https://play.google.com/store/apps/details?id=com.bostrot.weft"><img src="docs/images/badge-google-play.png" height="48" alt="Get it on Google Play" /></a>
+</p>
+
 ---
 
 Sennit is a [Matrix](https://matrix.org) client built from the ground up
@@ -88,6 +94,11 @@ infrastructure you don't own.
 | ![Mobile inbox](docs/images/inbox-mobile.png) | ![Merged chat](docs/images/chat-light.png) | ![Photos and video in a chat, dark](docs/images/chat-media-dark.png) |
 
 ## Install
+
+On phones, get Sennit from the
+[App Store](https://apps.apple.com/app/sennit-messenger/id6804951341) or
+[Google Play](https://play.google.com/store/apps/details?id=com.bostrot.weft)
+(a public beta on Android for now).
 
 Desktop builds are attached to every
 [GitHub release](https://github.com/bostrot/sennit/releases/latest). The
