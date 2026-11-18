@@ -4828,6 +4828,15 @@
   "@verifyContinueWithoutKey": {
     "description": "Skips the recovery-key step. The two devices still verify each other; what it gives up is signing them into the account's chain of trust. Keep under ~30 chars."
   },
+  "verifyUseRecoveryKey": "Use your recovery key",
+  "@verifyUseRecoveryKey": {
+    "description": "Secondary button on the new-sign-in verification screen, under 'Verify with another device': verify by typing the recovery key instead. Keep under ~34 chars.",
+    "maxLength": 55
+  },
+  "verifyRecoveryBody": "Enter the recovery key you saved, or the passphrase you set with it. It proves this device is yours without another one, and unlocks your message history.",
+  "@verifyRecoveryBody": {
+    "description": "Explains the recovery-key path on the verification screen, above the field the key or passphrase is typed into."
+  },
   "verifyEmojiQuestion": "Do these appear, in this order, on your other device?",
   "@verifyEmojiQuestion": {
     "description": "The question above the emoji grid. The order matters as much as the emoji, which is why it is named in the question. Keep under ~54 chars."

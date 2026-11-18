@@ -840,6 +840,8 @@
   "verifyUnlockBody": "Introduce tu clave de recuperación para desbloquear las claves de firma de esta cuenta. Sin ellas, este dispositivo se puede comprobar pero no avalar.",
   "verifyUnlock": "Desbloquear",
   "verifyContinueWithoutKey": "Continuar sin ella",
+  "verifyUseRecoveryKey": "Usar tu clave de recuperación",
+  "verifyRecoveryBody": "Introduce la clave de recuperación que guardaste, o la frase de contraseña que definiste con ella. Demuestra que este dispositivo es tuyo sin necesitar otro y desbloquea tu historial de mensajes.",
   "verifyEmojiQuestion": "¿Aparecen estos, en este orden, en tu otro dispositivo?",
   "verifyEmojiNoMatch": "No coinciden",
   "verifyEmojiMatch": "Coinciden",

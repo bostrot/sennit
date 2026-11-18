@@ -840,6 +840,8 @@
   "verifyUnlockBody": "Saisis ta clé de récupération pour déverrouiller les clés de signature de ce compte. Sans elles, cet appareil peut être vérifié mais pas cautionné.",
   "verifyUnlock": "Déverrouiller",
   "verifyContinueWithoutKey": "Continuer sans elle",
+  "verifyUseRecoveryKey": "Utiliser ta clé de récupération",
+  "verifyRecoveryBody": "Saisis la clé de récupération que tu as enregistrée, ou la phrase secrète définie avec elle. Elle prouve que cet appareil est le tien sans en utiliser un autre, et déverrouille ton historique de messages.",
   "verifyEmojiQuestion": "Ces émojis apparaissent-ils, dans cet ordre, sur ton autre appareil ?",
   "verifyEmojiNoMatch": "Ils ne correspondent pas",
   "verifyEmojiMatch": "Ils correspondent",

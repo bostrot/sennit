@@ -840,6 +840,8 @@
   "verifyUnlockBody": "Gib deinen Wiederherstellungsschlüssel ein, um die Signaturschlüssel dieses Kontos zu entsperren. Ohne sie lässt sich dieses Gerät prüfen, aber nicht beglaubigen.",
   "verifyUnlock": "Entsperren",
   "verifyContinueWithoutKey": "Ohne ihn fortfahren",
+  "verifyUseRecoveryKey": "Wiederherstellungsschlüssel verwenden",
+  "verifyRecoveryBody": "Gib den Wiederherstellungsschlüssel ein, den du gespeichert hast, oder die Passphrase, die du dazu festgelegt hast. Damit weist du ohne ein weiteres Gerät nach, dass dieses Gerät dir gehört, und dein Nachrichtenverlauf wird entsperrt.",
   "verifyEmojiQuestion": "Erscheinen diese, in dieser Reihenfolge, auf deinem anderen Gerät?",
   "verifyEmojiNoMatch": "Sie stimmen nicht überein",
   "verifyEmojiMatch": "Sie stimmen überein",

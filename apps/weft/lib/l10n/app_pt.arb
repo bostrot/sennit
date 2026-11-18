@@ -841,6 +841,8 @@
   "verifyUnlockBody": "Digite sua chave de recuperação para desbloquear as chaves de assinatura desta conta. Sem elas, este dispositivo pode ser conferido, mas não avalizado.",
   "verifyUnlock": "Desbloquear",
   "verifyContinueWithoutKey": "Continuar sem ela",
+  "verifyUseRecoveryKey": "Usar sua chave de recuperação",
+  "verifyRecoveryBody": "Digite a chave de recuperação que você salvou, ou a frase secreta que definiu com ela. Ela prova que este dispositivo é seu sem precisar de outro e desbloqueia seu histórico de mensagens.",
   "verifyEmojiQuestion": "Estes aparecem, nesta ordem, no seu outro dispositivo?",
   "verifyEmojiNoMatch": "Não coincidem",
   "verifyEmojiMatch": "Coincidem",

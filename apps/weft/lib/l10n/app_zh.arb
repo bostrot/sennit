@@ -841,6 +841,8 @@
   "verifyUnlockBody": "请输入你的恢复密钥以解锁本账号的签名密钥。没有它们，本设备可以被校验，但无法被担保。",
   "verifyUnlock": "解锁",
   "verifyContinueWithoutKey": "不使用并继续",
+  "verifyUseRecoveryKey": "使用恢复密钥",
+  "verifyRecoveryBody": "请输入你保存的恢复密钥，或与它一同设置的口令。无需其他设备即可证明本设备属于你，并解锁你的消息记录。",
   "verifyEmojiQuestion": "你的另一台设备上是否按此顺序显示这些图案？",
   "verifyEmojiNoMatch": "不一致",
   "verifyEmojiMatch": "一致",

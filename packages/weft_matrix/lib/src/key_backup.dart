@@ -306,8 +306,9 @@ abstract class KeyBackup {
     bool replaceExisting = false,
   });
 
-  /// Unlocks this account's secret storage with a recovery key or passphrase
-  /// and pulls the backed-up room keys down.
+  /// Unlocks this account's secret storage with a recovery key or passphrase,
+  /// pulls the backed-up room keys down, and signs this device as verified if
+  /// it was not already.
   Future<void> restore(String keyOrPassphrase);
 }
 
@@ -403,22 +404,51 @@ class MatrixKeyBackup implements KeyBackup {
     }
 
     try {
-      await handle.unlock(keyOrPassphrase: keyOrPassphrase.trim());
-    } on enc.InvalidPassphraseException {
+      // No post-unlock: the SDK's own would self-sign here and swallow the
+      // failure, and this is the one caller that has to be able to say whether
+      // the device ended up trusted.
+      await handle.unlock(
+        keyOrPassphrase: keyOrPassphrase.trim(),
+        postUnlock: false,
+      );
+    } catch (_) {
+      // Unlocking touches no network, so whatever it throws is about the key —
+      // and the SDK throws several unrelated types for one that does not work.
       throw const KeyBackupException(
         'That is not the recovery key or passphrase for this account. Check '
         'for a mistyped character — the key is case-sensitive.',
       );
     }
 
-    // Caches the cross-signing secrets too, which is what makes this device
-    // trusted rather than merely able to read old messages.
+    // Caches the cross-signing secrets too, which the signing below needs.
     await handle.maybeCacheAll();
 
-    final info = await encryption.keyManager.getRoomKeysBackupInfo(false);
-    await encryption.keyManager.loadFromResponse(
-      await _client.getRoomKeys(info.version),
-    );
+    // The history first: it is worth having even if the signing fails.
+    try {
+      final info = await encryption.keyManager.getRoomKeysBackupInfo(false);
+      await encryption.keyManager.loadFromResponse(
+        await _client.getRoomKeys(info.version),
+      );
+    } on sdk.MatrixException {
+      // M_NOT_FOUND. An account can be cross-signed with no backup, and the
+      // key still proves this device is its owner's.
+    }
+
+    // Signing this device with the account's own keys is what verifies it —
+    // the same end state as comparing emoji with another device, reached with
+    // the key instead.
+    final masterKey = _client.userDeviceKeys[_client.userID]?.masterKey;
+    if (encryption.crossSigning.enabled &&
+        (_client.isUnknownSession || masterKey?.directVerified != true)) {
+      try {
+        await encryption.crossSigning.selfSign(openSsss: handle);
+      } catch (error) {
+        throw KeyBackupException(
+          'That key unlocked your backup, but Weft could not verify this '
+          'device with it: $error',
+        );
+      }
+    }
   }
 }
 

@@ -48,6 +48,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   String? _error;
   bool _starting = false;
 
+  /// Whether the user chose to type their recovery key rather than bring in
+  /// another device.
+  bool _usingRecoveryKey = false;
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +109,22 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     }
   }
 
+  /// Swaps the device flow for the recovery-key field.
+  ///
+  /// A request nobody has answered is withdrawn first: left open, a device
+  /// that accepts it later would be talking to a screen that has moved on.
+  void _useRecoveryKey() {
+    final pending = _verification;
+    pending?.onUpdate = null;
+    pending?.cancel();
+    setState(() {
+      _verification = null;
+      _error = null;
+      _usingRecoveryKey = true;
+    });
+    announce(context, context.l10n.securityEnterKeyOrPassphrase);
+  }
+
   /// Reads the other device's code and hands its bytes to the SDK.
   ///
   /// The scan is the whole of this side's contribution: `verifyQrData` checks
@@ -133,6 +153,18 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   Widget build(BuildContext context) {
     final session = ref.read(matrixSessionProvider);
     final verification = _verification;
+    // The key verifies *this* device, so it is offered only where this device
+    // is the one in question and the account has keys for it to unlock — and
+    // only until another device has answered, after which there is a flow in
+    // progress that is quicker to finish than to abandon.
+    final canUseRecoveryKey =
+        !_usingRecoveryKey &&
+        widget.deviceId == null &&
+        widget.incoming == null &&
+        session.crossSigningExists &&
+        session.needsVerification &&
+        (verification == null ||
+            verification.state == KeyVerificationState.waitingAccept);
 
     return Scaffold(
       body: Center(
@@ -161,7 +193,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 ),
                 const SizedBox(height: WeftSpace.sm),
                 Text(
-                  widget.deviceId != null
+                  _usingRecoveryKey
+                      ? context.l10n.verifyRecoveryBody
+                      : widget.deviceId != null
                       ? context.l10n.verifyOtherDeviceBody
                       : session.crossSigningExists
                       ? context.l10n.verifyExistingBody
@@ -172,6 +206,12 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   ),
                 ),
                 const SizedBox(height: WeftSpace.xl),
+
+                if (_usingRecoveryKey)
+                  RecoveryKeyVerification(
+                    onDone: widget.onContinue,
+                    onBack: () => setState(() => _usingRecoveryKey = false),
+                  ),
 
                 if (verification != null)
                   _VerificationBody(
@@ -198,7 +238,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   const SizedBox(height: WeftSpace.lg),
                 ],
 
-                if (verification == null)
+                if (verification == null && !_usingRecoveryKey)
                   FilledButton.icon(
                     onPressed: _starting ? null : _start,
                     icon: _starting
@@ -214,6 +254,15 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                           : context.l10n.verifyStart,
                     ),
                   ),
+
+                if (canUseRecoveryKey) ...[
+                  const SizedBox(height: WeftSpace.sm),
+                  OutlinedButton.icon(
+                    onPressed: _starting ? null : _useRecoveryKey,
+                    icon: const Icon(Icons.key_rounded, size: 18),
+                    label: Text(context.l10n.verifyUseRecoveryKey),
+                  ),
+                ],
 
                 const SizedBox(height: WeftSpace.sm),
                 TextButton(
@@ -476,6 +525,135 @@ class _UnlockPromptState extends State<_UnlockPrompt> {
               ? null
               : () => widget.verification.openSSSS(skip: true),
           child: Text(context.l10n.verifyContinueWithoutKey),
+        ),
+        const SizedBox(height: WeftSpace.lg),
+      ],
+    );
+  }
+}
+
+/// Verifies this device with the account's recovery key, no other device
+/// needed.
+///
+/// Public for the reason [SasEmojiCell] is: the screen around it needs a live
+/// session to pump, and this — the field, the wrong-key line, the result — is
+/// the part worth pumping.
+class RecoveryKeyVerification extends ConsumerStatefulWidget {
+  const RecoveryKeyVerification({
+    super.key,
+    required this.onDone,
+    required this.onBack,
+  });
+
+  /// Invoked from the result once the device is verified.
+  final VoidCallback onDone;
+
+  /// Returns to verifying with another device.
+  final VoidCallback onBack;
+
+  @override
+  ConsumerState<RecoveryKeyVerification> createState() =>
+      _RecoveryKeyVerificationState();
+}
+
+class _RecoveryKeyVerificationState
+    extends ConsumerState<RecoveryKeyVerification> {
+  final TextEditingController _controller = TextEditingController();
+  String? _error;
+  bool _busy = false;
+  bool _verified = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verify() async {
+    final input = _controller.text.trim();
+    if (input.isEmpty) {
+      setState(() => _error = context.l10n.securityEnterKeyOrPassphrase);
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(keyBackupProvider).restore(input);
+      if (!mounted) return;
+      setState(() => _verified = true);
+      announce(context, context.l10n.verifyDone);
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = switch (error) {
+          KeyBackupException(:final message) => message,
+          _ => context.l10n.devicesUnreachableHomeserver,
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_verified) {
+      return _Result(
+        icon: Icons.check_circle_rounded,
+        message: context.l10n.verifyDone,
+        onDone: widget.onDone,
+        success: true,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          enabled: !_busy,
+          autocorrect: false,
+          enableSuggestions: false,
+          onSubmitted: (_) => _verify(),
+          decoration: InputDecoration(
+            labelText: context.l10n.securityKeyOrPassphraseField,
+          ),
+        ),
+        if (_error case final message?) ...[
+          const SizedBox(height: WeftSpace.sm),
+          // Live, as in [_UnlockPrompt]: a wrong key changes nothing on the
+          // screen but this line.
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: WeftSpace.lg),
+        FilledButton.icon(
+          onPressed: _busy ? null : _verify,
+          icon: _busy
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.lock_open_rounded, size: 18),
+          label: Text(context.l10n.commonVerify),
+        ),
+        const SizedBox(height: WeftSpace.sm),
+        OutlinedButton(
+          onPressed: _busy ? null : widget.onBack,
+          child: Text(context.l10n.verifyWithAnotherDevice),
         ),
         const SizedBox(height: WeftSpace.lg),
       ],
