@@ -115,10 +115,10 @@ jobs:
         run: |
           printf '\norg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g\norg.gradle.workers.max=2\n' \
             >> apps/weft/android/gradle.properties
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile > /dev/null
-          sudo swapon /swapfile
+          sudo fallocate -l 8G /ci-swapfile
+          sudo chmod 600 /ci-swapfile
+          sudo mkswap /ci-swapfile > /dev/null
+          sudo swapon /ci-swapfile
 
       - name: Setup Java
         if: steps.check_version.outputs.changed == 'true'
