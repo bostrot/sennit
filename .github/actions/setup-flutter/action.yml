@@ -1,16 +1,16 @@
 name: Set up Flutter
 description: >
-  Puts a pinned Flutter on PATH on a runner Google publishes no archive for.
+  Puts a pinned Flutter on PATH, the same way on every runner the workflows use.
 
   Flutter ships Linux SDK tarballs for x64 only — releases_linux.json carries
   no arm64 entry for any version, 3.44.0 included — so subosito/flutter-action
-  has nothing to download on the arm64 self-hosted box and fails there. A
-  shallow clone of the version tag is the supported way onto arm64; the tool
-  then fetches the Dart SDK and engine artifacts for the host it finds itself
-  on, and those *are* published for linux-arm64.
+  has nothing to download on an arm64 Linux runner. A shallow clone of the
+  version tag works on every host; the tool then fetches the Dart SDK and
+  engine artifacts for the host it finds itself on.
 
-  The clone is kept outside the workspace so it survives actions/checkout's
-  clean and is paid for once per runner rather than once per job.
+  The clone and the pub cache are kept outside the workspace and restored
+  from the Actions cache, so a hosted runner pays for them once per version
+  and OS rather than once per job.
 
 inputs:
   flutter-version:
@@ -20,6 +20,18 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Restore the Flutter SDK
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/flutter-sdks/${{ inputs.flutter-version }}
+        key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-${{ inputs.flutter-version }}
+    # Keyed on the lockfile, which the workspace keeps at the root.
+    - name: Restore the pub cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.pub-cache
+        key: pub-${{ runner.os }}-${{ runner.arch }}-${{ inputs.flutter-version }}-${{ hashFiles('pubspec.lock') }}
+        restore-keys: pub-${{ runner.os }}-${{ runner.arch }}-${{ inputs.flutter-version }}-
     - shell: bash
       run: |
         set -euo pipefail
@@ -31,9 +43,10 @@ runs:
           git clone --depth 1 --branch "${{ inputs.flutter-version }}" \
             https://github.com/flutter/flutter.git "$root"
         fi
-        # The runner account rarely owns this clone on a self-hosted box, and
-        # git refuses to read a repository it does not own — which the Flutter
-        # tool reports as a version it cannot determine.
+        # A restored clone is not always owned by the account running the
+        # job, and git refuses to read a repository it does not own — which
+        # the Flutter tool reports as a version it cannot determine.
         git config --global --add safe.directory "$root"
         echo "$root/bin" >> "$GITHUB_PATH"
+        echo "PUB_CACHE=$HOME/.pub-cache" >> "$GITHUB_ENV"
         "$root/bin/flutter" --version

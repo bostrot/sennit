@@ -1,6 +1,0 @@
-# The self-hosted runner's labels. actionlint only knows the GitHub-hosted
-# ones, and without this every `runs-on: [self-hosted, Linux, debian]` is
-# reported as an unknown label.
-self-hosted-runner:
-  labels:
-    - debian

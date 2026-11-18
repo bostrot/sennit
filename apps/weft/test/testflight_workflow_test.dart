@@ -58,7 +58,19 @@ void main() {
       ),
     );
     expect(workflow, contains('default: false'));
-    expect(workflow, contains('<key>destination</key><string>upload</string>'));
+    // A dry run exports to the runner; anything else is an upload.
+    expect(
+      workflow,
+      contains(
+        '<key>destination</key>'
+        "<string>\${{ inputs.dry_run && 'export' || 'upload' }}</string>",
+      ),
+    );
+  });
+
+  test('it runs on a hosted Mac', () {
+    expect(workflow, contains('    runs-on: macos-15\n'));
+    expect(workflow, isNot(contains('TESTFLIGHT_RUNS_ON')));
   });
 
   test('the key does not outlive the job', () {

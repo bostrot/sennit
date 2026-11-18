@@ -62,7 +62,9 @@ track** and releases it there, the same way papervault does. It runs on every
 push to `main` that changes the `version:` line of `apps/weft/pubspec.yaml` —
 so `tooling/scripts/release.sh` triggers it — and on demand from the Actions
 tab (workflow_dispatch), which ships whatever `main` is now without a bump.
-It needs only the self-hosted Mac runner, not the tag or any other platform.
+It runs on a GitHub-hosted `ubuntu-latest` runner and needs no tag or any
+other platform. A manual run with **dry_run** ticked builds and signs the
+bundle without uploading it.
 
 The app itself has to exist first — the Play API cannot create one, so
 `com.bostrot.weft` is a one-time **Create app** in the Console. Then create a
@@ -156,13 +158,12 @@ Before the first run, once:
 
 The build number is the commit count, the same number the Play upload uses.
 
-It runs on the self-hosted Mac named by the repository variable
-`TESTFLIGHT_RUNS_ON` (the runner's labels as JSON). That Mac needs Xcode with
-the iOS and watchOS platforms, CocoaPods, rustup with the iOS targets, and a
-keychain `ci.keychain-db` set as the default with its password in
-`~/.ci-keychain-pass` — a runner started as a service cannot be asked for the
-login keychain's password. Without the variable the job falls back to a
-GitHub-hosted Mac, where a minute is billed as ten.
+It runs on a GitHub-hosted `macos-15` runner, which carries Xcode,
+CocoaPods and rustup; the job makes a keychain of its own for the signing
+certificate Xcode creates. A manual run with **dry_run** ticked archives and
+exports a signed IPA without uploading it. Every workflow here runs on
+GitHub-hosted runners — free for a public repository — and none needs a
+self-hosted one.
 
 ### Windows / Linux
 

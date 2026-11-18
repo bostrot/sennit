@@ -24,7 +24,8 @@ permissions:
 jobs:
   products:
     name: Sennit Pro in the stores
-    runs-on: [self-hosted, macOS, ARM64]
+    # Python 3 and openssl, nothing more: any hosted image will do.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Check, and create when asked
