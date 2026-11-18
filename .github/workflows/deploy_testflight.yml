@@ -203,6 +203,16 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
           ls -l "$RUNNER_TEMP/export"
 
+      - name: Revoke the certificate this run made
+        # Its private key leaves with the runner, and the portal only takes so
+        # many: see tooling/store/revoke_keychain_certificates.py.
+        if: always() && env.KEYCHAIN != ''
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+        run: python3 tooling/store/revoke_keychain_certificates.py "$KEYCHAIN"
+
       - name: Remove the key from the runner
         # A hosted runner is discarded anyway; a reused machine is not.
         if: always()
