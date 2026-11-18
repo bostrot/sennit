@@ -15,7 +15,7 @@ related:
 
 # Manual Walkthrough — Android and macOS
 
-Every other phase in this playbook asserts something a test can express. This
+Every other audit in `docs/quality/` asserts something a test can express. This
 one looked at the app. Thirty-one surfaces on an Android emulator and
 twenty-nine in a macOS window, photographed under eight sets of viewing
 conditions, and then *read* — for gaps that do not match their neighbours,
@@ -55,10 +55,6 @@ test's surface.
 `macos/Runner/MainFlutterWindow.swift:71` — `minSize = NSSize(width: 720, …)`.
 It is not a hypothetical; it is the smallest window a person can drag the app
 to, and it is where the worst macOS finding was.
-
-Screenshots: `.maestro/playbooks/2026-08-28-Localization-UI-Audit-Features/Working/manual-walk/`
-— `android/`, `macos/`, and the after-shots in `android-after/` and
-`macos-after/`.
 
 ## What the walk gained
 

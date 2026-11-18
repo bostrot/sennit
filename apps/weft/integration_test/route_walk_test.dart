@@ -231,8 +231,7 @@ class WalkPass {
   /// Null rather than [Brightness.light] for the default pass: the setting is
   /// `WeftThemeMode.system` (`settings.dart:12`), so pinning it here would make
   /// the default walk stop matching what the machine running it actually draws
-  /// — and the macOS artefacts in `Working/route-walk/` were captured without a
-  /// pin.
+  /// — and the macOS screenshots in `ui-audit.md` were captured without a pin.
   final Brightness? brightness;
 
   bool get isDefault => name == 'default';
@@ -1372,9 +1371,9 @@ class RouteWalker {
 
 /// Where the images go.
 ///
-/// `WEFT_SHOT_DIR` wins; otherwise the phase's own working directory, found by
-/// walking up for the repository root; otherwise a temp directory whose real
-/// path is printed.
+/// `WEFT_SHOT_DIR` wins; otherwise `build/route-walk/` at the repository root,
+/// found by walking up for it and ignored by git; otherwise a temp directory
+/// whose real path is printed.
 ///
 /// The last case is not a fallback for nothing — it is the macOS run. A macOS
 /// app is sandboxed, so a path outside its container is not writable however
@@ -1450,16 +1449,7 @@ Future<Directory?> _shotDirectory(String override) async {
   var dir = Directory.current;
   for (var depth = 0; depth < 6; depth++) {
     if (Directory(p.join(dir.path, '.git')).existsSync()) {
-      return make(
-            p.join(
-              dir.path,
-              '.maestro',
-              'playbooks',
-              '2026-08-28-Localization-UI-Audit-Features',
-              'Working',
-              'route-walk',
-            ),
-          ) ??
+      return make(p.join(dir.path, 'build', 'route-walk')) ??
           await external() ??
           scratch();
     }

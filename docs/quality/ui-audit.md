@@ -100,17 +100,13 @@ findings, including two screens that were a red error page and an unnamed
 tappable node over every conversation row on the desktop. The counts below are
 the work that closed the gap.
 
-Screenshots of all 26 macOS surfaces, plus `findings-mac.tsv`, are in
-`.maestro/playbooks/2026-08-28-Localization-UI-Audit-Features/Working/route-walk/`.
-
-The 25 touch surfaces are **not** beside them, and the reason is worth stating
-rather than leaving as a gap somebody trips over. Neither run can write into the
-checkout: a macOS app is sandboxed, so the walk falls back to its container's
-temp directory and prints the path, and the copy above was made by hand from
-there. An Android run writes into the app's own `code_cache`, and the app is
-uninstalled when the run ends — so the images are gone before anyone can pull
-them. Locally, an Android run's images are for watching it happen, not for
-keeping.
+Neither run keeps its screenshots in the repository, and the reason is worth
+stating rather than leaving as a gap somebody trips over. Neither run can write
+into the checkout: a macOS app is sandboxed, so the walk falls back to its
+container's temp directory and prints the path to copy the images from. An
+Android run writes into the app's own `code_cache`, and the app is uninstalled
+when the run ends — so the images are gone before anyone can pull them.
+Locally, an Android run's images are for watching it happen, not for keeping.
 
 CI is where the touch set is kept. The `route-walk` job passes
 `--dart-define=WEFT_SHOT_DIR` into the workspace, which a Linux desktop target

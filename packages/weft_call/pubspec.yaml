@@ -16,11 +16,10 @@ dependencies:
   meta: ^1.17.0
   weft_domain: ^0.1.0
 
-# Deliberately NOT depended on: `matrix`. The orientation for this phase
-# (Working/phase-07-orientation.md §1) established that the SDK ships a
-# complete 1:1 VoIP stack and recommended wrapping it. This package
-# reimplements instead, and the reasons are recorded in `lib/weft_call.dart`
-# so the choice is visible from the code rather than only from a playbook.
+# Deliberately NOT depended on: `matrix`. The SDK ships a complete 1:1 VoIP
+# stack, and wrapping it was the obvious option. This package reimplements
+# instead, and the reasons are recorded in `lib/weft_call.dart` so the choice
+# is visible from the code.
 # The practical consequence for this file: no `matrix` dependency, so
 # weft_call stays in the pure-Dart CI group and `dart test` runs it.
 #

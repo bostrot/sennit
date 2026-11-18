@@ -15,11 +15,9 @@ related:
 
 # Accessibility and RTL Audit
 
-The state of Weft's UI before Phase 08 changes anything, screen by screen. This
-is the work list for the rest of the phase: every remaining task in
-`Phase-08-Accessibility-and-RTL.md` should be able to point at findings here and
-close them, and the closing task re-reads this file and marks each one fixed or
-explicitly deferred.
+The state of Weft's UI before the accessibility work changed anything, screen by
+screen. This is that work's list: every fix should be able to point at a
+finding here and close it, and each one is marked fixed or explicitly deferred.
 
 Findings are exhaustive rather than representative — every occurrence is listed
 with a file and a line, because a phase that fixes "the examples" leaves the
