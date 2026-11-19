@@ -1,7 +1,7 @@
 name: weft
 description: "Weft — every conversation, one thread."
 publish_to: none
-version: 1.0.12+342
+version: 1.0.13+349
 resolution: workspace
 
 environment:
