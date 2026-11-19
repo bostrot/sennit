@@ -201,6 +201,13 @@ exports a signed IPA without uploading it. Every workflow here runs on
 GitHub-hosted runners — free for a public repository — and none needs a
 self-hosted one.
 
+App Store Connect only accepts builds made with a current SDK: the iOS 26
+SDK (Xcode 26) since 2026-11-19, and the iOS 27 SDK (Xcode 27) from April
+2027. The workflow selects the newest installed Xcode 26 and fails before
+archiving without one. Before April 2027, move that step, and its check in
+`testflight_workflow_test.dart`, to Xcode 27 once the runner image has it as a
+release rather than a preview.
+
 ### Windows / Linux
 
 Ship unsigned. Windows SmartScreen will warn until the binary earns

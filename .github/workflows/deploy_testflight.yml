@@ -235,7 +235,10 @@ jobs:
             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
             -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
-          ls -l "$RUNNER_TEMP/export"
+          # Only a dry run leaves an IPA behind. Xcode 26 creates no export
+          # directory at all for an upload, and listing it failed the 1.0.13
+          # run after the upload had gone through, skipping the notes below.
+          if [ -d "$RUNNER_TEMP/export" ]; then ls -l "$RUNNER_TEMP/export"; fi
 
       - name: Revoke the certificate this run made
         # Its private key leaves with the runner, and the portal only takes so

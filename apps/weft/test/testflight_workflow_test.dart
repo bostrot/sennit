@@ -84,6 +84,22 @@ void main() {
     expect(workflow, contains(r'if [ "${sdk%%.*}" -lt 26 ]; then'));
   });
 
+  test('an upload that went through is not failed by a missing IPA', () {
+    // With `destination: upload` Xcode 26 writes no export directory; an
+    // unconditional `ls` of it failed 1.0.13 after the upload and skipped
+    // the notes. Only a dry run leaves something there to list.
+    expect(
+      workflow,
+      isNot(contains('\n          ls -l "\$RUNNER_TEMP/export"\n')),
+    );
+    expect(
+      workflow,
+      contains(
+        'if [ -d "\$RUNNER_TEMP/export" ]; then ls -l "\$RUNNER_TEMP/export"; fi',
+      ),
+    );
+  });
+
   test('the key does not outlive the job', () {
     final cleanup = workflow.substring(
       workflow.indexOf('      - name: Remove the key from the runner'),
