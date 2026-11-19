@@ -104,6 +104,7 @@ Future<File> stageAttachment(
   required Directory directory,
   void Function(int received)? onBytes,
   Future<bool> Function()? shouldContinue,
+  bool viaRepository = false,
 }) async {
   // Its own folder per event: two photos from different senders are both
   // `image.jpg`, and a flat staging directory would serve the first one for
@@ -116,10 +117,13 @@ Future<File> stageAttachment(
   await folder.create(recursive: true);
   final part = File('${target.path}.part');
 
-  final location = await repository.attachmentLocation(
-    message.roomId,
-    message.eventId,
-  );
+  // [viaRepository] skips the transport for the timeline's own small fetches —
+  // a GIF to loop, a poster frame to pull. Those must not raise a download
+  // notification for every bubble scrolled past, and they are capped small
+  // enough that holding one in memory is no hardship.
+  final location = viaRepository
+      ? null
+      : await repository.attachmentLocation(message.roomId, message.eventId);
 
   if (location != null) {
     await transport.download(
@@ -172,6 +176,11 @@ class MediaFileStore {
   final ModelDownloadTransport _transport;
   final Future<Directory> Function() _directory;
 
+  /// Stagings still in flight, by event id. The bubble pulling a poster frame
+  /// and the viewer opened on the same video share one download, rather than
+  /// both writing the same `.part` file at once.
+  final Map<String, Future<File>> _inFlight = {};
+
   /// Under application support rather than a temp directory, and not by taste:
   /// `background_downloader` silently falls back to plain HTTP for any target
   /// outside it, which on mobile is the difference between a download that
@@ -186,15 +195,39 @@ class MediaFileStore {
     required ChatRepository repository,
     void Function(int received)? onBytes,
     Future<bool> Function()? shouldContinue,
-  }) async {
-    return stageAttachment(
+    bool viaRepository = false,
+  }) {
+    return _inFlight[message.eventId] ??= _stageOnce(
       message,
       repository: repository,
-      transport: _transport,
-      directory: await _directory(),
       onBytes: onBytes,
       shouldContinue: shouldContinue,
+      viaRepository: viaRepository,
     );
+  }
+
+  Future<File> _stageOnce(
+    WeftMessage message, {
+    required ChatRepository repository,
+    void Function(int received)? onBytes,
+    Future<bool> Function()? shouldContinue,
+    required bool viaRepository,
+  }) async {
+    try {
+      return await stageAttachment(
+        message,
+        repository: repository,
+        transport: _transport,
+        directory: await _directory(),
+        onBytes: onBytes,
+        shouldContinue: shouldContinue,
+        viaRepository: viaRepository,
+      );
+    } finally {
+      // The removed value is the future this call is inside; only the key
+      // needed clearing.
+      _inFlight.remove(message.eventId)?.ignore();
+    }
   }
 
   /// Deletes everything staged for [eventId].

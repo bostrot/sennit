@@ -22,10 +22,16 @@ const int kVideoPosterMaxEdge = 1280;
 /// [AttachmentSource.filename] is a real path by the time a source reaches the
 /// repository — see `readAttachmentFile` — so the file is handed over by name
 /// and never read into Dart just to be given back.
-Future<Uint8List?> extractVideoPoster(AttachmentSource source) async {
+Future<Uint8List?> extractVideoPoster(AttachmentSource source) =>
+    extractVideoFrame(source.filename, label: source.basename);
+
+/// One frame of the video at [path], as JPEG bytes, or null when the platform
+/// cannot produce one. Shared by the send path and by the timeline, which
+/// draws a poster for a received video whose event carried none.
+Future<Uint8List?> extractVideoFrame(String path, {String? label}) async {
   try {
     final bytes = await FcNativeVideoThumbnail().saveThumbnailToBytes(
-      srcFile: source.filename,
+      srcFile: path,
       width: kVideoPosterMaxEdge,
       height: kVideoPosterMaxEdge,
       format: 'jpeg',
@@ -36,7 +42,7 @@ Future<Uint8List?> extractVideoPoster(AttachmentSource source) async {
     // Deliberately everything: a codec the device cannot open, a missing
     // plugin on a platform that has none. None of them is a reason to fail
     // the send.
-    debugPrint('No poster for ${source.basename}: $error');
+    debugPrint('No poster for ${label ?? path}: $error');
     return null;
   }
 }

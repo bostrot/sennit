@@ -74,6 +74,7 @@ class _FakeStore implements MediaFileStore {
     required ChatRepository repository,
     void Function(int received)? onBytes,
     Future<bool> Function()? shouldContinue,
+    bool viaRepository = false,
   }) async {
     calls++;
     final gate = this.gate;
@@ -285,6 +286,51 @@ void main() {
       );
 
       expect(askedForThumbnail, isFalse);
+    });
+
+    // The timeline's own fetch — a GIF to loop, a poster frame to pull — takes
+    // the repository path even in a plain room: no download notification for
+    // a bubble scrolled past, and the same authenticated, decrypting fetch the
+    // bubble's pictures already use.
+    test('a fetch for the timeline never goes through the transport', () async {
+      final repository = StubChatRepository(
+        bytes: kPixel,
+        location: AttachmentLocation(
+          url: Uri.parse('https://hs.example.org/_matrix/client/v1/media/x'),
+          headers: const {'authorization': 'Bearer tok'},
+        ),
+      );
+      final transport = _FakeTransport();
+
+      final file = await stageAttachment(
+        media(kind: MessageKind.video, body: 'video.mp4'),
+        repository: repository,
+        transport: transport,
+        directory: dir,
+        viaRepository: true,
+      );
+
+      expect(transport.calls, 0);
+      expect(repository.locationCalls, 0);
+      expect(repository.lastThumbnail, isFalse);
+      expect(file.readAsBytesSync(), kPixel);
+    });
+
+    test('a store stages one event once, however many ask at once', () async {
+      final repository = StubChatRepository(bytes: kPixel);
+      final store = MediaFileStore(
+        transport: _FakeTransport(),
+        directory: () async => dir,
+      );
+      final message = media(kind: MessageKind.video, body: 'video.mp4');
+
+      final results = await Future.wait([
+        store.stage(message, repository: repository, viaRepository: true),
+        store.stage(message, repository: repository),
+      ]);
+
+      expect(repository.byteCalls, 1);
+      expect(results[0].path, results[1].path);
     });
 
     test('the second call reuses the staged file', () async {

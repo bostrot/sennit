@@ -8,6 +8,8 @@
 /// first time the scale changes.
 library;
 
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -24,6 +26,8 @@ import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/attachments/attachment_byte_cache.dart';
+import '../../services/attachments/video_preview.dart';
+import '../../services/attachments/video_surface.dart';
 import '../../services/audio/voice_player.dart';
 import 'rich_text_view.dart';
 
@@ -306,6 +310,13 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   Uint8List? _bytes;
   bool _failed = false;
 
+  /// The video itself, once staged — what a GIF loops from.
+  File? _video;
+
+  /// A poster frame or a GIF's file is still on its way, so an empty box is
+  /// "loading" rather than "nothing to show".
+  bool _videoPending = false;
+
   String get _cacheKey =>
       AttachmentByteCache.keyFor(widget.message.roomId, widget.message.eventId);
 
@@ -318,8 +329,17 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     final cached = ref.read(attachmentByteCacheProvider).get(_cacheKey);
     if (cached != null) {
       _bytes = cached;
+      // The poster is cached; the loop is not. A GIF scrolled back into view
+      // still needs its file to move.
+      if (widget.message.loopsInline && previewDownloadsVideo(widget.message)) {
+        _videoPending = true;
+        _loadWhenSettled(() async {
+          if (!_reduceMotion) return _loadVideo();
+          setState(() => _videoPending = false);
+        });
+      }
     } else {
-      _loadWhenSettled();
+      _loadWhenSettled(_load);
     }
   }
 
@@ -331,29 +351,68 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   /// gone before it arrived. The same rule `Image` applies to its own
   /// decoding: while the scrollable says loading should wait, wait a frame
   /// and ask again.
-  void _loadWhenSettled() {
+  void _loadWhenSettled(Future<void> Function() load) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (Scrollable.recommendDeferredLoadingForContext(context)) {
         SchedulerBinding.instance.scheduleFrame();
-        _loadWhenSettled();
+        _loadWhenSettled(load);
         return;
       }
-      _load();
+      unawaited(load());
     });
   }
 
+  bool get _reduceMotion =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
   Future<void> _load() async {
+    final message = widget.message;
     final bytes = await ref
         .read(chatRepositoryProvider)
-        .attachmentBytes(widget.message.roomId, widget.message.eventId);
+        .attachmentBytes(
+          message.roomId,
+          message.eventId,
+          // A GIF's thumbnail is one still frame of it; the bubble wants the
+          // GIF. `Image` itself holds the animation still under reduce motion.
+          thumbnail: !previewUsesOriginal(message),
+        );
     if (bytes != null) {
       ref.read(attachmentByteCacheProvider).put(_cacheKey, bytes);
     }
     if (!mounted) return;
+    // Bridged videos carry no thumbnail at all — the mautrix bridges relay the
+    // film, its size and its shape and nothing else — so the poster has to
+    // come out of the film. A GIF wants its file even with a poster in hand,
+    // because the file is what loops.
+    final wantsVideo =
+        previewDownloadsVideo(message) &&
+        (bytes == null || (message.loopsInline && !_reduceMotion));
     setState(() {
       _bytes = bytes;
       _failed = bytes == null;
+      _videoPending = wantsVideo;
+    });
+    if (wantsVideo) await _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    final preview = await ref.read(videoPreviewLoaderProvider)(
+      widget.message,
+      ref.read(chatRepositoryProvider),
+    );
+    final poster = preview?.poster;
+    if (poster != null && _bytes == null) {
+      ref.read(attachmentByteCacheProvider).put(_cacheKey, poster);
+    }
+    if (!mounted) return;
+    setState(() {
+      _videoPending = false;
+      _video = preview?.file;
+      if (poster != null && _bytes == null) {
+        _bytes = poster;
+        _failed = false;
+      }
     });
   }
 
@@ -362,6 +421,13 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     final caption = attachmentCaption(widget.message);
     final isVideo = widget.message.kind == MessageKind.video;
     final isSticker = widget.message.kind == MessageKind.sticker;
+    final video = _video;
+    final loops = video != null && widget.message.loopsInline && !_reduceMotion;
+    // A video opens whether or not it has a poster: the poster is the sending
+    // client's courtesy, not the video. Bridged videos never have one, and
+    // gating the tap on it left every WhatsApp video in the timeline unplayable.
+    // A photo with no bytes has nothing to open.
+    final openable = widget.onOpen != null && (_bytes != null || isVideo);
 
     // One node for the whole picture: what it is, what the sender wrote under
     // it, and whether there is anything there yet. A photo previously announced
@@ -369,12 +435,12 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     // no semantics of its own — and the caption was a second, unattached node.
     return WeftFocusable(
       image: true,
-      button: _bytes != null && widget.onOpen != null,
-      onTap: _bytes == null ? null : widget.onOpen,
+      button: openable,
+      onTap: openable ? widget.onOpen : null,
       label: semanticsSentence([
         context.l10n.messageKind(widget.message.kind),
         caption,
-        if (_failed)
+        if (_failed && !_videoPending)
           context.l10n.attachmentCouldNotLoad
         else if (_bytes == null)
           context.l10n.attachmentLoading,
@@ -401,7 +467,7 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                   // a second recogniser on the same pixels was only ever a
                   // duplicate of the one the keyboard also has to be able to
                   // reach.
-                  switch ((_bytes, _failed)) {
+                  switch ((_bytes, _failed && !_videoPending)) {
                     (final Uint8List bytes, _) => Hero(
                       tag: mediaHeroTag(widget.message),
                       // Exactly the placeholder's box, so the swap from grey to
@@ -414,32 +480,38 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                       child: SizedBox(
                         width: _boxWidth,
                         height: _boxHeight,
-                        child: Image.memory(
-                          bytes,
-                          // A photo fills its box; a sticker is a transparent
-                          // cutout and has to fit inside one. Cropping a photo
-                          // to the bubble's shape is the intended look, but
-                          // doing it to a sticker slices the parrot's head off
-                          // whenever the bridge sent no dimensions and the box
-                          // fell back to a landscape default.
-                          fit: isSticker ? BoxFit.contain : BoxFit.cover,
-                          cacheWidth:
-                              (_boxWidth *
-                                      MediaQuery.devicePixelRatioOf(context))
-                                  .round(),
-                          errorBuilder: (_, _, _) =>
-                              _placeholder(context, broken: true),
+                        child: _loopOver(
+                          loops ? video : null,
+                          Image.memory(
+                            bytes,
+                            // A photo fills its box; a sticker is a transparent
+                            // cutout and has to fit inside one. Cropping a photo
+                            // to the bubble's shape is the intended look, but
+                            // doing it to a sticker slices the parrot's head off
+                            // whenever the bridge sent no dimensions and the box
+                            // fell back to a landscape default.
+                            fit: isSticker ? BoxFit.contain : BoxFit.cover,
+                            cacheWidth:
+                                (_boxWidth *
+                                        MediaQuery.devicePixelRatioOf(context))
+                                    .round(),
+                            errorBuilder: (_, _, _) =>
+                                _placeholder(context, broken: true),
+                          ),
                         ),
                       ),
                     ),
-                    (_, true) => _placeholder(context, broken: true),
-                    _ => _placeholder(context, broken: false),
+                    (_, final broken) => _loopOver(
+                      loops ? video : null,
+                      _placeholder(context, broken: broken),
+                    ),
                   },
                   // Over the picture rather than under it: a poster with a
                   // caption line reading "Video" is indistinguishable from a
                   // still at a glance, which is the one thing the badge exists to
-                  // prevent.
-                  if (isVideo) const PlayBadge(),
+                  // prevent. A GIF that is already moving needs no badge to say
+                  // so, and every bridge flags it `hide_controls` besides.
+                  if (isVideo && !loops) const PlayBadge(),
                 ],
               ),
             ),
@@ -453,6 +525,16 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
           ),
         ],
       ),
+    );
+  }
+
+  /// [still] with the GIF looping over it once [video] is there to play.
+  Widget _loopOver(File? video, Widget still) {
+    if (video == null) return still;
+    return SizedBox(
+      width: _boxWidth,
+      height: _boxHeight,
+      child: ref.watch(inlineVideoProvider)(context, video, still),
     );
   }
 

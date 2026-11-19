@@ -259,3 +259,91 @@ String _positionLabel(VideoPlayerValue value) {
 
   return '${clock(value.position)} of ${clock(value.duration)}';
 }
+
+/// A GIF-flagged video playing in its bubble: muted, looping, no controls.
+///
+/// What WhatsApp means by a GIF, and what every bridge's `fi.mau.gif` asks a
+/// client to do with it. Fills its box like the poster it replaces, so the swap
+/// from still to moving picture changes nothing about the row's layout; until
+/// the decoder is ready, or when it refuses the file, [placeholder] stays up.
+class InlineLoopingVideo extends StatefulWidget {
+  const InlineLoopingVideo({
+    super.key,
+    required this.file,
+    required this.placeholder,
+  });
+
+  final File file;
+  final Widget placeholder;
+
+  @override
+  State<InlineLoopingVideo> createState() => _InlineLoopingVideoState();
+}
+
+class _InlineLoopingVideoState extends State<InlineLoopingVideo> {
+  VideoPlayerController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _open();
+  }
+
+  Future<void> _open() async {
+    final controller = VideoPlayerController.file(
+      widget.file,
+      // Never pause someone's music for a looping GIF in a chat.
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
+    try {
+      await controller.initialize();
+      await controller.setVolume(0);
+      await controller.setLooping(true);
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      await controller.play();
+      setState(() => _controller = controller);
+    } on Object catch (error) {
+      // The poster is still a fine answer; tapping opens the viewer, which
+      // says properly that the film cannot be played.
+      debugPrint('weft: inline video ${widget.file.path} failed: $error');
+      await controller.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) return widget.placeholder;
+    final size = controller.value.size;
+    return ClipRect(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: size.width > 0 ? size.width : 1,
+          height: size.height > 0 ? size.height : 1,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+}
+
+/// Builds a bubble's inline GIF loop over [placeholder].
+typedef InlineVideoBuilder =
+    Widget Function(BuildContext context, File file, Widget placeholder);
+
+/// The timeline's inline GIF player. Same test seam as [videoSurfaceProvider].
+final inlineVideoProvider = Provider<InlineVideoBuilder>(
+  (ref) =>
+      (context, file, placeholder) =>
+          InlineLoopingVideo(file: file, placeholder: placeholder),
+);

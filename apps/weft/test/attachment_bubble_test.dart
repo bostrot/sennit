@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,8 @@ import 'package:weft/features/chat/attachment_preview_sheet.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft/services/attachments/attachment_picker.dart';
+import 'package:weft/services/attachments/video_preview.dart';
+import 'package:weft/services/attachments/video_surface.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -69,6 +72,8 @@ void main() {
     int? height,
     String? transcript,
     String? attachmentName,
+    String? mimeType,
+    bool playsAsGif = false,
   }) => WeftMessage(
     eventId: '\$event',
     roomId: roomId,
@@ -85,6 +90,8 @@ void main() {
     mediaSizeBytes: sizeBytes,
     mediaWidth: width,
     mediaHeight: height,
+    mediaMimeType: mimeType,
+    playsAsGif: playsAsGif,
     transcript: transcript,
   );
 
@@ -95,20 +102,32 @@ void main() {
     WidgetTester tester,
     Widget child, {
     Uint8List? bytes,
+    DemoChatRepository? repository,
+    VideoPreviewLoader? previewLoader,
+    InlineVideoBuilder? inlineVideo,
+    bool reduceMotion = false,
   }) {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
           chatRepositoryProvider.overrideWithValue(
-            bytes == null
-                ? DemoChatRepository()
-                : StubChatRepository(bytes: bytes),
+            repository ??
+                (bytes == null
+                    ? DemoChatRepository()
+                    : StubChatRepository(bytes: bytes)),
           ),
+          if (previewLoader != null)
+            videoPreviewLoaderProvider.overrideWithValue(previewLoader),
+          if (inlineVideo != null)
+            inlineVideoProvider.overrideWithValue(inlineVideo),
         ],
         child: MaterialApp(
           localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
-          home: Scaffold(body: Center(child: child)),
+          home: MediaQuery(
+            data: MediaQueryData(disableAnimations: reduceMotion),
+            child: Scaffold(body: Center(child: child)),
+          ),
         ),
       ),
     );
@@ -418,6 +437,189 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    });
+
+    group('a received video or GIF', () {
+      // The shape mautrix-whatsapp sends: size, shape and length, and no
+      // thumbnail — so `attachmentBytes` has nothing to give the bubble.
+      WeftMessage bridgedVideo({int? size = 2400000, bool gif = false}) =>
+          message(
+            kind: MessageKind.video,
+            body: 'video.mp4',
+            sizeBytes: size,
+            width: 480,
+            height: 852,
+            mimeType: 'video/mp4',
+            playsAsGif: gif,
+          );
+
+      VideoPreviewLoader loader(
+        List<String> calls, {
+        Uint8List? poster,
+        bool fails = false,
+      }) => (message, _) async {
+        calls.add(message.eventId);
+        if (fails) return null;
+        return VideoPreview(file: File('staged/video.mp4'), poster: poster);
+      };
+
+      Widget loopStub(BuildContext context, File file, Widget placeholder) =>
+          SizedBox.expand(key: const ValueKey('loop'), child: placeholder);
+
+      testWidgets('one with no poster still opens on tap', (tester) async {
+        // The report: a WhatsApp video drew an empty grey box with a play
+        // button that did nothing. The tap was gated on poster bytes, which a
+        // bridged video never has.
+        var opened = false;
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: bridgedVideo(),
+            own: false,
+            onOpen: () => opened = true,
+          ),
+          previewLoader: loader([], fails: true),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byType(PlayBadge));
+        expect(opened, isTrue);
+      });
+
+      testWidgets('one with no thumbnail gets a frame of itself as poster', (
+        tester,
+      ) async {
+        final calls = <String>[];
+        await pumpBubble(
+          tester,
+          AttachmentBubble(message: bridgedVideo(), own: false, onOpen: () {}),
+          previewLoader: loader(calls, poster: kPixel),
+        );
+        await tester.pumpAndSettle();
+
+        expect(calls, ['\$event']);
+        expect(find.byType(Image), findsOneWidget);
+        expect(find.byType(PlayBadge), findsOneWidget);
+        // Shaped by the announced 480x852, clamped, never an unbounded box.
+        final box = tester.getSize(
+          find
+              .ancestor(of: find.byType(Image), matching: find.byType(SizedBox))
+              .first,
+        );
+        expect(box.height, lessThanOrEqualTo(320));
+      });
+
+      testWidgets('a film too big to fetch for one frame is left alone', (
+        tester,
+      ) async {
+        final calls = <String>[];
+        var opened = false;
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: bridgedVideo(size: 400 * 1024 * 1024),
+            own: false,
+            onOpen: () => opened = true,
+          ),
+          previewLoader: loader(calls, poster: kPixel),
+        );
+        await tester.pumpAndSettle();
+
+        expect(calls, isEmpty);
+        await tester.tap(find.byType(PlayBadge));
+        expect(opened, isTrue);
+      });
+
+      testWidgets('a GIF loops in place with no play badge', (tester) async {
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: bridgedVideo(gif: true),
+            own: false,
+            onOpen: () {},
+          ),
+          previewLoader: loader([], poster: kPixel),
+          inlineVideo: loopStub,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('loop')), findsOneWidget);
+        expect(find.byType(PlayBadge), findsNothing);
+      });
+
+      testWidgets('a GIF with a thumbnail still fetches its file to loop', (
+        tester,
+      ) async {
+        final calls = <String>[];
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: bridgedVideo(gif: true),
+            own: false,
+            onOpen: () {},
+          ),
+          bytes: kPixel,
+          previewLoader: loader(calls),
+          inlineVideo: loopStub,
+        );
+        await tester.pumpAndSettle();
+
+        expect(calls, ['\$event']);
+        expect(find.byKey(const ValueKey('loop')), findsOneWidget);
+      });
+
+      testWidgets('under reduce motion a GIF holds still behind its badge', (
+        tester,
+      ) async {
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: bridgedVideo(gif: true),
+            own: false,
+            onOpen: () {},
+          ),
+          reduceMotion: true,
+          previewLoader: loader([], poster: kPixel),
+          inlineVideo: loopStub,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('loop')), findsNothing);
+        expect(find.byType(Image), findsOneWidget);
+        expect(find.byType(PlayBadge), findsOneWidget);
+      });
+
+      testWidgets('an image/gif is fetched whole, not as its still thumbnail', (
+        tester,
+      ) async {
+        final gif = StubChatRepository(bytes: kPixel);
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: message(kind: MessageKind.image, mimeType: 'image/gif'),
+            own: false,
+          ),
+          repository: gif,
+        );
+        await tester.pumpAndSettle();
+        expect(gif.lastThumbnail, isFalse);
+      });
+
+      testWidgets('a still photo is still fetched as its thumbnail', (
+        tester,
+      ) async {
+        final jpeg = StubChatRepository(bytes: kPixel);
+        await pumpBubble(
+          tester,
+          AttachmentBubble(
+            message: message(kind: MessageKind.image, mimeType: 'image/jpeg'),
+            own: false,
+          ),
+          repository: jpeg,
+        );
+        await tester.pumpAndSettle();
+        expect(jpeg.lastThumbnail, isTrue);
+      });
     });
 
     // The other half of the sticker fix. A sticker the timeline declined to
