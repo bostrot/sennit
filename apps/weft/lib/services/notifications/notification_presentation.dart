@@ -7,6 +7,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_share/weft_share.dart' show shareTargetSlotId;
 
+import '../../app/localisation.dart';
 import 'notification_channels.dart';
 
 /// What a posted notification carries so a tap — or an action — can be acted on
@@ -223,7 +224,7 @@ class NotificationPresentation {
           // The conversation *is* the notification. Without this the shade
           // shows one line and the expanded form shows the same line again.
           styleInformation: MessagingStyleInformation(
-            _self,
+            _self(),
             // Only a group gets a conversation title. In a DM the title *is*
             // the sender, and Android then prints the name twice — once as
             // the header, once on the message line with the network appended.
@@ -235,7 +236,7 @@ class NotificationPresentation {
                   message.body,
                   message.timestamp,
                   Person(
-                    key: message.senderName,
+                    key: 'sender:${message.senderName}',
                     name: message.senderName,
                     icon: _androidIcon(avatarPaths[message.eventId]),
                   ),
@@ -400,7 +401,17 @@ class NotificationPresentation {
 String chatShortcutId(String chatId) => shareTargetSlotId(chatId);
 
 /// The user, as `MessagingStyle` names the person a message is *not* from.
-const Person _self = Person(name: 'You');
+///
+/// Keyed, and keyed apart from every sender: Android Auto and Wear tell
+/// "you" from "them" by the person, and a sender whose display name happened
+/// to equal the user's would otherwise read out as the user talking to
+/// themselves. Named in the user's language because Android Auto speaks it.
+Person _self() =>
+    Person(key: kSelfPersonKey, name: weftPlatformL10n().commonYou);
+
+/// The [Person.key] of the user. Senders are keyed `sender:<name>`, so no
+/// display name can collide with it.
+const String kSelfPersonKey = 'self';
 
 AndroidIcon<Object>? _androidIcon(String? path) =>
     path == null ? null : BitmapFilePathAndroidIcon(path);

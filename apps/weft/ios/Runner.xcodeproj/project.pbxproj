@@ -23,6 +23,7 @@
 		5F30000000000000000000F3 /* CallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F30000000000000000000F2 /* CallManager.swift */; };
 		5F40000000000000000000F1 /* SnapshotContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E1 /* SnapshotContainer.swift */; };
 		5F40000000000000000000F2 /* SnapshotChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E2 /* SnapshotChannel.swift */; };
+		5F40000000000000000000F9 /* SiriIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E9 /* SiriIntents.swift */; };
 		5F40000000000000000000F3 /* WatchProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E3 /* WatchProtocol.swift */; };
 		5F40000000000000000000F4 /* WatchChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F40000000000000000000E4 /* WatchChannel.swift */; };
 		5F50000000000000000000F1 /* WeftWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F50000000000000000000E1 /* WeftWidget.swift */; };
@@ -204,6 +205,7 @@
 		5F30000000000000000000F2 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E1 /* SnapshotContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotContainer.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E2 /* SnapshotChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotChannel.swift; sourceTree = "<group>"; };
+		5F40000000000000000000E9 /* SiriIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriIntents.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E3 /* WatchProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProtocol.swift; sourceTree = "<group>"; };
 		5F40000000000000000000E4 /* WatchChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchChannel.swift; sourceTree = "<group>"; };
 		5F50000000000000000000E1 /* WeftWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeftWidget.swift; sourceTree = "<group>"; };
@@ -505,6 +507,7 @@
 				5F30000000000000000000F0 /* ShareChannel.swift */,
 				5F40000000000000000000E4 /* WatchChannel.swift */,
 				5F40000000000000000000E2 /* SnapshotChannel.swift */,
+				5F40000000000000000000E9 /* SiriIntents.swift */,
 				5F30000000000000000000F2 /* CallManager.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				5F30000000000000000000E5 /* Runner.entitlements */,
@@ -1117,6 +1120,7 @@
 				5F40000000000000000000F4 /* WatchChannel.swift in Sources */,
 				5F40000000000000000000F3 /* WatchProtocol.swift in Sources */,
 				5F30000000000000000000F3 /* CallManager.swift in Sources */,
+				5F40000000000000000000F9 /* SiriIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

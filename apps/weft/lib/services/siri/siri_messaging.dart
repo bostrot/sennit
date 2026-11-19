@@ -1,0 +1,195 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_notify/weft_notify.dart';
+
+import '../../data/chat_repository.dart';
+
+/// The Dart end of SiriKit messaging on iOS: "Read my messages", "Reply",
+/// "Send a message to …" and "Mark as read", on the phone and in CarPlay.
+///
+/// Siri resolves the intent in native code (`SiriIntents.swift`) and asks
+/// over `com.bostrot.weft/siri` for the three things only the Matrix side
+/// knows: which conversations a spoken name could mean, what is unread, and
+/// — once the user has confirmed — to send or to mark read. Sending goes
+/// through [ChatRepository.send] and reading through [ChatRepository.markRead],
+/// the same calls the composer and the notification actions make, so a reply
+/// dictated in the car is encrypted and routed exactly like a typed one, and
+/// nothing reaches any server but the user's own homeserver.
+///
+/// What Siri reads aloud obeys the notification preview setting: with
+/// previews off it says who wrote and "New message", never the text —
+/// the same thing the lock screen would show.
+class SiriMessaging {
+  SiriMessaging({
+    required ChatRepository repository,
+    required List<Chat> Function() chats,
+    required NotificationPolicy Function() policy,
+    required WeftNotifyStrings Function() words,
+    MethodChannel channel = const MethodChannel(kSiriChannelName),
+  }) : _repository = repository,
+       _chats = chats,
+       _policy = policy,
+       _words = words,
+       _channel = channel;
+
+  final ChatRepository _repository;
+  final List<Chat> Function() _chats;
+  final NotificationPolicy Function() _policy;
+  final WeftNotifyStrings Function() _words;
+  final MethodChannel _channel;
+
+  /// Takes calls from the native side, then tells it Dart is listening: an
+  /// intent that launched the app in the background is held natively until
+  /// this arrives.
+  Future<void> start() async {
+    _channel.setMethodCallHandler(handle);
+    try {
+      await _channel.invokeMethod<void>('ready');
+    } on MissingPluginException {
+      // Not iOS, or a build without the channel. Nothing to serve.
+    } on PlatformException catch (error) {
+      debugPrint('weft: Siri channel did not start: $error');
+    }
+  }
+
+  @visibleForTesting
+  Future<Object?> handle(MethodCall call) async {
+    final args = call.arguments is Map
+        ? (call.arguments as Map).cast<String, Object?>()
+        : const <String, Object?>{};
+    switch (call.method) {
+      case 'recipients':
+        return siriRecipientMatches(_chats(), args['query'] as String? ?? '');
+      case 'unread':
+        return siriUnreadMessages(_chats(), _policy(), _words());
+      case 'send':
+        final chatId = args['chatId'] as String? ?? '';
+        final text = (args['text'] as String? ?? '').trim();
+        if (chatId.isEmpty || text.isEmpty) return false;
+        await _repository.send(chatId, text);
+        // Answering is reading, as it is from a notification.
+        unawaited(_markReadQuietly(chatId));
+        return true;
+      case 'markRead':
+        final chatIds = (args['chatIds'] as List? ?? const [])
+            .whereType<String>();
+        for (final chatId in chatIds) {
+          await _repository.markRead(chatId);
+        }
+        return true;
+      default:
+        throw MissingPluginException('weft: no Siri method ${call.method}');
+    }
+  }
+
+  Future<void> _markReadQuietly(String chatId) async {
+    try {
+      await _repository.markRead(chatId);
+    } on Object catch (error) {
+      debugPrint('weft: $chatId was replied to by Siri but not read: $error');
+    }
+  }
+}
+
+const String kSiriChannelName = 'com.bostrot.weft/siri';
+
+/// How many conversations Siri offers for one spoken name before it asks
+/// the user to say more.
+const int kSiriMaxRecipientMatches = 5;
+
+/// How many unread conversations "Read my messages" reads. Siri reads every
+/// one it is given, and a long list is a long drive.
+const int kSiriMaxUnreadChats = 10;
+
+/// The conversations a spoken [query] could mean, best first.
+///
+/// Matched on the chat title, which for a DM is the person — already
+/// resolved through the address book and the merge fold, so "Anna" finds the
+/// one merged Anna rather than her WhatsApp and her Signal separately. An
+/// exact match outranks a word that starts with the query, which outranks the
+/// query appearing anywhere. Archived chats and pending requests are left out:
+/// replying to a request from the car would accept it without the user ever
+/// seeing who it is from.
+List<Map<String, Object?>> siriRecipientMatches(
+  List<Chat> chats,
+  String query,
+) {
+  final wanted = query.trim().toLowerCase();
+  if (wanted.isEmpty) return const [];
+
+  int? rank(Chat chat) {
+    final title = chat.title.trim().toLowerCase();
+    if (title == wanted) return 0;
+    if (title.split(RegExp(r'\s+')).any((word) => word.startsWith(wanted))) {
+      return 1;
+    }
+    if (title.contains(wanted)) return 2;
+    return null;
+  }
+
+  final ranked = <(int, Chat)>[
+    for (final chat in chats)
+      if (!chat.archived && chat.request == null)
+        if (rank(chat) case final r?) (r, chat),
+  ]..sort((a, b) => a.$1.compareTo(b.$1));
+
+  return [
+    for (final (_, chat) in ranked.take(kSiriMaxRecipientMatches))
+      {'chatId': chat.id, 'title': chat.title, 'isGroup': chat.isGroup},
+  ];
+}
+
+/// What "Read my messages" reads: the latest message of every unread,
+/// unmuted conversation, newest first.
+///
+/// One message per conversation, with the count beside it, rather than every
+/// unread line: Siri reads each item in full, and twelve messages from one
+/// group is not what a driver asked for. The body goes through
+/// [renderNotificationBody], so it is the notification's own wording — "Photo",
+/// "Voice message" — and degrades to the hidden-preview text when the user
+/// has turned previews off.
+List<Map<String, Object?>> siriUnreadMessages(
+  List<Chat> chats,
+  NotificationPolicy policy,
+  WeftNotifyStrings words,
+) {
+  final unread =
+      [
+        for (final chat in chats)
+          if (chat.unreadCount > 0 &&
+              !chat.muted &&
+              !chat.archived &&
+              chat.request == null &&
+              chat.lastMessage != null &&
+              !chat.lastMessage!.isOwn)
+            chat,
+      ]..sort(
+        (a, b) => b.lastMessage!.timestamp.compareTo(a.lastMessage!.timestamp),
+      );
+
+  return [
+    for (final chat in unread.take(kSiriMaxUnreadChats))
+      {
+        'id': chat.lastMessage!.eventId,
+        'chatId': chat.id,
+        'title': chat.title,
+        'isGroup': chat.isGroup,
+        'senderId': chat.lastMessage!.senderId,
+        'senderName': disambiguatedSenderName(
+          chat.lastMessage!,
+          withNetwork: false,
+          fallbackName: chat.isGroup ? null : chat.title,
+        ),
+        'text': renderNotificationBody(
+          chat.lastMessage!,
+          showPreview: policy.showPreviews,
+          words: words,
+        ),
+        'timestamp': chat.lastMessage!.timestamp.millisecondsSinceEpoch,
+        'unreadCount': chat.unreadCount,
+      },
+  ];
+}

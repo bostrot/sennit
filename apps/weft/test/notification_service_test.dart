@@ -183,6 +183,45 @@ void main() {
       expect(style.groupConversation, isFalse);
     });
 
+    test('names the user and every sender apart, as the car reads them', () {
+      final style =
+          NotificationPresentation.forMessage(
+                content: _content(),
+              ).details.android!.styleInformation!
+              as MessagingStyleInformation;
+
+      // Android Auto and Wear tell "you" from "them" by the person's key.
+      expect(style.person.key, kSelfPersonKey);
+      expect(style.person.name, 'You');
+      expect(style.messages!.single.person!.key, 'sender:Grace (WhatsApp)');
+      expect(style.messages!.single.person!.key, isNot(style.person.key));
+    });
+
+    test('a group carries its title and says it is a group', () {
+      final style =
+          NotificationPresentation.forMessage(
+                content: _content(),
+                isGroup: true,
+              ).details.android!.styleInformation!
+              as MessagingStyleInformation;
+
+      expect(style.conversationTitle, 'Grace');
+      expect(style.groupConversation, isTrue);
+    });
+
+    test('a hidden preview is what the car reads too', () {
+      // The body is rendered under the preview setting before it gets here;
+      // MessagingStyle, which is all Android Auto reads, carries nothing else.
+      final hidden = _content(body: kHiddenPreviewBody);
+      final android = NotificationPresentation.forMessage(
+        content: hidden,
+      ).details.android!;
+      final style = android.styleInformation! as MessagingStyleInformation;
+
+      expect(style.messages!.single.text, kHiddenPreviewBody);
+      expect(android.category, AndroidNotificationCategory.message);
+    });
+
     test('a mention outranks an ordinary message on every platform', () {
       final plain = NotificationPresentation.forMessage(content: _content());
       final mention = NotificationPresentation.forMessage(
@@ -1113,17 +1152,60 @@ void main() {
       expect(actions[WeftNotificationActions.muteForAnHour]!.inputs, isEmpty);
     });
 
-    test('every Android action is delivered to the main isolate', () {
-      // The load-bearing flag on this whole layer. `showsUserInterface: false`
-      // sends the action to a *background* isolate that has no Matrix client,
-      // no vodozemac and no handle on the database — which is to say, to
-      // nowhere the work can be done. See `weftAndroidMessageActions`.
-      for (final action in weftAndroidMessageActions()) {
-        expect(action.showsUserInterface, isTrue, reason: action.id);
+    test('reply and mark read run headless, as Android Auto requires', () {
+      // Android Auto and Wear only offer an action that does not open the
+      // phone's UI, and find it by its semantic action. A broadcast action is
+      // delivered to `runBackgroundNotificationAction`, which hands it to a
+      // live client or boots the headless stack. Mute still opens Sennit.
+      final actions = {for (final a in weftAndroidMessageActions()) a.id: a};
+
+      final reply = actions[WeftNotificationActions.reply]!;
+      expect(reply.showsUserInterface, isFalse);
+      expect(reply.semanticAction, SemanticAction.reply);
+      expect(reply.inputs, hasLength(1));
+
+      final markRead = actions[WeftNotificationActions.markRead]!;
+      expect(markRead.showsUserInterface, isFalse);
+      expect(markRead.semanticAction, SemanticAction.markAsRead);
+
+      expect(
+        actions[WeftNotificationActions.muteForAnHour]!.showsUserInterface,
+        isTrue,
+      );
+      for (final action in actions.values) {
         // Dismissal is the handler's, and only after the work succeeded.
         expect(action.cancelNotification, isFalse, reason: action.id);
         expect(action.allowGeneratedReplies, isFalse, reason: action.id);
       }
+    });
+
+    test('a message may reach CarPlay; a reply reminder may not', () {
+      final categories = {
+        for (final c in weftDarwinCategories()) c.identifier: c,
+      };
+
+      expect(
+        categories[kMessageCategoryId]!.options,
+        contains(DarwinNotificationCategoryOption.allowInCarPlay),
+      );
+      expect(
+        categories[kReplyReminderCategoryId]!.options,
+        isNot(contains(DarwinNotificationCategoryOption.allowInCarPlay)),
+      );
+      // Stopping reminders needs the UI isolate's ledger, so it opens Sennit
+      // rather than dying in a background engine with the app closed.
+      expect(
+        categories[kReplyReminderCategoryId]!.actions.single.options,
+        contains(DarwinNotificationActionOption.foreground),
+      );
+    });
+
+    test('a reply reminder is not a conversation to Android Auto', () {
+      final action = weftAndroidReplyReminderActions().single;
+
+      expect(action.semanticAction, isNot(SemanticAction.reply));
+      expect(action.semanticAction, isNot(SemanticAction.markAsRead));
+      expect(action.showsUserInterface, isTrue);
     });
 
     test('a posted message notification actually carries them', () {

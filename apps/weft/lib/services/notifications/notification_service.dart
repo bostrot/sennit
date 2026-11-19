@@ -11,6 +11,7 @@ import 'package:weft_notify/weft_notify.dart';
 import '../../app/localisation.dart';
 
 import '../ai/conversation_context.dart';
+import 'background_push.dart' show runBackgroundNotificationAction;
 import 'notification_channels.dart';
 import 'notification_presentation.dart';
 import 'push_registration.dart';
@@ -173,9 +174,18 @@ class LocalNotificationSink implements NotificationSink {
         ),
       ),
       onDidReceiveNotificationResponse: (response) {
-        final activation = _activationFor(response);
+        final activation = activationFor(response);
         if (activation != null) onActivation(activation);
       },
+      // Reply and mark read run without opening Sennit — the only kind of
+      // action Android Auto, Wear and a locked iPhone can use — so they arrive
+      // in an isolate of the plugin's own. Android and iOS only: macOS would
+      // start that engine with no plugins registered (its AppDelegate sets no
+      // registrant), and the desktops have no headless delivery at all.
+      onDidReceiveBackgroundNotificationResponse:
+          NotificationPlatform.isAndroid || NotificationPlatform.isIOS
+          ? runBackgroundNotificationAction
+          : null,
     );
 
     final android = _plugin
@@ -285,12 +295,13 @@ class LocalNotificationSink implements NotificationSink {
   Future<NotificationActivation?> launchActivation() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details == null || !details.didNotificationLaunchApp) return null;
-    return _activationFor(details.notificationResponse);
+    return activationFor(details.notificationResponse);
   }
 
-  static NotificationActivation? _activationFor(
-    NotificationResponse? response,
-  ) {
+  /// What [response] asks for, or null when it carries no payload Sennit
+  /// posted. Public for the background isolate, which gets the same response
+  /// through a different callback.
+  static NotificationActivation? activationFor(NotificationResponse? response) {
     if (response == null) return null;
     final payload = NotificationPayload.decode(response.payload);
     if (payload == null) return null;

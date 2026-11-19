@@ -95,32 +95,25 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 
 /// The three action buttons an Android message notification carries.
 ///
-/// **All three set `showsUserInterface: true`, and that is a decision rather
-/// than an oversight.** Android delivers an action whose pending intent is a
-/// broadcast — which is what `showsUserInterface: false` produces — only to a
-/// *background* isolate, through
-/// `onDidReceiveBackgroundNotificationResponse`. Every one of Weft's actions
-/// needs the Matrix client that lives in the main isolate: a reply has to be
-/// encrypted with an Olm session, a read marker is a write through the same
-/// `Client`, and a timed mute lands in the settings database the app already
-/// holds open. A second isolate would need its own vodozemac initialisation and
-/// its own handle on that database — the same wall background decryption hit,
-/// and for the same reason it is not climbed here.
+/// **Reply and Mark read run headless (`showsUserInterface: false`); Mute
+/// opens Sennit.** Android Auto, Wear and the conversation bubble only offer
+/// an action that does not bring up the phone's screen — a driver cannot be
+/// handed the app — and they find the two by their [SemanticAction], not by
+/// position. Such an action is a broadcast, which the plugin delivers to a
+/// background isolate through `onDidReceiveBackgroundNotificationResponse`;
+/// `runBackgroundNotificationAction` passes it to the UI isolate's (or the
+/// sync daemon's) live Matrix client when there is one, and boots the same
+/// headless stack background push uses when there is not. The reply text is
+/// collected by `RemoteInput` and travels on the broadcast.
 ///
-/// So the action's intent launches the activity instead, and the response
-/// arrives in the main isolate through `onDidReceiveNotificationResponse` —
-/// or, when Weft was not running, through `getNotificationAppLaunchDetails`,
-/// which [NotificationSink.launchActivation] already reads. The reply text is
-/// still typed in the shade: `RemoteInput` collects it before the intent fires
-/// and it travels on that intent. What it costs is that Weft comes to the
-/// foreground to do the work, which is the thing to revisit if a
-/// background-capable client isolate is ever built.
+/// Mute keeps `showsUserInterface: true`: a timed mute lives in the policy the
+/// UI isolate holds in memory, no car surface offers it, and opening the app
+/// to confirm it costs nothing a driver would see.
 ///
-/// `cancelNotification` is false on all three: the plugin only honours it in
-/// the broadcast receiver these actions deliberately do not use, and
-/// [NotificationActionHandler] dismisses the conversation itself once the work
-/// has actually succeeded. A reply that could not be sent therefore leaves its
-/// notification standing rather than vanishing into a message that never went.
+/// `cancelNotification` is false on all three: [NotificationActionHandler]
+/// dismisses the conversation itself once the work has actually succeeded. A
+/// reply that could not be sent therefore leaves its notification standing
+/// rather than vanishing into a message that never went.
 List<AndroidNotificationAction> weftAndroidMessageActions({
   List<String> aiReplies = const [],
 }) {
@@ -143,18 +136,18 @@ List<AndroidNotificationAction> weftAndroidMessageActions({
       // What tells Android Auto, Wear and the launcher's bubble that this is
       // *the* reply action rather than a button that happens to be first.
       semanticAction: SemanticAction.reply,
-      // Deliberately left at its default of false. Generated replies are the
-      // system reading the message body to propose an answer to it, and Sennit
-      // has spent this whole phase keeping that body off every surface it does
-      // not have to be on.
-      showsUserInterface: true,
+      // Generated replies (`allowGeneratedReplies`) are deliberately left at
+      // their default of false. They are the system reading the message body
+      // to propose an answer to it, and Sennit has spent this whole phase
+      // keeping that body off every surface it does not have to be on.
+      showsUserInterface: false,
       cancelNotification: false,
     ),
     AndroidNotificationAction(
       WeftNotificationActions.markRead,
       l10n.notificationActionMarkRead,
       semanticAction: SemanticAction.markAsRead,
-      showsUserInterface: true,
+      showsUserInterface: false,
       cancelNotification: false,
     ),
     AndroidNotificationAction(
@@ -227,9 +220,12 @@ List<AndroidNotificationChannel> weftNotificationChannels() {
 
 /// The one action a reply reminder carries on Android.
 ///
-/// `showsUserInterface: true` for the reason [weftAndroidMessageActions]
-/// gives: the reminder ledger lives in the settings database the main isolate
-/// holds open, and a broadcast would only reach a background isolate.
+/// `showsUserInterface: true`: the reminder ledger and its scheduler live in
+/// the UI isolate, which a headless action could not reach with the app
+/// closed. No semantic action either, on purpose — a reminder is Sennit
+/// talking, not a person, so it is posted without `MessagingStyle` and stays
+/// off Android Auto, which reads only conversations, and off CarPlay, which
+/// announces only messages.
 List<AndroidNotificationAction> weftAndroidReplyReminderActions() => [
   AndroidNotificationAction(
     WeftNotificationActions.stopReplyReminder,
@@ -281,14 +277,23 @@ List<DarwinNotificationCategory> weftDarwinCategories() {
         // should be, and a merged contact's two legs read as two apps.
         DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
         DarwinNotificationCategoryOption.hiddenPreviewShowSubtitle,
+        // What lets a message reach the car's screen once Apple has granted
+        // the CarPlay communication entitlement; without the entitlement iOS
+        // ignores it. Only messages: a reply reminder is not something to
+        // put in front of a driver. See docs/car-integrations.md.
+        DarwinNotificationCategoryOption.allowInCarPlay,
       },
     ),
     DarwinNotificationCategory(
       kReplyReminderCategoryId,
       actions: [
+        // Foreground, for the reason the Android action gives: the reminder
+        // ledger is the UI isolate's, and a background engine with the app
+        // closed has no scheduler to stop.
         DarwinNotificationAction.plain(
           WeftNotificationActions.stopReplyReminder,
           l10n.notificationActionStopReminding,
+          options: {DarwinNotificationActionOption.foreground},
         ),
       ],
     ),

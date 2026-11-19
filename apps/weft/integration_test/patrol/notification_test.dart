@@ -172,16 +172,15 @@ void main() {
         reader: matrixUserId(kAppUser),
       );
 
-      // Weft is in the foreground, because it has to be: all three actions
-      // carry `showsUserInterface: true`, since a broadcast action is delivered
-      // only to a background isolate and every one of them needs the Matrix
-      // client that lives in the main one. The suite asserts that rather than
-      // working around it.
-      await pumpUntil(
-        $,
-        () => showing(inbox) || showing(composerField),
-        within: kUiDeadline,
-        reason: 'Weft to be on screen after the reply action',
+      // Reply runs headless (`showsUserInterface: false`), because that is
+      // the only kind of action Android Auto and Wear offer, so Sennit does
+      // not come forward. The notification is taken down once the send
+      // succeeded.
+      await openShade($);
+      await pollUntilAsync(
+        () async => !await shadeShows($, incoming.body),
+        reason: 'the notification for "${incoming.body}" to be taken down',
+        within: kNotificationDeadline,
       );
     },
     config: kWeftPatrolConfig,
@@ -210,8 +209,8 @@ void main() {
       await awaitNotification($, incoming.body);
 
       await expandNotification($, incoming.body);
+      // Headless, like Reply: nothing comes to the foreground.
       await pressNotificationAction($, 'Mark read');
-      await awaitWeftForeground($);
 
       // The receipt is the point of the action. Dismissing the notification is
       // local bookkeeping; the `m.read` is what the sender's client sees and
@@ -227,7 +226,6 @@ void main() {
       // dismisses only after the work succeeded — `cancelNotification` is false
       // on all three actions precisely so a failed one leaves its notification
       // standing.
-      await backgroundApp($);
       await openShade($);
       await pollUntilAsync(
         () async => !await shadeShows($, incoming.body),

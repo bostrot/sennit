@@ -456,6 +456,25 @@
             android:name="com.google.firebase.messaging.auto_init_enabled"
             android:value="true" />
 
+        <!-- Android Auto. Declares Sennit a messaging app, which in the car
+             means notifications and nothing else: the head unit reads the
+             MessagingStyle notifications the phone posts, speaks them, and
+             answers through the Reply and Mark-as-read actions. Those two run
+             headless — the receiver below is what delivers them with Sennit
+             closed — because a driver cannot be handed the phone's UI. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc"/>
+        <!-- flutter_local_notifications' receiver for actions that do not open
+             the app (`showsUserInterface: false`): Reply and Mark read. The
+             plugin does not declare it itself; without it the broadcast goes
+             nowhere and the reply typed in the shade, on a watch or in the car
+             is lost without a trace. Not exported — the only sender is this
+             app's own PendingIntent. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

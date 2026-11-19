@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto. A messaging app is a notification app there: the car reads
+     message notifications that carry MessagingStyle, a Reply action with a
+     RemoteInput and a Mark-as-read action, both with their semantic action set
+     and neither opening the phone's UI. See notification_channels.dart. -->
+<automotiveApp>
+    <uses name="notification"/>
+</automotiveApp>

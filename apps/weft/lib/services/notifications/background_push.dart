@@ -5,6 +5,8 @@ import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show NotificationResponse;
 import 'package:unifiedpush/unifiedpush.dart';
 import 'package:weft_domain/weft_domain.dart' show Chat;
 import 'package:weft_matrix/weft_matrix.dart';
@@ -16,6 +18,8 @@ import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../data/matrix_chat_repository.dart';
 import '../status/status_feed.dart' show isStatusBroadcastChat;
+import 'background_actions.dart';
+import 'notification_actions.dart';
 import 'notification_service.dart';
 
 /// The headless half of push.
@@ -75,9 +79,42 @@ Future<void> runSyncDaemon() async {
   await Completer<void>().future;
 }
 
+/// A notification action that arrived with no UI to deliver it to.
+///
+/// `flutter_local_notifications` starts this in an engine of its own for every
+/// action that does not open the app: on Android the reply and mark-read
+/// buttons — the only two Android Auto and Wear can use — and on iOS every
+/// action without the foreground option, which is how a reply typed under a
+/// banner or a "Mark read" from the lock screen arrives.
+///
+/// The work is the same [NotificationActionHandler] the UI uses. What differs
+/// is whose client it runs on: the UI isolate's or the daemon's when either is
+/// alive in this process ([forwardNotificationAction]), and a headless boot of
+/// its own only when neither is — never a second client beside a live one.
+/// Nothing new leaves the device: the reply and the read receipt go to the
+/// user's own homeserver, exactly as the composer would send them.
+@pragma('vm:entry-point')
+Future<void> runBackgroundNotificationAction(
+  NotificationResponse response,
+) async {
+  final activation = LocalNotificationSink.activationFor(response);
+  if (activation == null || activation.isTap) return;
+
+  if (await forwardNotificationAction(activation) != null) return;
+
+  await _service();
+  final actions = _bootedActions;
+  if (actions == null) return;
+  final result = await actions.handle(activation);
+  debugPrint('weft: background notification action: ${result.name}');
+}
+
 /// The session the current background process opened, for the daemon's
 /// graceful stop.
 WeftMatrixSession? _bootedSession;
+
+/// The action handler over the booted stack's client; null until it is up.
+NotificationActionHandler? _bootedActions;
 
 /// The stack, booted once per background process and shared by every message
 /// the process lives long enough to receive.
@@ -119,6 +156,22 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
       pipeline: pipeline,
       chatForRoom: chatForRoom,
     );
+    // Actions are served from here too: a reply sent from the car while the
+    // daemon is running goes out on the daemon's client, not on a second one.
+    final actions = NotificationActionHandler(
+      repository: repository,
+      // The policy notifier lives in the UI isolate; with no UI, the timed
+      // mute is written where it will read it back from.
+      muteChat: (chatId, {DateTime? until}) => stores.settings.setJson(
+        WeftSettings.notifyPolicy,
+        NotificationPolicy.fromJson(
+          stores.settings.getJson(WeftSettings.notifyPolicy),
+        ).muteChat(chatId, until: until).toJson(),
+      ),
+      dismiss: service.dismissChat,
+    );
+    _bootedActions = actions;
+    NotificationActionServer.serve(actions.handle);
     await service.start();
     return service;
   } on Object catch (error) {

@@ -11,6 +11,7 @@ import 'app/auto_reply_providers.dart';
 import 'app/billing_providers.dart';
 import 'app/intents.dart';
 import 'app/design_strings.dart';
+import 'app/l10n_labels.dart';
 import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
@@ -32,11 +33,13 @@ import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
+import 'services/notifications/background_actions.dart';
 import 'services/notifications/background_push.dart';
 import 'services/notifications/conversation_clearer.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 import 'services/notifications/unified_push.dart';
+import 'services/siri/siri_messaging.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -315,6 +318,23 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       stopReplyReminder: ref.read(replyReminderServiceProvider).dismiss,
     );
     service.onAction = (activation) => unawaited(actions.handle(activation));
+    // Reply and mark read from the car, a watch or the lock screen arrive in
+    // the plugin's own isolate. While this one is alive they are done here,
+    // on this client, rather than on a second one opened beside it.
+    NotificationActionServer.serve(actions.handle);
+    // Siri and CarPlay: "Read my messages", dictated replies, "mark as read".
+    // iOS only delivers these intents once the Siri entitlement is signed in;
+    // until then the channel is served and simply never called.
+    if (NotificationPlatform.isIOS) {
+      unawaited(
+        SiriMessaging(
+          repository: ref.read(chatRepositoryProvider),
+          chats: () => ref.read(chatsProvider).value ?? const [],
+          policy: () => ref.read(notificationPolicyProvider),
+          words: () => weftNotifyStringsFrom(weftPlatformL10n()),
+        ).start(),
+      );
+    }
     // Opening a conversation has to clear its row in the shade, and the screen
     // that shows the messages cannot reach the service without building the
     // whole notification stack. Handing it the one function it needs keeps

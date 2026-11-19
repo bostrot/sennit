@@ -1,5 +1,7 @@
 import Flutter
+import Intents
 import UIKit
+import flutter_local_notifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -7,7 +9,24 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Reply and Mark read under a notification run without opening Sennit, in
+    // an engine flutter_local_notifications starts for them. That engine needs
+    // the plugins the headless Matrix stack uses; without this callback the
+    // plugin starts it with none and the action dies before reaching Dart.
+    FlutterLocalNotificationsPlugin.setPluginRegistrantCallback { registry in
+      GeneratedPluginRegistrant.register(with: registry)
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  /// SiriKit messaging, handled in-app. See `SiriIntents.swift`.
+  override func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any? {
+    switch intent {
+    case is INSendMessageIntent, is INSearchForMessagesIntent, is INSetMessageAttributeIntent:
+      return WeftMessagesIntentHandler.shared
+    default:
+      return nil
+    }
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
@@ -49,6 +68,10 @@ import UIKit
     // do, but every other channel is here and this one costs nothing until used.
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftBackgroundWork") {
       WeftBackgroundWork.register(with: registrar)
+    }
+    // Siri. On the launch path because an intent is often what launched it.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftSiriChannel") {
+      WeftSiriChannel.register(with: registrar)
     }
   }
 }
