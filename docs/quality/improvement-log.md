@@ -104,3 +104,13 @@ and what was noticed but not done.
   the event id, so `_openMention` cannot jump to the message. Making inbound
   event links scroll to the message is the first run; the copy action is the
   second.
+- **Loading older history can call `setState` during layout.** Found
+  2026-11-19 while testing the jump-to-latest key: when the timeline's
+  content dimensions change with the reader within a screen of the top, the
+  ballistic scroll that `applyNewDimensions` starts dispatches a
+  `ScrollStartNotification` from inside layout, and the listener in
+  `chat_view.dart` calls `_loadOlder`, whose first line is a `setState`.
+  Debug builds assert ("Build scheduled during frame"); release builds lag a
+  frame. Deferring the call with `addPostFrameCallback` (or checking
+  `SchedulerBinding.schedulerPhase`) is likely the whole fix, with a widget
+  test that jumps to `maxScrollExtent` as the reproduction.
