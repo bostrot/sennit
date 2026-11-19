@@ -184,6 +184,8 @@ class WeftMessage {
     this.mediaWidth,
     this.mediaHeight,
     this.mediaSizeBytes,
+    this.mediaMimeType,
+    this.playsAsGif = false,
   });
 
   final String eventId;
@@ -382,6 +384,29 @@ class WeftMessage {
   /// that the bubble simply shows no size rather than a zero.
   final int? mediaSizeBytes;
 
+  /// The attachment's declared `info.mimetype`, lower-cased, or null.
+  ///
+  /// Needed for one decision the kind cannot make: an `image/gif` is a picture
+  /// that moves, and its thumbnail — a single JPEG frame — is not.
+  final String? mediaMimeType;
+
+  /// A video that stands in for a GIF: silent, short, and meant to loop in
+  /// place rather than be opened and played.
+  ///
+  /// WhatsApp has no GIF format of its own; it sends an MP4 with a playback
+  /// flag, and the mautrix bridges relay that as `m.video` carrying
+  /// `fi.mau.gif`, `fi.mau.loop` and `fi.mau.autoplay` in `info`.
+  final bool playsAsGif;
+
+  /// Whether the bubble should loop this attachment inline, muted.
+  bool get loopsInline => kind == MessageKind.video && playsAsGif;
+
+  /// A picture whose preview has to be the file itself, because the
+  /// thumbnail of an animated GIF is one still frame of it.
+  bool get isAnimatedImage =>
+      (kind == MessageKind.image || kind == MessageKind.sticker) &&
+      mediaMimeType == 'image/gif';
+
   /// Aspect ratio of the attachment, when both dimensions are known.
   double? get mediaAspectRatio {
     final w = mediaWidth;
@@ -465,6 +490,8 @@ class WeftMessage {
       mediaWidth: mediaWidth,
       mediaHeight: mediaHeight,
       mediaSizeBytes: mediaSizeBytes,
+      mediaMimeType: mediaMimeType,
+      playsAsGif: playsAsGif,
     );
   }
 

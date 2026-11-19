@@ -384,6 +384,8 @@ WeftMessage? mapEvent(
     mediaWidth: _positiveInfoInt(content, 'w'),
     mediaHeight: _positiveInfoInt(content, 'h'),
     mediaSizeBytes: _positiveInfoInt(content, 'size'),
+    mediaMimeType: _infoMimeType(content),
+    playsAsGif: isGifVideo(content),
   );
 
   // A redacted event has no content left to relate to. Its edits and its
@@ -694,6 +696,37 @@ int? _positiveInfoInt(Map<String, Object?> content, String key) {
   if (value is! num) return null;
   final pixels = value.round();
   return pixels > 0 ? pixels : null;
+}
+
+/// `info.mimetype`, lower-cased, or the encrypted `file` block's when `info`
+/// has none — the same fallback the SDK's `attachmentMimetype` makes.
+String? _infoMimeType(Map<String, Object?> content) {
+  final info = content['info'];
+  final file = content['file'];
+  final declared =
+      (info is Map ? info['mimetype'] : null) ??
+      (file is Map ? file['mimetype'] : null);
+  if (declared is! String || declared.trim().isEmpty) return null;
+  return declared.trim().toLowerCase();
+}
+
+/// Whether a video event is a GIF in a video container.
+///
+/// WhatsApp's GIFs are MP4s with a playback flag, and the mautrix bridges
+/// (whatsapp, meta, signal, telegram) relay that flag as `fi.mau.gif` in
+/// `info`, alongside `fi.mau.loop` and `fi.mau.autoplay`. Either the GIF flag or
+/// the loop-and-autoplay pair is enough: both say "play this in place, on
+/// repeat", which is the only thing the bubble needs to know.
+///
+/// `== true` rather than truthiness, for the same reason as the auto-reply
+/// key: a sender that put a string there meant something this build does not
+/// understand.
+bool isGifVideo(Map<String, Object?> content) {
+  if (content['msgtype'] != sdk.MessageTypes.Video) return false;
+  final info = content['info'];
+  if (info is! Map) return false;
+  return info['fi.mau.gif'] == true ||
+      (info['fi.mau.loop'] == true && info['fi.mau.autoplay'] == true);
 }
 
 int? _durationMs(Map<String, Object?> content) {

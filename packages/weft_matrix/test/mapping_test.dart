@@ -434,6 +434,80 @@ void main() {
       expect(message.attachmentUrl, r'$event:example.org');
     });
 
+    // The shape mautrix-whatsapp sends for a WhatsApp GIF in an encrypted
+    // room: an MP4 under `file`, size, shape and length, the playback flags —
+    // and no thumbnail at all, which is why the bubble has to make its own.
+    test('a bridged WhatsApp GIF is a video that loops in place', () {
+      final message = map({
+        'msgtype': 'm.video',
+        'body': 'video.mp4',
+        'file': {
+          'url': 'mxc://example.org/ciphertext',
+          'iv': 'aaaa',
+          'hashes': {'sha256': 'bbbb'},
+          'key': {
+            'k': 'cccc',
+            'alg': 'A256CTR',
+            'key_ops': ['encrypt', 'decrypt'],
+          },
+          'v': 'v2',
+        },
+        'info': {
+          'mimetype': 'video/mp4',
+          'size': 412000,
+          'w': 480,
+          'h': 852,
+          'duration': 3000,
+          'fi.mau.gif': true,
+          'fi.mau.loop': true,
+          'fi.mau.autoplay': true,
+          'fi.mau.hide_controls': true,
+          'fi.mau.no_audio': true,
+        },
+      })!;
+
+      expect(message.kind, MessageKind.video);
+      expect(message.playsAsGif, isTrue);
+      expect(message.loopsInline, isTrue);
+      expect(message.mediaMimeType, 'video/mp4');
+      expect(message.mediaWidth, 480);
+      expect(message.mediaHeight, 852);
+      expect(message.durationMs, 3000);
+      expect(message.attachmentUrl, isNotNull);
+    });
+
+    test('an ordinary video is not a GIF', () {
+      final message = map({
+        'msgtype': 'm.video',
+        'body': 'clip.mp4',
+        'url': 'mxc://example.org/video',
+        'info': {'mimetype': 'video/mp4', 'fi.mau.gif': 'yes'},
+      })!;
+
+      expect(message.playsAsGif, isFalse);
+      expect(message.loopsInline, isFalse);
+    });
+
+    test('an image/gif is an animated image, whatever case it came in', () {
+      final message = map({
+        'msgtype': 'm.image',
+        'body': 'dance.gif',
+        'url': 'mxc://example.org/gif',
+        'info': {
+          'mimetype': 'IMAGE/GIF',
+          'w': 320,
+          'h': 240,
+          'thumbnail_url': 'mxc://example.org/still',
+          'thumbnail_info': {'mimetype': 'image/jpeg', 'w': 320, 'h': 240},
+        },
+      })!;
+
+      expect(message.kind, MessageKind.image);
+      expect(message.mediaMimeType, 'image/gif');
+      expect(message.isAnimatedImage, isTrue);
+      expect(message.playsAsGif, isFalse);
+    });
+
     test('an m.audio is audio, and stays audio without the voice key', () {
       final message = map({
         'msgtype': 'm.audio',
