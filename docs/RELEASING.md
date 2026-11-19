@@ -208,6 +208,30 @@ archiving without one. Before April 2027, move that step, and its check in
 `testflight_workflow_test.dart`, to Xcode 27 once the runner image has it as a
 release rather than a preview.
 
+#### Export compliance, per build
+
+Every uploaded build waits in TestFlight as "Missing Compliance" until its
+encryption questions are answered: open the build, choose **Provide Export
+Compliance Documentation**, and answer:
+
+1. *Which type of encryption algorithms does your app use?* **Standard
+   encryption algorithms instead of, or in addition to, using or accessing the
+   encryption within Apple's operating system.** End-to-end encryption runs
+   in the app, in vodozemac (Olm and Megolm: AES-256, Curve25519, Ed25519,
+   HMAC-SHA256), not only through iOS. These are standard, published
+   algorithms; nothing is proprietary.
+2. *Will your app be available for distribution in France?* **No.** France
+   requires an encryption declaration for such apps, so Sennit is not offered
+   there: in App Store Connect, Pricing and Availability lists France (and
+   mainland China) as not available. Keep it that way, or the answer above
+   becomes wrong.
+
+Save; the build turns "Ready to Test" for the internal group.
+
+`ITSAppUsesNonExemptEncryption` is deliberately not in `Info.plist`. Setting it
+to false would skip these questions by declaring that the app uses no
+encryption beyond what is exempt, which is not the answer above.
+
 ### Windows / Linux
 
 Ship unsigned. Windows SmartScreen will warn until the binary earns
