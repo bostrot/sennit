@@ -205,6 +205,11 @@ MediaDimensions? probeImageDimensions(Uint8List header) {
 /// non-zero dimensions — audio tracks carry 0x0 and must be skipped. Returns
 /// null when `moov` sits at the end of the file, which is the normal layout for
 /// anything not written for streaming, as well as for WebM and for garbage.
+///
+/// The answer is the size the film is *shown* at. A phone records portrait
+/// video as landscape pixels with a quarter turn in the track's matrix, and
+/// announcing the stored 1920x1080 for it lays out a landscape box that crops
+/// away most of a portrait clip.
 MediaDimensions? probeVideoDimensions(Uint8List header) {
   if (!_hasFtyp(header)) return null;
   final top = _childBoxes(header, 0, header.length);
@@ -220,6 +225,47 @@ MediaDimensions? probeVideoDimensions(Uint8List header) {
     }
   }
   return null;
+}
+
+/// Playback length of an MP4 or QuickTime file in milliseconds, from the
+/// movie header (`moov/mvhd`), or null when it cannot be read.
+///
+/// The send path calls this on the whole file, not on the header slice: `moov`
+/// is at the end of most files a phone records, and a video sent without
+/// `info.duration` shows no length on any client.
+int? probeVideoDurationMs(Uint8List bytes) {
+  if (!_hasFtyp(bytes)) return null;
+  final moov = _childBoxes(
+    bytes,
+    0,
+    bytes.length,
+  ).firstWhereOrNull((box) => box.type == 'moov');
+  if (moov == null) return null;
+  final mvhd = _childBoxes(
+    bytes,
+    moov.start,
+    moov.end,
+  ).firstWhereOrNull((box) => box.type == 'mvhd');
+  if (mvhd == null || mvhd.start >= bytes.length) return null;
+
+  // version/flags (4), then creation and modification times — 32-bit in
+  // version 0, 64-bit in version 1 — then the timescale and the duration.
+  final version = bytes[mvhd.start];
+  final timescaleAt = mvhd.start + 4 + (version == 1 ? 16 : 8);
+  final timescale = _u32be(bytes, timescaleAt);
+  int? duration;
+  if (version == 1) {
+    final high = _u32be(bytes, timescaleAt + 4);
+    final low = _u32be(bytes, timescaleAt + 8);
+    if (high != null && low != null) duration = (high << 32) | low;
+  } else {
+    duration = _u32be(bytes, timescaleAt + 4);
+  }
+  if (timescaleAt + 4 + (version == 1 ? 8 : 4) > mvhd.end) return null;
+  if (timescale == null || timescale == 0 || duration == null) return null;
+  // All ones means "unknown" in both versions.
+  if (duration == 0xFFFFFFFF || duration <= 0) return null;
+  return (duration * 1000 / timescale).round();
 }
 
 // --- Magic bytes -----------------------------------------------------------
@@ -554,9 +600,19 @@ MediaDimensions? _parseTkhd(Uint8List b, _Box box) {
   final height = _u32be(b, offset + 4);
   if (width == null || height == null) return null;
 
+  // The matrix's first row is `a b u`. A quarter turn either way leaves `a` at
+  // zero and puts ±1.0 (16.16) in `b`; that is how every phone stores a
+  // portrait recording.
+  final matrix = box.start + 4 + timingBytes + 16;
+  final a = _u32be(b, matrix);
+  final rb = _u32be(b, matrix + 4);
+  final quarterTurn = a == 0 && (rb == 0x00010000 || rb == 0xFFFF0000);
+
   // Both are 16.16 fixed-point. An audio track stores 0x0, which is how a
   // soundtrack gets skipped in favour of the real visual track.
-  return _dimensionsOrNull(width >> 16, height >> 16);
+  return quarterTurn
+      ? _dimensionsOrNull(height >> 16, width >> 16)
+      : _dimensionsOrNull(width >> 16, height >> 16);
 }
 
 // --- Byte helpers ----------------------------------------------------------

@@ -142,6 +142,51 @@ void main() {
       expect(p.dimensions, isNull);
     });
 
+    // The send path reads the whole file for upload and measures it then;
+    // a phone's recording keeps `moov` at the end, out of the header's reach.
+    test('a video measured from the whole file announces shape and length', () {
+      final whole = Uint8List.fromList(
+        mp4WithTracks(
+          const [MediaDimensions(1920, 1080)],
+          portrait: true,
+          timescale: 600,
+          duration: 1800,
+          moovAtEnd: true,
+        ),
+      );
+      final p = plan(whole.take(48).toList(), filename: 'clip.mp4');
+      expect(p.dimensions, isNull);
+
+      final info =
+          p.toEventContent(
+                uri: 'mxc://weft.test/v',
+                measuredDimensions: probeVideoDimensions(whole),
+                measuredDurationMs: probeVideoDurationMs(whole),
+              )['info']!
+              as Map<String, Object?>;
+      expect(info['mimetype'], 'video/mp4');
+      expect(info['w'], 1080);
+      expect(info['h'], 1920);
+      expect(info['duration'], 3000);
+    });
+
+    test('what the plan knew is not overwritten by a measurement', () {
+      final p = plan(
+        mp4WithTracks(const [MediaDimensions(640, 360)]),
+        filename: 'a.mp4',
+        durationMs: 1234,
+      );
+      final info =
+          p.toEventContent(
+                uri: 'mxc://weft.test/v',
+                measuredDimensions: const MediaDimensions(1, 1),
+                measuredDurationMs: 9,
+              )['info']!
+              as Map<String, Object?>;
+      expect(info['w'], 640);
+      expect(info['duration'], 1234);
+    });
+
     test('duration is the caller\'s to supply', () {
       expect(plan(mp3(), filename: 'a.mp3', durationMs: 4200).durationMs, 4200);
       expect(plan(mp3(), filename: 'a.mp3').durationMs, isNull);

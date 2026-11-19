@@ -117,6 +117,11 @@ List<int> mp4WithTracks(
   List<MediaDimensions> dimensions, {
   int tkhdVersion = 0,
   bool largeMoovSize = false,
+  bool portrait = false,
+  int? timescale,
+  int? duration,
+  int mvhdVersion = 0,
+  bool moovAtEnd = false,
 }) {
   final traks = <int>[];
   for (final size in dimensions) {
@@ -124,15 +129,38 @@ List<int> mp4WithTracks(
     final tkhd = box('tkhd', [
       tkhdVersion, 0x00, 0x00, 0x07, // version + flags
       ...List.filled(timingBytes, 0), // creation, modification, id, duration
-      ...List.filled(52, 0), // reserved, layer, volume, transform matrix
+      ...List.filled(16, 0), // reserved, layer, alternate group, volume
+      // The matrix's first row: identity, or the quarter turn a phone writes
+      // for a portrait recording.
+      ...(portrait ? [0, 0, 0, 0, 0, 1, 0, 0] : [0, 1, 0, 0, 0, 0, 0, 0]),
+      ...List.filled(28, 0), // the rest of the matrix
       ..._u32be(size.width << 16), // 16.16 fixed point
       ..._u32be(size.height << 16),
     ]);
     traks.addAll(box('trak', tkhd));
   }
 
-  final moov = largeMoovSize ? largeBox('moov', traks) : box('moov', traks);
-  return [...isoBaseMedia(brand: 'isom'), ...moov];
+  final mvhd = timescale == null
+      ? <int>[]
+      : box('mvhd', [
+          mvhdVersion, 0, 0, 0, // version + flags
+          ...List.filled(mvhdVersion == 1 ? 16 : 8, 0), // creation, modification
+          ..._u32be(timescale),
+          if (mvhdVersion == 1) ..._u32be(0),
+          ..._u32be(duration ?? 0),
+          ...List.filled(80, 0), // rate, volume, matrix, next track id
+        ]);
+
+  final children = [...mvhd, ...traks];
+  final moov =
+      largeMoovSize ? largeBox('moov', children) : box('moov', children);
+  return moovAtEnd
+      ? [
+          ...isoBaseMedia(brand: 'isom'),
+          ...box('mdat', List.filled(64, 0)),
+          ...moov,
+        ]
+      : [...isoBaseMedia(brand: 'isom'), ...moov];
 }
 
 /// An EBML header followed by its doctype string, which is the only thing

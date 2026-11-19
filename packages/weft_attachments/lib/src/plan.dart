@@ -350,6 +350,14 @@ final class UploadPlan extends UploadDecision {
   /// [ArgumentError] instead of degrading — an event that carries both a plain
   /// `url` and a `file` block is ambiguous to every receiving client.
   ///
+  /// [measuredDimensions] and [measuredDurationMs] are what the sender learnt
+  /// from the *whole* file once it was read for upload — [probeVideoDimensions]
+  /// and [probeVideoDurationMs] over every byte rather than the header slice
+  /// this plan was made from. They fill in only what the plan left null: a
+  /// phone's recording keeps `moov` at the end, and without them every video
+  /// went out with no `duration` and, usually, no `w`/`h` either, which other
+  /// clients draw as a squat box with no length on it.
+  ///
   /// A [caption] replaces `body` with the user's text and moves the filename to
   /// `filename`, per MSC2530. Without one, `body` is the filename, which is what
   /// clients that predate captions expect — and which is why the two keys are
@@ -362,6 +370,8 @@ final class UploadPlan extends UploadDecision {
     EncryptedFileInfo? thumbnailFile,
     int? thumbnailSizeBytes,
     MediaDimensions? thumbnailDimensions,
+    MediaDimensions? measuredDimensions,
+    int? measuredDurationMs,
   }) {
     if (encrypted && file == null) {
       throw ArgumentError.notNull('file');
@@ -394,11 +404,13 @@ final class UploadPlan extends UploadDecision {
     }
 
     final info = <String, Object?>{'mimetype': mimeType, 'size': sizeBytes};
-    if (dimensions != null) {
-      info['w'] = dimensions!.width;
-      info['h'] = dimensions!.height;
+    final shape = dimensions ?? measuredDimensions;
+    if (shape != null) {
+      info['w'] = shape.width;
+      info['h'] = shape.height;
     }
-    if (durationMs != null) info['duration'] = durationMs;
+    final length = durationMs ?? measuredDurationMs;
+    if (length != null) info['duration'] = length;
 
     if (thumbnailUri != null) {
       // Same split as the attachment itself, one level down. Getting this half

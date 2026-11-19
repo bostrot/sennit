@@ -435,6 +435,27 @@ void main() {
       expect(probeVideoDimensions(Uint8List.fromList(bytes)), isNull);
     });
 
+    test('a portrait recording is announced as portrait', () {
+      // Stored as 1920x1080 with a quarter turn, as every phone writes it.
+      final bytes = mp4WithTracks(const [
+        MediaDimensions(1920, 1080),
+      ], portrait: true);
+      expect(
+        probeVideoDimensions(Uint8List.fromList(bytes)),
+        const MediaDimensions(1080, 1920),
+      );
+    });
+
+    test('the whole file finds a moov that sits at the end', () {
+      final bytes = mp4WithTracks(const [
+        MediaDimensions(1280, 720),
+      ], moovAtEnd: true);
+      expect(
+        probeVideoDimensions(Uint8List.fromList(bytes)),
+        const MediaDimensions(1280, 720),
+      );
+    });
+
     test('returns null for a non-ISO-BMFF file', () {
       expect(probeVideoDimensions(Uint8List.fromList(webm())), isNull);
       expect(
@@ -468,6 +489,74 @@ void main() {
         ...List.filled(16, 0),
       ];
       expect(probeVideoDimensions(Uint8List.fromList(bogus)), isNull);
+    });
+  });
+
+  group('probeVideoDurationMs', () {
+    test('reads the movie header, wherever moov sits', () {
+      final front = mp4WithTracks(
+        const [MediaDimensions(640, 360)],
+        timescale: 600,
+        duration: 7470,
+      );
+      expect(probeVideoDurationMs(Uint8List.fromList(front)), 12450);
+
+      final end = mp4WithTracks(
+        const [MediaDimensions(640, 360)],
+        timescale: 1000,
+        duration: 3000,
+        moovAtEnd: true,
+      );
+      expect(probeVideoDurationMs(Uint8List.fromList(end)), 3000);
+    });
+
+    test('handles a version 1 movie header', () {
+      final bytes = mp4WithTracks(
+        const [MediaDimensions(640, 360)],
+        timescale: 90000,
+        duration: 450000,
+        mvhdVersion: 1,
+      );
+      expect(probeVideoDurationMs(Uint8List.fromList(bytes)), 5000);
+    });
+
+    test('is null with no movie header, no timescale, or no file', () {
+      expect(
+        probeVideoDurationMs(
+          Uint8List.fromList(mp4WithTracks(const [MediaDimensions(1, 1)])),
+        ),
+        isNull,
+      );
+      expect(
+        probeVideoDurationMs(
+          Uint8List.fromList(
+            mp4WithTracks(
+              const [MediaDimensions(1, 1)],
+              timescale: 0,
+              duration: 10,
+            ),
+          ),
+        ),
+        isNull,
+      );
+      expect(probeVideoDurationMs(Uint8List.fromList(webm())), isNull);
+      expect(probeVideoDurationMs(Uint8List(0)), isNull);
+    });
+
+    test('never throws on truncation', () {
+      final full = mp4WithTracks(
+        const [MediaDimensions(100, 50)],
+        timescale: 600,
+        duration: 600,
+      );
+      for (var take = 0; take < full.length; take++) {
+        expect(
+          () => probeVideoDurationMs(
+            Uint8List.fromList(full.take(take).toList()),
+          ),
+          returnsNormally,
+        );
+      }
     });
   });
 

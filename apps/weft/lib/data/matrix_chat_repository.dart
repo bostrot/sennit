@@ -1456,6 +1456,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// not put a second copy of the preview on the media repo.
   final Map<String, MatrixThumbnailUpload?> _thumbnails = {};
 
+  /// A video's shape and length, read from the whole file once it is in
+  /// memory for upload, keyed like [_thumbnails]. The plan only ever saw the
+  /// header slice, and a phone's recording keeps both at the end.
+  final Map<String, ({MediaDimensions? dimensions, int? durationMs})>
+  _measured = {};
+
   /// Rooms with a dispatch loop running, so two queue updates arriving during
   /// one `sendEvent` cannot send the same event twice.
   final Set<String> _dispatching = {};
@@ -1531,6 +1537,17 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   Future<UploadPayload> _loadPayload(UploadPlan plan, String taskId) async {
     final bytes = await _readBytes(plan.source);
 
+    if (plan.kind == MessageKind.video && !_measured.containsKey(taskId)) {
+      _measured[taskId] = (
+        dimensions: plan.dimensions == null
+            ? probeVideoDimensions(bytes)
+            : null,
+        durationMs: plan.durationMs == null
+            ? probeVideoDurationMs(bytes)
+            : null,
+      );
+    }
+
     if (!_thumbnails.containsKey(taskId)) {
       // Without a picture to scale down there is no preview, and the send
       // goes ahead without one.
@@ -1587,6 +1604,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     }
 
     final thumbnail = _thumbnails[task.id];
+    final measured = _measured[task.id];
     try {
       await room.sendEvent(
         task.plan.toEventContent(
@@ -1596,6 +1614,8 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
           thumbnailFile: thumbnail?.file,
           thumbnailSizeBytes: thumbnail?.sizeBytes,
           thumbnailDimensions: thumbnail?.dimensions,
+          measuredDimensions: measured?.dimensions,
+          measuredDurationMs: measured?.durationMs,
         ),
       );
       // The SDK's own local echo takes over from here — the event is in the
@@ -1617,6 +1637,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   void _forgetUpload(String taskId) {
     _uploads.remove(taskId);
     _thumbnails.remove(taskId);
+    _measured.remove(taskId);
     _undispatchable.remove(taskId);
   }
 
@@ -1655,6 +1676,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   Future<void> cancelUpload(String taskId) async {
     _uploads.cancel(taskId);
     _thumbnails.remove(taskId);
+    _measured.remove(taskId);
     _undispatchable.remove(taskId);
   }
 
