@@ -178,7 +178,7 @@ class ReplyReminderSettings {
 /// Why a chat gets no reply reminder. Named for the same reason
 /// [NotificationSuppression] is: "why did it not remind me" has an answer.
 enum ReplyReminderSkip {
-  /// Reply reminders are switched off.
+  /// Reply reminders are switched off, or notifications are.
   disabled,
 
   /// Nothing has been said in the chat yet.
@@ -260,7 +260,11 @@ ReplyReminderSkip? replyReminderSkipFor(
   Set<String> serviceChatIds = const {},
   ReplyReminderEntry? entry,
 }) {
-  if (!settings.enabled) return ReplyReminderSkip.disabled;
+  // The notification master switch says nothing is ever posted, and a
+  // reminder is something posted.
+  if (!settings.enabled || policy?.enabled == false) {
+    return ReplyReminderSkip.disabled;
+  }
   final awaiting = _awaitingSkip(chat);
   if (awaiting != null) return awaiting;
   if (now.difference(chat.lastMessage!.timestamp) > kReplyReminderMaxAge) {

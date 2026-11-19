@@ -7974,5 +7974,150 @@
         "example": "same phone number"
       }
     }
+  },
+  "notificationChannelReplyReminders": "Reply reminders",
+  "@notificationChannelReplyReminders": {
+    "description": "Name of the reply-reminder notification channel, shown in the operating system's notification settings. Keep under ~26 chars."
+  },
+  "notificationChannelReplyRemindersDescription": "Reminders about messages you read but haven’t answered.",
+  "@notificationChannelReplyRemindersDescription": {
+    "description": "Description of the reply-reminder channel, in the operating system's notification settings."
+  },
+  "notificationActionStopReminding": "Stop reminding",
+  "@notificationActionStopReminding": {
+    "description": "Label of the action on a reply reminder notification that stops further reminders about that message. Drawn by the operating system. Very tight. Keep under ~18 chars.",
+    "maxLength": 36
+  },
+  "replyReminderTitle": "You haven’t replied to {chat}",
+  "@replyReminderTitle": {
+    "description": "Title of a reply reminder notification: the user read a message in this chat and has not answered. Never carries the message itself.",
+    "placeholders": {
+      "chat": {
+        "type": "String",
+        "description": "The chat's name: a person or a group.",
+        "example": "Grace"
+      }
+    }
+  },
+  "replyReminderTitleHidden": "A chat is waiting for your reply",
+  "@replyReminderTitleHidden": {
+    "description": "Title of a reply reminder notification when message previews are switched off, so not even the chat is named."
+  },
+  "replyReminderBody": "Tap to open the chat.",
+  "@replyReminderBody": {
+    "description": "Body of a reply reminder notification."
+  },
+  "replyRemindersTitle": "Reply reminders",
+  "@replyRemindersTitle": {
+    "description": "Title of the reply reminders settings screen, of the row leading to it in notification settings, and of the per-chat switch in a chat's profile."
+  },
+  "replyRemindersRowSubtitleOff": "Get a nudge about messages you read and didn’t answer",
+  "@replyRemindersRowSubtitleOff": {
+    "description": "Subtitle of the reply reminders row in notification settings while the feature is off."
+  },
+  "replyRemindersEveryMinutes": "{count, plural, =1{Every minute} other{Every {count} minutes}}",
+  "@replyRemindersEveryMinutes": {
+    "description": "How often reply reminders repeat, in minutes. A choice in a list, and the subtitle of the settings row while reminders are on.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Minutes between reminders.",
+        "example": "30"
+      }
+    }
+  },
+  "replyRemindersEveryHours": "{count, plural, =1{Every hour} other{Every {count} hours}}",
+  "@replyRemindersEveryHours": {
+    "description": "How often reply reminders repeat, in hours. A choice in a list, and the subtitle of the settings row while reminders are on.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Hours between reminders.",
+        "example": "3"
+      }
+    }
+  },
+  "replyRemindersEnableTitle": "Remind me to reply",
+  "@replyRemindersEnableTitle": {
+    "description": "Switch that turns reply reminders on."
+  },
+  "replyRemindersEnableSubtitle": "When you read a message and don’t answer, Sennit reminds you until you reply or tap Stop reminding. Reminders are made on this device and send nothing anywhere.",
+  "@replyRemindersEnableSubtitle": {
+    "description": "Explains reply reminders under their switch. 'Stop reminding' is the notification action notificationActionStopReminding and should match it."
+  },
+  "replyRemindersIntervalTitle": "How often",
+  "@replyRemindersIntervalTitle": {
+    "description": "Section header above the reminder interval choices."
+  },
+  "replyRemindersIntervalSubtitle": "The first reminder comes this long after you read a message, then again at the same pace until you reply.",
+  "@replyRemindersIntervalSubtitle": {
+    "description": "Explains the reminder interval choices under their header."
+  },
+  "replyRemindersWhichChatsTitle": "Which chats",
+  "@replyRemindersWhichChatsTitle": {
+    "description": "Section header above the switches choosing which chats get reply reminders."
+  },
+  "replyRemindersWhichChatsSubtitle": "One-to-one chats are always included. Archived chats, chat requests, bridge bots and messages older than a week never are.",
+  "@replyRemindersWhichChatsSubtitle": {
+    "description": "Explains the built-in rules for which chats get reply reminders."
+  },
+  "replyRemindersIncludeGroupsTitle": "Small groups",
+  "@replyRemindersIncludeGroupsTitle": {
+    "description": "Switch: also remind about small group chats."
+  },
+  "replyRemindersIncludeGroupsSubtitle": "Groups with up to {count} other people",
+  "@replyRemindersIncludeGroupsSubtitle": {
+    "description": "Subtitle of the small groups switch: the size limit.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "The most people besides the user a group may have.",
+        "example": "8"
+      }
+    }
+  },
+  "replyRemindersIncludeMutedTitle": "Muted chats",
+  "@replyRemindersIncludeMutedTitle": {
+    "description": "Switch: also remind about muted chats."
+  },
+  "replyRemindersIncludeMutedSubtitle": "Remind me about chats I muted, too",
+  "@replyRemindersIncludeMutedSubtitle": {
+    "description": "Subtitle of the muted chats switch."
+  },
+  "replyRemindersQuietHoursTitle": "Respect quiet hours",
+  "@replyRemindersQuietHoursTitle": {
+    "description": "Switch: hold reminders during the notification quiet hours."
+  },
+  "replyRemindersQuietHoursSubtitle": "Hold reminders until your notification quiet hours end",
+  "@replyRemindersQuietHoursSubtitle": {
+    "description": "Subtitle of the quiet hours switch."
+  },
+  "replyRemindersExcludedTitle": "Never remind me about",
+  "@replyRemindersExcludedTitle": {
+    "description": "Section header above the list of chats excluded from reply reminders."
+  },
+  "replyRemindersExcludedSubtitle": "Chats you switched reminders off for, here or in a chat’s profile.",
+  "@replyRemindersExcludedSubtitle": {
+    "description": "Explains the excluded chats list."
+  },
+  "replyRemindersNoneExcluded": "No chats excluded.",
+  "@replyRemindersNoneExcluded": {
+    "description": "Shown when no chat is excluded from reply reminders."
+  },
+  "replyRemindersExcludeChat": "Exclude a chat",
+  "@replyRemindersExcludeChat": {
+    "description": "Button that opens a list of chats to exclude from reply reminders, and the title of that list."
+  },
+  "replyRemindersIncludeAgain": "Remind me again",
+  "@replyRemindersIncludeAgain": {
+    "description": "Tooltip and screen-reader label of the button that takes a chat off the excluded list."
+  },
+  "replyRemindersNoChatsToExclude": "No chats to exclude.",
+  "@replyRemindersNoChatsToExclude": {
+    "description": "Shown in the exclude-a-chat list when every chat is already excluded or there are none."
+  },
+  "contactReplyRemindersSubtitle": "Remind me when I read a message here and don’t answer",
+  "@contactReplyRemindersSubtitle": {
+    "description": "Subtitle of the reply reminders switch in a chat's profile."
   }
 }

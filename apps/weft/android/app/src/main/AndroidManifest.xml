@@ -351,6 +351,24 @@
         <receiver
             android:name=".call.CallActionReceiver"
             android:exported="false"/>
+        <!-- Scheduled local notifications: the "remind me" on a message and
+             reply reminders. `zonedSchedule` sets an alarm whose broadcast
+             goes to the first receiver; without it the alarm fires into
+             nothing. The boot receiver puts pending ones back after a restart
+             or an app update, which clear every alarm an app has set. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
 
         <!-- Home screen widgets. Both are `GlanceAppWidgetReceiver`s, which are
              `AppWidgetProvider`s underneath, which are `BroadcastReceiver`s —

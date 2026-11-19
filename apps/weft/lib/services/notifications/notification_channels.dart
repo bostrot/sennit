@@ -29,6 +29,18 @@ const String kCallsChannelId = 'weft.calls';
 /// arrive on.
 const String kBackgroundChannelId = 'weft.background';
 
+/// Channel for reply reminders — "you read this and have not answered".
+///
+/// Its own channel rather than the network's, so a user who finds the nudges
+/// too loud can turn *them* down in Android's settings without touching the
+/// messages they are about. Default importance: a reminder is worth a sound,
+/// not a heads-up over whatever the user is doing.
+const String kReplyRemindersChannelId = 'weft.reply_reminders';
+
+/// The Darwin category a reply reminder is posted under. Separate from
+/// [kMessageCategoryId] because its one action is not a message's three.
+const String kReplyReminderCategoryId = 'weft.reply_reminder';
+
 /// Prefix of the per-network conversation channels. See [messageChannelFor].
 const String kMessageChannelPrefix = 'weft.messages.';
 
@@ -59,6 +71,10 @@ abstract final class WeftNotificationActions {
   static const String reply = 'weft.reply';
   static const String markRead = 'weft.mark_read';
   static const String muteForAnHour = 'weft.mute_1h';
+
+  /// "Stop reminding" on a reply reminder: no more reminders about the message
+  /// it is about. The next message from the other side starts over.
+  static const String stopReplyReminder = 'weft.reply_reminder.stop';
 
   /// The input field's id on the platforms that name one.
   static const String replyInput = 'weft.reply.input';
@@ -201,8 +217,27 @@ List<AndroidNotificationChannel> weftNotificationChannels() {
       playSound: false,
       enableVibration: false,
     ),
+    AndroidNotificationChannel(
+      kReplyRemindersChannelId,
+      l10n.notificationChannelReplyReminders,
+      description: l10n.notificationChannelReplyRemindersDescription,
+    ),
   ];
 }
+
+/// The one action a reply reminder carries on Android.
+///
+/// `showsUserInterface: true` for the reason [weftAndroidMessageActions]
+/// gives: the reminder ledger lives in the settings database the main isolate
+/// holds open, and a broadcast would only reach a background isolate.
+List<AndroidNotificationAction> weftAndroidReplyReminderActions() => [
+  AndroidNotificationAction(
+    WeftNotificationActions.stopReplyReminder,
+    weftPlatformL10n().notificationActionStopReminding,
+    showsUserInterface: true,
+    cancelNotification: false,
+  ),
+];
 
 AndroidNotificationChannelGroup weftMessagesChannelGroup() {
   final l10n = weftPlatformL10n();
@@ -247,6 +282,15 @@ List<DarwinNotificationCategory> weftDarwinCategories() {
         DarwinNotificationCategoryOption.hiddenPreviewShowTitle,
         DarwinNotificationCategoryOption.hiddenPreviewShowSubtitle,
       },
+    ),
+    DarwinNotificationCategory(
+      kReplyReminderCategoryId,
+      actions: [
+        DarwinNotificationAction.plain(
+          WeftNotificationActions.stopReplyReminder,
+          l10n.notificationActionStopReminding,
+        ),
+      ],
     ),
   ];
 }

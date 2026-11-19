@@ -105,6 +105,13 @@ void main() {
       );
     });
 
+    test('notifications switched off switch reminders off too', () {
+      expect(
+        skipFor(waiting(), policy: NotificationPolicy(enabled: false)),
+        ReplyReminderSkip.disabled,
+      );
+    });
+
     test('pending requests, archived chats and service rooms are skipped', () {
       expect(
         skipFor(waiting(request: ChatRequestState.pending)),

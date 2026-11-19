@@ -1041,6 +1041,22 @@ void main() {
       expect(channels.map((c) => c.id).toSet(), hasLength(channels.length));
     });
 
+    test('reply reminders have a channel and a category of their own', () {
+      final channels = {for (final c in weftNotificationChannels()) c.id: c};
+      expect(channels[kReplyRemindersChannelId], isNotNull);
+      expect(channels[kReplyRemindersChannelId]!.groupId, isNull);
+
+      final category = weftDarwinCategories().singleWhere(
+        (c) => c.identifier == kReplyReminderCategoryId,
+      );
+      expect(category.actions.map((a) => a.identifier), [
+        WeftNotificationActions.stopReplyReminder,
+      ]);
+      expect(weftAndroidReplyReminderActions().map((a) => a.id), [
+        WeftNotificationActions.stopReplyReminder,
+      ]);
+    });
+
     test('calls and background sync are separate from messages', () {
       final channels = {for (final c in weftNotificationChannels()) c.id: c};
 
@@ -1050,7 +1066,7 @@ void main() {
     });
 
     test('the iOS category carries the three actions a message has', () {
-      final category = weftDarwinCategories().single;
+      final category = weftDarwinCategories().first;
 
       expect(category.identifier, kMessageCategoryId);
       expect(category.actions.map((a) => a.identifier), [
@@ -1072,7 +1088,7 @@ void main() {
       // agree on them or one platform's buttons quietly do nothing.
       expect(
         android.map((a) => a.id),
-        weftDarwinCategories().single.actions.map((a) => a.identifier),
+        weftDarwinCategories().first.actions.map((a) => a.identifier),
       );
       expect(android.map((a) => a.id), [
         WeftNotificationActions.reply,
@@ -1298,6 +1314,35 @@ void main() {
       expect(repository.sent, isEmpty);
       expect(repository.markedRead, isEmpty);
       expect(dismissed, isEmpty);
+    });
+
+    test('stop reminding stops the reply reminders for that message', () async {
+      final stopped = <(String, String?)>[];
+      final withReminders = NotificationActionHandler(
+        repository: repository,
+        muteChat: (chatId, {DateTime? until}) {},
+        dismiss: (chatId) async => dismissed.add(chatId),
+        stopReplyReminder: (chatId, {String? eventId}) async =>
+            stopped.add((chatId, eventId)),
+      );
+
+      final result = await withReminders.handle(
+        _activation(WeftNotificationActions.stopReplyReminder),
+      );
+
+      expect(result, NotificationActionResult.remindersStopped);
+      expect(stopped.single.$1, 'merged:contact_1');
+      expect(stopped.single.$2, isNotEmpty);
+      // Nothing is sent, read or muted on the user's behalf.
+      expect(repository.sent, isEmpty);
+      expect(repository.markedRead, isEmpty);
+      // Without a stopper — a build that has none wired — it is ignored.
+      expect(
+        await handler.handle(
+          _activation(WeftNotificationActions.stopReplyReminder),
+        ),
+        NotificationActionResult.ignored,
+      );
     });
 
     test('an action id from a newer build is ignored', () async {

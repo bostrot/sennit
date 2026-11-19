@@ -343,6 +343,21 @@ abstract final class WeftSettings {
   /// keeps the rest, which a column-per-setting layout could not do.
   static const String notifyPolicy = 'notify.policy';
 
+  /// `ReplyReminderSettings` from `weft_notify`, as one JSON blob. Absent
+  /// means off, which is the default: nothing is reminded about until the user
+  /// asks for it.
+  static const String notifyReplyReminders = 'notify.reply_reminders';
+
+  /// `ReplyReminderLedger`: which chats are waiting for a reply and since
+  /// when. Kept so the reminder clock survives a restart.
+  static const String notifyReplyReminderLedger =
+      'notify.reply_reminder_ledger';
+
+  /// The reply reminders currently queued with the OS, as a list of plan keys
+  /// under `keys`, so the next plan can cancel exactly what it replaces.
+  static const String notifyReplyRemindersQueued =
+      'notify.reply_reminders_queued';
+
   /// The push gateway's `/_matrix/push/v1/notify` endpoint.
   ///
   /// Deliberately a *setting* and not a constant. Weft hosts nothing, and which

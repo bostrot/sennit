@@ -15,6 +15,7 @@ import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
 import 'app/providers.dart';
+import 'app/reply_reminder_providers.dart';
 import 'app/retention_providers.dart';
 import 'app/search_providers.dart';
 import 'app/session_providers.dart';
@@ -189,6 +190,10 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       // push covers a phone that is asleep; this covers one that is awake and
       // holding a socket open, which the gateway may skip entirely.
       unawaited(_readElsewhere.onChats(chats));
+      // And a fifth: a chat read and not answered is queued a reply reminder,
+      // and one answered has its reminders taken back. A no-op until the user
+      // switches reminders on.
+      unawaited(ref.read(replyReminderServiceProvider).onChats(chats));
       // A launch drain almost always arrives before the first chat list does,
       // and a share sheet with no conversations in it is not worth spending a
       // staged share on. This is where the inbox finally exists.
@@ -228,6 +233,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     unawaited(ref.read(shareShortcutServiceProvider).clear());
     unawaited(ref.read(snapshotWriterProvider).clear());
     unawaited(ref.read(watchReplyHandlerProvider).clear());
+    unawaited(ref.read(replyReminderServiceProvider).clear());
   }
 
   /// Re-ranks the share targets and rewrites the snapshot.
@@ -306,6 +312,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       repository: ref.read(chatRepositoryProvider),
       muteChat: ref.read(notificationPolicyProvider.notifier).muteChat,
       dismiss: service.dismissChat,
+      stopReplyReminder: ref.read(replyReminderServiceProvider).dismiss,
     );
     service.onAction = (activation) => unawaited(actions.handle(activation));
     // Opening a conversation has to clear its row in the shade, and the screen

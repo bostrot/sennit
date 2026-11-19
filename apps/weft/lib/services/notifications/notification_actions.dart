@@ -25,6 +25,11 @@ typedef ChatMuteWriter = void Function(String chatId, {DateTime? until});
 /// conversation.
 typedef NotificationDismisser = Future<void> Function(String chatId);
 
+/// Stops the reply reminders for one chat's current message.
+/// `ReplyReminderService.dismiss`, as a function for the same reason.
+typedef ReplyReminderStopper =
+    Future<void> Function(String chatId, {String? eventId});
+
 /// What became of an action.
 ///
 /// An enum rather than a bool because "nothing to do" and "it failed" lead
@@ -40,6 +45,9 @@ enum NotificationActionResult {
 
   /// A timed mute was written and the notification cleared.
   muted,
+
+  /// Reply reminders for the chat's current message were stopped.
+  remindersStopped,
 
   /// A tap, an action id from a newer build, or an empty reply. Nothing was
   /// attempted and nothing is wrong.
@@ -83,15 +91,18 @@ class NotificationActionHandler {
     required ChatRepository repository,
     required ChatMuteWriter muteChat,
     required NotificationDismisser dismiss,
+    ReplyReminderStopper? stopReplyReminder,
     Duration muteDuration = kMuteForAnHour,
   }) : _repository = repository,
        _muteChat = muteChat,
        _dismiss = dismiss,
+       _stopReplyReminder = stopReplyReminder,
        _muteDuration = muteDuration;
 
   final ChatRepository _repository;
   final ChatMuteWriter _muteChat;
   final NotificationDismisser _dismiss;
+  final ReplyReminderStopper? _stopReplyReminder;
   final Duration _muteDuration;
 
   /// Handles one activation, or declines to.
@@ -131,6 +142,8 @@ class NotificationActionHandler {
         return _markRead(chatId);
       case WeftNotificationActions.muteForAnHour:
         return _mute(chatId);
+      case WeftNotificationActions.stopReplyReminder:
+        return _stopReminders(chatId, activation.payload.eventId);
       default:
         // An action id this build does not know. Ignored rather than guessed
         // at: an iOS category registered by a *newer* build survives on
@@ -214,6 +227,23 @@ class NotificationActionHandler {
     }
     await _dismissQuietly(chatId);
     return NotificationActionResult.muted;
+  }
+
+  /// "Stop reminding" on a reply reminder. The service cancels the reminder
+  /// itself, delivered one included, so there is nothing to dismiss here.
+  Future<NotificationActionResult> _stopReminders(
+    String chatId,
+    String eventId,
+  ) async {
+    final stop = _stopReplyReminder;
+    if (stop == null) return NotificationActionResult.ignored;
+    try {
+      await stop(chatId, eventId: eventId);
+    } on Object catch (error) {
+      debugPrint('weft: reply reminders for $chatId could not stop: $error');
+      return NotificationActionResult.failed;
+    }
+    return NotificationActionResult.remindersStopped;
   }
 
   Future<void> _markReadQuietly(String chatId) async {

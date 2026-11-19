@@ -15,10 +15,12 @@ import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
+import '../../app/reply_reminder_providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../../services/notifications/push_registration.dart';
 import '../../services/notifications/unified_push.dart';
+import 'reply_reminders_screen.dart';
 import 'settings_section.dart';
 
 /// What the policy says about one network, as a single choice rather than two
@@ -274,6 +276,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               const _SmartRepliesTile(),
+              const _ReplyRemindersTile(),
 
               const Divider(height: WeftSpace.xl),
               SettingsSectionHeader(
@@ -587,6 +590,29 @@ class _MutedChats extends ConsumerWidget {
         debugPrint('weft: could not unmute $chatId on the server: $error');
       }
     }
+  }
+}
+
+/// The way into reply reminders, saying whether they are on.
+class _ReplyRemindersTile extends ConsumerWidget {
+  const _ReplyRemindersTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(replyReminderSettingsProvider);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(context.l10n.replyRemindersTitle),
+      subtitle: Text(
+        settings.enabled
+            ? replyReminderIntervalLabel(context, settings.interval)
+            : context.l10n.replyRemindersRowSubtitleOff,
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const ReplyRemindersScreen()),
+      ),
+    );
   }
 }
 

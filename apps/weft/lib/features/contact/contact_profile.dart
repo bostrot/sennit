@@ -6,6 +6,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../app/labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
+import '../../app/reply_reminder_providers.dart';
 import '../../app/retention_providers.dart';
 import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
@@ -53,6 +54,7 @@ class ContactProfileScreen extends ConsumerWidget {
     };
     ref.watch(chatLabelsProvider);
     final labels = ref.watch(chatLabelsProvider.notifier).ofChat(chat.id);
+    final reminders = ref.watch(replyReminderSettingsProvider);
 
     return Scaffold(
       appBar: WeftAppBar(title: Text(context.l10n.contactTitle)),
@@ -214,6 +216,18 @@ class ContactProfileScreen extends ConsumerWidget {
               value: chat.muted,
               onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
             ),
+            // Only while reminders are on: a switch for a feature that is off
+            // would be a switch that does nothing.
+            if (reminders.enabled)
+              SwitchListTile(
+                secondary: const Icon(Icons.notifications_paused_outlined),
+                title: Text(context.l10n.replyRemindersTitle),
+                subtitle: Text(context.l10n.contactReplyRemindersSubtitle),
+                value: !reminders.isExcluded(chat.id),
+                onChanged: (on) => ref
+                    .read(replyReminderSettingsProvider.notifier)
+                    .setChatExcluded(chat.id, excluded: !on),
+              ),
             SwitchListTile(
               secondary: const Icon(Icons.archive_outlined),
               title: Text(context.l10n.inboxArchive),
