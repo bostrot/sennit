@@ -728,6 +728,7 @@ composer had no reachable second line.
 | Previous conversation | `Alt+↑`, `Ctrl/Cmd+PageUp` | app-wide |
 | Search all conversations | `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | app-wide |
 | Write a message | `Ctrl/Cmd+Shift+M` | app-wide |
+| Jump to latest | `Cmd+↓` (Mac), `Ctrl+End` (Windows, Linux) | app-wide; stands aside while a focused text field's caret is not yet at its end |
 | Keyboard shortcuts | `Ctrl/Cmd+/` | app-wide |
 | Send | `Enter` | the composer |
 | New line | `Shift+Enter` | the composer |

@@ -311,6 +311,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// provider through a dead `BuildContext` throws.
   late final ComposerHandle _composerHandle;
 
+  /// Held for the same reason, for the jump-to-latest shortcut.
+  late final LatestMessageHandle _latestHandle;
+
   /// Held for the same reason as [_composerHandle]: [dispose] has to say this
   /// conversation is no longer on screen, and cannot read a provider to do it.
   late final OpenChats _openChats;
@@ -335,6 +338,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _openChats = ref.read(openChatsProvider);
     _composerHandle = ref.read(composerHandleProvider)
       ..register(this, _composerFocus);
+    _latestHandle = ref.read(latestMessageHandleProvider);
+    // A preview is a peek over a conversation that is still open underneath;
+    // the key belongs to that one.
+    if (!widget.preview) {
+      _latestHandle.register(
+        this,
+        isAway: () => _awayFromLatest.value,
+        jump: _jumpToLatest,
+      );
+    }
     // Every sync re-emits the chat list, which makes it the heartbeat this
     // view needs: until now nothing refreshed [_view] when the *other side*
     // did something, so an incoming message — a bridge bot answering a
@@ -488,6 +501,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // so an unconditional release here would clear the registration the
     // incoming screen has already made.
     _composerHandle.release(this);
+    _latestHandle.release(this);
     _reportOnScreen(null);
     // A conversation left before it arrived.
     _stopWaitingForChat();
@@ -499,6 +513,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _searchQuery.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _jumpToLatest() {
+    if (!mounted) return;
+    unawaited(scrollToLatest(_scroll, duration: context.motion.normal));
   }
 
   void _onScrolled() {
@@ -2050,12 +2069,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                       // out at the edge of the glass.
                       overlay: JumpToLatestButton(
                         visible: _awayFromLatest,
-                        onPressed: () => unawaited(
-                          scrollToLatest(
-                            _scroll,
-                            duration: context.motion.normal,
-                          ),
-                        ),
+                        onPressed: _jumpToLatest,
                       ),
                       child: _selectableMessages(
                         ListView.builder(
