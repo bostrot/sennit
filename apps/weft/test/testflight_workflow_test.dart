@@ -69,8 +69,19 @@ void main() {
   });
 
   test('it runs on a hosted Mac', () {
-    expect(workflow, contains('    runs-on: macos-15\n'));
+    expect(workflow, contains('    runs-on: macos-26\n'));
     expect(workflow, isNot(contains('TESTFLIGHT_RUNS_ON')));
+  });
+
+  test('it archives with Xcode 26, or not at all', () {
+    // App Store Connect refuses an upload built with an SDK older than iOS
+    // 26, and does so only after the whole archive: build 342 was the proof.
+    final select = workflow.indexOf('      - name: Select Xcode 26');
+    expect(select, isNot(-1));
+    expect(select, lessThan(workflow.indexOf('      - name: Archive')));
+    expect(workflow, contains("-name 'Xcode_26*.app'"));
+    expect(workflow, contains('sudo xcode-select -s'));
+    expect(workflow, contains(r'if [ "${sdk%%.*}" -lt 26 ]; then'));
   });
 
   test('the key does not outlive the job', () {
