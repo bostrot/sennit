@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_store/weft_store.dart';
 
+import '../features/whats_new/whats_new.dart' show recordLaunchVersion;
+import '../services/backup/backup_service.dart' show kSennitVersion;
 import 'session_providers.dart';
 
 /// Every store, opened once at startup.
@@ -182,6 +184,9 @@ final storesBootstrapProvider = FutureProvider<WeftStores>((ref) async {
     directoryOverride: kDemoMode ? ':memory:' : null,
   );
   ref.onDispose(stores.dispose);
+  // Before anything is drawn, so a fresh install has recorded its version
+  // by the time it reaches the inbox; see [recordLaunchVersion].
+  if (!kDemoMode) recordLaunchVersion(stores.settings, kSennitVersion);
   return stores;
 });
 

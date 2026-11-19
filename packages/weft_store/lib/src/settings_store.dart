@@ -190,6 +190,14 @@ abstract final class WeftSettings {
   /// not owe it a second time.
   static const String walkthroughDone = 'onboarding.walkthrough_done';
 
+  /// The app version this install last started as, e.g. `1.0.12`. Written on
+  /// every start; a stored version older than the running one is an update.
+  static const String whatsNewLastVersion = 'whats_new.last_version';
+
+  /// The version whose release notes are owed: set on the start that found
+  /// an update, cleared the moment the notes are shown, so they show once.
+  static const String whatsNewPendingVersion = 'whats_new.pending_version';
+
   /// Whether people are named from the device address book when a phone
   /// number matches, instead of whatever the network calls them. Off by
   /// default: reading contacts is a permission the user grants knowingly.

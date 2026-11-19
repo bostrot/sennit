@@ -4710,6 +4710,29 @@
   "@matrixInfoLinkBridges": {
     "description": "Link to matrix.org/ecosystem/bridges."
   },
+  "whatsNewTitle": "What''s new in Sennit {version}",
+  "@whatsNewTitle": {
+    "description": "Title of the sheet shown once after the app updates, listing that version's release notes. {version} is a version number like 1.0.12. 'Sennit' is the app name and is never translated.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.12"
+      }
+    }
+  },
+  "whatsNewIntro": "Sennit just updated. Here is what changed.",
+  "@whatsNewIntro": {
+    "description": "One line under the title of the \"What's new\" sheet, before the release notes themselves (which are in English)."
+  },
+  "whatsNewDismiss": "Got it",
+  "@whatsNewDismiss": {
+    "description": "Primary button that closes the \"What's new\" sheet. Button — keep short.",
+    "maxLength": 25
+  },
+  "whatsNewAllChanges": "All changes on GitHub",
+  "@whatsNewAllChanges": {
+    "description": "Text button in the \"What's new\" sheet that opens the full release on GitHub in the browser. 'GitHub' is a name and is never translated."
+  },
   "brandTagline": "Every conversation, one thread.",
   "@brandTagline": {
     "description": "The app's one-line promise under its name on the sign-in screen. Every messenger stitched into a single thread. Keep it short and slogan-like, under ~36 chars."

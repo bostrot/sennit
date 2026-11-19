@@ -147,6 +147,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # This version's release notes, for the "What's new" sheet. CI writes it
+    # before every store and release build (tooling/scripts/release_notes.py);
+    # the committed copy is empty, which shows nothing.
+    - assets/release_notes.json
   # Turns on `flutter gen-l10n` as part of `flutter pub get` and every build, so
   # `lib/l10n/gen/app_l10n.dart` exists without anyone having to remember to
   # regenerate it. Configured by `l10n.yaml` next to this file; the output is

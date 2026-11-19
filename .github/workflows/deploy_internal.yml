@@ -182,6 +182,17 @@ jobs:
         run: flutter pub get
         working-directory: apps/weft
 
+      - name: Write the release notes
+        if: steps.check_version.outputs.changed == 'true'
+        # The same text the GitHub release and App Store Connect get, from
+        # the same commit — see tooling/scripts/release_notes.py. Play's
+        # "What's new" takes 500 characters; the app bundles the rest.
+        run: |
+          version=$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)\+.*/\1/p' apps/weft/pubspec.yaml)
+          python3 tooling/scripts/release_notes.py "$version" \
+            --play-dir "$RUNNER_TEMP/whatsnew" \
+            --app-asset apps/weft/assets/release_notes.json
+
       - name: Record the build details
         if: steps.check_version.outputs.changed == 'true'
         # Commit, branch and build time for Settings → About, so a tester can
@@ -224,6 +235,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.bostrot.weft
           releaseFiles: apps/weft/build/app/outputs/bundle/release/app-release.aab
+          whatsNewDirectory: ${{ runner.temp }}/whatsnew
           track: internal
           # `completed` hands the build to internal testers straight away.
           # Play only refuses it while the app has never been published on

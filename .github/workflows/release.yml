@@ -5,6 +5,12 @@ name: Release
 # The tag drives everything below; pubspec.yaml stays the single source of
 # truth and the verify job refuses a tag that doesn't match it.
 #
+# The release notes come from tooling/scripts/release_notes.py — the
+# committed docs/release-notes/<version>.md, or the history since the last
+# release commit — the same text deploy_internal.yml gives Play and
+# deploy_testflight.yml gives App Store Connect, worked out from the same
+# commit. Nothing here has to run before those, or after.
+#
 # workflow_dispatch builds all platforms without publishing — a dry run.
 
 on:
@@ -31,12 +37,15 @@ env:
 
 jobs:
   verify:
-    # It only reads pubspec.yaml.
+    # It only reads the checkout: pubspec.yaml, and the release notes.
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The notes fall back to the history since the last release commit.
+          fetch-depth: 0
       - name: Read the version from pubspec.yaml
         id: version
         run: |
@@ -52,6 +61,16 @@ jobs:
             echo "tag v$TAG != pubspec ${{ steps.version.outputs.version }} — run tooling/scripts/release.sh" >&2
             exit 1
           }
+      - name: Write the release notes
+        # github.md is the release body; release_notes.json is what every
+        # build below bundles for the app's "What's new" sheet.
+        run: |
+          python3 tooling/scripts/release_notes.py "${{ steps.version.outputs.version }}" \
+            --github notes/github.md --app-asset notes/release_notes.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes/*
 
   android:
     needs: verify
@@ -136,6 +155,11 @@ jobs:
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - run: flutter build apk --release ${{ env.DIRECT_DEFINES }}
@@ -169,6 +193,11 @@ jobs:
       - uses: ./.github/actions/setup-flutter
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - run: flutter build linux --release ${{ env.DIRECT_DEFINES }}
@@ -200,6 +229,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - run: flutter build windows --release ${{ env.DIRECT_DEFINES }}
@@ -229,6 +263,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - name: Build (signing deferred)
@@ -342,6 +381,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - name: Import the distribution certificate and profile
@@ -405,11 +449,15 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - run: ls -la dist/
+      - name: Take the release notes out of the files
+        run: |
+          mv dist/github.md "$RUNNER_TEMP/release-notes.md"
+          rm dist/release_notes.json
+          ls -la dist/
       - name: Publish the GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: Sennit ${{ needs.verify.outputs.version }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
           files: dist/*

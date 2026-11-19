@@ -8,6 +8,7 @@ import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../inbox/inbox_shell.dart';
+import '../whats_new/whats_new.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
 import 'verification_screen.dart';
@@ -123,7 +124,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         key: const ValueKey('walkthrough'),
         onDone: _finishWalkthrough,
       ),
-      _ => const InboxShell(key: ValueKey('inbox')),
+      _ => const WhatsNewGate(key: ValueKey('inbox'), child: InboxShell()),
     };
   }
 }

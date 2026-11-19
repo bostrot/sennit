@@ -25,6 +25,11 @@ if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
   exit 1
 fi
 
+# The notes the stores, the GitHub release and the app's "What's new" get —
+# see tooling/scripts/release_notes.py. Without them they get the history.
+[ -f "$REPO/docs/release-notes/$VERSION.md" ] ||
+  echo "warning: no docs/release-notes/$VERSION.md — the release notes will list commit titles" >&2
+
 # +1 for the release commit this script is about to make.
 BUILD=$(( $(git -C "$REPO" rev-list --count HEAD) + 1 ))
 

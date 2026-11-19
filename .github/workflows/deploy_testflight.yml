@@ -105,6 +105,17 @@ jobs:
           key: ios-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
           restore-keys: ios-${{ runner.arch }}-
 
+      - name: Write the release notes
+        # The same text the GitHub release and Play get, from the same commit
+        # — see tooling/scripts/release_notes.py. The app bundles it; App
+        # Store Connect gets it once the upload is in.
+        run: |
+          version=$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)\+.*/\1/p' apps/weft/pubspec.yaml)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          python3 tooling/scripts/release_notes.py "$version" \
+            --store "$RUNNER_TEMP/store_notes.txt" \
+            --app-asset apps/weft/assets/release_notes.json
+
       - name: Configure the build
         # The commit count, as on Play: one number for the same commit on
         # both stores, rising with every commit and needing no bump. The
@@ -219,3 +230,17 @@ jobs:
         run: |
           rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/ExportOptions.plist"
           [ -z "${KEYCHAIN:-}" ] || security delete-keychain "$KEYCHAIN" || true
+
+      - name: Set "What to Test" and "What's New"
+        # After the upload, and after the certificate is gone: App Store
+        # Connect only lists a build a few minutes after it arrives, and this
+        # waits for it. "What's New" lands on the App Store version of the
+        # same number when one is open for editing; see the script.
+        if: ${{ !inputs.dry_run }}
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+        run: |
+          python3 tooling/store/build_notes.py "$VERSION" \
+            "$(git rev-list --count HEAD)" "$RUNNER_TEMP/store_notes.txt"

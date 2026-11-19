@@ -3,6 +3,8 @@
 ## Cutting a release
 
 ```bash
+$EDITOR docs/release-notes/1.2.0.md      # the release notes; see below
+git commit -am "Write the 1.2.0 release notes"
 tooling/scripts/release.sh 1.2.0
 git push && git push origin v1.2.0
 ```
@@ -16,8 +18,8 @@ commits, and tags `v1.2.0`. The pushed tag triggers the
 2. builds Android (APK + AAB), Linux (tar.gz), Windows (zip), macOS (zip,
    signed and notarized when secrets are configured) and iOS (IPA — signed
    with secrets, sideloadable-unsigned without),
-3. publishes a GitHub release with **auto-generated release notes** from the
-   commits since the previous tag, with all six artifacts attached.
+3. publishes a GitHub release whose body is the [release notes](#release-notes),
+   with all six artifacts attached.
 
 The Play Store upload is a separate workflow, `deploy_internal.yml` — see
 [Google Play](#google-play) below.
@@ -28,6 +30,40 @@ builds, nothing is published.
 `pubspec.yaml` stays the single source of truth for the version. The build
 number after the `+` is the commit count, so Android's `versionCode` and
 iOS's `CFBundleVersion` rise monotonically on their own.
+
+## Release notes
+
+One text per version reaches four places: the GitHub release body, Play's
+"What's new" on the internal track, TestFlight's "What to Test" (and the App
+Store "What's New" when that version is open for editing), and the sheet the
+app shows once after it updates. All four come from
+`tooling/scripts/release_notes.py <version>`, which reads:
+
+1. `docs/release-notes/<version>.md` when it exists — write one for every
+   release, for people who use the app, as a short Markdown list;
+2. otherwise the first-parent history of `main` since the previous
+   `Release x.y.z` commit: pull request titles, and the subjects of commits
+   pushed directly. It works without tags and without pull requests, and it
+   reads like a changelog for developers — the fallback, not the plan.
+
+Each workflow runs the script on the commit it builds, so the text is the
+same everywhere and no workflow waits for another:
+
+| Workflow | Writes |
+|---|---|
+| `release.yml` (tag `v*`) | the release body (`--github`); the app asset, into every platform build |
+| `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-en-US`, cut to 500 characters at a whole line; the app asset |
+| `deploy_testflight.yml` (version bump on `main`) | the app asset; after the upload, "What to Test" and "What's New" through `tooling/store/build_notes.py` |
+
+The app asset is `apps/weft/assets/release_notes.json`. The committed copy is
+empty, so a local build or a fork shows no sheet; CI overwrites it before
+building and never commits it. The app reads it from the bundle and makes no
+request for it.
+
+Pushing `main` and pushing the tag can happen in either order: the stores get
+their notes from the `main` push, the GitHub release from the tag push, and
+both from the same file in the same commit. `deploy_prebuilt.yml` uploads a
+bundle built elsewhere and sets no notes.
 
 ## Signing secrets
 
