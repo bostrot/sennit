@@ -323,18 +323,17 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // on this client, rather than on a second one opened beside it.
     NotificationActionServer.serve(actions.handle);
     // Siri and CarPlay: "Read my messages", dictated replies, "mark as read".
-    // iOS only delivers these intents once the Siri entitlement is signed in;
-    // until then the channel is served and simply never called.
-    if (NotificationPlatform.isIOS) {
-      unawaited(
-        SiriMessaging(
-          repository: ref.read(chatRepositoryProvider),
-          chats: () => ref.read(chatsProvider).value ?? const [],
-          policy: () => ref.read(notificationPolicyProvider),
-          words: () => weftNotifyStringsFrom(weftPlatformL10n()),
-        ).start(),
-      );
-    }
+    // iOS delivers these intents only once the user has allowed Siri for
+    // Sennit, which is asked for below, after the notification prompt.
+    final siri = NotificationPlatform.isIOS
+        ? SiriMessaging(
+            repository: ref.read(chatRepositoryProvider),
+            chats: () => ref.read(chatsProvider).value ?? const [],
+            policy: () => ref.read(notificationPolicyProvider),
+            words: () => weftNotifyStringsFrom(weftPlatformL10n()),
+          )
+        : null;
+    if (siri != null) unawaited(siri.start());
     // Opening a conversation has to clear its row in the shade, and the screen
     // that shows the messages cannot reach the service without building the
     // whole notification stack. Handing it the one function it needs keeps
@@ -354,6 +353,10 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     ref.read(todoAgentProvider)?.start();
 
     await _ensureNotificationPermission();
+    // Siri's own prompt, once: after sign-in and after the notification
+    // question has been settled, so the two system sheets never stack and
+    // a first launch is never met with a request about cars.
+    if (siri != null) unawaited(siri.requestAuthorizationIfUndecided());
     // Registration and rule reconciliation both need permission to have been
     // settled first: on iOS the APNs token does not exist until the user has
     // said yes, so registering before the prompt reliably yields `noToken`.

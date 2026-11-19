@@ -55,6 +55,31 @@ class SiriMessaging {
     }
   }
 
+  /// Siri's permission for Sennit: `authorized`, `denied`, `restricted` or
+  /// `notDetermined`. Null where there is no Siri channel.
+  Future<String?> authorizationStatus() => _ask('authorizationStatus');
+
+  /// Asks for Siri, once. The system prompt only appears while the answer is
+  /// still `notDetermined`; Sennit calls this after sign-in, never on first
+  /// launch, so the prompt arrives when the user knows what it is for. Until
+  /// the user allows it, iOS routes no messaging intent to the app, in the
+  /// car or anywhere else.
+  Future<String?> requestAuthorizationIfUndecided() async {
+    if (await authorizationStatus() != 'notDetermined') return null;
+    return _ask('requestAuthorization');
+  }
+
+  Future<String?> _ask(String method) async {
+    try {
+      return await _channel.invokeMethod<String>(method);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException catch (error) {
+      debugPrint('weft: Siri $method failed: $error');
+      return null;
+    }
+  }
+
   @visibleForTesting
   Future<Object?> handle(MethodCall call) async {
     final args = call.arguments is Map

@@ -68,7 +68,7 @@ App Quality terms; the review is against the messaging notification
 guidelines above. Until Google accepts it, the car shows a Play build only
 with *Unknown sources* enabled in Android Auto's developer settings.
 
-## CarPlay and Siri: code ready, entitlements needed
+## CarPlay and Siri: entitled since 2026-11-19
 
 CarPlay messaging is SiriKit plus notifications. Sennit handles the three
 intents CarPlay requires in the app (no Intents extension, for the same
@@ -92,38 +92,50 @@ and Mark read on a notification did nothing before (the plugin's background
 engine had no plugin registrant and no Dart handler). `AppDelegate` now
 registers one and the actions go through the same relay as on Android.
 
-### What only the account holder can do
+### Entitlements and signing
 
-Nothing above is active until the build is signed with these entitlements.
-They are **not** in `Runner.entitlements` on purpose: the TestFlight workflow
-signs automatically with an API key, and an entitlement the App ID does not
-have — `carplay-communication` cannot be enabled without Apple's approval —
-fails the archive and would block the release.
+Apple assigned the CarPlay Communication entitlement to the team on
+2026-11-19. Siri and CarPlay are enabled on the `com.bostrot.weft` App ID, and
+`apps/weft/ios/Runner/Runner.entitlements` (used by Debug, Release and
+Profile) carries:
 
-1. **Request the CarPlay entitlement.** <https://developer.apple.com/contact/carplay/>
-   (Certificates, Identifiers & Profiles → *Request CarPlay entitlement*),
-   category **Communication / messaging**, for `com.bostrot.weft`. Apple
-   replies by email; it can take weeks.
-2. **Enable Siri** on the `com.bostrot.weft` App ID (Identifiers → App ID →
-   Capabilities → Siri), and **Communication Notifications** if wanted.
-3. Once granted, add to `apps/weft/ios/Runner/Runner.entitlements`:
+```xml
+<key>com.apple.developer.siri</key>
+<true/>
+<key>com.apple.developer.carplay-communication</key>
+<true/>
+```
 
-   ```xml
-   <key>com.apple.developer.siri</key>
-   <true/>
-   <key>com.apple.developer.carplay-communication</key>
-   <true/>
-   <key>com.apple.developer.usernotifications.communication</key>
-   <true/>
-   ```
+The TestFlight workflow signs automatically with the App Store Connect API
+key, so each run regenerates the profiles from the App ID's capabilities. An
+entitlement in the file that the App ID lacks fails the archive; enable it on
+the App ID first. `car_integrations_test.dart` holds the file to both keys.
 
-   and let the next TestFlight run regenerate the profile.
-4. Ask for Siri authorisation once, after notifications are allowed
-   (`INPreferences.requestSiriAuthorization`). It is not called today
-   because calling it without the Siri entitlement raises an exception.
-5. Test in Xcode's simulator with **I/O → External Displays → CarPlay**, or
-   on a device: "Hey Siri, read my messages", "Reply …", and a message sent
-   with "Send a message to <name> on Sennit".
+**Siri permission.** iOS routes no messaging intent to an app until the user
+allows Siri for it. Sennit asks once, through `INPreferences.requestSiriAuthorization`
+on the `com.bostrot.weft/siri` channel (`requestAuthorization`,
+`authorizationStatus`). It asks after sign-in and after the notification
+question is settled, and only while the answer is still undetermined, never on
+first launch. Someone who said no can change it in Settings → Apps → Sennit →
+Siri.
+
+**No CarPlay scene.** A messaging app appears in CarPlay through SiriKit and
+notifications. Apple's CarPlay Developer Guide requires text-messaging apps to
+support sending messages, searching for messages and setting message
+attributes (the three intents above), and a notification category with the
+CarPlay option (`allowInCarPlay`). The CarPlay framework's templates, and the
+`CPTemplateApplicationSceneSessionRoleApplication` scene they need, are
+optional for communication apps, so Sennit declares none. Sources: the
+[CarPlay Developer Guide](https://developer.apple.com/download/files/CarPlay-Developer-Guide.pdf)
+and [Accelerate your app with CarPlay (WWDC20)](https://developer.apple.com/videos/play/wwdc2020/10635/).
+
+### Testing it
+
+In Xcode's simulator use **I/O → External Displays → CarPlay**, or a car or
+CarPlay head unit with a TestFlight build: allow Siri for Sennit when asked,
+then "Hey Siri, read my messages", "Reply …", "Send a message to <name> on
+Sennit" and "Mark them as read". A message notification should show in
+CarPlay with the sender, and Siri should offer to read it.
 
 ### Not done yet
 
@@ -131,7 +143,8 @@ fails the archive and would block the release.
   announcing messages on AirPods and in CarPlay). They need an
   `INSendMessageIntent` with the sender's `INPerson` applied to the
   notification content when it is posted (`content.updating(from:)`), and the
-  entitlement in step 3. `flutter_local_notifications` cannot do that, and the
+  Communication Notifications capability on the App ID and in the
+  entitlements. `flutter_local_notifications` cannot do that, and the
   notification service extension only sees the room and event id, not the
   decrypted sender, so this needs a native posting path or extension
   decryption first.

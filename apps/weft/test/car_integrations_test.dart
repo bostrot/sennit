@@ -56,6 +56,44 @@ void main() {
     });
   });
 
+  group('CarPlay and Siri signing', () {
+    test('the app is signed with the Siri and CarPlay entitlements', () {
+      final entitlements = File(
+        'ios/Runner/Runner.entitlements',
+      ).readAsStringSync();
+      for (final key in const [
+        'com.apple.developer.siri',
+        'com.apple.developer.carplay-communication',
+      ]) {
+        expect(
+          entitlements,
+          matches(RegExp('<key>${RegExp.escape(key)}</key>\\s*<true/>')),
+          reason: key,
+        );
+      }
+    });
+
+    test('every Runner configuration uses that entitlements file', () {
+      final project = File(
+        'ios/Runner.xcodeproj/project.pbxproj',
+      ).readAsStringSync();
+      expect(
+        RegExp(
+          'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;',
+        ).allMatches(project),
+        hasLength(3),
+      );
+    });
+
+    test('a messaging app declares no CarPlay template scene', () {
+      // CarPlay reaches a messaging app through SiriKit and notifications;
+      // a template scene would be a second, unreviewed UI in the car.
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(plist, isNot(contains('CPTemplateApplicationScene')));
+      expect(plist, contains('<key>INIntentsSupported</key>'));
+    });
+  });
+
   group('the headless action relay', () {
     const name = 'weft.test.notification_actions';
     NotificationActionServer? server;
@@ -258,6 +296,37 @@ void main() {
       expect(sent, isTrue);
       expect(repository.sent, [('merged:anna', 'hi')]);
       expect(repository.markedRead, ['merged:anna']);
+    });
+
+    test('Siri is asked for only while the answer is undecided', () async {
+      const channel = MethodChannel('weft.test.siri');
+      final calls = <String>[];
+      var status = 'notDetermined';
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call.method);
+            if (call.method == 'requestAuthorization') status = 'authorized';
+            return status;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+      final siri = SiriMessaging(
+        repository: _Repository(),
+        chats: () => const [],
+        policy: () => policy,
+        words: () => WeftNotifyStrings.english,
+        channel: channel,
+      );
+
+      expect(await siri.requestAuthorizationIfUndecided(), 'authorized');
+      expect(await siri.requestAuthorizationIfUndecided(), isNull);
+      expect(calls, [
+        'authorizationStatus',
+        'requestAuthorization',
+        'authorizationStatus',
+      ]);
     });
 
     test('an empty dictation sends nothing', () async {

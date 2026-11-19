@@ -55,11 +55,11 @@
 	<!-- Siri and CarPlay messaging: "Read my messages", dictated replies and
 	     "mark as read", handled in the app (AppDelegate, SiriIntents.swift).
 	     The usage description is what the Siri permission prompt shows; the
-	     intents list is what tells iOS which intents to route here. Neither
-	     does anything until the build is signed with the Siri entitlement —
-	     see docs/car-integrations.md. INSendMessageIntent in
-	     NSUserActivityTypes is what a communication notification needs once
-	     that entitlement is added. -->
+	     intents list is what tells iOS which intents to route here, once the
+	     user has allowed Siri (Runner.entitlements carries the Siri and
+	     CarPlay entitlements; see docs/car-integrations.md).
+	     INSendMessageIntent in NSUserActivityTypes is what a communication
+	     notification will need. -->
 	<key>NSSiriUsageDescription</key>
 	<string>Siri can read your new messages aloud and send the replies you dictate, on your phone and in CarPlay. With message previews turned off, Siri reads only who wrote.</string>
 	<key>INIntentsSupported</key>

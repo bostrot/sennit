@@ -12,12 +12,11 @@ import Intents
 /// to answer, and the answer comes from Dart over `com.bostrot.weft/siri` —
 /// see `lib/services/siri/siri_messaging.dart`.
 ///
-/// **Dormant until signed with the Siri entitlement.** iOS only routes these
-/// intents to an app whose signature carries `com.apple.developer.siri`, and
-/// CarPlay only shows a messaging app that also carries
-/// `com.apple.developer.carplay-communication`, which Apple grants on request.
-/// Neither is in `Runner.entitlements` yet — see docs/car-integrations.md —
-/// so in today's builds nothing here is ever called.
+/// Signed with `com.apple.developer.siri` and
+/// `com.apple.developer.carplay-communication` (granted 2026-11-19), in
+/// `Runner.entitlements`. Siri still only routes intents here once the user has
+/// allowed it: Dart asks for that through `requestAuthorization` once, after
+/// sign-in, never on first launch.
 final class WeftSiriChannel {
   static let shared = WeftSiriChannel()
 
@@ -36,9 +35,27 @@ final class WeftSiriChannel {
       case "ready":
         shared.markReady()
         result(nil)
+      case "authorizationStatus":
+        result(Self.name(of: INPreferences.siriAuthorizationStatus()))
+      case "requestAuthorization":
+        // Shows the system prompt only while the status is undetermined;
+        // otherwise iOS answers at once with what the user already chose.
+        INPreferences.requestSiriAuthorization { status in
+          DispatchQueue.main.async { result(Self.name(of: status)) }
+        }
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  private static func name(of status: INSiriAuthorizationStatus) -> String {
+    switch status {
+    case .authorized: return "authorized"
+    case .denied: return "denied"
+    case .restricted: return "restricted"
+    case .notDetermined: return "notDetermined"
+    @unknown default: return "notDetermined"
     }
   }
 

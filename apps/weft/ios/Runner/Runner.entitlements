@@ -15,6 +15,16 @@
 
 	     See docs/decisions/adr-002-ios-signing-handoff.md for what has to happen
 	     on the developer portal before a signed build will accept this. -->
+	<!-- SiriKit messaging and CarPlay. CarPlay shows a messaging app, reads
+	     its notifications and offers its Siri intents only when the app is
+	     signed with both; Apple assigned the CarPlay Communication entitlement
+	     to the team on 2026-11-19, and both capabilities are enabled on the
+	     com.bostrot.weft App ID, so automatic signing puts them in the
+	     profile. See docs/car-integrations.md. -->
+	<key>com.apple.developer.siri</key>
+	<true/>
+	<key>com.apple.developer.carplay-communication</key>
+	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.bostrot.weft</string>
