@@ -65,6 +65,11 @@ class FocusSearchIntent extends Intent {
   const FocusSearchIntent();
 }
 
+/// Scroll the open conversation back down to its newest message.
+class JumpToLatestIntent extends Intent {
+  const JumpToLatestIntent();
+}
+
 /// Show the list of every binding in this file.
 class ShowShortcutsIntent extends Intent {
   const ShowShortcutsIntent();
@@ -158,6 +163,20 @@ List<WeftKeyBinding> weftKeyBindings(AppL10n l10n, {bool? useMetaKey}) {
       description: l10n.shortcutWriteMessage,
       activators: [primary(LogicalKeyboardKey.keyM, shift: true)],
       intent: const FocusComposerIntent(),
+    ),
+    // The chat's jump-to-latest button, from the keyboard. ⌘↓ on a Mac and
+    // Ctrl+End elsewhere, because those are what "to the end" already means
+    // there — and in a text field too, which is why the action stands aside
+    // until the caret has nowhere further down to go.
+    WeftKeyBinding(
+      description: l10n.chatJumpToLatest,
+      activators: [
+        if (meta)
+          const SingleActivator(LogicalKeyboardKey.arrowDown, meta: true)
+        else
+          const SingleActivator(LogicalKeyboardKey.end, control: true),
+      ],
+      intent: const JumpToLatestIntent(),
     ),
     WeftKeyBinding(
       description: l10n.shortcutsTitle,
@@ -377,6 +396,73 @@ final composerHandleProvider = Provider<ComposerHandle>(
   (ref) => ComposerHandle(),
 );
 
+/// The open conversation's way back to its newest message, for the shortcut
+/// that takes it.
+///
+/// A registry for the same reason as [ComposerHandle]: on a two-pane window
+/// the focus can be in the inbox, a sibling of the conversation, and the key
+/// should still bring the conversation on screen back down.
+class LatestMessageHandle {
+  Object? _owner;
+  bool Function()? _isAway;
+  VoidCallback? _jump;
+
+  /// Claims the handle for [owner]. [isAway] says whether there is anywhere
+  /// to jump to; [jump] goes there.
+  void register(
+    Object owner, {
+    required bool Function() isAway,
+    required VoidCallback jump,
+  }) {
+    _owner = owner;
+    _isAway = isAway;
+    _jump = jump;
+  }
+
+  /// Releases it, if [owner] still holds it — see [ComposerHandle.release].
+  void release(Object owner) {
+    if (identical(_owner, owner)) {
+      _owner = null;
+      _isAway = null;
+      _jump = null;
+    }
+  }
+
+  /// True only while a conversation is open *and* scrolled away from its
+  /// newest message — the same moment its button is on screen.
+  bool get isAvailable => _isAway?.call() ?? false;
+
+  /// Scrolls back down. False when there was nowhere to go.
+  bool jump() {
+    final jump = _jump;
+    if (jump == null || !isAvailable) return false;
+    jump();
+    return true;
+  }
+}
+
+final latestMessageHandleProvider = Provider<LatestMessageHandle>(
+  (ref) => LatestMessageHandle(),
+);
+
+/// Whether the focused text field still has somewhere for the caret to go
+/// with "to the end" — that is, it is not collapsed at the end of the text.
+///
+/// ⌘↓ and Ctrl+End are the text field's own keys first. Taking them from a
+/// half-written draft would strand the caret mid-sentence; once it is already
+/// at the end (or the field is empty) the key has nothing left to do there, and
+/// carrying on to the end of the conversation is what it reads as.
+bool focusedTextCanMoveToEnd() {
+  final editable = FocusManager.instance.primaryFocus?.context
+      ?.findAncestorStateOfType<EditableTextState>();
+  if (editable == null) return false;
+  final value = editable.textEditingValue;
+  final selection = value.selection;
+  return !(selection.isValid &&
+      selection.isCollapsed &&
+      selection.baseOffset >= value.text.length);
+}
+
 /// An [Action] built from a callback that can also say it is not available.
 ///
 /// [CallbackAction] is always enabled, and always-enabled is the wrong answer
@@ -492,6 +578,12 @@ class _WeftShortcutsState extends ConsumerState<WeftShortcuts> {
             onInvoke: () => ref.read(composerHandleProvider).focus(),
             enabled: () => ref.read(composerHandleProvider).isAvailable,
           ),
+          JumpToLatestIntent: WeftGuardedAction<JumpToLatestIntent>(
+            onInvoke: () => ref.read(latestMessageHandleProvider).jump(),
+            enabled: () =>
+                ref.read(latestMessageHandleProvider).isAvailable &&
+                !focusedTextCanMoveToEnd(),
+          ),
           ShowShortcutsIntent: WeftGuardedAction<ShowShortcutsIntent>(
             onInvoke: _showShortcuts,
           ),
@@ -530,6 +622,7 @@ String _triggerLabel(LogicalKeyboardKey key) {
   if (key == LogicalKeyboardKey.arrowDown) return 'Arrow Down';
   if (key == LogicalKeyboardKey.pageUp) return 'Page Up';
   if (key == LogicalKeyboardKey.pageDown) return 'Page Down';
+  if (key == LogicalKeyboardKey.end) return 'End';
   final label = key.keyLabel;
   return label.isEmpty ? key.debugName ?? '?' : label;
 }

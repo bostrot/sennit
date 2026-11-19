@@ -11,6 +11,8 @@ and what was noticed but not done.
 - 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · https://github.com/bostrot/sennit/pull/4
 - 2026-11-18 · Localization · Reply quotes, link cards, statuses and the message sheet are read out (and the quote drawn) in the app's language; the l10n audit now sees inside `semanticsSentence` · https://github.com/bostrot/sennit/pull/5
 
+- 2026-11-19 · User experience · ⌘↓ (Mac) / Ctrl+End (Windows, Linux) jumps back to the newest message in the open conversation, without taking the key from a half-written draft · PR_LINK
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -26,6 +28,12 @@ and what was noticed but not done.
   fixed by "Keep switching chats light" (`_startAtNewest` in
   `didUpdateWidget`), so it is struck below.
 
+- 2026-11-19 · Still no review comments; #5 merged as opened, nothing
+  closed unmerged. CI moved to GitHub-hosted runners (#7), so the "offline
+  self-hosted runner" drafts of earlier runs should not recur. A fresh
+  worktree has no generated `AppL10n`: run `flutter gen-l10n` in
+  `apps/weft` before the first `flutter test`, or every test fails to load.
+
 ## Ideas backlog
 
 - **Count what arrived while scrolled up.** The jump-to-latest button knows
@@ -35,7 +43,12 @@ and what was noticed but not done.
   `apps/weft/lib/features/chat/chat_view.dart` already see each arrival;
   `jump_to_latest_button.dart` would take a count. Open question: whether an
   own message sent from another device counts.
-- **A key for it on the desktop.** Jump to latest has no shortcut. ⌘↓ is what
+- ~~**A key for it on the desktop.**~~ Done 2026-11-19. Left out: a
+  *Conversation ▸ Jump to Latest* entry in the Mac menu bar. A menu item with
+  ⌘↓ as its key equivalent is handled by AppKit before Flutter sees the key, so
+  it would take ⌘↓ from the composer's "caret to end" even mid-draft. It needs
+  the item shown without a key equivalent, or a way to let AppKit pass it on.
+  Was: Jump to latest has no shortcut. ⌘↓ is what
   other Mac messengers use; it would go through `shortcuts.dart` and
   `shortcuts_sheet.dart` as a `WeftGuardedAction` that reports itself disabled
   at the bottom, per the keyboard rules in `a11y-audit.md`.

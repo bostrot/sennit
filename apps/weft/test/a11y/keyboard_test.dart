@@ -162,6 +162,34 @@ void main() {
     return reached;
   }
 
+  /// The open conversation's message list.
+  ScrollPosition timeline(WidgetTester tester) => tester
+      .state<ScrollableState>(
+        find
+            .descendant(
+              of: find.descendant(
+                of: find.byType(ChatView),
+                matching: find.byType(ListView),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      )
+      .position;
+
+  /// Scrolls the open conversation all the way up into its oldest messages,
+  /// which is where its jump-to-latest button appears.
+  Future<void> scrollToOldest(WidgetTester tester) async {
+    final position = timeline(tester);
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    expect(
+      find.byTooltip('Jump to latest'),
+      findsOneWidget,
+      reason: 'the conversation must be long enough to scroll away from',
+    );
+  }
+
   group('every control is reachable by Tab alone', () {
     /// Asserts that everything on screen when it opens is reached by Tab.
     ///
@@ -332,6 +360,15 @@ void main() {
             'Sennit composer',
           ),
         ),
+        'Jump to latest': (
+          arrange: (tester, container) async {
+            container.read(selectedChatProvider.notifier).select('merged:anna');
+            await tester.pumpAndSettle();
+            await scrollToOldest(tester);
+          },
+          expectFired: (tester, container) =>
+              expect(timeline(tester).pixels, 0),
+        ),
         'Keyboard shortcuts': (
           arrange: (tester, container) async {},
           expectFired: (tester, container) =>
@@ -447,6 +484,98 @@ void main() {
 
       await press(tester, 'Write a message');
       expect(FocusManager.instance.primaryFocus?.debugLabel, 'Sennit composer');
+    });
+  });
+
+  group('jump to latest', () {
+    Future<void> pumpChat(WidgetTester tester) async {
+      await pumpApp(tester, home: const ChatView(chatId: 'merged:anna'));
+      await scrollToOldest(tester);
+    }
+
+    Future<void> pressJump(WidgetTester tester) =>
+        press(tester, 'Jump to latest');
+
+    testWidgets('is a Cmd+↓ on a Mac and a Ctrl+End elsewhere', (tester) async {
+      SingleActivator only(bool meta) => weftKeyBindings(
+        en,
+        useMetaKey: meta,
+      ).firstWhere((b) => b.description == 'Jump to latest').activators.single;
+      expect(
+        only(true),
+        const SingleActivator(LogicalKeyboardKey.arrowDown, meta: true),
+      );
+      expect(
+        only(false),
+        const SingleActivator(LogicalKeyboardKey.end, control: true),
+      );
+    });
+
+    testWidgets('leaves a caret in the middle of a draft alone', (
+      tester,
+    ) async {
+      await pumpChat(tester);
+      final away = timeline(tester).pixels;
+      final field = tester.widget<TextField>(find.byType(TextField));
+      await tester.showKeyboard(find.byType(TextField));
+      field.controller!.value = const TextEditingValue(
+        text: 'half a thought',
+        selection: TextSelection.collapsed(offset: 4),
+      );
+      await tester.pump();
+
+      // The key is the text field's first: "to the end of the draft".
+      await pressJump(tester);
+      expect(timeline(tester).pixels, away);
+    });
+
+    testWidgets('carries on to the newest message from the end of a draft', (
+      tester,
+    ) async {
+      await pumpChat(tester);
+      final field = tester.widget<TextField>(find.byType(TextField));
+      await tester.showKeyboard(find.byType(TextField));
+      field.controller!.value = const TextEditingValue(
+        text: 'half a thought',
+        selection: TextSelection.collapsed(offset: 14),
+      );
+      await tester.pump();
+
+      await pressJump(tester);
+      expect(timeline(tester).pixels, 0);
+      // Still writing: the jump moves the conversation, not the caret.
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'Sennit composer');
+      expect(field.controller!.text, 'half a thought');
+    });
+
+    testWidgets('at the newest message the key is not taken', (tester) async {
+      final container = await pumpApp(
+        tester,
+        home: const ChatView(chatId: 'merged:anna'),
+      );
+      // Disabled rather than silent, so the key carries on to whoever else
+      // wants it — the same rule next/previous conversation follow.
+      expect(container.read(latestMessageHandleProvider).isAvailable, isFalse);
+      await scrollToOldest(tester);
+      expect(container.read(latestMessageHandleProvider).isAvailable, isTrue);
+    });
+
+    test('a conversation closing does not take the handle from the next', () {
+      final handle = LatestMessageHandle();
+      final outgoing = Object();
+      final incoming = Object();
+      var jumped = '';
+      handle
+        ..register(outgoing, isAway: () => true, jump: () => jumped = 'old')
+        ..register(incoming, isAway: () => true, jump: () => jumped = 'new')
+        ..release(outgoing);
+
+      expect(handle.jump(), isTrue);
+      expect(jumped, 'new');
+
+      handle.release(incoming);
+      expect(handle.isAvailable, isFalse);
+      expect(handle.jump(), isFalse);
     });
   });
 
