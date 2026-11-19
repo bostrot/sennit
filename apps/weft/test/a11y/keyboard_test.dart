@@ -177,11 +177,17 @@ void main() {
       )
       .position;
 
-  /// Scrolls the open conversation all the way up into its oldest messages,
-  /// which is where its jump-to-latest button appears.
-  Future<void> scrollToOldest(WidgetTester tester) async {
+  /// Scrolls the open conversation up into its older messages, far enough for
+  /// its jump-to-latest button to appear.
+  ///
+  /// A screen and a half short of the top rather than all the way: within a
+  /// screen of it the chat starts loading older history, which is a different
+  /// test's business and makes the list grow under this one.
+  Future<void> scrollIntoHistory(WidgetTester tester) async {
     final position = timeline(tester);
-    position.jumpTo(position.maxScrollExtent);
+    position.jumpTo(
+      position.maxScrollExtent - position.viewportDimension * 1.5,
+    );
     await tester.pumpAndSettle();
     expect(
       find.byTooltip('Jump to latest'),
@@ -364,7 +370,7 @@ void main() {
           arrange: (tester, container) async {
             container.read(selectedChatProvider.notifier).select('merged:anna');
             await tester.pumpAndSettle();
-            await scrollToOldest(tester);
+            await scrollIntoHistory(tester);
           },
           expectFired: (tester, container) =>
               expect(timeline(tester).pixels, 0),
@@ -490,7 +496,7 @@ void main() {
   group('jump to latest', () {
     Future<void> pumpChat(WidgetTester tester) async {
       await pumpApp(tester, home: const ChatView(chatId: 'merged:anna'));
-      await scrollToOldest(tester);
+      await scrollIntoHistory(tester);
     }
 
     Future<void> pressJump(WidgetTester tester) =>
@@ -556,7 +562,7 @@ void main() {
       // Disabled rather than silent, so the key carries on to whoever else
       // wants it — the same rule next/previous conversation follow.
       expect(container.read(latestMessageHandleProvider).isAvailable, isFalse);
-      await scrollToOldest(tester);
+      await scrollIntoHistory(tester);
       expect(container.read(latestMessageHandleProvider).isAvailable, isTrue);
     });
 
