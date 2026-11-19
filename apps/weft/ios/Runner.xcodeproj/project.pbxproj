@@ -66,6 +66,7 @@
 		C5B1CF050E96626B688BF83A /* Pods_WeftWidget.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 917AE08CCF411E73FB8A1E70 /* Pods_WeftWidget.framework */; };
 		FA04F18D1F5ABAB6BCB7933F /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017597C2A4952B94EC1FFF99 /* Pods_RunnerTests.framework */; };
 		A11710000000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A11710000000000000000001 /* InfoPlist.strings */; };
+		A11810000000000000000002 /* AppIntentVocabulary.plist in Resources */ = {isa = PBXBuildFile; fileRef = A11810000000000000000001 /* AppIntentVocabulary.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -264,6 +265,13 @@
 		A1171000000000000000000C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "fr"; path = "fr.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A1171000000000000000000D /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A1171000000000000000000E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A11810000000000000000010 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Base"; path = "Base.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000011 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "en"; path = "en.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "de"; path = "de.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000013 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "es"; path = "es.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000014 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "fr"; path = "fr.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000015 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "pt-BR"; path = "pt-BR.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000016 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "zh-Hans"; path = "zh-Hans.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -496,6 +504,7 @@
 			isa = PBXGroup;
 			children = (
 				A11710000000000000000001 /* InfoPlist.strings */,
+				A11810000000000000000001 /* AppIntentVocabulary.plist */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -812,6 +821,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A11710000000000000000002 /* InfoPlist.strings in Resources */,
+				A11810000000000000000002 /* AppIntentVocabulary.plist in Resources */,
 				97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
@@ -1200,6 +1210,20 @@
 				A1171000000000000000000E /* zh-Hans */,
 			);
 			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+		A11810000000000000000001 /* AppIntentVocabulary.plist */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A11810000000000000000010 /* Base */,
+				A11810000000000000000011 /* en */,
+				A11810000000000000000012 /* de */,
+				A11810000000000000000013 /* es */,
+				A11810000000000000000014 /* fr */,
+				A11810000000000000000015 /* pt-BR */,
+				A11810000000000000000016 /* zh-Hans */,
+			);
+			name = AppIntentVocabulary.plist;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

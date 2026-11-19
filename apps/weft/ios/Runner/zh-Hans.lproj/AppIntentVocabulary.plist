@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Siri example phrases, one set per intent in INIntentsSupported. App
+     Store Connect rejects the Siri support (ITMS-90626) for every language
+     the bundle has a .lproj for that lacks them. siri_vocabulary_test.dart
+     holds every localization to all three. -->
+<dict>
+	<key>IntentPhrases</key>
+	<array>
+		<dict>
+			<key>IntentName</key>
+			<string>INSendMessageIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>用 Sennit 发送消息</string>
+				<string>在 Sennit 上回复安娜</string>
+				<string>用 Sennit 给小明发消息</string>
+			</array>
+		</dict>
+		<dict>
+			<key>IntentName</key>
+			<string>INSearchForMessagesIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>读一下我的 Sennit 消息</string>
+				<string>显示我在 Sennit 上的新消息</string>
+				<string>我在 Sennit 上有新消息吗</string>
+			</array>
+		</dict>
+		<dict>
+			<key>IntentName</key>
+			<string>INSetMessageAttributeIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>把我的 Sennit 消息标记为已读</string>
+				<string>在 Sennit 上把我的消息标记为已读</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
