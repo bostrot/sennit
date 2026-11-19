@@ -4642,6 +4642,74 @@
   "@loginFooter": {
     "description": "The line at the foot of the sign-in screen. 'Matrix' is the protocol name and is never translated."
   },
+  "matrixInfoButton": "What is a Matrix server?",
+  "@matrixInfoButton": {
+    "description": "Small text button under the server field on the sign-in screen and on the first walkthrough page; also the title of the explainer it opens. 'Matrix' is the protocol name and is never translated."
+  },
+  "matrixInfoBody": "Matrix is an open, decentralised chat network. No single company runs it: independent servers talk to each other, the way email providers do. Your account lives on one of them, your homeserver, and from there you can reach people on any other.",
+  "@matrixInfoBody": {
+    "description": "Opening paragraph of the \"What is a Matrix server?\" explainer sheet."
+  },
+  "matrixInfoPublicTitle": "Use our public server",
+  "@matrixInfoPublicTitle": {
+    "description": "Heading in the Matrix explainer for the option of signing up on the server Sennit runs."
+  },
+  "matrixInfoPublicBody": "{server} is the public server we run for Sennit. It is the quickest way to get started.",
+  "@matrixInfoPublicBody": {
+    "description": "Under matrixInfoPublicTitle. {server} is a server address such as matrix.aachen.dev.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "example": "matrix.aachen.dev"
+      }
+    }
+  },
+  "matrixInfoUseServer": "Use {server}",
+  "@matrixInfoUseServer": {
+    "description": "Button in the Matrix explainer that fills the sign-in server field with our public server. {server} is a server address.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "example": "matrix.aachen.dev"
+      }
+    }
+  },
+  "matrixInfoSelfHostTitle": "Host your own",
+  "@matrixInfoSelfHostTitle": {
+    "description": "Heading in the Matrix explainer for running a homeserver yourself."
+  },
+  "matrixInfoSelfHostBody": "Running your own homeserver keeps your account and your data under your control. Good places to start:",
+  "@matrixInfoSelfHostBody": {
+    "description": "Under matrixInfoSelfHostTitle, followed by a list of links."
+  },
+  "matrixInfoLinkServers": "Overview of Matrix server software",
+  "@matrixInfoLinkServers": {
+    "description": "Link to matrix.org/ecosystem/servers."
+  },
+  "matrixInfoLinkSynapse": "Synapse installation guide",
+  "@matrixInfoLinkSynapse": {
+    "description": "Link to the Synapse install docs. 'Synapse' is a product name and is not translated."
+  },
+  "matrixInfoLinkContinuwuity": "Continuwuity, a lightweight server (successor to conduwuit)",
+  "@matrixInfoLinkContinuwuity": {
+    "description": "Link to Continuwuity. 'Continuwuity' and 'conduwuit' are product names and are not translated."
+  },
+  "matrixInfoLinkAnsible": "Docker and Ansible setup (matrix-docker-ansible-deploy)",
+  "@matrixInfoLinkAnsible": {
+    "description": "Link to the matrix-docker-ansible-deploy project. The part in brackets is a project name and is not translated."
+  },
+  "matrixInfoBridgesTitle": "Bridges",
+  "@matrixInfoBridgesTitle": {
+    "description": "Heading in the Matrix explainer for bridges to other chat networks."
+  },
+  "matrixInfoBridgesBody": "Bridges connect a homeserver to WhatsApp, Telegram, Signal and other networks, so those chats show up in Sennit as well.",
+  "@matrixInfoBridgesBody": {
+    "description": "Under matrixInfoBridgesTitle."
+  },
+  "matrixInfoLinkBridges": "Browse available bridges",
+  "@matrixInfoLinkBridges": {
+    "description": "Link to matrix.org/ecosystem/bridges."
+  },
   "brandTagline": "Every conversation, one thread.",
   "@brandTagline": {
     "description": "The app's one-line promise under its name on the sign-in screen. Every messenger stitched into a single thread. Keep it short and slogan-like, under ~36 chars."

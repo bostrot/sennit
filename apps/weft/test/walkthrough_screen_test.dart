@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/billing_providers.dart';
 import 'package:weft/app/localisation.dart';
+import 'package:weft/features/auth/matrix_server_sheet.dart';
 import 'package:weft/features/auth/walkthrough_screen.dart';
 import 'package:weft/features/settings/pro_screen.dart';
 import 'package:weft/services/billing/entitlements.dart';
@@ -44,6 +45,18 @@ void main() {
 
     await tester.tap(find.text('Skip the tour'));
     expect(done, ['done']);
+  });
+
+  testWidgets('the first page explains Matrix without picking a server', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.tap(find.text('What is a Matrix server?'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MatrixServerSheet), findsOneWidget);
+    // Already signed in: there is no server left to pick.
+    expect(find.text('Use matrix.aachen.dev'), findsNothing);
   });
 
   testWidgets('walks every feature, then ends', (tester) async {

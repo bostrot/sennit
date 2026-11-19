@@ -11,6 +11,7 @@ import '../settings/auto_reply_screen.dart';
 import '../settings/models_screen.dart';
 import '../settings/pro_screen.dart';
 import '../todo/todo_screen.dart';
+import 'matrix_server_sheet.dart';
 
 /// The walkthrough after a first sign-in: what Sennit can do beyond showing
 /// messages, one feature to a page, each with the way into setting it up.
@@ -158,6 +159,13 @@ class _WalkthroughScreenState extends ConsumerState<WalkthroughScreen> {
                                   height: 1.4,
                                 ),
                               ),
+                              // The welcome page is where a first account has
+                              // just been made on a server the user may not
+                              // know the word for.
+                              if (first) ...[
+                                const SizedBox(height: WeftSpace.sm),
+                                const MatrixServerInfoButton(),
+                              ],
                             ],
                           ),
                         ),

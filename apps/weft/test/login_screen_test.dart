@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/localisation.dart';
 import 'package:weft/app/session_providers.dart';
 import 'package:weft/features/auth/login_screen.dart';
+import 'package:weft/features/auth/matrix_server_sheet.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
@@ -47,6 +49,92 @@ void main() {
     await tester.tap(find.text('Create account'));
     await tester.pumpAndSettle();
   }
+
+  group('What is a Matrix server?', () {
+    Future<_FakeSession> pumpUnresolved(WidgetTester tester) async {
+      final session = _FakeSession(offer: RegistrationOffer.open);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [matrixSessionProvider.overrideWithValue(session)],
+          child: MaterialApp(
+            localizationsDelegates: weftLocalizationsDelegates,
+            supportedLocales: weftSupportedLocales,
+            theme: WeftTheme.build(),
+            home: const LoginScreen(),
+          ),
+        ),
+      );
+      return session;
+    }
+
+    Future<void> openSheet(WidgetTester tester) async {
+      await tester.tap(find.byType(MatrixServerInfoButton));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sits under the server field and explains it', (tester) async {
+      await pumpUnresolved(tester);
+      expect(find.text('What is a Matrix server?'), findsOneWidget);
+
+      await openSheet(tester);
+      expect(find.byType(MatrixServerSheet), findsOneWidget);
+      expect(find.text('Use our public server'), findsOneWidget);
+      expect(find.text('Host your own'), findsOneWidget);
+      expect(find.text('Bridges'), findsOneWidget);
+      expect(find.textContaining('matrix.aachen.dev'), findsWidgets);
+    });
+
+    testWidgets('picking our server fills the field and resolves it', (
+      tester,
+    ) async {
+      final session = await pumpUnresolved(tester);
+      await tester.enterText(find.byType(TextField).first, 'elsewhere.org');
+      await openSheet(tester);
+
+      await tester.ensureVisible(find.text('Use matrix.aachen.dev'));
+      await tester.tap(find.text('Use matrix.aachen.dev'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MatrixServerSheet), findsNothing);
+      expect(session.resolved, kDefaultHomeserver);
+      expect(find.text('Sign in'), findsOneWidget);
+    });
+
+    testWidgets('links open outside the app', (tester) async {
+      final launched = <String>[];
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        if (call.method == 'launch') {
+          launched.add((call.arguments as Map)['url']! as String);
+        }
+        return true;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+
+      await pumpUnresolved(tester);
+      await openSheet(tester);
+      for (final label in [
+        'Synapse installation guide',
+        'Browse available bridges',
+      ]) {
+        await tester.ensureVisible(find.text(label));
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+      }
+
+      expect(launched, [
+        MatrixServerLinks.synapse.toString(),
+        MatrixServerLinks.bridges.toString(),
+      ]);
+    });
+  });
 
   testWidgets('a new install is pointed at the default server', (tester) async {
     final session = await pumpResolved(tester);

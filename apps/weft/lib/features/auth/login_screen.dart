@@ -6,6 +6,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import '../../app/localisation.dart';
 
 import '../../app/session_providers.dart';
+import 'matrix_server_sheet.dart';
 
 /// Where someone new lands unless they name a server of their own.
 const String kDefaultHomeserver = 'matrix.aachen.dev';
@@ -102,6 +103,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Picked from the Matrix explainer: back to the server a new install
+  /// starts with, resolved straight away.
+  void _useDefaultServer() {
+    setState(() {
+      _homeserver.text = kDefaultHomeserver;
+      _discovery = null;
+      _flows = const [];
+      _offer = null;
+    });
+    _resolveServer();
   }
 
   Future<void> _signIn() async {
@@ -288,6 +301,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: WeftSpace.sm),
                   _ServerSummary(discovery: d),
                 ],
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: MatrixServerInfoButton(
+                    onUseDefault: _busy ? null : _useDefaultServer,
+                  ),
+                ),
 
                 if (_serverResolved && !_creating && _supportsPassword) ...[
                   const SizedBox(height: WeftSpace.lg),
