@@ -11,7 +11,7 @@ and what was noticed but not done.
 - 2026-11-17 · Accessibility · The Mac search field's clear button is a 24pt target and speaks the reader's language · https://github.com/bostrot/sennit/pull/4
 - 2026-11-18 · Localization · Reply quotes, link cards, statuses and the message sheet are read out (and the quote drawn) in the app's language; the l10n audit now sees inside `semanticsSentence` · https://github.com/bostrot/sennit/pull/5
 
-- 2026-11-19 · User experience · ⌘↓ (Mac) / Ctrl+End (Windows, Linux) jumps back to the newest message in the open conversation, without taking the key from a half-written draft · PR_LINK
+- 2026-11-19 · User experience · ⌘↓ (Mac) / Ctrl+End (Windows, Linux) jumps back to the newest message in the open conversation, without taking the key from a half-written draft · https://github.com/bostrot/sennit/pull/8
 
 ## Lessons from reviews
 
