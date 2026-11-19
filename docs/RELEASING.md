@@ -194,7 +194,7 @@ Before the first run, once:
 
 The build number is the commit count, the same number the Play upload uses.
 
-It runs on a GitHub-hosted `macos-15` runner, which carries Xcode,
+It runs on a GitHub-hosted `macos-26` runner, which carries Xcode,
 CocoaPods and rustup; the job makes a keychain of its own for the signing
 certificate Xcode creates. A manual run with **dry_run** ticked archives and
 exports a signed IPA without uploading it. Every workflow here runs on

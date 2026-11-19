@@ -45,13 +45,36 @@ jobs:
   build:
     name: Archive and upload to TestFlight
     # Needs Xcode, which the hosted image carries, and CocoaPods and rustup
-    # with it. Hosted minutes are free for a public repository.
-    runs-on: macos-15
+    # with it. Hosted minutes are free for a public repository. macos-26,
+    # because App Store Connect has refused anything built with an SDK older
+    # than iOS 26 since 2026-11-19, and macos-15 still defaults to Xcode 16.4
+    # (iOS 18.5). release.yml's iOS job builds on the same image.
+    runs-on: macos-26
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Select Xcode 26
+        # Explicit rather than the image default, which is the image's to
+        # change: the newest Xcode 26 on the runner, or a loud failure before
+        # twenty minutes of archiving end in a rejected upload. Xcode 27 is
+        # left out while the images carry it only as a preview.
+        run: |
+          xcode=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)
+          if [ -z "$xcode" ]; then
+            echo "::error::No /Applications/Xcode_26*.app on this runner; App Store Connect requires the iOS 26 SDK"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          xcodebuild -version
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          if [ "${sdk%%.*}" -lt 26 ]; then
+            echo "::error::$xcode has the iOS $sdk SDK; App Store Connect requires iOS 26 or later"
+            exit 1
+          fi
+          echo "Building with $xcode, iOS SDK $sdk"
 
       - name: The App Store Connect key and the team must exist
         # As in deploy_internal.yml: uploading is all this is for, so a
