@@ -118,15 +118,19 @@ jobs:
         working-directory: apps/weft
 
       - name: Restore the CocoaPods and Cargo caches
+        # The download caches only, not apps/weft/ios/Pods. A restored Pods
+        # directory makes `pod install` skip work it must redo: 1.0.15's
+        # archive restored the one 1.0.14 saved and failed with
+        # 'ffmpegkit/FFmpegKitConfig.h' file not found. The key prefix
+        # changed with it so that entry is never restored again.
         uses: actions/cache@v4
         with:
           path: |
-            apps/weft/ios/Pods
             ~/Library/Caches/CocoaPods
             ~/.cargo/registry
             ~/.cargo/git
-          key: ios-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
-          restore-keys: ios-${{ runner.arch }}-
+          key: ios-downloads-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
+          restore-keys: ios-downloads-${{ runner.arch }}-
 
       - name: Write the release notes
         # The same text the GitHub release and Play get, from the same commit

@@ -100,6 +100,18 @@ void main() {
     );
   });
 
+  test('a cached Pods directory is never restored into the archive', () {
+    // Restoring apps/weft/ios/Pods broke 1.0.15's archive; only the
+    // download caches are kept between runs.
+    final cache = workflow.substring(
+      workflow.indexOf('      - name: Restore the CocoaPods and Cargo caches'),
+      workflow.indexOf('      - name: Write the release notes'),
+    );
+    expect(cache, isNot(contains('\n            apps/weft/ios/Pods\n')));
+    expect(cache, contains('~/Library/Caches/CocoaPods'));
+    expect(cache, contains('key: ios-downloads-'));
+  });
+
   test('the key does not outlive the job', () {
     final cleanup = workflow.substring(
       workflow.indexOf('      - name: Remove the key from the runner'),
