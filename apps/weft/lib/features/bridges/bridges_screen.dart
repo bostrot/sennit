@@ -725,7 +725,12 @@ final bridgeEndpointsProvider = FutureProvider<Map<String, Uri>>((ref) async {
     final client = session.client;
     final homeserver = client.homeserver;
     if (homeserver == null) return const {};
-    final wellKnown = await client.getWellknown();
+    // An hour, not the SDK's three days: a server that starts publishing its
+    // bridges should reach people who signed in last week the same day. A
+    // failed refresh still falls back to the cached copy.
+    final wellKnown = await client.getWellknown(
+      cacheLifetime: const Duration(hours: 1),
+    );
     return parseBridgeWellKnown(wellKnown.toJson(), homeserver: homeserver);
   } on Object {
     return const {};

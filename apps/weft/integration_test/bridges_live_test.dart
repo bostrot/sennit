@@ -27,7 +27,11 @@ import 'package:weft_matrix/weft_matrix.dart';
 ///     --dart-define=WEFT_LIVE_HOMESERVER=matrix.example.org \
 ///     --dart-define=WEFT_LIVE_USER=someone \
 ///     --dart-define=WEFT_LIVE_PASSWORD=… \
-///     [--dart-define=WEFT_LIVE_ENDPOINTS=whatsapp=http://localhost:29318/_matrix/provision,…]
+///     [--dart-define=WEFT_LIVE_ENDPOINTS=none | whatsapp=http://localhost:29318/_matrix/provision,…]
+///
+/// Without `WEFT_LIVE_ENDPOINTS` the app finds the bridges the way it does for
+/// everyone, in the server's well-known; `none` forces every network through
+/// its bot's chat; a list names the provisioning APIs by hand.
 ///
 /// Skipped without credentials, so the integration glob never runs it. It
 /// stops at every step that needs a real phone — a QR to scan, a code to
@@ -134,7 +138,8 @@ void main() {
         overrides: [
           storesProvider.overrideWithValue(stores),
           matrixSessionProvider.overrideWithValue(session),
-          bridgeEndpointsProvider.overrideWith((ref) async => endpoints),
+          if (endpointsDefine.isNotEmpty)
+            bridgeEndpointsProvider.overrideWith((ref) async => endpoints),
         ],
         child: RepaintBoundary(
           key: boundary,
@@ -226,7 +231,8 @@ void main() {
       // the Google account sign-in, which needs a browser.
       await until(
         tester,
-        endpoints.containsKey('gmessages')
+        endpointsDefine != 'none' &&
+                (endpointsDefine.isEmpty || endpoints.containsKey('gmessages'))
             ? find.text('Scan this code with Google Messages')
             : find.text('This way needs a web browser'),
         within: const Duration(seconds: 90),
