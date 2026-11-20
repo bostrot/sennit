@@ -212,7 +212,9 @@ jobs:
         # testing and the App Store, which is what "internal" means here.
         # App Store Connect will not let such a build be attached to a
         # version, so the one that goes to review is a manual run with
-        # `app_store` ticked. A push never sets it.
+        # `app_store` ticked — or, once STORE_PROMOTION_ENABLED is true,
+        # every upload: promote_to_stores.yml submits the newest one each
+        # night. Either way it only reaches the internal group until then.
         #
         # A dry run exports the signed IPA to the runner instead, which
         # signs it exactly as the upload would and sends nothing.
@@ -227,7 +229,7 @@ jobs:
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key><string>automatic</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
-            <key>testFlightInternalTestingOnly</key><${{ inputs.app_store && 'false' || 'true' }}/>
+            <key>testFlightInternalTestingOnly</key><${{ (inputs.app_store || vars.STORE_PROMOTION_ENABLED == 'true') && 'false' || 'true' }}/>
           </dict>
           </plist>
           EOF

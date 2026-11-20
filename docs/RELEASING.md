@@ -54,6 +54,7 @@ same everywhere and no workflow waits for another:
 | `release.yml` (tag `v*`) | the release body (`--github`); the app asset, into every platform build |
 | `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-en-US`, cut to 500 characters at a whole line; the app asset |
 | `deploy_testflight.yml` (version bump on `main`) | the app asset; after the upload, "What to Test" and "What's New" through `tooling/store/build_notes.py` |
+| `promote_to_stores.yml` (nightly, 03:00 Berlin) | nothing new: Play open testing gets the internal release's "What's new"; the App Store version gets "What's New" from the script, run on the build's commit |
 
 The app asset is `apps/weft/assets/release_notes.json`. The committed copy is
 empty, so a local build or a fork shows no sheet; CI overwrites it before
@@ -231,6 +232,39 @@ Save; the build turns "Ready to Test" for the internal group.
 `ITSAppUsesNonExemptEncryption` is deliberately not in `Info.plist`. Setting it
 to false would skip these questions by declaring that the app uses no
 encryption beyond what is exempt, which is not the answer above.
+
+### Going public, every night
+
+`promote_to_stores.yml` runs at 03:00 Berlin time and takes the newest build
+testers have to the public: Play's internal-track release to the **open
+testing** track, and the newest eligible TestFlight build to **App Review**,
+released automatically once approved. A build goes only when it is newer than
+what the store has, reached testers within the last 26 hours, and CI and its
+deploy passed on its commit. Apple reviews one version at a time, so a build
+that finds another in review waits for the next night. The rules, and why:
+[[adr-005-daily-store-promotion]].
+
+It is **off** until the repository variable `STORE_PROMOTION_ENABLED` is
+`true`. Until then the schedule does nothing, and a manual run is a dry run
+that prints what it would promote and, with **audit**, what each store still
+wants:
+
+```bash
+gh workflow run promote_to_stores.yml                     # dry run + audit
+gh variable set STORE_PROMOTION_ENABLED --body true       # on
+gh workflow run promote_to_stores.yml -f dry_run=false -f max_age_hours=0   # promote now
+gh variable delete STORE_PROMOTION_ENABLED                # off
+```
+
+With the switch on, `deploy_testflight.yml` uploads builds that may go to
+the App Store rather than internal-only ones; they still reach only the
+internal tester group until a promotion submits them. Optional variables:
+`PLAY_PROMOTION_TRACK=production` to promote to Play production instead of
+open testing, `PLAY_PRODUCTION_ROLLOUT` (for example `0.2`) for a staged
+rollout, `PLAY_CHANGES_NOT_SENT_FOR_REVIEW=true` when Play asks for it.
+
+Export compliance is copied from the newest build a person answered (see
+above), so answer one build by hand first and keep the answer the same.
 
 ### Windows / Linux
 
