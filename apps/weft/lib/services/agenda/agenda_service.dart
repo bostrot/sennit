@@ -79,26 +79,35 @@ class AgendaService {
 
   /// What to call [candidate] in a calendar.
   ///
-  /// The configured LLM names it when there is one; without one, or when it
-  /// fails, the rule-made [AgendaCandidate.title] stands. Asked only here —
-  /// on the tap, not at detection — so a message leaves the device because
+  /// The configured LLM names it when there is one, from [conversation] around
+  /// [message] — both sides of it, see [eventTitleTranscript] — rather than
+  /// from the one message with the date, which is usually "friday at 7?" and
+  /// names nothing. Without a model, when it fails, or when all it says is
+  /// "Meeting", the rule-made [AgendaCandidate.title] stands. Asked only here
+  /// — on the tap, not at detection — so a message leaves the device because
   /// its chip was used, never merely because it was scrolled past.
   Future<String> titleFor(
     WeftMessage message,
-    AgendaCandidate candidate,
-  ) async {
+    AgendaCandidate candidate, {
+    Iterable<WeftMessage> conversation = const [],
+  }) async {
     final known = _titles[message.eventId];
     if (known != null) return known;
     final endpoint = _ref.read(autoReplyEndpointProvider);
     if (endpoint == null) return candidate.title;
 
-    final title = await suggestEventTitle(
+    final suggested = await suggestEventTitle(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
       apiKey: endpoint.apiKey,
+      transcript: eventTitleTranscript(message, conversation),
+    );
+    final title = chooseEventTitle(
+      model: suggested,
+      fallback: candidate.title,
       message: message.body,
     );
-    if (title == null) return candidate.title;
+    if (title == candidate.title) return title;
     return _titles[message.eventId] = title;
   }
 

@@ -18,9 +18,14 @@ import '../../services/agenda/event_detector.dart';
 /// desktop, where no such editor is exposed, it produces an `.ics` and hands
 /// it to the share sheet, which every calendar app accepts.
 class AgendaChip extends ConsumerStatefulWidget {
-  const AgendaChip({super.key, required this.message});
+  const AgendaChip({super.key, required this.message, this.conversation});
 
   final WeftMessage message;
+
+  /// The loaded conversation [message] is part of, read on the tap: what the
+  /// title is made from, since the message with the date rarely says what
+  /// the appointment is.
+  final Iterable<WeftMessage> Function()? conversation;
 
   @override
   ConsumerState<AgendaChip> createState() => _AgendaChipState();
@@ -59,7 +64,11 @@ class _AgendaChipState extends ConsumerState<AgendaChip> {
     final candidate = _candidate!;
     final title = await ref
         .read(agendaServiceProvider)
-        .titleFor(widget.message, candidate);
+        .titleFor(
+          widget.message,
+          candidate,
+          conversation: widget.conversation?.call() ?? const [],
+        );
     await addToDeviceCalendar(
       title: title,
       start: candidate.start,
