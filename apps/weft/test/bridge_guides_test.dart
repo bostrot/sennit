@@ -49,6 +49,15 @@ void main() {
     ]);
   });
 
+  test('Google Messages through the chat: no unlisted QR', () {
+    expect(
+      loginMethodsFor(ChatNetwork.gmessages, const [
+        BridgeLoginFlow(id: 'google', name: 'google'),
+      ], withUnlisted: false).map((m) => m.flow.id),
+      ['google'],
+    );
+  });
+
   test('Instagram: password first, browser and app flows advanced', () {
     expect(
       methods(ChatNetwork.instagram, [

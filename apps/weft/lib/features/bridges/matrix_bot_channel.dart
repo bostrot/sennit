@@ -59,9 +59,44 @@ class MatrixBotChannel implements BridgeBotChannel {
   void _listen() {
     _subscription ??= _client.onTimelineEvent.stream.listen((event) {
       if (event.roomId != _roomId || event.senderId != botUserId) return;
-      final message = _toMessage(event);
-      if (message != null && !_messages.isClosed) _messages.add(message);
+      if (event.type == sdk.EventTypes.Encrypted) {
+        unawaited(_decryptLater(event));
+        return;
+      }
+      _deliver(event);
     });
+  }
+
+  /// Event ids already handed on, because the SDK reports one event more
+  /// than once — sent, synced, decrypted — and the bot's answer must be read
+  /// once.
+  final Set<String> _delivered = {};
+
+  void _deliver(sdk.Event event) {
+    if (!_delivered.add(event.eventId)) return;
+    final message = _toMessage(event);
+    if (message != null && !_messages.isClosed) _messages.add(message);
+  }
+
+  /// A bot reply that arrived before its key.
+  ///
+  /// The chat with a bridge bot is encrypted from its first message, and the
+  /// bot's first reply in a new chat routinely beats the key it was encrypted
+  /// with: the SDK hands it on still encrypted and never mentions it again.
+  /// Read as nothing, that reply was a sign-in that waited for an answer the
+  /// bot had already given. So it is tried again while the key arrives.
+  Future<void> _decryptLater(sdk.Event event) async {
+    final encryption = _client.encryption;
+    if (encryption == null) return;
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (_messages.isClosed || _delivered.contains(event.eventId)) return;
+      final decrypted = await encryption.decryptRoomEvent(event);
+      if (decrypted.type != sdk.EventTypes.Encrypted) {
+        _deliver(decrypted);
+        return;
+      }
+    }
   }
 
   static BotMessage? _toMessage(sdk.Event event) {

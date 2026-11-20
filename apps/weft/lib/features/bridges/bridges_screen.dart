@@ -900,9 +900,13 @@ class _NetworkRow extends StatelessWidget {
 
     final dotColor = failed || broken != null
         ? context.colors.error
-        : logins.any((l) => l.isActive)
+        : logins.isEmpty
+        ? null
+        // Green only when everything is: a hiccup the bridge is retrying on
+        // its own is neither fine nor the person's to fix.
+        : logins.every((l) => l.state == BridgeLoginState.connected)
         ? context.palette.online
-        : null;
+        : context.colors.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(

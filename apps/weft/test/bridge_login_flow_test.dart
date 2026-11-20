@@ -93,6 +93,9 @@ class _FakeBridge implements BridgeLoginBackend {
   bool get supportsCookies => false;
 
   @override
+  bool acceptsUnlistedFlows = true;
+
+  @override
   void dispose() {}
 }
 
@@ -572,6 +575,29 @@ void main() {
         find.text('Tap your profile picture, then Device pairing'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('through the bot chat, only what the bot lists', (
+      tester,
+    ) async {
+      final bridge = _FakeBridge(
+        [
+          const LoginStep(
+            stepId: 'fi.mau.gmessages.google_account',
+            type: LoginStepType.cookies,
+            loginId: 'lg1',
+            cookies: LoginCookiesParams(url: 'https://accounts.google.com/'),
+          ),
+        ],
+        flows: const [BridgeLoginFlow(id: 'google', name: 'Google account')],
+      )..acceptsUnlistedFlows = false;
+      await _pump(tester, bridge, ChatNetwork.gmessages);
+
+      // The one way left needs a browser, and the screen says so plainly
+      // rather than offering a QR the bot would refuse.
+      expect(find.text('Scan a QR code'), findsNothing);
+      expect(bridge.calls, ['flows', 'start google']);
+      expect(find.text('This way needs a web browser'), findsOneWidget);
     });
 
     testWidgets('the emoji to tap is shown large', (tester) async {

@@ -68,6 +68,9 @@ class _StatusBridge implements BridgeLoginBackend {
   bool get supportsCookies => false;
 
   @override
+  bool get acceptsUnlistedFlows => true;
+
+  @override
   void dispose() {}
 }
 

@@ -174,15 +174,20 @@ LoginMethodKind classifyFlow(BridgeLoginFlow flow) {
 }
 
 /// The bridge's flows as the methods to offer, best first.
+///
+/// [withUnlisted] adds the guide's [NetworkLoginGuide.extra] flows, which only
+/// a backend that starts unlisted flows can use.
 List<LoginMethod> loginMethodsFor(
   ChatNetwork network,
-  List<BridgeLoginFlow> flows,
-) {
+  List<BridgeLoginFlow> flows, {
+  bool withUnlisted = true,
+}) {
   final guide = networkLoginGuides[network] ?? const NetworkLoginGuide();
   final all = [
     ...flows,
-    for (final extra in guide.extra)
-      if (!flows.any((flow) => flow.id == extra.id)) extra,
+    if (withUnlisted)
+      for (final extra in guide.extra)
+        if (!flows.any((flow) => flow.id == extra.id)) extra,
   ].where((flow) => !guide.hidden.contains(flow.id)).toList();
 
   int rank(BridgeLoginFlow flow) {

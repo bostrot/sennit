@@ -128,6 +128,42 @@ void main() {
       expect(whoami.logins.single.state, BridgeLoginState.connected);
     });
 
+    // Live, against mautrix-signal: the greeting lands first, the real
+    // answer to `list-logins` a moment later — after the next command has
+    // gone out, where it used to be read as that command's answer.
+    test('the greeting in a new chat is not an answer', () async {
+      final bot = _FakeBot((command, bot) {
+        if (command == 'list-logins') {
+          Timer(const Duration(milliseconds: 40), () {
+            bot.say([_text(bot, "You're not logged in")]);
+          });
+          return [
+            _text(
+              bot,
+              "Hello, I'm a Signal bridge bot.\n\nUse `help` for help or "
+              '`login` to log in.\n\nThis room has been marked as your '
+              'management room.',
+            ),
+          ];
+        }
+        Timer(const Duration(milliseconds: 80), () {
+          bot.say([
+            _text(
+              bot,
+              'Invalid login flow `sennit-list-flows`. Available options:\n\n'
+              '* `qr` - Scan a QR code to pair the bridge to your Signal app',
+            ),
+          ]);
+        });
+        return const [];
+      });
+      final client = _client(bot);
+      addTearDown(client.dispose);
+
+      final flows = await client.loginFlows();
+      expect(flows.map((f) => f.id), ['qr']);
+    });
+
     test('a bot that never answers is a timeout, not a hang', () async {
       final bot = _FakeBot((_, _) => const []);
       final client = _client(bot);
@@ -536,6 +572,96 @@ void main() {
 
       expect(bot.sent, ['list-logins', 'logout 777', 'cancel']);
     });
+
+    // Seen live against mautrix-whatsapp: the cancelled QR login reports its
+    // own end a moment after "Login cancelled.", and that report clears the
+    // chat's command state — so the next login has to start after it.
+    test('a new login waits for a cancelled one to finish dying', () async {
+      final bot = _FakeBot((command, bot) {
+        if (command == 'list-logins') {
+          return [_text(bot, "You're not logged in")];
+        }
+        if (command == 'login qr') {
+          return [
+            _text(bot, 'Scan the QR code with the WhatsApp mobile app'),
+            _image(bot, '2@abc'),
+          ];
+        }
+        if (command == 'cancel') {
+          Timer(const Duration(milliseconds: 20), () {
+            bot.say([_text(bot, 'Login failed: context canceled')]);
+          });
+          return [_text(bot, 'Login cancelled.')];
+        }
+        if (command == 'login phone') {
+          return [_text(bot, 'Please enter your Phone number')];
+        }
+        return const [];
+      });
+      final client = _client(bot);
+      addTearDown(client.dispose);
+
+      await client.startLogin('qr');
+      unawaited(client.cancelLogin('chat'));
+      final step = await client.startLogin('phone');
+
+      expect(step.type, LoginStepType.userInput);
+      expect(step.fields.single.type, 'phone_number');
+      expect(bot.sent, ['list-logins', 'login qr', 'cancel', 'login phone']);
+    });
+
+    test(
+      'a late "context canceled" is not read as this login failing',
+      () async {
+        final bot = _FakeBot((command, bot) {
+          if (command == 'list-logins') {
+            return [_text(bot, "You're not logged in")];
+          }
+          return [
+            _text(bot, 'Login failed: context canceled'),
+            _text(bot, 'Please enter your Phone number'),
+          ];
+        });
+        final client = _client(bot);
+        addTearDown(client.dispose);
+
+        final step = await client.startLogin('phone');
+        expect(step.type, LoginStepType.userInput);
+      },
+    );
+
+    test('"Unknown command" to an answer fails at once', () async {
+      final bot = _FakeBot((command, bot) {
+        if (command == 'list-logins') {
+          return [_text(bot, "You're not logged in")];
+        }
+        if (command == 'login phone') {
+          return [_text(bot, 'Please enter your Phone number')];
+        }
+        return [
+          _text(bot, 'Unknown command, use the `help` command for help.'),
+        ];
+      });
+      final client = _client(bot);
+      addTearDown(client.dispose);
+
+      final step = await client.startLogin('phone');
+      await expectLater(
+        client.submitStep(
+          loginId: step.loginId!,
+          stepId: step.stepId,
+          stepType: 'user_input',
+          body: {'value': '+4915112345678'},
+        ),
+        throwsA(
+          isA<BridgeException>().having(
+            (e) => e.errorCode,
+            'errorCode',
+            BridgeCommandClient.errorLoginFailed,
+          ),
+        ),
+      );
+    });
   });
 
   group('legacy Discord', () {
@@ -555,6 +681,33 @@ void main() {
         ];
       }
       return const [];
+    });
+
+    // Live: mautrix-discord greets a new chat in three messages, the last
+    // two arriving after the first command, and any of them taken as its
+    // answer read the bot as bridgev2.
+    test('the three-message greeting is not an answer', () async {
+      final bot = _FakeBot((command, bot) {
+        if (command == 'list-logins') {
+          return [
+            _text(bot, "Hello, I'm a Discord bridge bot."),
+            _text(
+              bot,
+              'This room has been registered as your bridge '
+              'management/status room.',
+            ),
+            _text(bot, 'Use `help` for help or `login` to log in.'),
+            _text(bot, 'Unknown command, use the `help` command for help.'),
+          ];
+        }
+        return const [];
+      });
+      final client = _client(bot);
+      addTearDown(client.dispose);
+
+      final flows = await client.loginFlows();
+      expect(client.dialect, BotDialect.legacy);
+      expect(flows.map((f) => f.id), ['qr', 'token']);
     });
 
     test('QR, then success after the scan', () async {

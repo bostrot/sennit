@@ -48,6 +48,14 @@ abstract interface class BridgeLoginBackend {
   /// Whether a `cookies` step can be submitted through this backend.
   bool get supportsCookies;
 
+  /// Whether a flow the bridge does not list can still be started.
+  ///
+  /// The provisioning API starts any flow the connector knows; the bot's
+  /// `login` command checks the name against the list first. Google Messages
+  /// is where it shows: QR pairing is unlisted but works over the API, and is
+  /// refused in the chat.
+  bool get acceptsUnlistedFlows;
+
   void dispose();
 }
 

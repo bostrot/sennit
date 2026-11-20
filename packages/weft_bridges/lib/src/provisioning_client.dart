@@ -177,6 +177,9 @@ class BridgeProvisioningClient implements BridgeLoginBackend {
   }
 
   @override
+  bool get acceptsUnlistedFlows => true;
+
+  @override
   bool get supportsCookies => true;
 
   Future<Map<String, Object?>> _get(Uri uri) async {

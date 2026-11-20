@@ -135,7 +135,11 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   }
 
   void _offer(List<BridgeLoginFlow> flows) {
-    final methods = loginMethodsFor(widget.network, flows);
+    final methods = loginMethodsFor(
+      widget.network,
+      flows,
+      withUnlisted: widget.client.acceptsUnlistedFlows,
+    );
     setState(() => _methods = methods);
     final everyday = methods.where((m) => !m.advanced).toList();
     // One everyday way in skips the chooser: Signal has exactly one, and

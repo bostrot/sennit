@@ -98,8 +98,14 @@ class BridgeCommandClient implements BridgeLoginBackend {
   @override
   bool get supportsCookies => false;
 
+  @override
+  bool get acceptsUnlistedFlows => false;
+
   void _listen() {
     _subscription ??= _channel.messages.listen((message) {
+      // The bot greets a new chat unprompted, and a greeting read as the
+      // answer to the first command puts every reply after it one off.
+      if (_greeting.hasMatch(message.body)) return;
       _queue.add(message);
       final arrived = _arrived;
       _arrived = null;
@@ -107,9 +113,14 @@ class BridgeCommandClient implements BridgeLoginBackend {
     });
   }
 
+  /// A cancel still settling, which the next command waits for.
+  Future<void>? _cancelling;
+
   /// Sends [command], first dropping anything the bot said before it.
   Future<void> _command(String command) async {
     _listen();
+    final cancelling = _cancelling;
+    if (cancelling != null) await cancelling;
     await _channel.open();
     _queue.clear();
     try {
@@ -298,11 +309,34 @@ class BridgeCommandClient implements BridgeLoginBackend {
   }) => _readStep(timeout: waitTimeout, waiting: true);
 
   @override
-  Future<void> cancelLogin(String loginId) async {
+  Future<void> cancelLogin(String loginId) {
+    final cancelling = _cancelling = _cancel();
+    return cancelling.whenComplete(() {
+      if (identical(_cancelling, cancelling)) _cancelling = null;
+    });
+  }
+
+  /// Cancels, then waits for the cancelled login to finish dying.
+  ///
+  /// bridgev2 answers `cancel` at once ("Login cancelled."), but a login that
+  /// was waiting on a QR scan only notices a little later — and when it does,
+  /// it reports "Login failed: context canceled" and clears the chat's
+  /// command state. A login started in between loses its state to that, and
+  /// the bot answers its next prompt with "Unknown command". Seen live with
+  /// WhatsApp: cancel the QR, pick the pairing code, type the number, nothing.
+  Future<void> _cancel() async {
     try {
       await _command('cancel');
     } on BridgeException {
-      // Leaving anyway.
+      return;
+    }
+    final deadline = DateTime.now().add(settle + settle);
+    while (true) {
+      final left = deadline.difference(DateTime.now());
+      if (left <= Duration.zero) return;
+      final message = await _next(left);
+      if (message == null) return;
+      if (_staleFailure.hasMatch(message.body.trim())) return;
     }
   }
 
@@ -380,6 +414,16 @@ class BridgeCommandClient implements BridgeLoginBackend {
 
       final text = message.body.trim();
       if (text.isEmpty) continue;
+
+      // The end of a login cancelled earlier, arriving late: not about this
+      // one. See [_cancel].
+      if (_staleFailure.hasMatch(text)) continue;
+
+      // The bot no longer knows a login is in progress, so it read the answer
+      // as a command. Waiting on is waiting for nothing.
+      if (_unknownCommand.hasMatch(text)) {
+        throw BridgeException(text, errorCode: errorLoginFailed);
+      }
 
       final prompt = _prompt.firstMatch(text);
       if (prompt != null) return _inputStep(prompt, prose);
@@ -627,6 +671,15 @@ class BridgeCommandClient implements BridgeLoginBackend {
   ];
 
   static final _unknownCommand = RegExp(r'^Unknown command', multiLine: true);
+  static final _greeting = RegExp(
+    r"^Hello, I'm an? .*bot|^This room has been (marked|registered) as your "
+    r'(bridge )?management|^Use `help` for help',
+    caseSensitive: false,
+  );
+  static final _staleFailure = RegExp(
+    r'^Login failed: context canceled',
+    caseSensitive: false,
+  );
   static final _notLoggedIn = RegExp(
     r"You're not logged in|You are not logged in",
     caseSensitive: false,
