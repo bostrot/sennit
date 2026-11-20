@@ -69,6 +69,10 @@ void main() {
   final runChat = only == 'chat';
   final runDeep = only == 'deep';
   final runSwitch = only == 'switch';
+  final runTyping = only == 'typing';
+
+  // How much of the group's history `typing` starts with loaded.
+  const typingPreloaded = int.fromEnvironment('PERF_PRELOADED');
 
   testWidgets('perf — $surfaceName/$only', (tester) async {
     expect(kDemoMode, isTrue, reason: 'Run with --dart-define=WEFT_DEMO=true');
@@ -80,7 +84,11 @@ void main() {
     addTearDown(() => binding.setSurfaceSize(null));
 
     final repository = LoadChatRepository(
-      preloaded: runDeep ? 1500 : 0,
+      preloaded: runDeep
+          ? 1500
+          : runTyping
+          ? typingPreloaded
+          : 0,
       cachesTimelines: runSwitch,
     );
     final container = ProviderContainer(
@@ -125,11 +133,20 @@ void main() {
       );
     }
 
+    // Whether each sync also carries what a live group's syncs carry besides
+    // messages: someone starting or stopping typing, receipts moving.
+    var groupChurn = false;
+
     // The sync heartbeat, for the whole run.
-    final heartbeat = Timer.periodic(
-      const Duration(milliseconds: 300),
-      (_) => repository.tick(changeOne: tickChanges),
-    );
+    final heartbeat = Timer.periodic(const Duration(milliseconds: 300), (_) {
+      if (groupChurn) {
+        if (!repository.typingChats.remove(LoadChatRepository.groupChatId)) {
+          repository.typingChats.add(LoadChatRepository.groupChatId);
+        }
+        repository.everyoneHasRead = !repository.everyoneHasRead;
+      }
+      repository.tick(changeOne: tickChanges);
+    });
     addTearDown(heartbeat.cancel);
 
     final inboxList = find.byType(Scrollable).first;
@@ -207,6 +224,47 @@ void main() {
           }
         });
       }
+    }
+
+    if (runTyping) {
+      // Typing into the busy group in the situations a live account puts it
+      // in: a quiet room, a room where others are typing and reading as you
+      // write, and a long draft.
+      await tester.tap(find.text('Load test group').first);
+      await _run(tester, const Duration(milliseconds: 1500));
+      final composer = find.descendant(
+        of: find.byType(ChatView),
+        matching: find.byType(EditableText),
+      );
+      await tester.tap(composer.first);
+      await _run(tester, const Duration(milliseconds: 300));
+
+      Future<void> type(String prefix) async {
+        const text = 'The quick brown fox jumps over the lazy dog';
+        for (var i = 1; i <= text.length; i++) {
+          final value = prefix + text.substring(0, i);
+          tester.testTextInput.updateEditingValue(
+            TextEditingValue(
+              text: value,
+              selection: TextSelection.collapsed(offset: value.length),
+            ),
+          );
+          await _run(tester, const Duration(milliseconds: 50));
+        }
+      }
+
+      await measure('typing_quiet', () => type(''));
+
+      groupChurn = true;
+      await measure('typing_group_churn', () => type(''));
+      groupChurn = false;
+
+      final draft = List.filled(
+        40,
+        'A paragraph of a long reply, the kind that gets written over a '
+        'few minutes and rewritten twice before it is sent.\n',
+      ).join();
+      await measure('typing_long_draft', () => type(draft));
     }
 
     if (runSwitch) {
