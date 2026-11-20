@@ -17,9 +17,6 @@ on:
   schedule:
     - cron: '0 1 * * *'
     - cron: '0 2 * * *'
-  # TEMPORARY: a dry run from this branch before merge; removed before merging.
-  push:
-    branches: [bostrot/daily-store-promotion]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -105,7 +102,7 @@ jobs:
           # Changes anything only with the switch on, and then only on the
           # schedule or a manual run with dry_run off.
           APPLY: ${{ vars.STORE_PROMOTION_ENABLED == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)) && '--apply' || '' }}
-          AUDIT: ${{ (github.event_name == 'push' || inputs.audit) && '--audit' || '' }}
+          AUDIT: ${{ inputs.audit && '--audit' || '' }}
         run: |
           python3 tooling/store/promote.py "$STORE" $APPLY $AUDIT \
             --schedule "$SCHEDULE" --max-age-hours "$MAX_AGE_HOURS" \

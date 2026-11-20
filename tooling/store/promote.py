@@ -406,7 +406,7 @@ def play(apply, audit, now, max_age_hours, rollout, track):
 
 
 def play_audit(token, base, track):
-    print(f'play: --- before the first public release on {track} ---')
+    print(f'play: --- what Play wants for a release on {track} ---')
     details = call('GET', f'{base}/details', token) or {}
     for key in ('defaultLanguage', 'contactEmail', 'contactWebsite'):
         print(f'play: [{"x" if details.get(key) else " "}] details.{key}')
