@@ -1402,5 +1402,8 @@
   "replyRemindersExcludeChat": "Exclure une discussion",
   "replyRemindersIncludeAgain": "Rappeler à nouveau",
   "replyRemindersNoChatsToExclude": "Aucune discussion à exclure.",
-  "contactReplyRemindersSubtitle": "Me rappeler si je lis un message ici sans répondre"
+  "contactReplyRemindersSubtitle": "Me rappeler si je lis un message ici sans répondre",
+  "composeRecipientMissing": "Choisis la discussion à laquelle envoyer ton message.",
+  "composeRecipientUnclear": "Quelle discussion voulais-tu dire par « {name} » ? Choisis-la ici.",
+  "composeRecipientUnclearCopied": "Quelle discussion voulais-tu dire par « {name} » ? Ton message est copié : choisis la discussion et colle-le."
 }

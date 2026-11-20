@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_share/weft_share.dart';
 
 import 'app/auto_reply_providers.dart';
 import 'app/billing_providers.dart';
@@ -210,6 +212,13 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       if (pending != null) {
         _pendingShare = null;
         _handleShare(pending);
+      }
+      // A "send a message to …" that cold-started the app, for the same reason:
+      // the name can only be resolved against an inbox that exists.
+      final compose = _pendingCompose;
+      if (compose != null) {
+        _pendingCompose = null;
+        _handleLink(compose);
       }
     }, fireImmediately: true);
     unawaited(_drainStagedShares());
@@ -448,8 +457,59 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // choice `OpenUserLink` above makes, for the same reason.
         debugPrint('weft: sms compose for $addresses — SMS composer pending');
         navigator.popUntil((route) => route.isFirst);
+      case ComposeMessageLink():
+        _compose(navigator, link);
       case OpenInboxLink():
         navigator.popUntil((route) => route.isFirst);
+    }
+  }
+
+  /// A voice assistant's "send a message to … on Sennit", held until the
+  /// inbox exists — see [_compose].
+  ComposeMessageLink? _pendingCompose;
+
+  /// Opens the conversation an assistant named, with its words in the
+  /// composer and nothing sent.
+  ///
+  /// The name is what the recogniser heard, so it goes through
+  /// `resolveMessageRecipient` — the matching Siri uses — and a conversation is
+  /// opened only when the name means exactly one. Otherwise the user picks: the
+  /// search opens on the name, and the dictated words go to the clipboard so
+  /// choosing the chat does not cost them the message.
+  void _compose(NavigatorState navigator, ComposeMessageLink link) {
+    final chats = ref.read(chatsProvider).value;
+    if (chats == null) {
+      _pendingCompose = link;
+      return;
+    }
+
+    switch (resolveMessageRecipient(chats, link.recipient)) {
+      case RecipientResolved(:final chat):
+        ref.read(composerPrefillProvider).offer(chat.id, link.text);
+        _openChat(navigator, chat.id);
+      case RecipientAmbiguous() || RecipientNotFound():
+        navigator.popUntil((route) => route.isFirst);
+        if (link.recipient.isNotEmpty) {
+          unawaited(
+            navigator.push(
+              MaterialPageRoute<void>(
+                builder: (_) => SearchScreen(initialQuery: link.recipient),
+              ),
+            ),
+          );
+        }
+        if (link.text.isNotEmpty) {
+          unawaited(Clipboard.setData(ClipboardData(text: link.text)));
+        }
+        final l10n = navigator.context.l10n;
+        final message = switch ((link.recipient.isEmpty, link.text.isEmpty)) {
+          (true, _) => l10n.composeRecipientMissing,
+          (false, true) => l10n.composeRecipientUnclear(link.recipient),
+          (false, false) => l10n.composeRecipientUnclearCopied(link.recipient),
+        };
+        ScaffoldMessenger.maybeOf(
+          navigator.context,
+        )?.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 

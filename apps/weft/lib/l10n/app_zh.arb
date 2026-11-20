@@ -1403,5 +1403,8 @@
   "replyRemindersExcludeChat": "排除聊天",
   "replyRemindersIncludeAgain": "恢复提醒",
   "replyRemindersNoChatsToExclude": "没有可排除的聊天。",
-  "contactReplyRemindersSubtitle": "在此读了消息却未回复时提醒我"
+  "contactReplyRemindersSubtitle": "在此读了消息却未回复时提醒我",
+  "composeRecipientMissing": "选择要把消息发送到的聊天。",
+  "composeRecipientUnclear": "你说的「{name}」是哪个聊天？请在这里选择。",
+  "composeRecipientUnclearCopied": "你说的「{name}」是哪个聊天？消息已复制：选择聊天后粘贴即可。"
 }
