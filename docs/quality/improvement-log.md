@@ -13,7 +13,7 @@ and what was noticed but not done.
 
 - 2026-11-19 · User experience · ⌘↓ (Mac) / Ctrl+End (Windows, Linux) jumps back to the newest message in the open conversation, without taking the key from a half-written draft · https://github.com/bostrot/sennit/pull/8
 
-- 2026-11-20 · Bug fix · Older history asked for from inside layout waits for the frame to finish, so reaching the top of a chat no longer rebuilds it mid-frame · PR_LINK
+- 2026-11-20 · Bug fix · Older history asked for from inside layout waits for the frame to finish, so reaching the top of a chat no longer rebuilds it mid-frame · https://github.com/bostrot/sennit/pull/9
 
 ## Lessons from reviews
 
