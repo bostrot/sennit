@@ -428,9 +428,11 @@ def play_audit(token, base, track):
           f'{" (" + ", ".join(sorted(regions)[:12]) + "…)" if regions else ""}'
           f'{" restOfWorld" if countries.get("restOfWorld") else ""}')
     tracks = (call('GET', f'{base}/tracks', token) or {}).get('tracks', [])
-    print('play: tracks: ' + ', '.join(
-        f'{t["track"]}={[r.get("name") + ":" + r.get("status", "") for r in t.get("releases", [])]}'
-        for t in tracks))
+    for t in tracks:
+        print(f'play: track {t["track"]}: ' + (', '.join(
+            f'{r.get("name")} {r.get("versionCodes")} {r.get("status")}'
+            f'{" " + str(r["userFraction"]) if "userFraction" in r else ""}'
+            for r in t.get('releases', [])) or 'empty'))
     product = call('GET', f'{PLAY}/oneTimeProducts/{PRODUCT_ID}', token)
     states = [o.get('state') for o in (product or {}).get('purchaseOptions', [])]
     print(f'play: [{"x" if "ACTIVE" in states else " "}] in-app product {PRODUCT_ID}: '
@@ -685,7 +687,7 @@ def mark(ok):
 
 
 def appstore_audit(token, app, versions):
-    print('appstore: --- before the first App Store release ---')
+    print('appstore: --- what App Review will want for the next version ---')
     attributes = call('GET', f'{ASC}/v1/apps/{app}', token)['data']['attributes']
     print(f'appstore: [{mark(attributes.get("contentRightsDeclaration"))}] content rights '
           f'declaration: {attributes.get("contentRightsDeclaration")}')
@@ -700,9 +702,15 @@ def appstore_audit(token, app, versions):
               f'{category["id"] if category else "none"}')
         rating = (call('GET', f'{ASC}/v1/appInfos/{info["id"]}/ageRatingDeclaration', token)
                   or {}).get('data')
-        unanswered = [k for k, v in ((rating or {}).get('attributes') or {}).items() if v is None]
+        # Fields only some apps answer: a Korean rating number, a link, a
+        # Kids category band.
+        optional = {'developerAgeRatingInfoUrl', 'gracRatingClassificationNumber',
+                    'kidsAgeBand', 'koreaAgeRatingOverride', 'ageRatingOverride',
+                    'ageRatingOverrideV2'}
+        unanswered = sorted(k for k, v in ((rating or {}).get('attributes') or {}).items()
+                            if v is None and k not in optional)
         print(f'appstore: [{mark(rating and not unanswered)}] age rating questionnaire'
-              f'{": unanswered " + ", ".join(sorted(unanswered)) if unanswered else ""}')
+              f'{": unanswered " + ", ".join(unanswered) if unanswered else ""}')
         for loc in call('GET', f'{ASC}/v1/appInfos/{info["id"]}/appInfoLocalizations',
                         token)['data']:
             a = loc['attributes']
@@ -770,7 +778,8 @@ def appstore_audit(token, app, versions):
     state = found[0]['attributes'].get('state') if found else 'missing'
     print(f'appstore: [{mark(state in ("READY_TO_SUBMIT", "WAITING_FOR_REVIEW", "APPROVED"))}] '
           f'in-app purchase {PRODUCT_ID}: {state} (the first one goes to review with a version)')
-    declarations = call('GET', f'{ASC}/v1/apps/{app}/appEncryptionDeclarations', token)['data']
+    declarations = call('GET', f'{ASC}/v1/appEncryptionDeclarations?filter[app]={app}',
+                        token)['data']
     print(f'appstore: export compliance declarations: '
           f'{[(d["id"], d["attributes"]) for d in declarations] or "none"}')
     source, answer, _ = compliance_source(token, app)
