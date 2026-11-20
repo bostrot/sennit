@@ -129,6 +129,18 @@ jobs:
             fi
           done
 
+  store-tooling:
+    name: Store tooling tests (Python)
+    # What decides which build goes public each night: see
+    # tooling/store/promote.py. Python and git, no Flutter.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test the store promotion rules
+        run: python3 -m unittest discover -s tooling/store -v
+
   widget:
     name: Widget & golden tests (${{ matrix.shard }}/3)
     # macOS on Apple silicon, not ubuntu: the golden files are rendered there

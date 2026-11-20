@@ -49,12 +49,15 @@ void main() {
     expect(workflow, contains('exit 1'));
   });
 
-  test('the build stays internal unless a manual run asks otherwise', () {
+  test('the build stays internal unless asked, or promotion is on', () {
+    // promote_to_stores.yml can only submit a build that is not
+    // internal-only, so turning it on makes every upload eligible.
     expect(
       workflow,
       contains(
         '<key>testFlightInternalTestingOnly</key>'
-        "<\${{ inputs.app_store && 'false' || 'true' }}/>",
+        "<\${{ (inputs.app_store || vars.STORE_PROMOTION_ENABLED == 'true') "
+        "&& 'false' || 'true' }}/>",
       ),
     );
     expect(workflow, contains('default: false'));
