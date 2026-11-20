@@ -68,6 +68,130 @@ App Quality terms; the review is against the messaging notification
 guidelines above. Until Google accepts it, the car shows a Play build only
 with *Unknown sources* enabled in Android Auto's developer settings.
 
+## Gemini and Google Assistant on Android
+
+Gemini has replaced Google Assistant on most Android phones and is replacing
+it in Android Auto through 2026 ([Android Auto help: Send and receive
+messages](https://support.google.com/androidauto/answer/6348317)). Neither
+Gemini nor Assistant has a messaging API for third-party apps. What exists,
+checked against Google's documentation on 2026-11-20:
+
+| Mechanism | What Google documents | Used by Sennit |
+|---|---|---|
+| Notification `MessagingStyle` + Reply / Mark-as-read actions | The Android Auto messaging contract ([notification-based messaging](https://developer.android.com/training/cars/communication/notification-messaging)); the assistant reads the notification and dictates into the reply's `RemoteInput` | Since 1.0.12 |
+| Long-lived conversation shortcuts with a `Person` ([People and conversations](https://developer.android.com/develop/ui/views/notifications/conversations)) pushed with `pushDynamicShortcut`, and the Google Shortcuts Integration Library so Google surfaces receive them ([creating shortcuts](https://developer.android.com/develop/ui/compose/system/shortcuts/creating-shortcuts#gsi-library)) | How the system and Google's assistant learn which conversations exist and what the people in them are called | Shortcuts since Direct Share; the library and the capability bindings since this change |
+| `addCapabilityBinding("actions.intent.SEND_MESSAGE")` / `RECEIVE_MESSAGE` on those shortcuts, with `message.recipient.@type = Audience` for groups | The `ShortcutInfoCompat.Builder` API; the message ids are App Actions built-in intents. Signal publishes exactly these (`ConversationUtil.java`) | Since this change |
+| App Actions `actions.intent.CREATE_MESSAGE` capability in `shortcuts.xml` ([reference](https://developer.android.com/reference/app-actions/built-in-intents/communications/create-message)) | Still documented; only the old `actions.xml` form is being retired. **In the car, App Actions only serve parking and charging apps** ([App Actions for cars](https://developer.android.com/develop/devices/assistant/cars)) | Since this change, phone only |
+| Gemini "connected apps" (Messages, WhatsApp) | A Google partner integration with no public API | Not possible |
+
+### What works, per case
+
+**(a) Replying by voice to a Sennit notification in the car: works.** The
+notification is a `MessagingStyle` conversation with a `SEMANTIC_ACTION_REPLY`
+action carrying a single `RemoteInput`, `showsUserInterface(false)`, handled
+headless (above). That is all Android Auto and its assistant need to read the
+message aloud and send a dictated reply, and it is the same contract Google
+documents. Nothing in it is Gemini-specific: the car's assistant fills the
+`RemoteInput` either way. This change also binds each notification's
+conversation shortcut to `RECEIVE_MESSAGE` and gives it a `LocusId` equal to
+its id.
+
+**(b) Starting a new message by voice in the car ("Hey Google, send a message
+to Alex on Sennit"): prepared, needs a hand test.** Android Auto takes this
+request for "any messaging app compatible with Android Auto", but Google does
+not document how a third-party app is offered as a target or receives the
+text. The open-source precedent is Signal: conversation shortcuts that are
+long-lived, carry a `Person`, are pushed with `pushDynamicShortcut` and are
+bound to `SEND_MESSAGE`. Sennit now publishes the same. Its top eight chats
+(pinned first, then recency and how often the user writes to them; see
+`ShareTargetRanker`) are bound to `SEND_MESSAGE`, and every chat that posts a
+notification is bound to both `SEND_MESSAGE` and `RECEIVE_MESSAGE`.
+`core-google-shortcuts` hands those pushes to Google's surfaces. Whether
+Gemini in Android Auto then offers Sennit for an arbitrary contact is Google's
+decision. Expect a contact who wrote recently to work first. Reports exist of
+Assistant refusing new messages for some apps ("I can't send messages with
+Telegram yet") while replies worked.
+
+**(c) On the phone, without a car: replies need a hand test, new messages are
+implemented.** "Hey Google, send a message to Alex on Sennit" on the phone goes
+through the `CREATE_MESSAGE` App Action. The assistant opens
+`weft://compose?recipient=Alex&text=…` and `WeftLink.parse` reads it as a
+`ComposeMessageLink`. `resolveMessageRecipient` (in `weft_share`, the same
+matching Siri uses) then picks the conversation, and it opens with the
+dictated words in the composer, **unsent**, after anything already typed. An
+App Action cannot ask "send it?", so the composer asks instead. When the name
+fits several chats or none, the search opens on the name, the dictated words
+go to the clipboard, and a snackbar says so. Whether Gemini on the phone still
+dispatches App Actions is not stated anywhere current. Google documents the
+intent without a deprecation, but some developers report that Gemini ignores
+older Assistant shortcuts. If it does not dispatch them, the capability does
+nothing and costs nothing. Voice replies to a notification on the phone work
+wherever the phone's assistant replies to notifications at all. They use the
+same reply action as the car.
+
+### Which chats the assistant can name
+
+- **Merged chats are one name.** A shortcut is a `Chat`, keyed by
+  `shareTargetSlotId(chat.id)`, so Anna on WhatsApp and Signal is one Anna,
+  and a reply goes through `ChatRepository.send` to her preferred leg, as from
+  the composer. Matching is on the chat title, which for a DM is the person
+  after the address book and the merge fold.
+- **Groups are audiences**, bound with `message.recipient.@type = Audience` or
+  `message.sender.@type = Audience`, so "message Anna" does not offer the
+  family group.
+- **Not addressable** (`isVoiceAddressable`): archived chats, and chat requests
+  that are pending or declined. A request published as a shortcut would hand a
+  stranger's name to the launcher and the assistant before the user had
+  accepted, and answering one by voice would accept it unseen. This also
+  removes such requests from Direct Share.
+
+### Privacy
+
+A conversation shortcut puts the chat's name and avatar into the launcher, the
+share sheet and, through `core-google-shortcuts`, Google's on-device assistant.
+It carries no message text. That is the same exposure Direct Share has always
+had, and it matches the preview setting's reading: with previews off, the
+notification still names the sender and only the body becomes "New message".
+The car and the assistant read only what the notification says. Sign-out
+removes every shortcut (`ShareShortcuts.clear`, `removeLongLivedShortcuts`),
+and the compat library forwards the removal to Google's surfaces too.
+
+### Play policy
+
+No new permission, declaration or Data safety change. Nothing is collected,
+and no data leaves the device beyond what the user's assistant already reads
+from shortcuts. The Android Auto opt-in under **Play Console** above is still
+what the car needs. The App Action needs no Play Console step.
+
+### Testing it by hand
+
+Unit and widget tests pin Sennit's side: the declarations
+(`assistant_messaging_test.dart`), the compose link and composer prefill, the
+name resolution (`packages/weft_share/test/recipient_test.dart`) and the
+ranker's request filter. Google's assistant, the DHU and a signed-in Google
+account are not available to CI. Check these by hand on a Play build, or on a
+debug build with *Unknown sources* enabled in Android Auto's developer
+settings:
+
+1. **Shortcuts reach the system.** After signing in and getting a message:
+   `adb shell dumpsys shortcut`, in the `com.bostrot.weft` package. Expect
+   `chat_…` ids that are dynamic and long-lived, with the conversation
+   category and a person.
+2. **(a) in the car / DHU.** As in the DHU steps above: a message arrives, the
+   head unit reads it, "Reply" takes a dictated answer, and it arrives in the
+   room. Do it once with Gemini enabled as the phone's assistant.
+3. **(b) in the car / DHU.** Press the voice button and say "Send a message to
+   <a contact who wrote recently> on Sennit", then "… to <a pinned chat> on
+   Sennit". Note what Gemini answers. If it says Sennit cannot send new
+   messages, Google is not offering third-party targets, and nothing more can
+   be done on Sennit's side.
+4. **(c) on the phone.** "Hey Google, send a message to <exact chat name> on
+   Sennit saying test": Sennit should open that chat with "test" in the
+   composer. Then try an ambiguous name: search should open with a snackbar,
+   and the text should be on the clipboard. To confirm the capability is
+   registered when Gemini will not trigger it, start the link directly:
+   `adb shell am start -a android.intent.action.VIEW -d 'weft://compose?recipient=Anna&text=hi' com.bostrot.weft`.
+
 ## CarPlay and Siri: entitled since 2026-11-19
 
 CarPlay messaging is SiriKit plus notifications. Sennit handles the three

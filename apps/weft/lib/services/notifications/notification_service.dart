@@ -114,6 +114,7 @@ abstract interface class NotificationSink {
     required String label,
     required String link,
     String? iconPath,
+    bool isGroup = false,
   });
 
   /// Removes one posted notification. [tag] is Android's, and must match the
@@ -253,6 +254,7 @@ class LocalNotificationSink implements NotificationSink {
     required String label,
     required String link,
     String? iconPath,
+    bool isGroup = false,
   }) async {
     if (!NotificationPlatform.isAndroid) return;
     try {
@@ -270,6 +272,9 @@ class LocalNotificationSink implements NotificationSink {
         'label': label,
         'link': link,
         'iconPath': iconPath,
+        // A group is bound to the assistant as an audience rather than a
+        // person, so "message Anna" does not offer the family group.
+        'isGroup': isGroup,
       });
     } on MissingPluginException {
       // A platform with no such handler. Notifications still post.
@@ -758,6 +763,7 @@ class WeftNotificationService {
       label: content.title,
       link: content.deepLink,
       iconPath: _avatars[content.eventId],
+      isGroup: _chatForRoom?.call(content.roomId)?.isGroup ?? false,
     );
 
     var aiReplies = const <String>[];

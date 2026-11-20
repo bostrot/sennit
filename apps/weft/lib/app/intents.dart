@@ -21,6 +21,10 @@ sealed class WeftLink {
   ///   `/chat/{roomOrChatId}`   → open that conversation
   ///   `/user/{matrixUserId}`   → open or create a DM
   ///   `/search?q={query}`      → open search pre-filled
+  ///   `/compose?recipient={name}&text={text}`
+  ///                            → a new message to whoever the name means,
+  ///                              from an Android App Action (Assistant or
+  ///                              Gemini on the phone)
   ///
   /// Plus the four telephony schemes — `sms:`, `smsto:`, `mms:`, `mmsto:` —
   /// which are not Sennit's own links at all: they are what the dialer, the
@@ -65,6 +69,11 @@ sealed class WeftLink {
         return OpenUserLink(segments[1]);
       case 'search':
         return OpenSearchLink(uri.queryParameters['q'] ?? '');
+      case 'compose':
+        return ComposeMessageLink(
+          recipient: (uri.queryParameters['recipient'] ?? '').trim(),
+          text: (uri.queryParameters['text'] ?? '').trim(),
+        );
       default:
         return null;
     }
@@ -91,6 +100,21 @@ class OpenSearchLink extends WeftLink {
   const OpenSearchLink(this.query);
 
   final String query;
+}
+
+/// "Send a message to Anna on Sennit", from a voice assistant.
+///
+/// What the `actions.intent.CREATE_MESSAGE` capability in `shortcuts.xml`
+/// opens: the assistant fills in the spoken name and, when it heard one, the
+/// message. Both may be empty — "Send a message on Sennit" names nobody — and
+/// the name is whatever the recogniser heard, so it is resolved against the
+/// inbox (`resolveMessageRecipient`) rather than trusted as an id. Nothing is
+/// sent from here: the text lands in the composer and the user sends it.
+class ComposeMessageLink extends WeftLink {
+  const ComposeMessageLink({this.recipient = '', this.text = ''});
+
+  final String recipient;
+  final String text;
 }
 
 /// The four schemes an "message this number" intent arrives under.

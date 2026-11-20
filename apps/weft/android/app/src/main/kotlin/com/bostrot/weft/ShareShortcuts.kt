@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import kotlin.math.abs
@@ -49,6 +50,27 @@ object ShareShortcuts {
     /// value written twice, and a typo in either produces an app that shares
     /// fine and simply never appears as a person.
     const val SHARE_CATEGORY = "com.bostrot.weft.category.SHARE_TARGET"
+
+    /// What the voice assistant reads off a conversation shortcut.
+    ///
+    /// Google's assistant (Gemini, and Assistant before it) learns who can be
+    /// messaged in an app from the shortcuts the app pushes: a shortcut bound
+    /// to `actions.intent.SEND_MESSAGE` is a conversation the user writes to,
+    /// one bound to `RECEIVE_MESSAGE` a conversation that wrote to the user.
+    /// That is the whole of what "Hey Google, send a message to Anna on
+    /// Sennit" needs to resolve "Anna" — the same binding Signal publishes.
+    /// The ids are App Actions built-in intents; they need no declaration in
+    /// `shortcuts.xml` to be bound, only to be *invoked* (see the
+    /// `CREATE_MESSAGE` capability there).
+    const val CAPABILITY_SEND_MESSAGE = "actions.intent.SEND_MESSAGE"
+    const val CAPABILITY_RECEIVE_MESSAGE = "actions.intent.RECEIVE_MESSAGE"
+
+    /// A group is an audience, not a person: bound with this parameter, the
+    /// assistant offers it as "the family group", never as a person to call
+    /// "family".
+    private const val PARAMETER_RECIPIENT_TYPE = "message.recipient.@type"
+    private const val PARAMETER_SENDER_TYPE = "message.sender.@type"
+    private val AUDIENCE = listOf("Audience")
 
     /// Shortcut id → [Chat.id], so a Direct Share intent can be resolved.
     ///
@@ -135,6 +157,9 @@ object ShareShortcuts {
                 // The rank the ranker chose, not this loop's index: the two
                 // agree today, and only one of them is a decision.
                 rank = (slot["rank"] as? Int) ?: index,
+                isGroup = slot["isGroup"] as? Boolean ?: false,
+                // The ranked set is who the user writes to.
+                capabilities = listOf(CAPABILITY_SEND_MESSAGE),
             ) ?: return@forEachIndexed
 
             try {
@@ -170,6 +195,7 @@ object ShareShortcuts {
         label: String,
         link: String,
         iconPath: String?,
+        isGroup: Boolean = false,
     ): Boolean {
         val shortcut = build(
             activity = activity,
@@ -182,6 +208,12 @@ object ShareShortcuts {
             // arrived, which the ranker will account for on its next pass. Until
             // then it should not displace a pinned conversation in the sheet.
             rank = Int.MAX_VALUE,
+            isGroup = isGroup,
+            // Pushed because a message arrived: this conversation wrote to the
+            // user. Still bound to SEND_MESSAGE as well, because this push
+            // replaces the ranked one under the same id, and a conversation
+            // that just wrote is the likeliest one to be answered by name.
+            capabilities = listOf(CAPABILITY_SEND_MESSAGE, CAPABILITY_RECEIVE_MESSAGE),
         ) ?: return false
 
         return try {
@@ -251,6 +283,8 @@ object ShareShortcuts {
         link: String,
         iconPath: String?,
         rank: Int,
+        isGroup: Boolean,
+        capabilities: List<String>,
     ): ShortcutInfoCompat? {
         val uri = Uri.parse(link)
         if (uri.scheme.isNullOrEmpty()) return null
@@ -268,7 +302,7 @@ object ShareShortcuts {
             .setIcon(icon)
             .build()
 
-        return ShortcutInfoCompat.Builder(activity, id)
+        val builder = ShortcutInfoCompat.Builder(activity, id)
             .setShortLabel(shortLabel)
             .setLongLabel(longLabel)
             .setIntent(intent)
@@ -277,14 +311,33 @@ object ShareShortcuts {
             // notification that created it — and it cannot be a Direct Share
             // target either, since the system caches the target list.
             .setLongLived(true)
+            // Marks it a conversation for the system's people service, which
+            // is what ranks it for the share sheet and the assistant.
+            .setIsConversation()
             .setPerson(person)
+            // The same id the notification is keyed on, so the system's
+            // intelligence services can tell they are one conversation.
+            .setLocusId(LocusIdCompat(id))
             // Both categories, because the two surfaces read different ones:
             // the shade wants `conversation` to file the notification, the
             // share sheet wants the share-target category to offer the icon.
             .setCategories(setOf(CONVERSATION_CATEGORY, SHARE_CATEGORY))
             .setRank(rank)
             .setIcon(icon)
-            .build()
+
+        for (capability in capabilities) {
+            val typeParameter = if (capability == CAPABILITY_SEND_MESSAGE) {
+                PARAMETER_RECIPIENT_TYPE
+            } else {
+                PARAMETER_SENDER_TYPE
+            }
+            if (isGroup) {
+                builder.addCapabilityBinding(capability, typeParameter, AUDIENCE)
+            } else {
+                builder.addCapabilityBinding(capability)
+            }
+        }
+        return builder.build()
     }
 
     private fun icon(path: String?): IconCompat? {

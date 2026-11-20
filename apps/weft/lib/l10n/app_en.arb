@@ -8119,5 +8119,29 @@
   "contactReplyRemindersSubtitle": "Remind me when I read a message here and don’t answer",
   "@contactReplyRemindersSubtitle": {
     "description": "Subtitle of the reply reminders switch in a chat's profile."
+  },
+  "composeRecipientMissing": "Pick the chat to send your message to.",
+  "@composeRecipientMissing": {
+    "description": "Snackbar after a voice assistant (Google Assistant or Gemini) asked Sennit to send a message but named nobody. The inbox is showing."
+  },
+  "composeRecipientUnclear": "Which chat did you mean by “{name}”? Pick it here.",
+  "@composeRecipientUnclear": {
+    "description": "Snackbar after a voice assistant asked Sennit to message someone whose name matches several chats or none. Search is open on the name. {name} is the name as the assistant heard it.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "composeRecipientUnclearCopied": "Which chat did you mean by “{name}”? Your message is copied: pick the chat and paste it.",
+  "@composeRecipientUnclearCopied": {
+    "description": "Like composeRecipientUnclear, when the assistant also dictated the message: it has been copied to the clipboard so the user can paste it into the chat they pick. {name} is the name as the assistant heard it.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
   }
 }

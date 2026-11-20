@@ -396,6 +396,43 @@ final composerHandleProvider = Provider<ComposerHandle>(
   (ref) => ComposerHandle(),
 );
 
+/// Text waiting to be put into a conversation's composer.
+///
+/// "Send a message to Anna saying I'm late" arrives as a link with the words
+/// in it, and the conversation it names may not be on screen yet — on a cold
+/// start it is seconds from existing. So the text is parked here under the
+/// chat id and the conversation takes it when it opens, or at once if it is
+/// already open. It is never sent from here: the user reads it and presses
+/// send, which is the confirmation an App Action has no other way to ask for.
+class ComposerPrefill extends ChangeNotifier {
+  final Map<String, String> _pending = {};
+
+  /// Parks [text] for [chatId], replacing anything parked there before.
+  void offer(String chatId, String text) {
+    if (text.trim().isEmpty) return;
+    _pending[chatId] = text.trim();
+    notifyListeners();
+  }
+
+  /// The text parked for any of [chatIds], removed so it is used once.
+  ///
+  /// Several ids because a conversation answers to more than one: the id the
+  /// link resolved to and the one the screen settled on after a merge.
+  String? take(Iterable<String> chatIds) {
+    for (final id in chatIds) {
+      final text = _pending.remove(id);
+      if (text != null) return text;
+    }
+    return null;
+  }
+}
+
+/// Held for the app's lifetime, like [composerHandleProvider]; the open
+/// conversation listens to it directly.
+final composerPrefillProvider = Provider<ComposerPrefill>(
+  (ref) => ComposerPrefill(),
+);
+
 /// The open conversation's way back to its newest message, for the shortcut
 /// that takes it.
 ///

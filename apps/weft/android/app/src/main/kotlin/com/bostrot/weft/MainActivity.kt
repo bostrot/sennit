@@ -96,6 +96,7 @@ class MainActivity : FlutterActivity() {
                                 label = label,
                                 link = link,
                                 iconPath = call.argument<String>("iconPath"),
+                                isGroup = call.argument<Boolean>("isGroup") ?: false,
                             )
                         )
                     }

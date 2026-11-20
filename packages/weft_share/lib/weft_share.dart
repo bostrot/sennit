@@ -21,6 +21,11 @@
 ///   hand-written Swift encoder produces and a decoder that never throws reads
 ///   back.
 ///
+/// [rankMessageRecipients] and [resolveMessageRecipient] answer the same
+/// question for a voice assistant: which conversation a spoken name means. The
+/// conversation shortcuts the ranker publishes are what Android's assistant
+/// matches names against, so the two belong together.
+///
 /// Nothing here touches the filesystem, a method channel or Flutter. The
 /// publishers do, in `apps/weft/lib/services/share/`.
 library;
@@ -29,5 +34,6 @@ library;
 export 'src/capability.dart';
 export 'src/content.dart';
 export 'src/ranker.dart';
+export 'src/recipient.dart';
 export 'src/slot.dart';
 export 'src/staging.dart';

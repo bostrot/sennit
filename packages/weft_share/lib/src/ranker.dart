@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import 'capability.dart';
 import 'content.dart';
+import 'recipient.dart';
 import 'slot.dart';
 
 /// How many targets the ranker publishes unless told otherwise.
@@ -170,7 +171,10 @@ class ShareTargetRanker {
   }
 
   bool _isEligible(Chat chat, ShareContent content) {
-    if (chat.archived) return false;
+    // Archived chats, and chat requests nobody has said yes to: a published
+    // shortcut is a name handed to the launcher, the share sheet and the
+    // voice assistant, and a stranger's should not get there first.
+    if (!isVoiceAddressable(chat)) return false;
     // A chat with no source has nowhere to send to. It exists transiently while
     // a merge is being rebuilt, and publishing it produces a shortcut whose tap
     // opens a conversation that cannot be written to.

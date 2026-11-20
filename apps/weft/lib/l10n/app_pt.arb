@@ -1403,5 +1403,8 @@
   "replyRemindersExcludeChat": "Deixar uma conversa de fora",
   "replyRemindersIncludeAgain": "Voltar a lembrar",
   "replyRemindersNoChatsToExclude": "Nenhuma conversa para deixar de fora.",
-  "contactReplyRemindersSubtitle": "Lembrar quando eu ler uma mensagem aqui e não responder"
+  "contactReplyRemindersSubtitle": "Lembrar quando eu ler uma mensagem aqui e não responder",
+  "composeRecipientMissing": "Escolha a conversa para onde enviar sua mensagem.",
+  "composeRecipientUnclear": "Qual conversa você quis dizer com “{name}”? Escolha aqui.",
+  "composeRecipientUnclearCopied": "Qual conversa você quis dizer com “{name}”? Sua mensagem foi copiada: escolha a conversa e cole."
 }

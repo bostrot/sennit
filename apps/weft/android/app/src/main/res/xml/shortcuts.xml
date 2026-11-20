@@ -23,6 +23,32 @@
      decide whether Weft is in the sheet at all, these decide whether the
      conversations are. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- "Hey Google, send a message to Anna on Sennit", on the phone.
+
+         An App Actions built-in intent: the assistant hears the name and,
+         when it is dictated, the message, and opens the URL below with both
+         filled in. `WeftLink.parse` reads it as a `ComposeMessageLink`; the
+         name is resolved against the inbox (`resolveMessageRecipient` in
+         weft_share) and the conversation opens with the words in the composer,
+         unsent. Opening rather than sending is deliberate: an App Action has no
+         way to ask "send it?", and the composer is that question.
+
+         Phone only. Google's App Actions in the car are limited to parking and
+         charging apps; in the car the assistant reaches Sennit through the
+         notification's reply action and the conversation shortcuts that
+         `ShareShortcuts.kt` binds to SEND_MESSAGE. See
+         docs/car-integrations.md. -->
+    <capability android:name="actions.intent.CREATE_MESSAGE">
+        <intent>
+            <url-template android:value="weft://compose{?recipient,text}"/>
+            <parameter
+                android:name="message.recipient.name"
+                android:key="recipient"/>
+            <parameter
+                android:name="message.text"
+                android:key="text"/>
+        </intent>
+    </capability>
     <share-target android:targetClass="com.bostrot.weft.MainActivity">
         <data android:mimeType="text/plain"/>
         <data android:mimeType="image/*"/>

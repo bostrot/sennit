@@ -67,6 +67,7 @@ class RecordingNotificationSink implements NotificationSink {
     required String label,
     required String link,
     String? iconPath,
+    bool isGroup = false,
   }) async => shortcuts.add((id: id, label: label, link: link));
 }
 

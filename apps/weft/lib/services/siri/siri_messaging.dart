@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_notify/weft_notify.dart';
+import 'package:weft_share/weft_share.dart';
 
 import '../../data/chat_repository.dart';
 
@@ -123,49 +124,31 @@ const String kSiriChannelName = 'com.bostrot.weft/siri';
 
 /// How many conversations Siri offers for one spoken name before it asks
 /// the user to say more.
-const int kSiriMaxRecipientMatches = 5;
+const int kSiriMaxRecipientMatches = kMaxRecipientMatches;
 
 /// How many unread conversations "Read my messages" reads. Siri reads every
 /// one it is given, and a long list is a long drive.
 const int kSiriMaxUnreadChats = 10;
 
-/// The conversations a spoken [query] could mean, best first.
+/// The conversations a spoken [query] could mean, best first, as Siri wants
+/// them.
 ///
-/// Matched on the chat title, which for a DM is the person — already
-/// resolved through the address book and the merge fold, so "Anna" finds the
-/// one merged Anna rather than her WhatsApp and her Signal separately. An
-/// exact match outranks a word that starts with the query, which outranks the
-/// query appearing anywhere. Archived chats and pending requests are left out:
-/// replying to a request from the car would accept it without the user ever
-/// seeing who it is from.
+/// The matching is `rankMessageRecipients` in `weft_share`, which the Android
+/// App Action resolves through too, so a name means the same conversation to
+/// Siri, to Gemini and in either car. It leaves out archived chats and chat
+/// requests nobody has accepted: replying to a request from the car would
+/// accept it without the user ever seeing who it is from.
 List<Map<String, Object?>> siriRecipientMatches(
   List<Chat> chats,
   String query,
-) {
-  final wanted = query.trim().toLowerCase();
-  if (wanted.isEmpty) return const [];
-
-  int? rank(Chat chat) {
-    final title = chat.title.trim().toLowerCase();
-    if (title == wanted) return 0;
-    if (title.split(RegExp(r'\s+')).any((word) => word.startsWith(wanted))) {
-      return 1;
-    }
-    if (title.contains(wanted)) return 2;
-    return null;
-  }
-
-  final ranked = <(int, Chat)>[
-    for (final chat in chats)
-      if (!chat.archived && chat.request == null)
-        if (rank(chat) case final r?) (r, chat),
-  ]..sort((a, b) => a.$1.compareTo(b.$1));
-
-  return [
-    for (final (_, chat) in ranked.take(kSiriMaxRecipientMatches))
-      {'chatId': chat.id, 'title': chat.title, 'isGroup': chat.isGroup},
-  ];
-}
+) => [
+  for (final chat in rankMessageRecipients(
+    chats,
+    query,
+    max: kSiriMaxRecipientMatches,
+  ))
+    {'chatId': chat.id, 'title': chat.title, 'isGroup': chat.isGroup},
+];
 
 /// What "Read my messages" reads: the latest message of every unread,
 /// unmuted conversation, newest first.

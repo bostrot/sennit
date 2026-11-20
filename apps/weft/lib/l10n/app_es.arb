@@ -1402,5 +1402,8 @@
   "replyRemindersExcludeChat": "Excluir un chat",
   "replyRemindersIncludeAgain": "Volver a recordar",
   "replyRemindersNoChatsToExclude": "No hay chats para excluir.",
-  "contactReplyRemindersSubtitle": "Recordarme si leo un mensaje aquí y no respondo"
+  "contactReplyRemindersSubtitle": "Recordarme si leo un mensaje aquí y no respondo",
+  "composeRecipientMissing": "Elige el chat al que enviar tu mensaje.",
+  "composeRecipientUnclear": "¿Qué chat querías decir con «{name}»? Elígelo aquí.",
+  "composeRecipientUnclearCopied": "¿Qué chat querías decir con «{name}»? Tu mensaje está copiado: elige el chat y pégalo."
 }

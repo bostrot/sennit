@@ -312,6 +312,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// provider through a dead `BuildContext` throws.
   late final ComposerHandle _composerHandle;
 
+  /// Where text from "Send a message to … saying …" waits for this
+  /// conversation; see [_takePrefill].
+  late final ComposerPrefill _prefill;
+
   /// Held for the same reason, for the jump-to-latest shortcut.
   late final LatestMessageHandle _latestHandle;
 
@@ -358,6 +362,27 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.addListener(_onComposerChanged);
     _scroll.addListener(_onScrolled);
     _open();
+    _prefill = ref.read(composerPrefillProvider)..addListener(_takePrefill);
+    _takePrefill();
+  }
+
+  /// Puts text a voice assistant dictated for this conversation into the
+  /// composer, unsent.
+  ///
+  /// Added after anything already typed rather than over it: a draft the user
+  /// was halfway through is theirs, and the dictated words are easier to
+  /// delete than the draft is to retype. A preview is a peek and takes
+  /// nothing, so the text waits for the conversation itself.
+  void _takePrefill() {
+    if (!mounted || widget.preview) return;
+    final text = _prefill.take({widget.chatId, _chatId});
+    if (text == null) return;
+    final current = _composer.text.trimRight();
+    final next = current.isEmpty ? text : '$current $text';
+    _composer.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
   }
 
   /// Who is typing and whether the peer is online, refreshed per sync tick.
@@ -503,6 +528,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // incoming screen has already made.
     _composerHandle.release(this);
     _latestHandle.release(this);
+    _prefill.removeListener(_takePrefill);
     _reportOnScreen(null);
     // A conversation left before it arrived.
     _stopWaitingForChat();
