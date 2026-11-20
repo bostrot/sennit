@@ -1755,6 +1755,8 @@ void main() {
         );
 
         final call = intents.calls.single;
+        // A person, not an audience: the assistant offers Grace by name.
+        expect((call.arguments! as Map)['isGroup'], isFalse);
         expect(call.method, 'publishChatShortcut');
         final args = call.arguments! as Map;
         expect(args['id'], 'chat_merged_contact_1');

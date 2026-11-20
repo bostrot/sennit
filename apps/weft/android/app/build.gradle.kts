@@ -133,6 +133,12 @@ dependencies {
     // dependency that a plugin upgrade drops would break the build with an
     // unresolved import rather than a version conflict.
     implementation("androidx.core:core-ktx:1.13.1")
+    // Hands the conversation shortcuts `ShareShortcuts` pushes to Google's
+    // surfaces as well as the launcher — the assistant (Gemini, Assistant)
+    // only learns who can be messaged in Sennit from shortcuts it receives
+    // through this library. It adds no API of its own: it registers a listener
+    // that `ShortcutManagerCompat.pushDynamicShortcut` and the removals call.
+    implementation("androidx.core:core-google-shortcuts:1.1.0")
     // The home screen widgets. Glance is the only way to build an AppWidget
     // without hand-writing `RemoteViews` against a layout XML per state, and
     // this widget has five states.
