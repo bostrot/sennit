@@ -195,6 +195,41 @@ void main() {
     expect(builtBubbles(tester), lessThan(40));
   });
 
+  testWidgets('reaching the top of what is loaded asks for older history '
+      'after the frame, not in the middle of it', (tester) async {
+    final repo = _repository();
+    await pumpWeft(
+      tester,
+      const ChatView(chatId: LoadChatRepository.groupChatId),
+      repository: repo,
+      size: const Size(412, 915),
+    );
+    await tester.pumpAndSettle();
+    final opened = repo.loadedIn(LoadChatRepository.groupChatId);
+    // Past the listener's cooldown, as a reader who has been reading is.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 350)),
+    );
+
+    // The reader ends up past the real top of the list: its extent was an
+    // estimate from the rows built so far, and the rows above turned out
+    // shorter. The next layout pulls the list back, and the scroll that
+    // starts announces itself from inside that layout — which, within a
+    // screen of the top, is where the next page used to be asked for.
+    final position = tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position;
+    position.correctPixels(
+      position.maxScrollExtent + position.viewportDimension / 2,
+    );
+    position.notifyListeners();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
+    expect(repo.loadedIn(LoadChatRepository.groupChatId), greaterThan(opened));
+  });
+
   testWidgets('a jump lands on a message far past the rows that are built', (
     tester,
   ) async {

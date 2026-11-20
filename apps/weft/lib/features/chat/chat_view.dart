@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 // `SelectionArea` reports what it holds as a `SelectedContent`, which lives in
 // the rendering layer and is not re-exported by `material.dart`.
 import 'package:flutter/rendering.dart' show SelectedContent;
+import 'package:flutter/scheduler.dart' show SchedulerBinding, SchedulerPhase;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1030,6 +1031,27 @@ class _ChatViewState extends ConsumerState<ChatView> {
     if (next.messages.length > before) _topUpHistory();
   }
 
+  /// [_loadOlder], from a scroll notification.
+  ///
+  /// Most of those come from a gesture or an animation tick, between frames,
+  /// but not all: when the list's extent changes under the reader — a page
+  /// landing, an estimate corrected, the window resized — the scroll that
+  /// settles it starts inside layout, and a `setState` there is a build
+  /// scheduled mid-frame. Then the page is asked for once the frame is done.
+  void _loadOlderSoon() {
+    if (SchedulerBinding.instance.schedulerPhase !=
+        SchedulerPhase.persistentCallbacks) {
+      _loadOlder();
+      return;
+    }
+    // Stamped now, so the notifications still to come in this frame do not
+    // queue a callback each.
+    _lastLoadOlderAt = DateTime.now();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadOlder();
+    });
+  }
+
   /// Loads older history until about a screen of it sits above what is
   /// showing, and no further.
   ///
@@ -2053,7 +2075,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           !_loading &&
                           DateTime.now().difference(_lastLoadOlderAt) >
                               const Duration(milliseconds: 300)) {
-                        _loadOlder();
+                        _loadOlderSoon();
                       }
                       return false;
                     },

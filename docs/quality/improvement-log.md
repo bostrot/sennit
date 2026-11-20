@@ -13,6 +13,8 @@ and what was noticed but not done.
 
 - 2026-11-19 · User experience · ⌘↓ (Mac) / Ctrl+End (Windows, Linux) jumps back to the newest message in the open conversation, without taking the key from a half-written draft · https://github.com/bostrot/sennit/pull/8
 
+- 2026-11-20 · Bug fix · Older history asked for from inside layout waits for the frame to finish, so reaching the top of a chat no longer rebuilds it mid-frame · PR_LINK
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -33,6 +35,13 @@ and what was noticed but not done.
   self-hosted runner" drafts of earlier runs should not recur. A fresh
   worktree has no generated `AppL10n`: run `flutter gen-l10n` in
   `apps/weft` before the first `flutter test`, or every test fails to load.
+
+- 2026-11-20 · #8 merged with only CI notes; nothing closed unmerged. A
+  flaky failure that comes and goes is worth chasing for its cause: the
+  "loading older history mid-layout" bug hid behind the listener's
+  wall-clock cooldown, failing about one run in five. A test that sets up
+  the state directly (reader past the end, cooldown elapsed) made it fail
+  every time.
 
 ## Ideas backlog
 
@@ -104,7 +113,10 @@ and what was noticed but not done.
   the event id, so `_openMention` cannot jump to the message. Making inbound
   event links scroll to the message is the first run; the copy action is the
   second.
-- **Loading older history can call `setState` during layout.** Found
+- ~~**Loading older history can call `setState` during layout.**~~ Done
+  2026-11-20 (`_loadOlderSoon`). Left as it is: `keyboard_test.dart`'s
+  `scrollIntoHistory` still stops short of the top; it no longer has to.
+  Was: Found
   2026-11-19 while testing the jump-to-latest key: when the timeline's
   content dimensions change with the reader within a screen of the top, the
   ballistic scroll that `applyNewDimensions` starts dispatches a
@@ -114,3 +126,9 @@ and what was noticed but not done.
   frame. Deferring the call with `addPostFrameCallback` (or checking
   `SchedulerBinding.schedulerPhase`) is likely the whole fix, with a widget
   test that jumps to `maxScrollExtent` as the reproduction.
+- **Let people refuse invites from strangers.** Matrix clients have started
+  shipping invite blocking (seen in This Week in Matrix, 2026-09-25:
+  https://matrix.org/blog/2026/09/25/this-week-in-matrix-2026-09-25/).
+  Sennit has chat requests (`chat_requests_test.dart`); check which MSC the
+  servers support and whether a "block invites from people you don't share a
+  room with" switch fits there. Probably a design note first.
