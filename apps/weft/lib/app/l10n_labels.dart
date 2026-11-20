@@ -80,7 +80,9 @@ extension WeftFailureLabels on AppL10n {
     null => null,
     BridgeFailure.rejected => bridgeErrorRejected,
     BridgeFailure.notFound => bridgeErrorNotFound,
-    BridgeFailure.unavailable => bridgeErrorUnavailable,
+    BridgeFailure.unavailable ||
+    BridgeFailure.unreachable ||
+    BridgeFailure.timeout => bridgeErrorUnavailable,
     BridgeFailure.other => bridgeErrorStatus(error.statusCode ?? 0),
   };
 

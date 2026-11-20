@@ -101,7 +101,7 @@ void main() {
       expect(find.text('WhatsApp'), findsWidgets);
       // The destinations the phone hides in an overflow menu are rows here.
       expect(find.text('Settings'), findsOneWidget);
-      expect(find.text('Bridges'), findsOneWidget);
+      expect(find.text('Messengers'), findsOneWidget);
     });
 
     testWidgets('selecting a conversation opens it beside the list', (

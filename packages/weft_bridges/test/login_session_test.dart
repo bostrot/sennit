@@ -223,11 +223,14 @@ void main() {
       await session.start();
 
       expect(session.status, BridgeLoginStatus.failed);
+      // The route forward is the screen's to word; what the session owes it
+      // is a reason it can tell apart from a bridge error.
       expect(
-        session.error,
-        contains('admin room'),
+        session.problem,
+        BridgeLoginProblem.unsupportedStep,
         reason: 'the user needs a route forward, not just an error',
       );
+      expect(session.error, contains('holographic_handshake'));
     });
 
     test('a bridge error fails the session with its message', () async {

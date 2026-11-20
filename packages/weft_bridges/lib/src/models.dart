@@ -80,7 +80,11 @@ enum BridgeLoginState {
     'CONNECTED' => BridgeLoginState.connected,
     'CONNECTING' => BridgeLoginState.connecting,
     'TRANSIENT_DISCONNECT' => BridgeLoginState.transientDisconnect,
-    'BAD_CREDENTIALS' => BridgeLoginState.badCredentials,
+    'BAD_CREDENTIALS' || 'LOGGED_OUT' => BridgeLoginState.badCredentials,
+    // An unknown error with the bridge still holding the session: it retries
+    // on its own, so it reads as a hiccup rather than a sign-out.
+    'UNKNOWN_ERROR' => BridgeLoginState.transientDisconnect,
+    'BACKFILLING' || 'RUNNING' => BridgeLoginState.connected,
     _ => BridgeLoginState.unknown,
   };
 
@@ -116,6 +120,41 @@ class BridgeLogin {
       state == BridgeLoginState.transientDisconnect;
 
   String get label => remoteProfileName ?? name ?? id;
+
+  /// One entry of `/v3/whoami`'s `logins`.
+  ///
+  /// The state moved from top-level `state_event` into a `state` object in
+  /// bridgev2; both shapes are still served, and a bridge new enough to drop
+  /// the old one must not read as "unknown" — which asks the user to sign in
+  /// again for no reason.
+  factory BridgeLogin.fromJson(Map<Object?, Object?> json) {
+    final state = json['state'];
+    final stateMap = state is Map ? state : const <Object?, Object?>{};
+    final rawState =
+        stateMap['state_event'] as String? ??
+        json['state_event'] as String? ??
+        (state is String ? state : null);
+    final profile = json['profile'];
+    final error =
+        json['error'] as String? ??
+        stateMap['message'] as String? ??
+        json['state_reason'] as String?;
+    return BridgeLogin(
+      id: json['id'] as String? ?? '',
+      state: BridgeLoginState.fromWire(rawState),
+      name: json['name'] as String?,
+      remoteProfileName: profile is Map
+          ? (profile['name'] as String?)?.nonEmpty ??
+                (profile['username'] as String?)?.nonEmpty ??
+                (profile['phone'] as String?)?.nonEmpty
+          : null,
+      errorMessage: error?.nonEmpty,
+    );
+  }
+}
+
+extension on String {
+  String? get nonEmpty => trim().isEmpty ? null : this;
 }
 
 /// One way of logging in — QR, phone number, bot token…
@@ -170,12 +209,38 @@ class LoginInputField {
     required this.name,
     this.description,
     this.pattern,
+    this.defaultValue,
+    this.placeholder,
+    this.options = const [],
+    this.optional = false,
+    this.minLength = 0,
+    this.maxLength = 0,
   });
+
+  factory LoginInputField.fromJson(Map<Object?, Object?> json) {
+    final options = json['options'];
+    return LoginInputField(
+      id: json['id'] as String? ?? '',
+      type: json['type'] as String? ?? 'text',
+      name: json['name'] as String? ?? json['id'] as String? ?? 'Value',
+      description: (json['description'] as String?)?.nonEmpty,
+      pattern: (json['pattern'] as String?)?.nonEmpty,
+      defaultValue: (json['default_value'] as String?)?.nonEmpty,
+      placeholder: (json['placeholder'] as String?)?.nonEmpty,
+      options: options is List
+          ? options.whereType<String>().toList(growable: false)
+          : const [],
+      optional: json['optional'] == true,
+      minLength: (json['min_length'] as num?)?.toInt() ?? 0,
+      maxLength: (json['max_length'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   final String id;
 
   /// Bridge-declared semantic type: `phone_number`, `email`, `password`,
-  /// `token`, `username`, `2fa_code`…
+  /// `token`, `username`, `2fa_code`, `select`, `url`, `domain`,
+  /// `captcha_code`…
   final String type;
 
   final String name;
@@ -185,27 +250,98 @@ class LoginInputField {
   /// typo is caught locally instead of costing a round trip.
   final String? pattern;
 
+  /// What the field starts with, when the bridge suggests something.
+  final String? defaultValue;
+
+  /// Hint text for an empty field.
+  final String? placeholder;
+
+  /// For a `select` field, the only values the bridge accepts.
+  final List<String> options;
+
+  /// Whether the field may be left empty.
+  final bool optional;
+
+  /// Length bounds as a hint; zero means no bound.
+  final int minLength;
+  final int maxLength;
+
   bool get isSecret =>
       type == 'password' || type == 'token' || type.contains('2fa');
+
+  bool get isSelect => type == 'select' && options.isNotEmpty;
 
   /// Best keyboard for this field.
   String get keyboardHint => switch (type) {
     'phone_number' => 'phone',
     'email' => 'email',
     '2fa_code' => 'number',
+    'url' || 'domain' => 'url',
     _ => 'text',
   };
 
   /// Whether [value] satisfies [pattern]. Accepts anything when the bridge
   /// gave no pattern or gave one that does not compile.
   bool validate(String value) {
-    if (pattern == null || pattern!.isEmpty) return value.trim().isNotEmpty;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return optional;
+    if (isSelect) return options.contains(trimmed);
+    if (minLength > 0 && trimmed.length < minLength) return false;
+    if (maxLength > 0 && trimmed.length > maxLength) return false;
+    if (pattern == null || pattern!.isEmpty) return true;
     try {
-      return RegExp(pattern!).hasMatch(value);
+      return RegExp(pattern!).hasMatch(_normalised(trimmed));
     } on FormatException {
-      return value.trim().isNotEmpty;
+      return true;
     }
   }
+
+  /// What the bridge would see after its own clean-up.
+  ///
+  /// bridgev2 strips spaces, dashes and brackets out of a phone number before
+  /// matching it, so `+49 170 123-4567` is valid there — and must be valid
+  /// here, or the field refuses a number the bridge would have taken.
+  String _normalised(String value) => type == 'phone_number'
+      ? value.replaceAll(RegExp(r'[\s()\-]'), '')
+      : value;
+
+  /// [value] as it should be submitted.
+  String clean(String value) => _normalised(value.trim());
+}
+
+/// What a [LoginStepType.cookies] step wants collected from a web session.
+@immutable
+class LoginCookiesParams {
+  const LoginCookiesParams({
+    required this.url,
+    this.userAgent,
+    this.fieldIds = const [],
+    this.extractJs,
+    this.waitForUrlPattern,
+  });
+
+  factory LoginCookiesParams.fromJson(Map<Object?, Object?> json) {
+    final fields = json['fields'];
+    return LoginCookiesParams(
+      url: json['url'] as String? ?? '',
+      userAgent: (json['user_agent'] as String?)?.nonEmpty,
+      fieldIds: fields is List
+          ? [
+              for (final field in fields.whereType<Map>())
+                if (field['id'] is String) field['id'] as String,
+            ]
+          : const [],
+      extractJs: (json['extract_js'] as String?)?.nonEmpty,
+      waitForUrlPattern: (json['wait_for_url_pattern'] as String?)?.nonEmpty,
+    );
+  }
+
+  /// The page to sign in on.
+  final String url;
+  final String? userAgent;
+  final List<String> fieldIds;
+  final String? extractJs;
+  final String? waitForUrlPattern;
 }
 
 /// A step in a login flow.
@@ -224,6 +360,8 @@ class LoginStep {
     this.displayImageUrl,
     this.displayType,
     this.loginId,
+    this.userLoginId,
+    this.cookies,
     this.raw = const {},
   });
 
@@ -240,11 +378,19 @@ class LoginStep {
   final String? displayData;
   final String? displayImageUrl;
 
-  /// `qr`, `emoji`, or `nothing`.
+  /// `qr`, `emoji`, `code`, or `nothing`.
   final String? displayType;
 
-  /// Set on [LoginStepType.complete].
+  /// The login *process* this step belongs to — what the next request is
+  /// addressed to.
   final String? loginId;
+
+  /// Set on [LoginStepType.complete]: the remote account the bridge now holds,
+  /// which is what logging out later is addressed to.
+  final String? userLoginId;
+
+  /// For [LoginStepType.cookies].
+  final LoginCookiesParams? cookies;
 
   /// The undecoded step, so an unsupported type can still be shown for
   /// debugging rather than vanishing.
@@ -260,34 +406,32 @@ class LoginStep {
     if (userInput is Map && userInput['fields'] is List) {
       for (final field in userInput['fields'] as List) {
         if (field is! Map) continue;
-        fields.add(
-          LoginInputField(
-            id: field['id'] as String? ?? '',
-            type: field['type'] as String? ?? 'text',
-            name: field['name'] as String? ?? field['id'] as String? ?? 'Value',
-            description: field['description'] as String?,
-            pattern: field['pattern'] as String?,
-          ),
-        );
+        fields.add(LoginInputField.fromJson(field));
       }
     }
 
     final display = json['display_and_wait'];
     final complete = json['complete'];
+    final cookies = json['cookies'];
 
     return LoginStep(
       stepId: json['step_id'] as String? ?? '',
       type: type,
-      instructions: json['instructions'] as String?,
+      instructions: (json['instructions'] as String?)?.nonEmpty,
       fields: fields,
       displayData: display is Map ? display['data'] as String? : null,
       displayImageUrl: display is Map ? display['image_url'] as String? : null,
       displayType: display is Map ? display['type'] as String? : null,
-      // The login id appears at the top level on the start response and
-      // inside `complete` on the final step; either may be present.
+      // The process id is top-level on every response. Older test doubles and
+      // bridges put it inside `complete` too, so that is the fallback.
       loginId:
-          (complete is Map ? complete['login_id'] as String? : null) ??
-          json['login_id'] as String?,
+          json['login_id'] as String? ??
+          (complete is Map ? complete['login_id'] as String? : null),
+      userLoginId: complete is Map
+          ? complete['user_login_id'] as String? ??
+                complete['login_id'] as String?
+          : null,
+      cookies: cookies is Map ? LoginCookiesParams.fromJson(cookies) : null,
       raw: json,
     );
   }
@@ -319,6 +463,10 @@ class BridgeException implements Exception {
   /// Set only when [message] is this package's own English, not the bridge's.
   final BridgeFailure? failure;
 
+  /// [errorCode] for a value the bridge rejected while keeping the step open,
+  /// so the form can be shown again with the reason under it.
+  static const invalidInputCode = 'CHAT.SENNIT.INVALID_INPUT';
+
   @override
   String toString() => 'BridgeException: $message';
 }
@@ -337,6 +485,12 @@ enum BridgeFailure {
 
   /// 502, 503 or 504: starting up, or down.
   unavailable,
+
+  /// No answer at all: the network failed before any status code arrived.
+  unreachable,
+
+  /// The bridge took too long to answer.
+  timeout,
 
   /// Anything else, with [BridgeException.statusCode] carrying the number.
   other,
