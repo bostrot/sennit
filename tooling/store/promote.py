@@ -348,6 +348,10 @@ def play(apply, audit, now, max_age_hours, rollout, track):
             candidate = Candidate(release.get('name') or '?', code)
             log('play', f'internal track: {release.get("name")} ({code})')
             check_commit(candidate, 'play')
+        if audit:
+            # Before the release below is put into the edit, so the tracks
+            # it lists are what Play has.
+            play_audit(token, base, track)
         current = play_current(target)
         log('play', f'{track}: {"build " + str(current) if current else "nothing yet"}')
         decision = decide(candidate, current, now, max_age_hours)
@@ -390,8 +394,6 @@ def play(apply, audit, now, max_age_hours, rollout, track):
             elif decision.promote:
                 log('play', 'dry run: not committed')
 
-        if audit:
-            play_audit(token, base, track)
         return decision
     finally:
         if not committed:
