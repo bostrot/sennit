@@ -43,6 +43,7 @@ class LoginMethod {
     required this.kind,
     this.recommended = false,
     this.advanced = false,
+    this.inAppBrowser = false,
   });
 
   final BridgeLoginFlow flow;
@@ -54,6 +55,9 @@ class LoginMethod {
   /// Kept behind "More ways to connect": real options, but not ones a person
   /// who just wants their chats should have to read past.
   final bool advanced;
+
+  /// A browser sign-in this device can open, inside the app.
+  final bool inAppBrowser;
 
   IconData get icon => switch (kind) {
     LoginMethodKind.qr => Icons.qr_code_2_rounded,
@@ -128,8 +132,8 @@ const Map<ChatNetwork, NetworkLoginGuide> networkLoginGuides = {
     advanced: {'token'},
   ),
   ChatNetwork.instagram: NetworkLoginGuide(
-    order: ['instagram-password', 'android', 'instagram'],
-    advanced: {'android', 'instagram'},
+    order: ['instagram-password', 'instagram', 'android'],
+    advanced: {'android'},
     kinds: {
       'instagram-password': LoginMethodKind.password,
       'android': LoginMethodKind.password,
@@ -139,11 +143,11 @@ const Map<ChatNetwork, NetworkLoginGuide> networkLoginGuides = {
   ChatNetwork.messenger: NetworkLoginGuide(
     order: [
       'messenger-lite',
+      'messenger',
       'messenger-lite-android',
       'facebook',
-      'messenger',
     ],
-    advanced: {'messenger-lite-android', 'facebook', 'messenger'},
+    advanced: {'messenger-lite-android', 'facebook'},
     kinds: {
       'messenger-lite': LoginMethodKind.password,
       'messenger-lite-android': LoginMethodKind.password,
@@ -181,6 +185,7 @@ List<LoginMethod> loginMethodsFor(
   ChatNetwork network,
   List<BridgeLoginFlow> flows, {
   bool withUnlisted = true,
+  bool browser = false,
 }) {
   final guide = networkLoginGuides[network] ?? const NetworkLoginGuide();
   final all = [
@@ -205,13 +210,20 @@ List<LoginMethod> loginMethodsFor(
   final methods = <LoginMethod>[];
   for (final (_, flow) in indexed) {
     final kind = guide.kinds[flow.id] ?? classifyFlow(flow);
-    // A browser sign-in is offered only when nothing else is: this app cannot
-    // open one, and listing it beside a QR code invites a dead end.
+    // A browser sign-in is folded away where this device cannot open one:
+    // listed beside a QR code, it would be a dead end.
     final advanced =
         guide.advanced.contains(flow.id) ||
-        kind == LoginMethodKind.browser ||
+        (kind == LoginMethodKind.browser && !browser) ||
         kind == LoginMethodKind.token;
-    methods.add(LoginMethod(flow: flow, kind: kind, advanced: advanced));
+    methods.add(
+      LoginMethod(
+        flow: flow,
+        kind: kind,
+        advanced: advanced,
+        inAppBrowser: browser && kind == LoginMethodKind.browser,
+      ),
+    );
   }
   if (methods.every((method) => method.advanced)) {
     return methods;
@@ -220,6 +232,7 @@ List<LoginMethod> loginMethodsFor(
   methods[first] = LoginMethod(
     flow: methods[first].flow,
     kind: methods[first].kind,
+    inAppBrowser: methods[first].inAppBrowser,
     recommended: methods.where((m) => !m.advanced).length > 1,
   );
   return methods;
@@ -251,7 +264,10 @@ String? methodSubtitle(AppL10n l10n, ChatNetwork network, LoginMethod method) =>
         network.label,
       ),
       LoginMethodKind.google => l10n.bridgeMethodGoogleSubtitle,
-      LoginMethodKind.browser => l10n.bridgeMethodBrowserSubtitle,
+      LoginMethodKind.browser =>
+        method.inAppBrowser
+            ? l10n.bridgeMethodBrowserSubtitleInApp(network.label)
+            : l10n.bridgeMethodBrowserSubtitle,
       LoginMethodKind.bot => l10n.bridgeMethodBotSubtitle,
       LoginMethodKind.token => l10n.bridgeMethodTokenSubtitle,
       LoginMethodKind.other => method.flow.description,

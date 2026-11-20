@@ -9,6 +9,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../components/qr_card.dart';
+import 'bridge_browser_sign_in.dart';
 import 'bridge_guides.dart';
 
 /// Connecting an account, as one guided flow.
@@ -41,6 +42,7 @@ class BridgeLoginFlowScreen extends StatefulWidget {
     this.bridgeLabel,
     this.reloginId,
     this.onUseAdminRoom,
+    this.browserSignIn,
   });
 
   final BridgeLoginBackend client;
@@ -58,6 +60,10 @@ class BridgeLoginFlowScreen extends StatefulWidget {
 
   /// Opens the bot's chat, for the few things only it can do.
   final VoidCallback? onUseAdminRoom;
+
+  /// Opens a network's sign-in page for a `cookies` step. Defaults to the
+  /// in-app browser where the platform has one; tests hand in a fake.
+  final BrowserSignIn? browserSignIn;
 
   @override
   State<BridgeLoginFlowScreen> createState() => _BridgeLoginFlowScreenState();
@@ -139,6 +145,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
       widget.network,
       flows,
       withUnlisted: widget.client.acceptsUnlistedFlows,
+      browser: _browser != null,
     );
     setState(() => _methods = methods);
     final everyday = methods.where((m) => !m.advanced).toList();
@@ -194,6 +201,26 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   }
 
   bool get _hasAlternatives => (_methods?.length ?? 0) > 1;
+
+  /// How a `cookies` step is done here, or null when it cannot be.
+  ///
+  /// It takes both ends: a browser on this device, and a backend that can
+  /// hand the bridge what the browser collected — the provisioning API can,
+  /// the bot chat cannot (it never says which cookies it wants).
+  BrowserSignIn? get _browser {
+    if (!widget.client.supportsCookies) return null;
+    return widget.browserSignIn ??
+        (browserSignInAvailable ? openBrowserSignIn : null);
+  }
+
+  Future<void> _openBrowser(LoginStep step) async {
+    final browser = _browser;
+    final params = step.cookies;
+    if (browser == null || params == null) return;
+    final values = await browser(context, params, _networkName);
+    if (!mounted || values == null) return;
+    unawaited(_session?.submitCookies(values));
+  }
 
   /// Drops the controllers when the step they belonged to is gone.
   void _syncInputsToStep() {
@@ -325,6 +352,14 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
           onTryAnother: _hasAlternatives ? _chooseAnother : null,
           onClose: () => _leave(false),
         ),
+        (BridgeLoginStatus.waitingForUser, final s?)
+            when s.type == LoginStepType.cookies && _browser != null =>
+          _BrowserStep(
+            network: widget.network,
+            networkName: _networkName,
+            onOpen: () => _openBrowser(s),
+            onTryAnother: _hasAlternatives ? _chooseAnother : null,
+          ),
         (BridgeLoginStatus.waitingForUser, final s?)
             when s.type == LoginStepType.cookies =>
           _CookiesUnsupported(
@@ -1102,6 +1137,53 @@ class _Notice extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A sign-in on the network's own page, before it opens.
+///
+/// A screen of its own rather than the page at once: a login form for
+/// Instagram appearing inside another app is exactly what a person should be
+/// wary of, so this says whose page it is and what Sennit does with it first.
+class _BrowserStep extends StatelessWidget {
+  const _BrowserStep({
+    required this.network,
+    required this.networkName,
+    required this.onOpen,
+    this.onTryAnother,
+  });
+
+  final ChatNetwork network;
+  final String networkName;
+  final VoidCallback onOpen;
+  final VoidCallback? onTryAnother;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return ListView(
+      shrinkWrap: true,
+      children: [
+        _Header(
+          network: network,
+          title: l10n.bridgeMethodBrowserTitle(networkName),
+          subtitle: l10n.bridgeBrowserIntro(networkName),
+        ),
+        const SizedBox(height: WeftSpace.lg),
+        FilledButton.icon(
+          onPressed: onOpen,
+          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+          label: Text(l10n.bridgeBrowserContinue(networkName)),
+        ),
+        if (onTryAnother != null) ...[
+          const SizedBox(height: WeftSpace.sm),
+          TextButton(
+            onPressed: onTryAnother,
+            child: Text(l10n.bridgeFlowTryAnotherWay),
+          ),
+        ],
+      ],
     );
   }
 }

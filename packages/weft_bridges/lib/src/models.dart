@@ -316,21 +316,22 @@ class LoginCookiesParams {
     required this.url,
     this.userAgent,
     this.fieldIds = const [],
+    this.fields = const [],
     this.extractJs,
     this.waitForUrlPattern,
   });
 
   factory LoginCookiesParams.fromJson(Map<Object?, Object?> json) {
-    final fields = json['fields'];
+    final fields = [
+      if (json['fields'] is List)
+        for (final field in (json['fields'] as List).whereType<Map>())
+          if (field['id'] is String) LoginCookieField.fromJson(field),
+    ];
     return LoginCookiesParams(
       url: json['url'] as String? ?? '',
       userAgent: (json['user_agent'] as String?)?.nonEmpty,
-      fieldIds: fields is List
-          ? [
-              for (final field in fields.whereType<Map>())
-                if (field['id'] is String) field['id'] as String,
-            ]
-          : const [],
+      fieldIds: [for (final field in fields) field.id],
+      fields: fields,
       extractJs: (json['extract_js'] as String?)?.nonEmpty,
       waitForUrlPattern: (json['wait_for_url_pattern'] as String?)?.nonEmpty,
     );
@@ -340,8 +341,108 @@ class LoginCookiesParams {
   final String url;
   final String? userAgent;
   final List<String> fieldIds;
+
+  /// What to read out of the browser once the person is signed in.
+  final List<LoginCookieField> fields;
   final String? extractJs;
+
+  /// The address the page reaches once sign-in is done.
   final String? waitForUrlPattern;
+
+  /// Whether [url] is the page that means sign-in is done.
+  ///
+  /// With no pattern from the bridge, never: the browser then decides by
+  /// [collect] succeeding instead.
+  bool isDone(String url) {
+    final pattern = waitForUrlPattern;
+    if (pattern == null) return false;
+    return RegExp(pattern).hasMatch(url);
+  }
+
+  /// The values to submit, read from what the browser holds — or null while
+  /// a required one is still missing.
+  ///
+  /// [cookies] is every cookie the browser has for the sign-in site, by name;
+  /// [localStorage] the page's local storage. A field is taken from the first
+  /// of its sources that has a value. Sources this app cannot read (request
+  /// headers and bodies, which need the page's network traffic) are skipped,
+  /// and a field that only they could fill counts as missing if required.
+  Map<String, String>? collect(
+    Map<String, String> cookies, {
+    Map<String, String> localStorage = const {},
+  }) {
+    final values = <String, String>{};
+    for (final field in fields) {
+      String? value;
+      for (final source in field.sources) {
+        value = switch (source.type) {
+          'cookie' => cookies[source.name],
+          'local_storage' => localStorage[source.name],
+          _ => null,
+        };
+        if (value != null && value.isNotEmpty) break;
+        value = null;
+      }
+      if (value != null) {
+        values[field.id] = value;
+      } else if (field.required) {
+        return null;
+      }
+    }
+    return values;
+  }
+
+  /// Local storage keys any field reads, so the browser asks only for those.
+  List<String> get localStorageKeys => [
+    for (final field in fields)
+      for (final source in field.sources)
+        if (source.type == 'local_storage') source.name,
+  ];
+}
+
+/// One value a `cookies` step needs, and where in the browser it lives.
+@immutable
+class LoginCookieField {
+  const LoginCookieField({
+    required this.id,
+    this.required = false,
+    this.sources = const [],
+  });
+
+  factory LoginCookieField.fromJson(Map<Object?, Object?> json) =>
+      LoginCookieField(
+        id: json['id'] as String,
+        required: json['required'] == true,
+        sources: [
+          if (json['sources'] is List)
+            for (final source in (json['sources'] as List).whereType<Map>())
+              if (source['type'] is String && source['name'] is String)
+                LoginCookieSource(
+                  type: source['type'] as String,
+                  name: source['name'] as String,
+                  cookieDomain: source['cookie_domain'] as String?,
+                ),
+        ],
+      );
+
+  final String id;
+  final bool required;
+  final List<LoginCookieSource> sources;
+}
+
+/// Where a [LoginCookieField] is read from: `cookie`, `local_storage`,
+/// `request_header`, `request_body` or `special`.
+@immutable
+class LoginCookieSource {
+  const LoginCookieSource({
+    required this.type,
+    required this.name,
+    this.cookieDomain,
+  });
+
+  final String type;
+  final String name;
+  final String? cookieDomain;
 }
 
 /// A step in a login flow.

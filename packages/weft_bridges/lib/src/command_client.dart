@@ -532,9 +532,11 @@ class BridgeCommandClient implements BridgeLoginBackend {
     if (lower.contains('phone')) return 'phone_number';
     if (lower.contains('password') || lower.contains('pin')) return 'password';
     if (lower.contains('token') || lower.contains('json')) return 'token';
+    // "Email or username" (Instagram) takes either, so it is not an email
+    // field: the keyboard must not insist on an @.
+    if (lower.contains('username')) return 'username';
     if (lower.contains('email')) return 'email';
     if (lower.contains('code')) return '2fa_code';
-    if (lower.contains('username')) return 'username';
     return 'text';
   }
 
