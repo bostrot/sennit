@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
 // `SelectionArea` reports what it holds as a `SelectedContent`, which lives in
 // the rendering layer and is not re-exported by `material.dart`.
@@ -386,8 +386,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
   }
 
   /// Who is typing and whether the peer is online, refreshed per sync tick.
-  List<String> _typing = const [];
-  bool _peerOnline = false;
+  ///
+  /// A notifier rather than state: in a live group someone starts or stops
+  /// typing every few seconds, and as `setState` each of those rebuilt the
+  /// whole conversation — every bubble on screen, and the thread grouping
+  /// under them — for a change to one line of the bar and one row of the list.
+  /// Arriving between two keystrokes, that rebuild is what made typing
+  /// stutter in exactly the conversations people type in. Only the bar and
+  /// the typing row listen.
+  final _presence = ValueNotifier<_Presence>(const _Presence());
 
   /// Rate-limits the outgoing typing signal: one every few seconds while the
   /// user keeps writing, an immediate "stopped" when the field empties. The
@@ -458,21 +465,30 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // fingerprint: someone starting to type changes no message.
     final typing = repository.typingIn(_chatId);
     final online = repository.presenceFor(_chatId)?.online ?? false;
+    final presence = _presence.value;
+    if (!listEquals(typing, presence.typing) || online != presence.online) {
+      _presence.value = _Presence(typing: typing, online: online);
+    }
     // Receipts too. The ticks and the per-topic unread counts are read
     // straight off the repository while the list builds, and nothing about a
     // receipt arriving changes a message or the conversation's row — so this
     // is the only place that can notice one. It used to be noticed by
     // accident: the screen watched the whole inbox and so rebuilt, bubbles and
     // all, after every sync of every room.
-    final receipts = _receiptFingerprint(repository);
-    if (!listEquals(typing, _typing) ||
-        online != _peerOnline ||
-        receipts != _receipts) {
-      setState(() {
-        _typing = typing;
-        _peerOnline = online;
-        _receipts = receipts;
-      });
+    //
+    // The other side's receipts move only the ticks and the "Seen" line under
+    // the user's own bubbles, and in a group they move on nearly every sync —
+    // each member reading each message — so only those bubbles listen. The
+    // user's own receipts decide the per-topic unread counts the thread
+    // grouping is built from, and still rebuild the view.
+    final peerReceipts = _peerReceiptFingerprint(repository);
+    if (peerReceipts != _peerReceipts.value) {
+      _peerMarkers = repository.peerReadUpTo(_chatId);
+      _peerReceipts.value = peerReceipts;
+    }
+    final ownReceipts = _ownReceiptFingerprint(repository);
+    if (ownReceipts != _ownReceipts) {
+      setState(() => _ownReceipts = ownReceipts);
     }
     final timeline = _timeline;
     if (timeline == null) return;
@@ -482,14 +498,23 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _indexNewMessages(next.messages);
   }
 
-  /// Where everyone — the local user included — has read up to, as one number.
-  int _receipts = 0;
+  /// Where everyone else has read up to, as one number; what the user's own
+  /// bubbles listen to for their ticks.
+  final _peerReceipts = ValueNotifier<int>(0);
 
-  int _receiptFingerprint(ChatRepository repository) {
+  /// Where the local user has read up to, as one number.
+  int _ownReceipts = 0;
+
+  int _peerReceiptFingerprint(ChatRepository repository) {
     var hash = 0;
     for (final marker in repository.peerReadUpTo(_chatId)) {
       hash = Object.hash(hash, marker.roomId, marker.userId, marker.eventId);
     }
+    return hash;
+  }
+
+  int _ownReceiptFingerprint(ChatRepository repository) {
+    var hash = 0;
     for (final marker in repository.ownReadUpTo(_chatId)) {
       hash = Object.hash(hash, marker.roomId, marker.eventId, marker.at);
     }
@@ -536,6 +561,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.dispose();
     _scroll.dispose();
     _awayFromLatest.dispose();
+    _presence.dispose();
+    _peerReceipts.dispose();
     _searchDebounce?.cancel();
     _searchQuery.dispose();
     _searchFocus.dispose();
@@ -2051,13 +2078,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
               onNewer: () => _stepSearch(-1),
               onClose: _closeSearch,
             )
-          : _ChatAppBar(
-              chat: chat,
+          : _LiveChatAppBar(
+              presence: _presence,
               mac: context.isMac,
-              typing: _typing,
-              online: _peerOnline,
-              preview: widget.preview,
-              onSearch: _openSearch,
+              builder: (presence) => _ChatAppBar(
+                chat: chat,
+                mac: context.isMac,
+                typing: presence.typing,
+                online: presence.online,
+                preview: widget.preview,
+                onSearch: _openSearch,
+              ),
             ),
       body: _escapeCancels(
         // Ordered rather than reading order: the timeline comes before the
@@ -2144,28 +2175,28 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             if (key is! ValueKey<String>) return null;
                             final i = rowIndex.indexOf(key.value);
                             if (i == null) return null;
-                            return (_typing.isEmpty ? 0 : 1) +
-                                uploads.length +
-                                i;
+                            return 1 + uploads.length + i;
                           },
-                          itemCount:
-                              (_typing.isEmpty ? 0 : 1) +
-                              uploads.length +
-                              visible.length +
-                              1,
+                          itemCount: 1 + uploads.length + visible.length + 1,
                           itemBuilder: (context, index) {
                             // The list is reversed, so index 0 is the bottom of
                             // the screen — which is where someone typing belongs,
-                            // under the last thing they said.
-                            if (_typing.isNotEmpty) {
-                              if (index == 0) {
-                                return _TypingBubble(
-                                  names: _typing,
-                                  isGroup: chat.isGroup,
-                                );
-                              }
-                              index -= 1;
+                            // under the last thing they said. Always there and
+                            // empty while nobody is, so that someone starting
+                            // to type redraws this row and not the list.
+                            if (index == 0) {
+                              return ValueListenableBuilder<_Presence>(
+                                valueListenable: _presence,
+                                builder: (context, presence, _) =>
+                                    presence.typing.isEmpty
+                                    ? const SizedBox.shrink()
+                                    : _TypingBubble(
+                                        names: presence.typing,
+                                        isGroup: chat.isGroup,
+                                      ),
+                              );
                             }
+                            index -= 1;
                             if (index < uploads.length) {
                               // Reversed: index 0 is the newest, and the newest upload is
                               // the last one enqueued.
@@ -2216,215 +2247,236 @@ class _ChatViewState extends ConsumerState<ChatView> {
                             final older = olderIndex < visible.length
                                 ? visible[olderIndex]
                                 : null;
-                            final delivery = _effectiveDelivery(
-                              message,
-                              chat,
-                              receiptsEnabled: receiptsEnabled,
-                            );
-                            // One message, one line in anything copied out of
-                            // a drag across several of them — the alternative
-                            // is `Hello thereSee you at six`, which is what a
-                            // `SelectionArea` does with two children left to
-                            // itself.
-                            return WeftSelectionLine(
-                              key: ValueKey(message.eventId),
-                              child: Column(
-                                key: _messageKeys.putIfAbsent(
-                                  message.eventId,
-                                  GlobalKey.new,
-                                ),
-                                children: [
-                                  if (_needsDayDivider(message, older))
-                                    _DayDivider(date: message.timestamp),
-                                  _SwipeToReply(
-                                    enabled:
-                                        !widget.preview && !message.redacted,
-                                    onReply: () => _enterComposerContext(
-                                      ComposerContext.reply(message),
-                                    ),
-                                    child: _MessageBubble(
-                                      message: message,
-                                      delivery: delivery,
-                                      deliveryIsComplete:
-                                          deliveryStateIsComplete(
-                                            state: delivery,
-                                            network: message.network,
-                                            receiptsEnabled: receiptsEnabled,
-                                          ),
-                                      replyPreview: _replyPreviewFor(message),
-                                      content: gallery == null
-                                          ? null
-                                          : MediaGallery(
-                                              items: gallery.items,
-                                              onOpen: widget.preview
-                                                  ? null
-                                                  : _openMedia,
-                                              onActions: widget.preview
-                                                  ? null
-                                                  : (photo) => unawaited(
-                                                      _openActions(photo),
-                                                    ),
-                                            ),
-                                      // Any photo of an album: a jump to one
-                                      // lands on the album that draws it.
-                                      highlighted:
-                                          message.eventId ==
-                                              _highlightEventId ||
-                                          (gallery?.items.any(
-                                                (m) =>
-                                                    m.eventId ==
-                                                    _highlightEventId,
-                                              ) ??
-                                              false),
-                                      transcribing: _transcribing.contains(
-                                        message.eventId,
+                            Widget row() {
+                              final delivery = _effectiveDelivery(
+                                message,
+                                chat,
+                                receiptsEnabled: receiptsEnabled,
+                              );
+                              // One message, one line in anything copied out of
+                              // a drag across several of them — the alternative
+                              // is `Hello thereSee you at six`, which is what a
+                              // `SelectionArea` does with two children left to
+                              // itself.
+                              return WeftSelectionLine(
+                                key: ValueKey(message.eventId),
+                                child: Column(
+                                  key: _messageKeys.putIfAbsent(
+                                    message.eventId,
+                                    GlobalKey.new,
+                                  ),
+                                  children: [
+                                    if (_needsDayDivider(message, older))
+                                      _DayDivider(date: message.timestamp),
+                                    _SwipeToReply(
+                                      enabled:
+                                          !widget.preview && !message.redacted,
+                                      onReply: () => _enterComposerContext(
+                                        ComposerContext.reply(message),
                                       ),
-                                      onOpen:
-                                          !widget.preview &&
-                                              rendersAsAttachment(message)
-                                          ? () => _openMedia(message)
-                                          : null,
-                                      onTranscribe:
-                                          message.canTranscribe &&
-                                              message.transcript == null
-                                          ? () => _transcribe(message)
-                                          : null,
-                                      onRetranscribe:
-                                          message.canTranscribe &&
-                                              message.transcript != null
-                                          ? () => _retranscribe(message)
-                                          : null,
-                                      onActions: widget.preview
-                                          ? null
-                                          : () => _openActions(message),
-                                      onActionsAt: widget.preview
-                                          ? null
-                                          : (position) => unawaited(
-                                              _openActions(
-                                                message,
-                                                at: position,
+                                      child: _MessageBubble(
+                                        message: message,
+                                        delivery: delivery,
+                                        deliveryIsComplete:
+                                            deliveryStateIsComplete(
+                                              state: delivery,
+                                              network: message.network,
+                                              receiptsEnabled: receiptsEnabled,
+                                            ),
+                                        replyPreview: _replyPreviewFor(message),
+                                        content: gallery == null
+                                            ? null
+                                            : MediaGallery(
+                                                items: gallery.items,
+                                                onOpen: widget.preview
+                                                    ? null
+                                                    : _openMedia,
+                                                onActions: widget.preview
+                                                    ? null
+                                                    : (photo) => unawaited(
+                                                        _openActions(photo),
+                                                      ),
                                               ),
-                                            ),
-                                      onCopy: widget.preview
-                                          ? null
-                                          : () => unawaited(
-                                              _copySelectionOr(message),
-                                            ),
-                                      onQuickReply: widget.preview
-                                          ? null
-                                          : () => _enterComposerContext(
-                                              ComposerContext.reply(message),
-                                            ),
-                                      onQuickReact: widget.preview
-                                          ? null
-                                          : (anchor) => unawaited(
-                                              _pickReaction(
+                                        // Any photo of an album: a jump to one
+                                        // lands on the album that draws it.
+                                        highlighted:
+                                            message.eventId ==
+                                                _highlightEventId ||
+                                            (gallery?.items.any(
+                                                  (m) =>
+                                                      m.eventId ==
+                                                      _highlightEventId,
+                                                ) ??
+                                                false),
+                                        transcribing: _transcribing.contains(
+                                          message.eventId,
+                                        ),
+                                        onOpen:
+                                            !widget.preview &&
+                                                rendersAsAttachment(message)
+                                            ? () => _openMedia(message)
+                                            : null,
+                                        onTranscribe:
+                                            message.canTranscribe &&
+                                                message.transcript == null
+                                            ? () => _transcribe(message)
+                                            : null,
+                                        onRetranscribe:
+                                            message.canTranscribe &&
+                                                message.transcript != null
+                                            ? () => _retranscribe(message)
+                                            : null,
+                                        onActions: widget.preview
+                                            ? null
+                                            : () => _openActions(message),
+                                        onActionsAt: widget.preview
+                                            ? null
+                                            : (position) => unawaited(
+                                                _openActions(
+                                                  message,
+                                                  at: position,
+                                                ),
+                                              ),
+                                        onCopy: widget.preview
+                                            ? null
+                                            : () => unawaited(
+                                                _copySelectionOr(message),
+                                              ),
+                                        onQuickReply: widget.preview
+                                            ? null
+                                            : () => _enterComposerContext(
+                                                ComposerContext.reply(message),
+                                              ),
+                                        onQuickReact: widget.preview
+                                            ? null
+                                            : (anchor) => unawaited(
+                                                _pickReaction(
+                                                  message,
+                                                  anchor: anchor,
+                                                ),
+                                              ),
+                                        onJumpToReply: (eventId) =>
+                                            _jumpTo(eventId),
+                                        onToggleReaction: widget.preview
+                                            ? null
+                                            : (tally) => _toggleReaction(
+                                                message,
+                                                tally,
+                                              ),
+                                        onAddReaction: widget.preview
+                                            ? null
+                                            : (anchor) => _pickReaction(
                                                 message,
                                                 anchor: anchor,
                                               ),
+                                        onShowReactionSenders: (tally) =>
+                                            showReactionSendersSheet(
+                                              context,
+                                              tally: tally,
+                                              nameFor: _nameFor,
                                             ),
-                                      onJumpToReply: (eventId) =>
-                                          _jumpTo(eventId),
-                                      onToggleReaction: widget.preview
-                                          ? null
-                                          : (tally) =>
-                                                _toggleReaction(message, tally),
-                                      onAddReaction: widget.preview
-                                          ? null
-                                          : (anchor) => _pickReaction(
-                                              message,
-                                              anchor: anchor,
-                                            ),
-                                      onShowReactionSenders: (tally) =>
-                                          showReactionSendersSheet(
-                                            context,
-                                            tally: tally,
-                                            nameFor: _nameFor,
-                                          ),
-                                      onTapLink: _openLink,
-                                      onTapMention: _openMention,
-                                      // Null inside a thread: the root is the
-                                      // thing being read, and an indicator on it
-                                      // would be a way back to where the reader
-                                      // already is.
-                                      thread: rootId == null
-                                          ? grouping.threadFor(message)
-                                          : null,
-                                      onOpenThread: widget.preview
-                                          ? null
-                                          : () => _openThread(message.eventId),
-                                      onRespondInvite:
-                                          message.calendarInvite == null
-                                          ? null
-                                          : (reply, proposedStart) =>
-                                                _respondInvite(
-                                                  message,
-                                                  reply,
-                                                  proposedStart,
-                                                ),
-                                      onAddInviteToCalendar:
-                                          message.calendarInvite == null
-                                          ? null
-                                          : () => _addInviteToCalendar(message),
-                                      onEditInvite:
-                                          message.calendarInvite == null
-                                          ? null
-                                          : () => _editInvite(message),
-                                      onVote: message.kind == MessageKind.poll
-                                          ? (optionId) => _run(
-                                              () => ref
-                                                  .read(chatRepositoryProvider)
-                                                  .votePoll(
-                                                    message.roomId,
-                                                    message.eventId,
-                                                    {optionId},
+                                        onTapLink: _openLink,
+                                        onTapMention: _openMention,
+                                        // Null inside a thread: the root is the
+                                        // thing being read, and an indicator on it
+                                        // would be a way back to where the reader
+                                        // already is.
+                                        thread: rootId == null
+                                            ? grouping.threadFor(message)
+                                            : null,
+                                        onOpenThread: widget.preview
+                                            ? null
+                                            : () =>
+                                                  _openThread(message.eventId),
+                                        onRespondInvite:
+                                            message.calendarInvite == null
+                                            ? null
+                                            : (reply, proposedStart) =>
+                                                  _respondInvite(
+                                                    message,
+                                                    reply,
+                                                    proposedStart,
                                                   ),
-                                            )
-                                          : null,
-                                      showNetwork: chat.isMerged,
-                                      showSender: chat.isGroup,
-                                      // Same *person*, not merely the same side
-                                      // of the thread. Without the sender check a
-                                      // group ran two people's messages together
-                                      // whenever they landed within five minutes,
-                                      // and the second one lost its name — so a
-                                      // reply from someone else read as a second
-                                      // line from whoever spoke first, which is
-                                      // the one thing a group chat must never get
-                                      // wrong.
-                                      groupedWithPrevious:
-                                          older != null &&
-                                          older.senderId == message.senderId &&
-                                          older.isOwn == message.isOwn &&
-                                          older.network == message.network &&
-                                          message.timestamp
-                                                  .difference(older.timestamp)
-                                                  .inMinutes <
-                                              5,
-                                    ),
-                                  ),
-                                  if (_seenAt(message) case final DateTime seen)
-                                    Padding(
-                                      padding: const EdgeInsetsDirectional.only(
-                                        top: 2,
-                                        end: WeftSpace.xs,
+                                        onAddInviteToCalendar:
+                                            message.calendarInvite == null
+                                            ? null
+                                            : () =>
+                                                  _addInviteToCalendar(message),
+                                        onEditInvite:
+                                            message.calendarInvite == null
+                                            ? null
+                                            : () => _editInvite(message),
+                                        onVote: message.kind == MessageKind.poll
+                                            ? (optionId) => _run(
+                                                () => ref
+                                                    .read(
+                                                      chatRepositoryProvider,
+                                                    )
+                                                    .votePoll(
+                                                      message.roomId,
+                                                      message.eventId,
+                                                      {optionId},
+                                                    ),
+                                              )
+                                            : null,
+                                        showNetwork: chat.isMerged,
+                                        showSender: chat.isGroup,
+                                        // Same *person*, not merely the same side
+                                        // of the thread. Without the sender check a
+                                        // group ran two people's messages together
+                                        // whenever they landed within five minutes,
+                                        // and the second one lost its name — so a
+                                        // reply from someone else read as a second
+                                        // line from whoever spoke first, which is
+                                        // the one thing a group chat must never get
+                                        // wrong.
+                                        groupedWithPrevious:
+                                            older != null &&
+                                            older.senderId ==
+                                                message.senderId &&
+                                            older.isOwn == message.isOwn &&
+                                            older.network == message.network &&
+                                            message.timestamp
+                                                    .difference(older.timestamp)
+                                                    .inMinutes <
+                                                5,
                                       ),
-                                      child: Align(
-                                        alignment:
-                                            AlignmentDirectional.centerEnd,
-                                        child: Text(
-                                          _seenLabel(context.l10n, seen),
-                                          style: context.text.labelSmall
-                                              ?.copyWith(
-                                                color: context
-                                                    .colors
-                                                    .onSurfaceVariant,
-                                              ),
+                                    ),
+                                    if (_seenAt(message)
+                                        case final DateTime seen)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsetsDirectional.only(
+                                              top: 2,
+                                              end: WeftSpace.xs,
+                                            ),
+                                        child: Align(
+                                          alignment:
+                                              AlignmentDirectional.centerEnd,
+                                          child: Text(
+                                            _seenLabel(context.l10n, seen),
+                                            style: context.text.labelSmall
+                                                ?.copyWith(
+                                                  color: context
+                                                      .colors
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            // The ticks and the "Seen" line under the user's
+                            // own messages follow the other side's receipts,
+                            // and nothing else on the row does.
+                            if (!message.isOwn) return row();
+                            return ValueListenableBuilder<int>(
+                              key: ValueKey(message.eventId),
+                              valueListenable: _peerReceipts,
+                              builder: (context, _, _) => row(),
                             );
                           },
                         ),
@@ -3269,6 +3321,44 @@ class _ThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
+}
+
+/// Who is typing in a conversation and whether its peer is online.
+@immutable
+class _Presence {
+  const _Presence({this.typing = const [], this.online = false});
+
+  final List<String> typing;
+  final bool online;
+}
+
+/// The conversation's bar, redrawn on its own when [presence] changes.
+///
+/// "typing…" and the online dot are the only parts of the screen that follow
+/// someone else's keyboard, so they are the only part that rebuilds for it.
+class _LiveChatAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _LiveChatAppBar({
+    required this.presence,
+    required this.mac,
+    required this.builder,
+  });
+
+  final ValueListenable<_Presence> presence;
+
+  /// As [_ChatAppBar.mac]; the height has to be known without a build.
+  final bool mac;
+
+  final _ChatAppBar Function(_Presence presence) builder;
+
+  @override
+  Size get preferredSize =>
+      Size.fromHeight(mac ? MacMetrics.toolbarHeight : 64);
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<_Presence>(
+    valueListenable: presence,
+    builder: (context, presence, _) => builder(presence),
+  );
 }
 
 class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {

@@ -145,5 +145,95 @@ void main() {
         expect(identical(after[i], before[i]), isTrue);
       }
     });
+
+    // Every message row on screen, by event id.
+    Map<String, WeftSelectionLine> rows(WidgetTester tester) => {
+      for (final line in tester.widgetList<WeftSelectionLine>(
+        find.byType(WeftSelectionLine),
+      ))
+        if (line.key case ValueKey<String>(:final value)) value: line,
+    };
+
+    // Whether `$g_i` is the user's own message, as the load repository
+    // assigns them: runs of three, member 0 is the user.
+    bool isOwn(String eventId, int members) =>
+        (int.parse(eventId.substring(3)) ~/ 3) % members == 0;
+
+    testWidgets('someone starting and stopping typing rebuilds no bubble', (
+      tester,
+    ) async {
+      // The composer's keystrokes compete with every rebuild a sync causes,
+      // and in a live group someone starts or stops typing every few
+      // seconds. Each of those used to redraw the whole conversation.
+      final semantics = tester.ensureSemantics();
+      final repo = repository();
+      await pumpWeft(
+        tester,
+        const ChatView(chatId: LoadChatRepository.groupChatId),
+        repository: repo,
+        size: const Size(412, 915),
+      );
+      final before = rows(tester);
+      expect(before, isNotEmpty);
+
+      repo.typingChats.add(LoadChatRepository.groupChatId);
+      repo.tick(changeOne: false);
+      // Not settled: the dots repeat for as long as somebody types.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Member 1 is typing…'), findsOneWidget);
+      expect(find.bySemanticsLabel('Member 1 is typing'), findsOneWidget);
+      var after = rows(tester);
+      for (final id in before.keys) {
+        if (!after.containsKey(id)) continue;
+        expect(identical(after[id], before[id]), isTrue, reason: id);
+      }
+
+      repo.typingChats.clear();
+      repo.tick(changeOne: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Member 1 is typing…'), findsNothing);
+      expect(find.bySemanticsLabel('Member 1 is typing'), findsNothing);
+      after = rows(tester);
+      for (final id in before.keys) {
+        if (!after.containsKey(id)) continue;
+        expect(identical(after[id], before[id]), isTrue, reason: id);
+      }
+      semantics.dispose();
+    });
+
+    testWidgets('a peer read receipt rebuilds only the user\'s own bubbles', (
+      tester,
+    ) async {
+      final repo = repository();
+      await pumpWeft(
+        tester,
+        const ChatView(chatId: LoadChatRepository.groupChatId),
+        repository: repo,
+        size: const Size(412, 915),
+      );
+      final before = rows(tester);
+      expect(before.keys.where((id) => isOwn(id, 4)), isNotEmpty);
+      expect(before.keys.where((id) => !isOwn(id, 4)), isNotEmpty);
+
+      repo.everyoneHasRead = true;
+      repo.tick(changeOne: false);
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Read'), findsWidgets);
+      final after = rows(tester);
+      for (final id in before.keys) {
+        if (!after.containsKey(id)) continue;
+        expect(
+          identical(after[id], before[id]),
+          !isOwn(id, 4),
+          reason: isOwn(id, 4)
+              ? '$id is the user\'s own and has ticks to turn'
+              : '$id is someone else\'s and has nothing a receipt changes',
+        );
+      }
+    });
   });
 }
