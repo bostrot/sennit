@@ -22,6 +22,7 @@ class ReplyReminderNotice {
     required this.body,
     required this.at,
     required this.payload,
+    this.repeatsDaily = false,
   });
 
   final int id;
@@ -29,6 +30,10 @@ class ReplyReminderNotice {
   final String body;
   final DateTime at;
   final NotificationPayload payload;
+
+  /// Fires again every day at the same time until it is cancelled; see
+  /// [PlannedReplyReminder.repeatsDaily].
+  final bool repeatsDaily;
 }
 
 /// Where reply reminders are queued. A fake of it is how the service is
@@ -46,7 +51,9 @@ abstract interface class ReplyReminderPoster {
 /// arrives with Sennit closed. Linux has no scheduled notifications in the
 /// plugin, so there a timer posts it while Sennit is running — the service
 /// requeues everything on every launch, so a timer lost with the process is
-/// replaced by the next one.
+/// replaced by the next one. A daily repeat is a calendar trigger on Android,
+/// iOS and macOS and a periodic timer on Linux; the Windows plugin has no
+/// repeating schedule, so there it fires once.
 class LocalReplyReminderPoster implements ReplyReminderPoster {
   LocalReplyReminderPoster({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -65,17 +72,24 @@ class LocalReplyReminderPoster implements ReplyReminderPoster {
     if (!_osSchedules) {
       _timers.remove(notice.id)?.cancel();
       final delay = notice.at.difference(clock.now());
+      void show() => unawaited(
+        _plugin.show(
+          id: notice.id,
+          title: notice.title,
+          body: notice.body,
+          notificationDetails: details,
+          payload: payload,
+        ),
+      );
       _timers[notice.id] = Timer(delay.isNegative ? Duration.zero : delay, () {
         _timers.remove(notice.id);
-        unawaited(
-          _plugin.show(
-            id: notice.id,
-            title: notice.title,
-            body: notice.body,
-            notificationDetails: details,
-            payload: payload,
-          ),
-        );
+        show();
+        if (notice.repeatsDaily) {
+          _timers[notice.id] = Timer.periodic(
+            const Duration(days: 1),
+            (_) => show(),
+          );
+        }
       });
       return;
     }
@@ -96,6 +110,11 @@ class LocalReplyReminderPoster implements ReplyReminderPoster {
       // is still a nudge.
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       payload: payload,
+      // In UTC, "the same time" is exactly a day later, whatever the clocks
+      // do locally.
+      matchDateTimeComponents: notice.repeatsDaily
+          ? DateTimeComponents.time
+          : null,
     );
   }
 
@@ -142,7 +161,9 @@ typedef ReplyReminderWords = ({
 /// time, so an ordinary tick — nothing read, nothing answered — makes no
 /// platform call at all. Replying shows up as the chat's last message being
 /// the user's own, which drops it from the plan and cancels its reminders,
-/// delivered ones included.
+/// delivered ones included. Until then the last reminder queued for a chat
+/// repeats daily, so the reminding outlasts the queue when Sennit does not
+/// run to plan again.
 ///
 /// Everything stays on the device: the plan is built from the chat list
 /// already in memory, and a reminder names the chat — or, with previews off,
@@ -273,9 +294,17 @@ class ReplyReminderService {
         // The text is part of the key, so a renamed chat or a flipped preview
         // setting requeues under the same id rather than going stale.
         key: '${reminder.key}|$title',
-        id: stableNotificationId('reply-reminder:${reminder.key}'),
+        // One id per chat for the repeating one: moving it later is then a
+        // reschedule that replaces it, and never a cancel that would also
+        // take one it already posted out of the shade.
+        id: stableNotificationId(
+          reminder.repeatsDaily
+              ? 'reply-reminder-daily:${reminder.chatId}'
+              : 'reply-reminder:${reminder.key}',
+        ),
         chatId: reminder.chatId,
         at: reminder.at,
+        repeatsDaily: reminder.repeatsDaily,
       );
       wanted[queued.key] = queued;
       notices[queued.key] = ReplyReminderNotice(
@@ -290,6 +319,7 @@ class ReplyReminderService {
           eventId: plan.ledger[reminder.chatId]?.eventId ?? '',
           network: ChatNetwork.unknown,
         ),
+        repeatsDaily: reminder.repeatsDaily,
       );
     }
 
@@ -305,7 +335,11 @@ class ReplyReminderService {
         if (_requeued) kept.add(queued);
         continue;
       }
-      if (!queued.at.isAfter(now) && stillReminded.contains(queued.chatId)) {
+      // A repeating one is never left behind as delivered: it would go on
+      // firing beside its replacement.
+      if (!queued.repeatsDaily &&
+          !queued.at.isAfter(now) &&
+          stillReminded.contains(queued.chatId)) {
         final newest = newestDelivered[queued.chatId];
         if (newest == null || queued.at.isAfter(newest.at)) {
           if (newest != null) cancel.add(newest.id);
@@ -376,18 +410,21 @@ class _Queued {
     required this.id,
     required this.chatId,
     required this.at,
+    this.repeatsDaily = false,
   });
 
   final String key;
   final int id;
   final String chatId;
   final DateTime at;
+  final bool repeatsDaily;
 
   Map<String, Object?> toJson() => {
     'key': key,
     'id': id,
     'chatId': chatId,
     'at': at.toUtc().millisecondsSinceEpoch,
+    if (repeatsDaily) 'repeatsDaily': true,
   };
 
   static _Queued? fromJson(Object? raw) {
@@ -404,6 +441,7 @@ class _Queued {
       id: id,
       chatId: chatId,
       at: DateTime.fromMillisecondsSinceEpoch(at, isUtc: true),
+      repeatsDaily: raw['repeatsDaily'] == true,
     );
   }
 }

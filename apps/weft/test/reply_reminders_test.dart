@@ -124,6 +124,35 @@ void main() {
       expect(poster.queued, isEmpty);
     });
 
+    test(
+      'the last reminder repeats daily and is moved, not cancelled',
+      () async {
+        final reminders = service();
+        await withClock(Clock.fixed(now), () => reminders.onChats([dm()]));
+        final daily = poster.queued.values
+            .where((n) => n.repeatsDaily)
+            .toList();
+        expect(daily, hasLength(1));
+        final latest = poster.queued.values.reduce(
+          (a, b) => a.at.isAfter(b.at) ? a : b,
+        );
+        expect(daily.single.id, latest.id);
+
+        // A reminder has fired, so the window moves on and the repeating one
+        // with it — under the same id, so a copy already in the shade is
+        // replaced rather than taken away.
+        final later = now.add(kDefaultReplyReminderInterval * 1.5);
+        await withClock(Clock.fixed(later), () => reminders.onChats([dm()]));
+        final moved = poster.queued.values
+            .where((n) => n.repeatsDaily)
+            .toList();
+        expect(moved, hasLength(1));
+        expect(moved.single.id, daily.single.id);
+        expect(moved.single.at.isAfter(daily.single.at), isTrue);
+        expect(poster.cancelled, isNot(contains(daily.single.id)));
+      },
+    );
+
     test('stop reminding cancels until something new arrives', () async {
       final reminders = service();
       await withClock(Clock.fixed(now), () => reminders.onChats([dm()]));
@@ -270,6 +299,7 @@ void main() {
 
 class _FakePoster implements ReplyReminderPoster {
   final Map<int, ReplyReminderNotice> queued = {};
+  final List<int> cancelled = [];
   int calls = 0;
 
   @override
@@ -281,6 +311,7 @@ class _FakePoster implements ReplyReminderPoster {
   @override
   Future<void> cancel(int id) async {
     calls++;
+    cancelled.add(id);
     queued.remove(id);
   }
 }
