@@ -407,6 +407,30 @@ void main() {
       expect(chatIdsOf(slots), ['live']);
     });
 
+    test('a chat request is published only once it is accepted', () {
+      // A shortcut hands the name to the launcher and the voice assistant;
+      // a stranger's should not get there before the user has said yes.
+      final slots = rank([
+        chat(
+          id: 'pending',
+          request: ChatRequestState.pending,
+          lastMessageAt: now,
+        ),
+        chat(
+          id: 'declined',
+          request: ChatRequestState.declined,
+          lastMessageAt: now,
+        ),
+        chat(
+          id: 'accepted',
+          request: ChatRequestState.accepted,
+          lastMessageAt: now,
+        ),
+      ]);
+
+      expect(chatIdsOf(slots), ['accepted']);
+    });
+
     test('a chat with no sources is never published', () {
       // It exists transiently while a merge is rebuilt; its shortcut would open
       // a conversation with nowhere to send.

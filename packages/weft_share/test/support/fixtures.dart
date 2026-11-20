@@ -27,12 +27,14 @@ Chat chat({
   bool archived = false,
   bool isGroup = false,
   String? avatarUrl,
+  ChatRequestState? request,
 }) {
   return Chat(
     id: id,
     title: title ?? id,
     pinned: pinned,
     archived: archived,
+    request: request,
     isGroup: isGroup,
     avatarUrl: avatarUrl,
     sources: [
