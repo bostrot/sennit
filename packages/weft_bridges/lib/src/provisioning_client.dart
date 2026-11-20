@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'backend.dart';
 import 'models.dart';
 
 /// Client for the mautrix **bridgev2 provisioning API v3**.
@@ -12,13 +14,18 @@ import 'models.dart';
 /// steps and fields, so a new login method works without a Weft release.
 ///
 /// Authentication is the user's Matrix access token — bridges validate it
-/// against the homeserver they are attached to.
-class BridgeProvisioningClient {
+/// against the homeserver they are attached to. They also need to be told
+/// *whose* token it is: bridgev2 reads the Matrix id from a `user_id` query
+/// parameter and rejects a token without one as "Invalid auth token", which is
+/// how this client failed against every real bridge before it sent [userId].
+class BridgeProvisioningClient implements BridgeLoginBackend {
   BridgeProvisioningClient({
     required this.baseUrl,
     required this.accessToken,
+    this.userId,
     http.Client? httpClient,
     this.timeout = const Duration(seconds: 30),
+    this.waitTimeout = const Duration(minutes: 6),
   }) : _http = httpClient ?? http.Client(),
        _ownsClient = httpClient == null;
 
@@ -28,7 +35,20 @@ class BridgeProvisioningClient {
   /// Matrix access token for the logged-in user.
   final String accessToken;
 
+  /// The Matrix id [accessToken] belongs to.
+  final String? userId;
+
   final Duration timeout;
+
+  /// How long one `display_and_wait` request may stay open.
+  ///
+  /// It is a long poll: the bridge answers when the other side does something
+  /// or the code refreshes, which for WhatsApp is about every twenty seconds
+  /// and for Signal can be minutes. Cutting it at [timeout] dropped the
+  /// request, and an older bridge reads a dropped request as the client giving
+  /// up — it cancelled the login under the QR code still on screen.
+  final Duration waitTimeout;
+
   final http.Client _http;
   final bool _ownsClient;
 
@@ -37,55 +57,54 @@ class BridgeProvisioningClient {
     'content-type': 'application/json',
   };
 
-  Uri _v3(String path) => baseUrl.replace(
-    path: '${baseUrl.path.replaceAll(RegExp(r'/$'), '')}/v3$path',
-  );
+  Uri _v3(String path, [Map<String, String> query = const {}]) =>
+      baseUrl.replace(
+        path: '${baseUrl.path.replaceAll(RegExp(r'/$'), '')}/v3$path',
+        queryParameters: {
+          ...baseUrl.queryParameters,
+          'user_id': ?userId,
+          ...query,
+        }.nullIfEmpty,
+      );
 
   /// Identifies the bridge and lists the user's logins.
   ///
   /// Also the reachability probe: a bridge that cannot answer this is offline,
   /// and the UI says so rather than implying the user is signed out.
+  @override
   Future<BridgeWhoami> whoami() async {
     final json = await _get(_v3('/whoami'));
 
     final network = json['network'];
-    final logins = <BridgeLogin>[];
-    if (json['logins'] is List) {
-      for (final entry in json['logins'] as List) {
-        if (entry is! Map) continue;
-        final stateEvent = entry['state_event'] ?? entry['state'];
-        logins.add(
-          BridgeLogin(
-            id: entry['id'] as String? ?? '',
-            state: BridgeLoginState.fromWire(stateEvent as String?),
-            name: entry['name'] as String?,
-            remoteProfileName: entry['profile'] is Map
-                ? (entry['profile'] as Map)['name'] as String?
-                : null,
-            errorMessage: entry['error'] as String?,
-          ),
-        );
-      }
-    }
+    final logins = <BridgeLogin>[
+      if (json['logins'] is List)
+        for (final entry in (json['logins'] as List).whereType<Map>())
+          BridgeLogin.fromJson(entry),
+    ];
 
     return BridgeWhoami(
       networkId: network is Map
           ? network['beeper_bridge_type'] as String? ??
+                network['network_id'] as String? ??
                 network['id'] as String? ??
                 network['displayname'] as String?
           : null,
       networkName: network is Map ? network['displayname'] as String? : null,
+      botUserId: json['bridge_bot'] as String?,
       logins: logins,
+      flows: _flows(json['login_flows']),
     );
   }
 
   /// Login methods this bridge offers.
+  @override
   Future<List<BridgeLoginFlow>> loginFlows() async {
     final json = await _get(_v3('/login/flows'));
+    return _flows(json['flows']);
+  }
 
-    final flows = json['flows'];
+  static List<BridgeLoginFlow> _flows(Object? flows) {
     if (flows is! List) return const [];
-
     return flows
         .whereType<Map>()
         .map(
@@ -100,8 +119,12 @@ class BridgeProvisioningClient {
   }
 
   /// Begins [flowId], returning its first step.
-  Future<LoginStep> startLogin(String flowId) async {
-    final json = await _post(_v3('/login/start/$flowId'), null);
+  @override
+  Future<LoginStep> startLogin(String flowId, {String? reloginId}) async {
+    final json = await _post(
+      _v3('/login/start/$flowId', {'login_id': ?reloginId}),
+      null,
+    );
     return LoginStep.fromJson(json);
   }
 
@@ -109,6 +132,7 @@ class BridgeProvisioningClient {
   ///
   /// [stepType] is echoed back in the path exactly as the bridge reported it —
   /// the server uses it to confirm the client rendered the step it meant.
+  @override
   Future<LoginStep> submitStep({
     required String loginId,
     required String stepId,
@@ -122,7 +146,8 @@ class BridgeProvisioningClient {
     return LoginStep.fromJson(json);
   }
 
-  /// Polls a `display_and_wait` step until the remote side responds.
+  /// Long-polls a `display_and_wait` step until the remote side responds.
+  @override
   Future<LoginStep> waitForStep({
     required String loginId,
     required String stepId,
@@ -130,26 +155,56 @@ class BridgeProvisioningClient {
     final json = await _post(
       _v3('/login/step/$loginId/$stepId/display_and_wait'),
       const {},
+      timeout: waitTimeout,
     );
     return LoginStep.fromJson(json);
   }
 
+  @override
+  Future<void> cancelLogin(String loginId) async {
+    try {
+      await _post(_v3('/login/cancel/$loginId'), const {});
+    } on BridgeException {
+      // Older bridges have no cancel endpoint and drop the attempt on their
+      // own timeout. Nothing the user can do about either.
+    }
+  }
+
   /// Signs a remote account out of the bridge.
+  @override
   Future<void> logout(String loginId) async {
     await _post(_v3('/logout/$loginId'), const {});
   }
+
+  @override
+  bool get acceptsUnlistedFlows => true;
+
+  @override
+  bool get supportsCookies => true;
 
   Future<Map<String, Object?>> _get(Uri uri) async {
     final http.Response response;
     try {
       response = await _http.get(uri, headers: _headers).timeout(timeout);
+    } on TimeoutException {
+      throw const BridgeException(
+        'The bridge did not answer in time.',
+        failure: BridgeFailure.timeout,
+      );
     } on Exception catch (e) {
-      throw BridgeException('Could not reach the bridge: $e');
+      throw BridgeException(
+        'Could not reach the bridge: $e',
+        failure: BridgeFailure.unreachable,
+      );
     }
     return _decode(response);
   }
 
-  Future<Map<String, Object?>> _post(Uri uri, Object? body) async {
+  Future<Map<String, Object?>> _post(
+    Uri uri,
+    Object? body, {
+    Duration? timeout,
+  }) async {
     final http.Response response;
     try {
       response = await _http
@@ -158,9 +213,17 @@ class BridgeProvisioningClient {
             headers: _headers,
             body: body == null ? null : jsonEncode(body),
           )
-          .timeout(timeout);
+          .timeout(timeout ?? this.timeout);
+    } on TimeoutException {
+      throw const BridgeException(
+        'The bridge did not answer in time.',
+        failure: BridgeFailure.timeout,
+      );
     } on Exception catch (e) {
-      throw BridgeException('Could not reach the bridge: $e');
+      throw BridgeException(
+        'Could not reach the bridge: $e',
+        failure: BridgeFailure.unreachable,
+      );
     }
     return _decode(response);
   }
@@ -176,8 +239,12 @@ class BridgeProvisioningClient {
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (json == null) {
+        // A 200 that is not JSON is almost always a web server answering for
+        // a path it does not route — an SPA's index.html, typically — which
+        // is "nothing here", not "the bridge is broken".
         throw const BridgeException(
           'The bridge returned an unreadable response',
+          failure: BridgeFailure.notFound,
         );
       }
       return json;
@@ -214,23 +281,15 @@ class BridgeProvisioningClient {
       'No provisioning API at that URL. It usually ends in /_matrix/provision.',
     BridgeFailure.unavailable =>
       'The bridge is not responding. It may be starting up or offline.',
-    BridgeFailure.other => 'The bridge returned an error ($status).',
+    _ => 'The bridge returned an error ($status).',
   };
 
+  @override
   void dispose() {
     if (_ownsClient) _http.close();
   }
 }
 
-/// Result of `/whoami`.
-class BridgeWhoami {
-  const BridgeWhoami({
-    this.networkId,
-    this.networkName,
-    this.logins = const [],
-  });
-
-  final String? networkId;
-  final String? networkName;
-  final List<BridgeLogin> logins;
+extension on Map<String, String> {
+  Map<String, String>? get nullIfEmpty => isEmpty ? null : this;
 }

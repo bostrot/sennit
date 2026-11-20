@@ -9,6 +9,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../components/qr_card.dart';
+import 'bridge_guides.dart';
 
 /// Connecting an account, as one guided flow.
 ///
@@ -19,38 +20,43 @@ import '../components/qr_card.dart';
 /// what the user needs is a screen that reads like the task rather than like
 /// the protocol.
 ///
-/// So this screen owns the whole journey, from "which network" to "you are
-/// connected", instead of the flow picker being a sheet somewhere else and the
-/// steps being a bare column of text fields. Everything the *bridge* decides
-/// still comes from the bridge: the fields, their names, their validation
-/// patterns, the instructions. What is decided here is only how those are put
-/// on screen — a phone number gets a phone keypad and a leading `+`, a
-/// six-digit code gets a wide, tracked, numeric field with the caret already
-/// in it, a token gets a monospace box you can paste into.
+/// So this screen owns the whole journey, from "how do you want to connect" to
+/// "you are connected". Everything the *bridge* decides still comes from the
+/// bridge: which ways exist, the fields, their validation patterns. What is
+/// decided here is how those read to someone who has never heard of a bridge:
+/// [bridge_guides.dart] names the methods in plain words, says what to tap on
+/// the phone while a code is on screen, and turns error codes into sentences.
+/// The bridge's own words are kept for whatever the guide does not cover, and
+/// under "Details" when something fails.
+///
+/// It does not know which door it came through. [client] is the bridge's
+/// provisioning API when the server publishes it and the bot's chat when it
+/// does not; both produce the same steps.
 class BridgeLoginFlowScreen extends StatefulWidget {
   const BridgeLoginFlowScreen({
     super.key,
     required this.client,
     required this.network,
-    required this.flows,
+    this.flows,
     this.bridgeLabel,
+    this.reloginId,
     this.onUseAdminRoom,
   });
 
-  final BridgeProvisioningClient client;
+  final BridgeLoginBackend client;
   final ChatNetwork network;
 
-  /// The ways this bridge offers to sign in. One skips the picker.
-  final List<BridgeLoginFlow> flows;
+  /// The ways this bridge offers to sign in, when already known. Null asks
+  /// the bridge.
+  final List<BridgeLoginFlow>? flows;
 
   /// The bridge's own name, when it differs from the network's.
   final String? bridgeLabel;
 
-  /// Opens the bot's management room.
-  ///
-  /// The escape hatch, and the reason a `cookies` step is a dead end rather
-  /// than a failure: Sennit ships no embedded browser, and the admin room can
-  /// do everything the provisioning API can.
+  /// An account to sign in again rather than adding a new one.
+  final String? reloginId;
+
+  /// Opens the bot's chat, for the few things only it can do.
   final VoidCallback? onUseAdminRoom;
 
   @override
@@ -58,7 +64,14 @@ class BridgeLoginFlowScreen extends StatefulWidget {
 }
 
 class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
-  BridgeLoginFlow? _flow;
+  List<LoginMethod>? _methods;
+  BridgeException? _loadError;
+
+  /// Whether the chooser is showing: a person picks only when there is a real
+  /// choice, and comes back to it from "Try another way".
+  bool _choosing = false;
+
+  LoginMethod? _method;
   BridgeLoginSession? _session;
   StreamSubscription<BridgeLoginSession>? _updates;
 
@@ -79,34 +92,108 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   /// pre-filled with a phone number.
   String? _inputsForStep;
 
+  /// The refresh count last announced, so each fresh QR is said once.
+  int _announcedRefreshes = 0;
+
+  String get _networkName => widget.bridgeLabel ?? widget.network.label;
+
   @override
   void initState() {
     super.initState();
-    if (widget.flows.length == 1) _choose(widget.flows.single);
+    final flows = widget.flows;
+    if (flows != null) {
+      _offer(flows);
+    } else {
+      unawaited(_loadFlows());
+    }
   }
 
   @override
   void dispose() {
-    _updates?.cancel();
-    unawaited(_session?.dispose());
+    unawaited(_updates?.cancel());
+    final session = _session;
+    if (session != null && !session.isComplete) session.cancel();
+    unawaited(session?.dispose());
     for (final controller in _inputs.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
-  void _choose(BridgeLoginFlow flow) {
-    final session = BridgeLoginSession(client: widget.client, flowId: flow.id);
+  Future<void> _loadFlows() async {
+    setState(() {
+      _loadError = null;
+      _methods = null;
+    });
+    try {
+      final flows = await widget.client.loginFlows();
+      if (!mounted) return;
+      _offer(flows);
+    } on BridgeException catch (e) {
+      if (mounted) setState(() => _loadError = e);
+    }
+  }
+
+  void _offer(List<BridgeLoginFlow> flows) {
+    final methods = loginMethodsFor(
+      widget.network,
+      flows,
+      withUnlisted: widget.client.acceptsUnlistedFlows,
+    );
+    setState(() => _methods = methods);
+    final everyday = methods.where((m) => !m.advanced).toList();
+    // One everyday way in skips the chooser: Signal has exactly one, and
+    // asking "how do you want to connect?" with one answer is a pointless
+    // tap. The rarer ways stay reachable from "Try another way".
+    if (methods.length == 1 || everyday.length == 1) {
+      _choose(methods.length == 1 ? methods.single : everyday.single);
+    } else {
+      setState(() => _choosing = true);
+    }
+  }
+
+  void _choose(LoginMethod method) {
+    unawaited(_updates?.cancel());
+    final previous = _session;
+    if (previous != null && !previous.isComplete) previous.cancel();
+    unawaited(previous?.dispose());
+
+    final session = BridgeLoginSession(
+      client: widget.client,
+      flowId: method.flow.id,
+      reloginId: widget.reloginId,
+    );
+    _announcedRefreshes = 0;
     _updates = session.updates.listen((_) {
       if (!mounted) return;
-      setState(() => _syncInputsToStep());
+      setState(_syncInputsToStep);
+      if (session.refreshes > _announcedRefreshes) {
+        _announcedRefreshes = session.refreshes;
+        announce(context, context.l10n.bridgeFlowRefreshed);
+      }
     });
     setState(() {
-      _flow = flow;
+      _method = method;
       _session = session;
+      _choosing = false;
+      _inputsForStep = null;
     });
     unawaited(session.start());
   }
+
+  void _chooseAnother() {
+    unawaited(_updates?.cancel());
+    final session = _session;
+    if (session != null && !session.isComplete) session.cancel();
+    unawaited(session?.dispose());
+    setState(() {
+      _session = null;
+      _updates = null;
+      _choosing = true;
+    });
+  }
+
+  bool get _hasAlternatives => (_methods?.length ?? 0) > 1;
 
   /// Drops the controllers when the step they belonged to is gone.
   void _syncInputsToStep() {
@@ -122,12 +209,10 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   }
 
   TextEditingController _controllerFor(LoginInputField field) =>
-      _inputs.putIfAbsent(field.id, TextEditingController.new);
-
-  /// Whether every field the bridge asked for is filled in acceptably.
-  bool _isValid(LoginStep step) => step.fields.every(
-    (field) => field.validate(_inputs[field.id]?.text ?? ''),
-  );
+      _inputs.putIfAbsent(
+        field.id,
+        () => TextEditingController(text: field.defaultValue),
+      );
 
   void _submit(LoginStep step) {
     setState(() {
@@ -153,39 +238,126 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
   /// What to say about a field the bridge would reject.
   ///
   /// The bridge supplies a regex, not a sentence, so the sentence is this
-  /// screen's job — and "Check these fields: Phone number" underneath a form is
-  /// not one. An empty field and a malformed one are different mistakes and get
-  /// different words.
+  /// screen's job. An empty field and a malformed one are different mistakes
+  /// and get different words.
   String _messageFor(LoginInputField field) {
+    final l10n = context.l10n;
     final value = _inputs[field.id]?.text.trim() ?? '';
-    if (value.isEmpty) return '${field.name} is required.';
+    if (value.isEmpty) return l10n.bridgeFieldRequired(field.name);
     return switch (field.type) {
-      'phone_number' =>
-        'That does not look like a full phone number. Include the country '
-            'code, as in +49 170 1234567.',
-      'email' => 'That does not look like an email address.',
-      '2fa_code' => 'That code is not the right length.',
-      _ => '${field.name} is not in the format this bridge expects.',
+      'phone_number' => l10n.bridgeFieldPhoneInvalid,
+      'email' => l10n.bridgeFieldEmailInvalid,
+      '2fa_code' => l10n.bridgeFieldCodeInvalid,
+      _ => l10n.bridgeFieldInvalid(field.name),
     };
   }
 
   void _restart() {
-    _updates?.cancel();
-    unawaited(_session?.dispose());
-    setState(() {
-      _session = null;
-      _inputsForStep = null;
-    });
-    final flow = _flow;
-    if (flow != null) _choose(flow);
+    final method = _method;
+    if (method != null) _choose(method);
   }
 
-  String get _title => 'Connect ${widget.bridgeLabel ?? widget.network.label}';
+  void _leave(bool connected) {
+    final session = _session;
+    if (session != null && !session.isComplete) session.cancel();
+    Navigator.of(context).pop(connected);
+  }
+
+  String get _title => widget.reloginId != null
+      ? context.l10n.bridgeFlowReconnectTitle(_networkName)
+      : context.l10n.botLoginTitle(_networkName);
 
   @override
   Widget build(BuildContext context) {
     final session = _session;
     final step = session?.currentStep;
+    final methods = _methods;
+
+    final Widget body;
+    if (_loadError != null) {
+      body = _Failed(
+        networkName: _networkName,
+        message: friendlyLoginError(
+          context.l10n,
+          widget.network,
+          errorCode: _loadError!.errorCode,
+          failure: _loadError!.failure,
+        ),
+        details: _loadError!.message,
+        onRetry: _loadFlows,
+        onClose: () => _leave(false),
+      );
+    } else if (methods == null) {
+      body = _Working(
+        label: context.l10n.bridgeFlowLoadingMethods(_networkName),
+      );
+    } else if (methods.isEmpty) {
+      body = _Failed(
+        networkName: _networkName,
+        message: context.l10n.bridgeFlowNoMethods(_networkName),
+        onClose: () => _leave(false),
+        onUseAdminRoom: widget.onUseAdminRoom,
+      );
+    } else if (_choosing || session == null) {
+      body = _ChooseMethod(
+        network: widget.network,
+        networkName: _networkName,
+        methods: methods,
+        onPick: _choose,
+      );
+    } else {
+      body = switch ((session.status, step)) {
+        (BridgeLoginStatus.complete, _) => _Done(
+          network: widget.network,
+          onClose: () => Navigator.of(context).pop(true),
+        ),
+        (BridgeLoginStatus.failed, _) => _Failed(
+          networkName: _networkName,
+          message: friendlyLoginError(
+            context.l10n,
+            widget.network,
+            errorCode: session.errorCode,
+            failure: session.failure,
+            problem: session.problem,
+          ),
+          details: session.error,
+          onRetry: _restart,
+          onTryAnother: _hasAlternatives ? _chooseAnother : null,
+          onClose: () => _leave(false),
+        ),
+        (BridgeLoginStatus.waitingForUser, final s?)
+            when s.type == LoginStepType.cookies =>
+          _CookiesUnsupported(
+            networkName: _networkName,
+            onTryAnother: _hasAlternatives ? _chooseAnother : null,
+            onUseAdminRoom: widget.onUseAdminRoom,
+          ),
+        (BridgeLoginStatus.waitingForUser, final s?) => _InputStep(
+          step: s,
+          network: widget.network,
+          networkName: _networkName,
+          controllerFor: _controllerFor,
+          errors: _fieldErrors,
+          showErrors: _submitted,
+          bridgeError: session.problem == BridgeLoginProblem.invalidInput
+              ? session.error
+              : null,
+          onChanged: () => setState(() {}),
+          onSubmit: () => _submit(s),
+          onTryAnother: _hasAlternatives ? _chooseAnother : null,
+        ),
+        (BridgeLoginStatus.waitingForRemote, final s?) => _WaitStep(
+          step: s,
+          network: widget.network,
+          networkName: _networkName,
+          flowName: _method?.flow.name ?? '',
+          refreshes: session.refreshes,
+          onTryAnother: _hasAlternatives ? _chooseAnother : null,
+          onCancel: () => _leave(false),
+        ),
+        _ => _Working(label: context.l10n.bridgeFlowConnecting),
+      };
+    }
 
     return Scaffold(
       appBar: WeftAppBar(
@@ -193,12 +365,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
         // Leaving mid-flow abandons the attempt rather than backgrounding it:
         // a half-finished login holds a slot on some bridges, and one left
         // running would fail the *next* attempt with "already in progress".
-        leading: BackButton(
-          onPressed: () {
-            session?.cancel();
-            Navigator.of(context).pop();
-          },
-        ),
+        leading: BackButton(onPressed: () => _leave(false)),
       ),
       body: SafeArea(
         child: Center(
@@ -206,45 +373,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
             constraints: const BoxConstraints(maxWidth: 460),
             child: Padding(
               padding: const EdgeInsets.all(WeftSpace.xl),
-              child: switch ((session?.status, step)) {
-                (null, _) => _ChooseFlow(
-                  network: widget.network,
-                  flows: widget.flows,
-                  onPick: _choose,
-                ),
-                (BridgeLoginStatus.complete, _) => _Done(
-                  network: widget.network,
-                  onClose: () => Navigator.of(context).pop(true),
-                ),
-                (BridgeLoginStatus.failed, _) => _Failed(
-                  message: session!.error ?? 'Sign-in failed.',
-                  onRetry: _restart,
-                  onClose: () => Navigator.of(context).pop(false),
-                ),
-                (BridgeLoginStatus.waitingForUser, final s?)
-                    when s.type == LoginStepType.cookies =>
-                  _CookiesUnsupported(onUseAdminRoom: widget.onUseAdminRoom),
-                (BridgeLoginStatus.waitingForUser, final s?) => _InputStep(
-                  step: s,
-                  network: widget.network,
-                  controllerFor: _controllerFor,
-                  errors: _fieldErrors,
-                  showErrors: _submitted,
-                  canSubmit: _isValid(s),
-                  onChanged: () => setState(() {}),
-                  onSubmit: () => _submit(s),
-                ),
-                (BridgeLoginStatus.waitingForRemote, final s?) => _WaitStep(
-                  step: s,
-                  flowName: _flow?.name ?? '',
-                  timeout: session!.maxWait,
-                  onCancel: () {
-                    session.cancel();
-                    Navigator.of(context).pop(false);
-                  },
-                ),
-                _ => const _Working(),
-              },
+              child: body,
             ),
           ),
         ),
@@ -258,94 +387,153 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
 /// A screen rather than a sheet of list tiles, because this is a real decision
 /// with real consequences: scanning a QR with the phone that holds the account
 /// and typing a phone number to be texted a code are different amounts of
-/// work, and the bridge's one-line description is what tells them apart.
-class _ChooseFlow extends StatelessWidget {
-  const _ChooseFlow({
+/// work. The easiest is marked; the technical ones wait behind a fold.
+class _ChooseMethod extends StatefulWidget {
+  const _ChooseMethod({
     required this.network,
-    required this.flows,
+    required this.networkName,
+    required this.methods,
     required this.onPick,
   });
 
   final ChatNetwork network;
-  final List<BridgeLoginFlow> flows;
-  final ValueChanged<BridgeLoginFlow> onPick;
+  final String networkName;
+  final List<LoginMethod> methods;
+  final ValueChanged<LoginMethod> onPick;
+
+  @override
+  State<_ChooseMethod> createState() => _ChooseMethodState();
+}
+
+class _ChooseMethodState extends State<_ChooseMethod> {
+  bool _showAdvanced = false;
 
   @override
   Widget build(BuildContext context) {
+    final everyday = widget.methods.where((m) => !m.advanced).toList();
+    final advanced = widget.methods.where((m) => m.advanced).toList();
+    // Nothing everyday at all: the advanced ones are all there is, so they
+    // are not hidden behind a fold.
+    final showAdvanced = _showAdvanced || everyday.isEmpty;
+
     return ListView(
       shrinkWrap: true,
       children: [
         _Header(
-          network: network,
-          title: context.l10n.bridgeFlowChooseTitle,
-          subtitle: context.l10n.bridgeFlowChooseSubtitle(network.label),
+          network: widget.network,
+          title: context.l10n.bridgeFlowConnectTitle(widget.networkName),
         ),
         const SizedBox(height: WeftSpace.lg),
-        for (final flow in flows) ...[
-          _FlowCard(flow: flow, onTap: () => onPick(flow)),
+        for (final method in everyday) ...[
+          _MethodCard(
+            network: widget.network,
+            method: method,
+            onTap: () => widget.onPick(method),
+          ),
           const SizedBox(height: WeftSpace.sm),
         ],
+        if (advanced.isNotEmpty && everyday.isNotEmpty)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+              icon: Icon(
+                showAdvanced
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+                size: 18,
+              ),
+              label: Text(context.l10n.bridgeMethodMoreOptions),
+            ),
+          ),
+        if (showAdvanced)
+          for (final method in advanced) ...[
+            _MethodCard(
+              network: widget.network,
+              method: method,
+              onTap: () => widget.onPick(method),
+            ),
+            const SizedBox(height: WeftSpace.sm),
+          ],
       ],
     );
   }
 }
 
-class _FlowCard extends StatelessWidget {
-  const _FlowCard({required this.flow, required this.onTap});
+class _MethodCard extends StatelessWidget {
+  const _MethodCard({
+    required this.network,
+    required this.method,
+    required this.onTap,
+  });
 
-  final BridgeLoginFlow flow;
+  final ChatNetwork network;
+  final LoginMethod method;
   final VoidCallback onTap;
-
-  /// A guess at what the flow is, from its name.
-  ///
-  /// The protocol carries no icon and no category, so this reads the name the
-  /// bridge chose. Wrong guesses cost a generic glyph, never a wrong action —
-  /// the label beside it is the bridge's own words.
-  IconData get _icon {
-    final name = flow.name.toLowerCase();
-    if (name.contains('qr')) return Icons.qr_code_2_rounded;
-    if (name.contains('phone') || name.contains('sms')) {
-      return Icons.smartphone_rounded;
-    }
-    if (name.contains('token') || name.contains('bot')) {
-      return Icons.key_rounded;
-    }
-    if (name.contains('password') || name.contains('email')) {
-      return Icons.alternate_email_rounded;
-    }
-    if (name.contains('cookie') || name.contains('browser')) {
-      return Icons.public_rounded;
-    }
-    return Icons.login_rounded;
-  }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final title = methodTitle(l10n, network, method);
+    final subtitle = methodSubtitle(l10n, network, method);
     return WeftFocusable(
       onTap: onTap,
-      label: semanticsSentence([flow.name, flow.description]),
+      label: semanticsSentence([
+        title,
+        if (method.recommended) l10n.bridgeMethodRecommended,
+        subtitle,
+      ]),
       borderRadius: WeftRadius.allMd,
       child: Container(
         padding: const EdgeInsets.all(WeftSpace.md),
         decoration: BoxDecoration(
           color: context.colors.surfaceContainerLow,
           borderRadius: WeftRadius.allMd,
-          border: Border.all(color: context.palette.border, width: 0.5),
+          border: Border.all(
+            color: method.recommended
+                ? context.colors.primary
+                : context.palette.border,
+            width: method.recommended ? 1.2 : 0.5,
+          ),
         ),
         child: Row(
           children: [
-            Icon(_icon, size: 22, color: context.colors.primary),
+            Icon(method.icon, size: 24, color: context.colors.primary),
             const SizedBox(width: WeftSpace.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(flow.name, style: context.text.titleSmall),
-                  if (flow.description != null) ...[
+                  Wrap(
+                    spacing: WeftSpace.sm,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(title, style: context.text.titleSmall),
+                      if (method.recommended)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: context.colors.primaryContainer,
+                            borderRadius: WeftRadius.allSm,
+                          ),
+                          child: Text(
+                            l10n.bridgeMethodRecommended,
+                            style: context.text.labelSmall?.copyWith(
+                              color: context.colors.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(
-                      flow.description!,
+                      subtitle,
                       style: context.text.bodySmall?.copyWith(
                         color: context.colors.onSurfaceVariant,
                       ),
@@ -371,67 +559,158 @@ class _InputStep extends StatelessWidget {
   const _InputStep({
     required this.step,
     required this.network,
+    required this.networkName,
     required this.controllerFor,
     required this.errors,
     required this.showErrors,
-    required this.canSubmit,
     required this.onChanged,
     required this.onSubmit,
+    this.bridgeError,
+    this.onTryAnother,
   });
 
   final LoginStep step;
   final ChatNetwork network;
+  final String networkName;
   final TextEditingController Function(LoginInputField) controllerFor;
   final Map<String, String> errors;
   final bool showErrors;
-  final bool canSubmit;
   final VoidCallback onChanged;
   final VoidCallback onSubmit;
 
+  /// What the bridge said about the last value, when it refused it and kept
+  /// the step open.
+  final String? bridgeError;
+  final VoidCallback? onTryAnother;
+
   /// The heading, from what is being asked for.
-  ///
-  /// A bridge's `instructions` are prose and often absent; a step that asks for
-  /// one field called "Phone number" can say so at the top of the screen
-  /// without waiting for the bridge to have thought of it.
-  String get _heading {
+  String _heading(BuildContext context) {
+    final l10n = context.l10n;
     if (step.fields.length == 1) {
       return switch (step.fields.single.type) {
-        'phone_number' => 'What is your phone number?',
-        '2fa_code' => 'Enter the code you were sent',
-        'email' => 'What is your email address?',
-        'password' => 'Enter your password',
-        'token' => 'Paste your access token',
+        'phone_number' => l10n.bridgeInputPhoneHeading,
+        '2fa_code' => l10n.bridgeInputCodeHeading,
+        'email' => l10n.bridgeInputEmailHeading,
+        'password' => l10n.bridgeInputPasswordHeading,
+        'token' => l10n.bridgeInputTokenHeading,
         _ => step.fields.single.name,
       };
     }
-    return 'Sign in to ${network.label}';
+    return l10n.bridgeInputGenericHeading(networkName);
+  }
+
+  /// Whether the bridge's instruction is saying the last try was wrong —
+  /// Telegram's "Incorrect code" arrives as a fresh step whose only
+  /// explanation is that line, and it deserves more than grey small print.
+  bool get _isRetry => RegExp(
+    'incorrect|invalid|wrong|try again',
+    caseSensitive: false,
+  ).hasMatch(step.instructions ?? '');
+
+  /// The bridge's words with a capital, since they are shown as a sentence
+  /// and mautrix writes its validation errors in lower case.
+  static String? _sentence(String? text) {
+    if (text == null || text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
   }
 
   @override
   Widget build(BuildContext context) {
+    final single = step.fields.length == 1 ? step.fields.single : null;
+    final hint = single == null
+        ? null
+        : fieldHint(context.l10n, network, single);
+    // The guide's words lead; the bridge's instruction is kept when the guide
+    // has none, and promoted to a warning when it reports a failed try.
+    final subtitle = _isRetry ? hint : (hint ?? step.instructions);
+    final warning = _sentence(
+      bridgeError ?? (_isRetry ? step.instructions : null),
+    );
+
     return ListView(
       shrinkWrap: true,
       children: [
-        _Header(network: network, title: _heading, subtitle: step.instructions),
+        _Header(network: network, title: _heading(context), subtitle: subtitle),
+        if (warning != null) ...[
+          const SizedBox(height: WeftSpace.md),
+          _Notice(text: warning),
+        ],
         const SizedBox(height: WeftSpace.lg),
         for (final field in step.fields) ...[
-          _LoginField(
-            field: field,
-            controller: controllerFor(field),
-            error: showErrors ? errors[field.id] : null,
-            autofocus: field == step.fields.first,
-            onChanged: onChanged,
-            onSubmit: onSubmit,
-          ),
+          if (field.isSelect)
+            _SelectField(
+              field: field,
+              controller: controllerFor(field),
+              onChanged: onChanged,
+            )
+          else
+            _LoginField(
+              field: field,
+              controller: controllerFor(field),
+              error: showErrors ? errors[field.id] : null,
+              autofocus: field == step.fields.first,
+              onChanged: onChanged,
+              onSubmit: onSubmit,
+            ),
           const SizedBox(height: WeftSpace.md),
         ],
         const SizedBox(height: WeftSpace.sm),
         FilledButton(
-          // Enabled or not, it is pressable: a disabled button explains
-          // nothing, and pressing this one is what puts the reason under the
-          // field that is wrong.
+          // Always pressable: a disabled button explains nothing, and pressing
+          // this one is what puts the reason under the field that is wrong.
           onPressed: onSubmit,
           child: Text(context.l10n.commonContinue),
+        ),
+        if (onTryAnother != null) ...[
+          const SizedBox(height: WeftSpace.sm),
+          TextButton(
+            onPressed: onTryAnother,
+            child: Text(context.l10n.bridgeFlowTryAnotherWay),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A bridge-supplied choice between fixed options.
+class _SelectField extends StatefulWidget {
+  const _SelectField({
+    required this.field,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final LoginInputField field;
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  @override
+  State<_SelectField> createState() => _SelectFieldState();
+}
+
+class _SelectFieldState extends State<_SelectField> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.field.name, style: context.text.labelLarge),
+        const SizedBox(height: WeftSpace.sm),
+        Wrap(
+          spacing: WeftSpace.sm,
+          runSpacing: WeftSpace.sm,
+          children: [
+            for (final option in widget.field.options)
+              ChoiceChip(
+                label: Text(option),
+                selected: widget.controller.text == option,
+                onSelected: (_) {
+                  setState(() => widget.controller.text = option);
+                  widget.onChanged();
+                },
+              ),
+          ],
         ),
       ],
     );
@@ -473,14 +752,23 @@ class _LoginFieldState extends State<_LoginField> {
       autofocus: widget.autofocus,
       autocorrect: false,
       enableSuggestions: false,
-      obscureText: field.isSecret && !_revealed,
+      obscureText: field.isSecret && !isCode && !_revealed,
       onChanged: (_) => widget.onChanged(),
       onSubmitted: (_) => widget.onSubmit(),
       textInputAction: TextInputAction.done,
+      autofillHints: switch (field.type) {
+        'phone_number' => const [AutofillHints.telephoneNumber],
+        'email' => const [AutofillHints.email],
+        'username' => const [AutofillHints.username],
+        'password' => const [AutofillHints.password],
+        '2fa_code' => const [AutofillHints.oneTimeCode],
+        _ => null,
+      },
       keyboardType: switch (field.keyboardHint) {
         'phone' => TextInputType.phone,
         'email' => TextInputType.emailAddress,
         'number' => TextInputType.number,
+        'url' => TextInputType.url,
         _ => TextInputType.text,
       },
       // A verification code is read off another screen a digit at a time, so
@@ -497,15 +785,12 @@ class _LoginFieldState extends State<_LoginField> {
       ],
       decoration: InputDecoration(
         labelText: field.name,
+        hintText: field.placeholder,
         helperText: field.description,
         helperMaxLines: 3,
         errorText: widget.error,
         errorMaxLines: 3,
-        // The country code is part of the number on every network that asks
-        // for one, and leaving it out is the single most common way this step
-        // fails.
-        prefixText: field.type == 'phone_number' ? '+' : null,
-        suffixIcon: field.isSecret
+        suffixIcon: field.isSecret && !isCode
             ? IconButton(
                 tooltip: _revealed
                     ? context.l10n.commonHide
@@ -524,116 +809,94 @@ class _LoginFieldState extends State<_LoginField> {
   }
 }
 
-/// A step where the user does something on another device.
+/// A step where the user does something on the phone: scan a QR, type a
+/// pairing code into WhatsApp, tap an emoji.
 class _WaitStep extends StatefulWidget {
   const _WaitStep({
     required this.step,
+    required this.network,
+    required this.networkName,
     required this.flowName,
-    required this.timeout,
+    required this.refreshes,
     required this.onCancel,
+    this.onTryAnother,
   });
 
   final LoginStep step;
+  final ChatNetwork network;
+  final String networkName;
   final String flowName;
-  final Duration timeout;
+  final int refreshes;
   final VoidCallback onCancel;
+  final VoidCallback? onTryAnother;
 
   @override
   State<_WaitStep> createState() => _WaitStepState();
 }
 
 class _WaitStepState extends State<_WaitStep> {
-  late DateTime _startedAt;
-  Timer? _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    _restartClock();
-  }
-
-  @override
-  void didUpdateWidget(_WaitStep old) {
-    super.didUpdateWidget(old);
-    // A refreshed payload is a new code with a full life ahead of it.
-    if (old.step.displayData != widget.step.displayData) _restartClock();
-  }
-
-  void _restartClock() {
-    _startedAt = DateTime.now();
-    _tick?.cancel();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
-  Duration get _left {
-    final gone = DateTime.now().difference(_startedAt);
-    final left = widget.timeout - gone;
-    return left.isNegative ? Duration.zero : left;
-  }
+  bool _trouble = false;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final step = widget.step;
-    final minutes = _left.inMinutes;
-    final seconds = _left.inSeconds % 60;
+    final type = step.displayType ?? 'nothing';
+    final data = step.displayData;
+    final steps = phoneSteps(l10n, widget.network, type);
+
+    final title = switch (type) {
+      'qr' => l10n.bridgeFlowQrTitle(widget.networkName),
+      'code' => l10n.bridgeFlowPairingCodeTitle(widget.networkName),
+      'emoji' => l10n.bridgeFlowEmojiTitle,
+      _ => step.instructions ?? l10n.bridgeFlowConfirmOnOther,
+    };
 
     return ListView(
       shrinkWrap: true,
       children: [
-        Text(
-          step.instructions ?? context.l10n.bridgeFlowConfirmOnOther,
-          textAlign: TextAlign.center,
-          style: context.text.titleSmall,
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: context.text.titleMedium,
+          ),
         ),
         const SizedBox(height: WeftSpace.lg),
-        if (step.displayData != null && step.displayType == 'qr') ...[
+        if (data != null && type == 'qr')
+          Center(child: QrCard.data(data, size: 240, semanticsLabel: title)),
+        if (data != null && type == 'code') _BigCode(code: data),
+        if (data != null && type == 'emoji')
           Center(
-            child: QrCard.data(
-              step.displayData!,
-              semanticsLabel: context.l10n.bridgeFlowQrSemantics(
-                widget.flowName,
-              ),
+            child: Text(
+              data,
+              style: const TextStyle(fontSize: 64),
+              semanticsLabel: data,
             ),
           ),
+        const SizedBox(height: WeftSpace.lg),
+        if (steps != null)
+          _PhoneSteps(steps: steps)
+        else if (step.instructions != null && type != 'nothing')
+          Text(
+            step.instructions!,
+            textAlign: TextAlign.center,
+            style: context.text.bodyMedium,
+          ),
+        if (type == 'qr') ...[
           const SizedBox(height: WeftSpace.md),
-        ],
-        if (step.displayData != null) ...[
-          // The raw payload stays available under the image: some networks
-          // accept pasting the code, and it is the fallback if a camera has
-          // trouble with a screen.
-          Container(
-            padding: const EdgeInsets.all(WeftSpace.md),
-            decoration: BoxDecoration(
-              color: context.colors.surfaceContainerHigh,
-              borderRadius: WeftRadius.allMd,
-            ),
-            child: SelectableText(
-              step.displayData!,
-              textAlign: TextAlign.center,
-              style: context.text.bodySmall?.copyWith(fontFamily: 'monospace'),
+          Text(
+            widget.refreshes > 0
+                ? l10n.bridgeFlowRefreshed
+                : l10n.bridgeFlowRefreshes,
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall?.copyWith(
+              color: context.colors.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: WeftSpace.sm),
-          Center(
-            child: TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: step.displayData!));
-                showWeftMessage(context, context.l10n.bridgeFlowCodeCopied);
-              },
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: Text(context.l10n.bridgeFlowCopyCode),
-            ),
-          ),
-          const SizedBox(height: WeftSpace.lg),
         ],
+        const SizedBox(height: WeftSpace.lg),
         // One live node over the spinner and its caption. This step ends when
         // the *other* device does something, so the user is waiting on an
         // event they cannot see coming — and every transition out of here
@@ -641,55 +904,219 @@ class _WaitStepState extends State<_WaitStep> {
         Semantics(
           liveRegion: true,
           container: true,
-          label: context.l10n.bridgeFlowWaitingSemantics,
+          label: l10n.bridgeFlowWaitingSemantics,
           excludeSemantics: true,
-          child: Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(
-                width: 20,
-                height: 20,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              const SizedBox(height: WeftSpace.md),
+              const SizedBox(width: WeftSpace.sm),
               Text(
-                context.l10n.bridgeFlowWaiting,
+                l10n.bridgeFlowWaiting,
                 style: context.text.bodySmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: WeftSpace.xs),
-              // The clock is the difference between "this is taking a while"
-              // and "this has stopped working". Codes expire, and a spinner
-              // that has been turning for two minutes says neither.
-              Text(
-                _left == Duration.zero
-                    ? context.l10n.bridgeFlowExpired
-                    : context.l10n.bridgeFlowExpiresIn(
-                        '$minutes:${seconds.toString().padLeft(2, '0')}',
-                      ),
-                style: context.text.labelSmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: WeftSpace.lg),
-        Center(
-          child: TextButton(
-            onPressed: widget.onCancel,
-            child: Text(context.l10n.commonCancel),
+        if (type == 'qr') ...[
+          const SizedBox(height: WeftSpace.md),
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _trouble = !_trouble),
+              child: Text(l10n.bridgeFlowTroubleScanning),
+            ),
           ),
+          if (_trouble)
+            Text(
+              l10n.bridgeFlowTroubleScanningBody,
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+        ],
+        const SizedBox(height: WeftSpace.md),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: WeftSpace.sm,
+          children: [
+            if (widget.onTryAnother != null)
+              TextButton(
+                onPressed: widget.onTryAnother,
+                child: Text(l10n.bridgeFlowTryAnotherWay),
+              ),
+            TextButton(
+              onPressed: widget.onCancel,
+              child: Text(l10n.commonCancel),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
+/// A pairing code to read off this screen and type into the phone.
+class _BigCode extends StatelessWidget {
+  const _BigCode({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: WeftSpace.lg,
+            vertical: WeftSpace.md,
+          ),
+          decoration: BoxDecoration(
+            color: context.colors.surfaceContainerHigh,
+            borderRadius: WeftRadius.allMd,
+          ),
+          child: SelectableText(
+            code,
+            textAlign: TextAlign.center,
+            style: context.text.headlineMedium?.copyWith(
+              fontFamily: 'monospace',
+              letterSpacing: 4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: WeftSpace.sm),
+        TextButton.icon(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: code));
+            showWeftMessage(context, context.l10n.bridgeFlowCodeCopied);
+          },
+          icon: const Icon(Icons.copy_rounded, size: 16),
+          label: Text(context.l10n.bridgeFlowCopyCode),
+        ),
+      ],
+    );
+  }
+}
+
+/// What to do on the phone, as a numbered list.
+class _PhoneSteps extends StatelessWidget {
+  const _PhoneSteps({required this.steps});
+
+  final List<String> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(WeftSpace.md),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerLow,
+        borderRadius: WeftRadius.allMd,
+        border: Border.all(color: context.palette.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.bridgeFlowOnYourPhone,
+            style: context.text.labelMedium?.copyWith(
+              color: context.colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: WeftSpace.sm),
+          for (final (index, line) in steps.indexed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: WeftSpace.xs),
+              child: MergeSemantics(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: context.colors.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      // l10n-ignore: a step number, the same in every language.
+                      child: Text(
+                        '${index + 1}',
+                        style: context.text.labelSmall?.copyWith(
+                          color: context.colors.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: WeftSpace.sm),
+                    Expanded(child: Text(line, style: context.text.bodyMedium)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A warning line inside a step, for "that code was wrong".
+class _Notice extends StatelessWidget {
+  const _Notice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(WeftSpace.sm),
+        decoration: BoxDecoration(
+          color: context.colors.errorContainer,
+          borderRadius: WeftRadius.allSm,
+        ),
+        child: Row(
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 18,
+                color: context.colors.onErrorContainer,
+              ),
+            ),
+            const SizedBox(width: WeftSpace.sm),
+            Expanded(
+              child: Text(
+                text,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The one step type Sennit cannot render.
 class _CookiesUnsupported extends StatelessWidget {
-  const _CookiesUnsupported({this.onUseAdminRoom});
+  const _CookiesUnsupported({
+    required this.networkName,
+    this.onTryAnother,
+    this.onUseAdminRoom,
+  });
 
+  final String networkName;
+
+  final VoidCallback? onTryAnother;
   final VoidCallback? onUseAdminRoom;
 
   @override
@@ -712,18 +1139,25 @@ class _CookiesUnsupported extends StatelessWidget {
         ),
         const SizedBox(height: WeftSpace.sm),
         Text(
-          context.l10n.bridgeFlowCookiesBody,
+          // "Pick another way" only when there is one to pick.
+          onTryAnother != null
+              ? context.l10n.bridgeFlowCookiesBody
+              : context.l10n.bridgeFlowCookiesOnlyWay(networkName),
           textAlign: TextAlign.center,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: WeftSpace.lg),
+        if (onTryAnother != null)
+          FilledButton(
+            onPressed: onTryAnother,
+            child: Text(context.l10n.bridgeFlowTryAnotherWay),
+          ),
         if (onUseAdminRoom != null)
-          FilledButton.icon(
+          TextButton(
             onPressed: onUseAdminRoom,
-            icon: const Icon(Icons.chat_rounded, size: 16),
-            label: Text(context.l10n.bridgeFlowOpenManagementChat),
+            child: Text(context.l10n.bridgesAdvancedOpenChat(networkName)),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
@@ -781,23 +1215,41 @@ class _Done extends StatelessWidget {
   }
 }
 
-class _Failed extends StatelessWidget {
+class _Failed extends StatefulWidget {
   const _Failed({
+    required this.networkName,
     required this.message,
-    required this.onRetry,
     required this.onClose,
+    this.details,
+    this.onRetry,
+    this.onTryAnother,
+    this.onUseAdminRoom,
   });
 
+  final String networkName;
   final String message;
-  final VoidCallback onRetry;
+
+  /// The bridge's own words, kept for whoever has to work out what happened.
+  final String? details;
+  final VoidCallback? onRetry;
+  final VoidCallback? onTryAnother;
+  final VoidCallback? onUseAdminRoom;
   final VoidCallback onClose;
 
   @override
+  State<_Failed> createState() => _FailedState();
+}
+
+class _FailedState extends State<_Failed> {
+  bool _details = false;
+
+  @override
   Widget build(BuildContext context) {
+    final details = widget.details;
     return Semantics(
       liveRegion: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: ListView(
+        shrinkWrap: true,
         children: [
           ExcludeSemantics(
             child: Icon(
@@ -814,20 +1266,53 @@ class _Failed extends StatelessWidget {
           ),
           const SizedBox(height: WeftSpace.sm),
           Text(
-            message,
+            widget.message,
             textAlign: TextAlign.center,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
-            ),
+            style: context.text.bodyMedium,
           ),
+          if (details != null &&
+              details.isNotEmpty &&
+              details != widget.message) ...[
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() => _details = !_details),
+                child: Text(context.l10n.bridgeFlowDetails),
+              ),
+            ),
+            if (_details)
+              SelectableText(
+                details,
+                textAlign: TextAlign.center,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                  fontFamily: 'monospace',
+                ),
+              ),
+          ],
           const SizedBox(height: WeftSpace.lg),
           // Retry first, because most of what lands here is recoverable: an
           // expired QR, a mistyped code, a bridge that was restarting.
-          FilledButton(
-            onPressed: onRetry,
-            child: Text(context.l10n.settingsTryAgain),
+          if (widget.onRetry != null)
+            FilledButton(
+              onPressed: widget.onRetry,
+              child: Text(context.l10n.settingsTryAgain),
+            ),
+          if (widget.onTryAnother != null)
+            TextButton(
+              onPressed: widget.onTryAnother,
+              child: Text(context.l10n.bridgeFlowTryAnotherWay),
+            ),
+          if (widget.onUseAdminRoom != null)
+            TextButton(
+              onPressed: widget.onUseAdminRoom,
+              child: Text(
+                context.l10n.bridgesAdvancedOpenChat(widget.networkName),
+              ),
+            ),
+          TextButton(
+            onPressed: widget.onClose,
+            child: Text(context.l10n.commonClose),
           ),
-          TextButton(onPressed: onClose, child: Text(context.l10n.commonClose)),
         ],
       ),
     );
@@ -835,14 +1320,32 @@ class _Failed extends StatelessWidget {
 }
 
 class _Working extends StatelessWidget {
-  const _Working();
+  const _Working({required this.label});
+
+  final String label;
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: SizedBox(
-      width: 24,
-      height: 24,
-      child: CircularProgressIndicator(strokeWidth: 2),
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    label: label,
+    excludeSemantics: true,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(height: WeftSpace.md),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: context.text.bodySmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
+      ],
     ),
   );
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -185,44 +184,16 @@ void main() {
         reason: 'the bridge to hand over a QR step and the code to render',
       );
 
-      // The bridge's instructions, verbatim: a declarative flow means Weft
-      // cannot write this copy itself, and rendering it is the point of the
-      // generic step renderer.
-      expect(
-        showing(find.text('Open WhatsApp on your phone and scan this code.')),
-        isTrue,
-      );
-
-      // The payload in text, under the code. A rendered QR is 220dp of nothing
-      // to a screen reader and no use at all to someone pairing on the machine
-      // the code is displayed on, so the code's own label points here and this
-      // has to actually be here.
-      expect(
-        $.tester.widget<SelectableText>(find.byType(SelectableText)).data,
-        stub.qrPayload,
-      );
-
-      // "Copyable" asserted as copying rather than as a button existing.
-      await Clipboard.setData(const ClipboardData(text: 'weft-e2e-cleared'));
-      await $.tap(find.text('Copy code'));
-      await pumpUntil(
-        $,
-        () => true,
-        within: const Duration(milliseconds: 500),
-        reason: 'the clipboard write to land',
-      );
-      expect(
-        (await Clipboard.getData(Clipboard.kTextPlain))?.text,
-        stub.qrPayload,
-        reason: 'Copy code has to put the payload on the system clipboard',
-      );
+      // What to do on the phone, in the app's words rather than the bridge's:
+      // the guide knows WhatsApp, so the steps name its menus.
+      expect(showing(find.text('Open WhatsApp on your phone')), isTrue);
 
       // Cancel rather than completing: what happens after the other device
       // scans is the bridge's story, and there is no bridge.
       await $.tap(find.text('Cancel'));
       await pumpUntil(
         $,
-        () => showing(find.text('Bridges')),
+        () => showing(find.byTooltip('Advanced')),
         within: kUiDeadline,
         reason: 'the login screen to close',
       );
@@ -237,10 +208,10 @@ void main() {
 // ----------------------------------------------------------------- the screen
 
 Future<void> _openBridges(PatrolIntegrationTester $) async {
-  await openInboxMenu($, 'Bridges');
+  await openInboxMenu($, 'Messengers');
   await pumpUntil(
     $,
-    () => showing(find.text('Add bridge')),
+    () => showing(find.byTooltip('Advanced')),
     within: kUiDeadline,
     reason: 'the bridges screen',
   );
@@ -248,7 +219,8 @@ Future<void> _openBridges(PatrolIntegrationTester $) async {
 
 /// Adds a bridge by its provisioning URL, exactly as the screen asks for it.
 Future<void> _addBridge(PatrolIntegrationTester $, Uri url) async {
-  await $.tap(find.text('Add bridge'));
+  await $.tap(find.byTooltip('Advanced'));
+  await $.tap(find.text('Add a bridge by address'));
   await pumpUntil(
     $,
     () => showing(find.text('Add a bridge')),

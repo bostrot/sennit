@@ -36,11 +36,11 @@
   "@settingsMergedChatsSubtitle": {
     "description": "One-line subtitle under 'Merged chats'. Explains the feature; may wrap to two lines on a phone, so keep under ~60 chars."
   },
-  "settingsBridgesTitle": "Bridges",
+  "settingsBridgesTitle": "Messengers",
   "@settingsBridgesTitle": {
     "description": "Title of a settings row that opens the bridges screen. A 'bridge' is server software that relays another messenger (WhatsApp, Signal) into Matrix. Keep the established Matrix term for the language if there is one. Under ~20 chars."
   },
-  "settingsBridgesSubtitle": "The messenger bridges on your Matrix server",
+  "settingsBridgesSubtitle": "Connect WhatsApp, Signal, Telegram and more",
   "@settingsBridgesSubtitle": {
     "description": "One-line subtitle under 'Bridges'. 'Matrix' is the protocol name and stays untranslated. Keep under ~60 chars."
   },
@@ -341,7 +341,7 @@
     "description": "Menu entry and Mac sidebar row that opens the settings screen. Use the word the platform uses for its own settings. Keep under ~16 chars.",
     "maxLength": 32
   },
-  "commonBridges": "Bridges",
+  "commonBridges": "Messengers",
   "@commonBridges": {
     "description": "Menu entry and Mac sidebar row that opens the bridges screen. A 'bridge' is server software relaying another messenger into Matrix; keep the established Matrix term for the language. Under ~16 chars."
   },
@@ -4988,76 +4988,6 @@
       }
     }
   },
-  "botLoginSendFailed": "Could not send: {error}",
-  "@botLoginSendFailed": {
-    "description": "Toast when a command could not be sent to the bridge bot. The error text is the SDK's and is not translated.",
-    "placeholders": {
-      "error": {
-        "type": "String",
-        "description": "The underlying error, in English.",
-        "example": "M_FORBIDDEN"
-      }
-    }
-  },
-  "botLoginSignedIn": "Signed in. The bridge is syncing your chats — they will appear in the inbox as they arrive.",
-  "@botLoginSignedIn": {
-    "description": "The green banner in the management chat once the bridge reports a signed-in account."
-  },
-  "botLoginEmpty": "This is the bridge''s management chat. Start sign-in below — the bridge will answer here with its own instructions.",
-  "@botLoginEmpty": {
-    "description": "Shown in the management chat before anything has been said in it. Explains what this room is and what to do."
-  },
-  "botLoginStart": "Start sign-in",
-  "@botLoginStart": {
-    "description": "Chip that sends the bot the `login` command. Keep under ~22 chars.",
-    "maxLength": 40
-  },
-  "botLoginMyLogins": "My logins",
-  "@botLoginMyLogins": {
-    "description": "Chip that sends the bot the `list-logins` command. Keep under ~20 chars.",
-    "maxLength": 40
-  },
-  "botLoginCancelAction": "Cancel action",
-  "@botLoginCancelAction": {
-    "description": "Chip that sends the bot the `cancel` command, abandoning whatever it is waiting for. Keep under ~22 chars.",
-    "maxLength": 40
-  },
-  "botLoginHelp": "Help",
-  "@botLoginHelp": {
-    "description": "Chip that sends the bot the `help` command. One word. Keep under ~14 chars.",
-    "maxLength": 28
-  },
-  "botLoginAnswerField": "Answer the bridge",
-  "@botLoginAnswerField": {
-    "description": "Accessible name of the field for typing back to the bridge bot. Keep under ~26 chars."
-  },
-  "botLoginAnswerHint": "Type an answer or command — e.g. a phone number, or \"login qr\"",
-  "@botLoginAnswerHint": {
-    "description": "Placeholder in the bot-answer field. `login qr` is a literal command and stays as-is; the quotation marks are the language's own."
-  },
-  "botLoginImageFailed": "The image could not be loaded.",
-  "@botLoginImageFailed": {
-    "description": "Shown in place of a code the bridge sent when the image could not be fetched. Keep under ~40 chars."
-  },
-  "botLoginCodeSemantics": "Code from the bridge — usually the QR to scan with the phone that has the account",
-  "@botLoginCodeSemantics": {
-    "description": "Screen-reader-only label for an image the bridge sent — almost always the QR code to scan with the phone that holds the account."
-  },
-  "bridgeFlowChooseTitle": "How do you want to sign in?",
-  "@bridgeFlowChooseTitle": {
-    "description": "Heading of the step where a bridge offers more than one way to sign in. Keep under ~34 chars."
-  },
-  "bridgeFlowChooseSubtitle": "{network} offers more than one way. Any of them connects the same account.",
-  "@bridgeFlowChooseSubtitle": {
-    "description": "Subtitle of the sign-in-method step, reassuring that the choice does not matter to the outcome.",
-    "placeholders": {
-      "network": {
-        "type": "String",
-        "description": "A messenger's display name, never translated.",
-        "example": "WhatsApp"
-      }
-    }
-  },
   "commonShow": "Show",
   "@commonShow": {
     "description": "Tooltip on the eye beside a secret field: reveal what has been typed. Keep under ~12 chars.",
@@ -5071,17 +5001,6 @@
   "bridgeFlowConfirmOnOther": "Confirm on your other device",
   "@bridgeFlowConfirmOnOther": {
     "description": "The fallback instruction for a pairing step when the bridge sent none of its own. Keep under ~40 chars."
-  },
-  "bridgeFlowQrSemantics": "QR code for {flow}. Scan it with the other device, or use the pairing code just below, which can be copied.",
-  "@bridgeFlowQrSemantics": {
-    "description": "Screen-reader-only label for a bridge's pairing QR code. Unlike the device-verification one there is a text fallback, and naming it is the point of the second half.",
-    "placeholders": {
-      "flow": {
-        "type": "String",
-        "description": "The sign-in method's name, as the bridge gives it. Never translated.",
-        "example": "QR login"
-      }
-    }
   },
   "bridgeFlowCodeCopied": "Pairing code copied.",
   "@bridgeFlowCodeCopied": {
@@ -5100,33 +5019,23 @@
   "@bridgeFlowWaiting": {
     "description": "The visible caption under the spinner while a pairing step waits. Keep under ~34 chars."
   },
-  "bridgeFlowExpired": "The code has expired.",
-  "@bridgeFlowExpired": {
-    "description": "Replaces the countdown when a pairing code has run out. Keep under ~26 chars."
-  },
-  "bridgeFlowExpiresIn": "Expires in {clock}",
-  "@bridgeFlowExpiresIn": {
-    "description": "The countdown under a pairing code. The clock is the difference between 'this is taking a while' and 'this has stopped working'.",
-    "placeholders": {
-      "clock": {
-        "type": "String",
-        "description": "Minutes and seconds remaining, already formatted.",
-        "example": "1:42"
-      }
-    }
-  },
-  "bridgeFlowCookiesTitle": "This sign-in needs a browser",
+  "bridgeFlowCookiesTitle": "This way needs a web browser",
   "@bridgeFlowCookiesTitle": {
     "description": "Heading of the one sign-in step the app cannot render: it needs a real browser window. Keep under ~34 chars."
   },
-  "bridgeFlowCookiesBody": "The bridge wants to read the cookies from a signed-in web session, which means logging in inside a browser window. Sennit does not embed one — the bridge''s own management chat can do this step, and the account it connects is the same either way.",
+  "bridgeFlowCookiesBody": "This sign-in only works inside a web page, which Sennit can’t open here yet. Go back and pick another way to connect.",
   "@bridgeFlowCookiesBody": {
     "description": "The explanation of the browser-only sign-in step, and the way round it. 'Sennit' is the app's name and is never translated."
   },
-  "bridgeFlowOpenManagementChat": "Open the management chat",
-  "@bridgeFlowOpenManagementChat": {
-    "description": "Button that leaves the guided flow for the bridge's management chat. Keep under ~34 chars.",
-    "maxLength": 55
+  "bridgeFlowCookiesOnlyWay": "{network} can only be connected by signing in on a web page, which Sennit can’t open here yet. Whoever runs your server can make a way without a browser available.",
+  "@bridgeFlowCookiesOnlyWay": {
+    "description": "Shown when the only way the server offers to connect a messenger needs a sign-in inside a web browser, which the app cannot do. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
   },
   "bridgeFlowConnected": "{network} is connected",
   "@bridgeFlowConnected": {
@@ -5139,7 +5048,7 @@
       }
     }
   },
-  "bridgeFlowConnectedBody": "The bridge is pulling your conversations across now. They arrive in the inbox as they sync — a large account can take a few minutes, and nothing needs to stay open while it does.",
+  "bridgeFlowConnectedBody": "Your chats are coming over now and appear in the inbox as they arrive. A big account can take a few minutes — you don’t need to keep this open.",
   "@bridgeFlowConnectedBody": {
     "description": "The reassurance under 'is connected': syncing is under way and takes as long as it takes."
   },
@@ -5178,29 +5087,6 @@
         "example": "M_FORBIDDEN"
       }
     }
-  },
-  "bridgesAddBridge": "Add bridge",
-  "@bridgesAddBridge": {
-    "description": "The button that opens the add-bridge dialog — in the toolbar on desktop, a floating button on a phone. Keep under ~20 chars.",
-    "maxLength": 40
-  },
-  "bridgesEmpty": "No bridges yet.\n\nSennit connects to bridges you run on your own server — mautrix-whatsapp, -signal, -telegram and friends. Add one by its provisioning URL.",
-  "@bridgesEmpty": {
-    "description": "Shown when no bridge is configured or detected. Two paragraphs separated by a blank line. 'Sennit' is the app's name; 'mautrix-whatsapp' and friends are project names. None are translated."
-  },
-  "bridgesDetected": "Detected on your server",
-  "@bridgesDetected": {
-    "description": "Heading above bridges found on the homeserver that have not been added by URL yet. Keep under ~30 chars."
-  },
-  "bridgesOpenChat": "Open chat",
-  "@bridgesOpenChat": {
-    "description": "Button that opens a bridge's management chat directly. Keep under ~20 chars.",
-    "maxLength": 40
-  },
-  "bridgesAddProvisioningUrl": "Add provisioning URL",
-  "@bridgesAddProvisioningUrl": {
-    "description": "Button on a detected bridge with no provisioning URL yet, which is what unlocks the guided sign-in. Keep under ~30 chars.",
-    "maxLength": 54
   },
   "bridgesActionsFor": "Actions for the {network} bridge",
   "@bridgesActionsFor": {
@@ -5286,6 +5172,708 @@
   "@bridgesAddAnotherAccount": {
     "description": "The main button on a bridge card that already has an account, offering to connect a second one. Keep under ~30 chars.",
     "maxLength": 54
+  },
+  "bridgeMethodRecommended": "Recommended",
+  "@bridgeMethodRecommended": {
+    "description": "Small badge next to the sign-in method that is easiest. Under ~14 chars."
+  },
+  "bridgeMethodMoreOptions": "More ways to connect",
+  "@bridgeMethodMoreOptions": {
+    "description": "Expandable row below the main sign-in methods that reveals rarer, more technical ones. Under ~30 chars."
+  },
+  "bridgeMethodQrTitle": "Scan a QR code",
+  "@bridgeMethodQrTitle": {
+    "description": "Title of the sign-in method where the user scans a QR code shown in Sennit with their phone. Under ~30 chars."
+  },
+  "bridgeMethodQrSubtitle": "With the {network} app on your phone. Takes about a minute.",
+  "@bridgeMethodQrSubtitle": {
+    "description": "One line under 'Scan a QR code'. {network} is the messenger, e.g. WhatsApp. Under ~70 chars.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeMethodPairingCodeTitle": "Use a code instead of scanning",
+  "@bridgeMethodPairingCodeTitle": {
+    "description": "Title of the sign-in method where the user types their phone number and then types a code shown in Sennit into WhatsApp, instead of scanning. Under ~34 chars."
+  },
+  "bridgeMethodPairingCodeSubtitle": "Enter your phone number, then type the code we show into {network}. Handy if you can’t scan.",
+  "@bridgeMethodPairingCodeSubtitle": {
+    "description": "One line under the pairing-code method. {network} is the messenger. Under ~110 chars.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeMethodPhoneTitle": "Sign in with your phone number",
+  "@bridgeMethodPhoneTitle": {
+    "description": "Title of the sign-in method with phone number and a code sent by the network. Under ~34 chars."
+  },
+  "bridgeMethodPhoneSubtitle": "{network} sends you a login code.",
+  "@bridgeMethodPhoneSubtitle": {
+    "description": "One line under the phone-number method. {network} is the messenger. Under ~60 chars.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeMethodPasswordTitle": "Sign in with username and password",
+  "@bridgeMethodPasswordTitle": {
+    "description": "Title of the sign-in method with username/email and password. Under ~40 chars."
+  },
+  "bridgeMethodPasswordSubtitle": "The same details you use in the {network} app.",
+  "@bridgeMethodPasswordSubtitle": {
+    "description": "One line under the password method. {network} is the messenger. Under ~60 chars.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeMethodGoogleTitle": "Sign in with your Google account",
+  "@bridgeMethodGoogleTitle": {
+    "description": "Title of the Google Messages sign-in method that uses a Google account. 'Google' is not translated. Under ~34 chars."
+  },
+  "bridgeMethodGoogleSubtitle": "Needs a sign-in in a web browser, which Sennit can’t do yet.",
+  "@bridgeMethodGoogleSubtitle": {
+    "description": "One line under the Google account method; explains it needs a web browser Sennit cannot open. Under ~70 chars."
+  },
+  "bridgeMethodBrowserTitle": "Sign in on the {network} website",
+  "@bridgeMethodBrowserTitle": {
+    "description": "Title of a sign-in method that works only on the network's website. {network} is the messenger. Under ~36 chars.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeMethodBrowserSubtitle": "Needs a web browser, which Sennit can’t open here yet.",
+  "@bridgeMethodBrowserSubtitle": {
+    "description": "One line under a website sign-in method. Under ~60 chars."
+  },
+  "bridgeMethodBotTitle": "Connect a bot account",
+  "@bridgeMethodBotTitle": {
+    "description": "Title of a developer sign-in method that connects a bot account instead of a person. Under ~30 chars."
+  },
+  "bridgeMethodBotSubtitle": "For developers: uses a bot token instead of your account.",
+  "@bridgeMethodBotSubtitle": {
+    "description": "One line under the bot method. Under ~60 chars."
+  },
+  "bridgeMethodTokenTitle": "Paste a login token",
+  "@bridgeMethodTokenTitle": {
+    "description": "Title of an advanced sign-in method where the user pastes a session token. Under ~30 chars."
+  },
+  "bridgeMethodTokenSubtitle": "Advanced: for when scanning doesn’t work.",
+  "@bridgeMethodTokenSubtitle": {
+    "description": "One line under the token method. Under ~60 chars."
+  },
+  "bridgeStepWhatsappOpen": "Open WhatsApp on your phone",
+  "@bridgeStepWhatsappOpen": {
+    "description": "Numbered instruction while a WhatsApp QR/code is shown. 'WhatsApp' is not translated."
+  },
+  "bridgeStepWhatsappLinkedDevices": "Tap Settings (iPhone) or ⋮ (Android), then Linked devices",
+  "@bridgeStepWhatsappLinkedDevices": {
+    "description": "Numbered instruction. Use the exact menu names WhatsApp uses in this language ('Settings', 'Linked devices')."
+  },
+  "bridgeStepWhatsappScan": "Tap Link a device and point your phone at this code",
+  "@bridgeStepWhatsappScan": {
+    "description": "Numbered instruction. Use WhatsApp's own wording for 'Link a device'."
+  },
+  "bridgeStepWhatsappLinkWithPhone": "Tap Link a device, then Link with phone number instead",
+  "@bridgeStepWhatsappLinkWithPhone": {
+    "description": "Numbered instruction for the pairing-code method. Use WhatsApp's own wording."
+  },
+  "bridgeStepTypeCode": "Type in the code shown here",
+  "@bridgeStepTypeCode": {
+    "description": "Numbered instruction: type the code shown on this screen into the phone."
+  },
+  "bridgeStepSignalOpen": "Open Signal on your phone",
+  "@bridgeStepSignalOpen": {
+    "description": "Numbered instruction while a Signal QR is shown. 'Signal' is not translated."
+  },
+  "bridgeStepSignalLinkedDevices": "Tap your profile picture, then Settings → Linked devices",
+  "@bridgeStepSignalLinkedDevices": {
+    "description": "Numbered instruction. Use Signal's own menu names in this language."
+  },
+  "bridgeStepSignalScan": "Tap Link new device and scan this code",
+  "@bridgeStepSignalScan": {
+    "description": "Numbered instruction. Use Signal's own wording for 'Link new device'."
+  },
+  "bridgeStepTelegramOpen": "Open Telegram on your phone",
+  "@bridgeStepTelegramOpen": {
+    "description": "Numbered instruction while a Telegram QR is shown. 'Telegram' is not translated."
+  },
+  "bridgeStepTelegramDevices": "Go to Settings → Devices",
+  "@bridgeStepTelegramDevices": {
+    "description": "Numbered instruction. Use Telegram's own menu names."
+  },
+  "bridgeStepTelegramScan": "Tap Link Desktop Device and scan this code",
+  "@bridgeStepTelegramScan": {
+    "description": "Numbered instruction. Use Telegram's own wording for 'Link Desktop Device'."
+  },
+  "bridgeStepGmessagesOpen": "Open Google Messages on your Android phone",
+  "@bridgeStepGmessagesOpen": {
+    "description": "Numbered instruction. 'Google Messages' is the app name and stays untranslated unless it has an official local name."
+  },
+  "bridgeStepGmessagesPairing": "Tap your profile picture, then Device pairing",
+  "@bridgeStepGmessagesPairing": {
+    "description": "Numbered instruction. Use the app's own menu names."
+  },
+  "bridgeStepGmessagesScan": "Tap QR code scanner and scan this code",
+  "@bridgeStepGmessagesScan": {
+    "description": "Numbered instruction."
+  },
+  "bridgeStepGmessagesEmoji": "It shows a few emoji — tap the one shown here",
+  "@bridgeStepGmessagesEmoji": {
+    "description": "Numbered instruction: the phone shows several emoji; the user taps the one shown in Sennit."
+  },
+  "bridgeStepDiscordOpen": "Open Discord on your phone",
+  "@bridgeStepDiscordOpen": {
+    "description": "Numbered instruction while a Discord QR is shown. 'Discord' is not translated."
+  },
+  "bridgeStepDiscordScan": "Open your profile, tap the settings gear, then Scan QR Code",
+  "@bridgeStepDiscordScan": {
+    "description": "Numbered instruction. Use Discord's own menu names."
+  },
+  "bridgeStepDiscordConfirm": "Scan this code and confirm with Yes, log me in",
+  "@bridgeStepDiscordConfirm": {
+    "description": "Numbered instruction. Use Discord's own confirmation button text."
+  },
+  "bridgeStepGenericQr": "Open {network} on your phone, find linked devices or Scan QR code, and scan this code",
+  "@bridgeStepGenericQr": {
+    "description": "Instruction for a messenger without specific steps. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeStepGenericCode": "Type this code into {network} on your phone",
+  "@bridgeStepGenericCode": {
+    "description": "Instruction for a messenger without specific steps, while a code to type is shown. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeStepGenericEmoji": "Tap this emoji in {network} on your phone",
+  "@bridgeStepGenericEmoji": {
+    "description": "Instruction while an emoji to tap is shown. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeHintPhoneNumber": "Include your country code, like +49 for Germany or +1 for the US.",
+  "@bridgeHintPhoneNumber": {
+    "description": "Help line under a phone number field during sign-in."
+  },
+  "bridgeHintWhatsappPhone": "The number your WhatsApp uses, with the country code — like +49 151 1234567.",
+  "@bridgeHintWhatsappPhone": {
+    "description": "Help line under the phone number field when connecting WhatsApp."
+  },
+  "bridgeHintTelegramCode": "Telegram sent the code to your Telegram app — look for a message from “Telegram”. Without another device, it arrives by SMS.",
+  "@bridgeHintTelegramCode": {
+    "description": "Help line under the code field when connecting Telegram. 'Telegram' is not translated."
+  },
+  "bridgeHintTelegramPassword": "Your account has two-step verification. Enter the password you set in Telegram — not your phone’s PIN.",
+  "@bridgeHintTelegramPassword": {
+    "description": "Help line under the password field when a Telegram account has two-step verification."
+  },
+  "bridgeHintTelegramBotToken": "The token @BotFather gave you, like 123456:ABC-DEF…",
+  "@bridgeHintTelegramBotToken": {
+    "description": "Help line under the bot token field. '@BotFather' is a Telegram account name and is not translated."
+  },
+  "bridgeHintCode": "Check {network} or your text messages for the code.",
+  "@bridgeHintCode": {
+    "description": "Help line under a verification code field. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowLoadingMethods": "Getting {network} ready…",
+  "@bridgeFlowLoadingMethods": {
+    "description": "Shown with a spinner while Sennit asks the server how a messenger can be connected. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowConnecting": "One moment…",
+  "@bridgeFlowConnecting": {
+    "description": "Shown with a spinner between two steps of connecting a messenger, while Sennit waits for the server's answer."
+  },
+  "bridgeFlowConnectTitle": "How do you want to connect {network}?",
+  "@bridgeFlowConnectTitle": {
+    "description": "Heading of the sign-in screen when the user must choose how to connect. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowQrTitle": "Scan this code with {network}",
+  "@bridgeFlowQrTitle": {
+    "description": "Heading above a QR code to scan. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowPairingCodeTitle": "Enter this code in {network}",
+  "@bridgeFlowPairingCodeTitle": {
+    "description": "Heading above a short code the user types into the messenger on their phone. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowEmojiTitle": "Tap this emoji on your phone",
+  "@bridgeFlowEmojiTitle": {
+    "description": "Heading above an emoji the user must tap on their phone."
+  },
+  "bridgeFlowOnYourPhone": "On your phone",
+  "@bridgeFlowOnYourPhone": {
+    "description": "Small label above the numbered phone instructions. Under ~24 chars."
+  },
+  "bridgeFlowRefreshes": "The code renews itself — just keep this screen open.",
+  "@bridgeFlowRefreshes": {
+    "description": "Note under a QR code that changes by itself every 20 seconds or so."
+  },
+  "bridgeFlowRefreshed": "New code — scan this one.",
+  "@bridgeFlowRefreshed": {
+    "description": "Screen-reader announcement and brief note when the QR code has just been replaced by a fresh one."
+  },
+  "bridgeFlowTroubleScanning": "Trouble scanning?",
+  "@bridgeFlowTroubleScanning": {
+    "description": "Expandable link under a QR code that reveals the raw code text. Under ~24 chars."
+  },
+  "bridgeFlowTroubleScanningBody": "Turn up your screen brightness and hold the phone about 20 cm away. If it still won’t scan, go back and pick another way to connect.",
+  "@bridgeFlowTroubleScanningBody": {
+    "description": "Text revealed under 'Trouble scanning?'."
+  },
+  "bridgeFlowTryAnotherWay": "Try another way",
+  "@bridgeFlowTryAnotherWay": {
+    "description": "Button that goes back to the list of sign-in methods. Under ~24 chars."
+  },
+  "bridgeFlowDetails": "Details",
+  "@bridgeFlowDetails": {
+    "description": "Expandable label revealing the technical error message from the server. Under ~16 chars."
+  },
+  "bridgeFlowReconnectTitle": "Reconnect {network}",
+  "@bridgeFlowReconnectTitle": {
+    "description": "Heading when signing in again to an account whose connection was lost. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFlowNoMethods": "{network} can’t be connected from Sennit on this server.",
+  "@bridgeFlowNoMethods": {
+    "description": "Shown when the server offers no sign-in method this app can use for a messenger. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorExpired": "The code expired before it was used. Try again — you’ll get a fresh one.",
+  "@bridgeErrorExpired": {
+    "description": "Friendly sign-in error: the QR code or login code expired before it was used."
+  },
+  "bridgeErrorRateLimited": "{network} wants us to slow down. Wait a few minutes, then try again.",
+  "@bridgeErrorRateLimited": {
+    "description": "Friendly sign-in error: the messenger blocked too many attempts. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorPhoneNumber": "That phone number wasn’t accepted. Check it and include the country code, like +49.",
+  "@bridgeErrorPhoneNumber": {
+    "description": "Friendly sign-in error: the phone number was not accepted."
+  },
+  "bridgeErrorCode": "That code didn’t work. Check it and try again.",
+  "@bridgeErrorCode": {
+    "description": "Friendly sign-in error: the verification code was wrong."
+  },
+  "bridgeErrorPassword": "That password isn’t right.",
+  "@bridgeErrorPassword": {
+    "description": "Friendly sign-in error: wrong password."
+  },
+  "bridgeErrorDeviceLimit": "Your {network} account already has the most linked devices it allows. Remove one under Linked devices in {network}, then try again.",
+  "@bridgeErrorDeviceLimit": {
+    "description": "Friendly sign-in error: the account already has the maximum number of linked devices. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorWrongEmoji": "A different emoji was tapped. Try again and tap the one shown here.",
+  "@bridgeErrorWrongEmoji": {
+    "description": "Friendly sign-in error: the user tapped the wrong emoji on their phone."
+  },
+  "bridgeErrorNoPhone": "No phone with {network} answered. Make sure it’s on, online and has the app open.",
+  "@bridgeErrorNoPhone": {
+    "description": "Friendly sign-in error: no phone with the messenger app answered. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorTooManyLogins": "You’ve connected as many {network} accounts as your server allows. Disconnect one first.",
+  "@bridgeErrorTooManyLogins": {
+    "description": "Friendly sign-in error: the server allows no more accounts for this messenger. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorAlreadyConnected": "{network} is already connected.",
+  "@bridgeErrorAlreadyConnected": {
+    "description": "Friendly sign-in error: the account is already connected. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorCaptcha": "{network} wants to check you’re human, which can’t be done here. Try another way to connect.",
+  "@bridgeErrorCaptcha": {
+    "description": "Friendly sign-in error: the messenger demands a 'prove you are human' check that Sennit cannot show. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorNotAllowed": "Your server doesn’t let your account connect {network}. Ask whoever runs it.",
+  "@bridgeErrorNotAllowed": {
+    "description": "Friendly sign-in error: the server does not let this user connect the messenger. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorOffline": "The {network} service on your server isn’t responding. It may be restarting — try again in a minute.",
+  "@bridgeErrorOffline": {
+    "description": "Friendly error: the server-side service for this messenger is not responding. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorUnsupported": "{network} asked for a sign-in step this version of Sennit can’t show. Try another way, or update Sennit.",
+  "@bridgeErrorUnsupported": {
+    "description": "Friendly sign-in error: the server asked for a sign-in step this version of Sennit cannot show. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeErrorGeneric": "Something went wrong while connecting {network}. Try again.",
+  "@bridgeErrorGeneric": {
+    "description": "Friendly sign-in error when nothing more specific is known. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgesIntro": "Connect your other messengers to read and answer everything here.",
+  "@bridgesIntro": {
+    "description": "Intro line at the top of the screen listing messengers to connect."
+  },
+  "bridgesStatusConnectedAs": "Connected as {account}",
+  "@bridgesStatusConnectedAs": {
+    "description": "Status line of a connected messenger. {account} is the phone number or name of the connected account.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesStatusNeedsLogin": "{account} was signed out — reconnect to keep getting messages",
+  "@bridgesStatusNeedsLogin": {
+    "description": "Status line when a connected account was signed out and needs to be connected again. {account} is the account.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesStatusInterrupted": "{account}: connection interrupted, retrying on its own",
+  "@bridgesStatusInterrupted": {
+    "description": "Status line when a connection dropped briefly and is retrying by itself. {account} is the account.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesStatusConnecting": "{account}: connecting…",
+  "@bridgesStatusConnecting": {
+    "description": "Status line while an account is connecting. {account} is the account.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesStatusNotConnected": "Not connected",
+  "@bridgesStatusNotConnected": {
+    "description": "Status line of a messenger the user has not connected. Under ~30 chars."
+  },
+  "bridgesStatusChats": "{count, plural, =1{1 chat} other{{count} chats}}",
+  "@bridgesStatusChats": {
+    "description": "Status line when chats of this messenger exist but the connection could not be checked yet.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "bridgesStatusOffline": "Not responding right now",
+  "@bridgesStatusOffline": {
+    "description": "Status line when the server-side service for this messenger is not responding."
+  },
+  "bridgesConnect": "Connect",
+  "@bridgesConnect": {
+    "description": "Button that starts connecting a messenger. Under ~16 chars."
+  },
+  "bridgesReconnect": "Reconnect",
+  "@bridgesReconnect": {
+    "description": "Button that signs a disconnected account in again. Under ~16 chars."
+  },
+  "bridgesDisconnect": "Disconnect",
+  "@bridgesDisconnect": {
+    "description": "Button that disconnects an account. Under ~16 chars."
+  },
+  "bridgesDisconnectAccount": "Disconnect {account}",
+  "@bridgesDisconnectAccount": {
+    "description": "Screen-reader label of the disconnect button when several accounts are listed. {account} is the account.",
+    "placeholders": {
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesDisconnectTitle": "Disconnect {network} ({account})?",
+  "@bridgesDisconnectTitle": {
+    "description": "Title of the confirmation dialog before disconnecting. {network} is the messenger, {account} the account.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      },
+      "account": {
+        "type": "String",
+        "description": "The connected account as the network shows it: a phone number, a username or a display name.",
+        "example": "+49 151 12345678"
+      }
+    }
+  },
+  "bridgesDisconnectBody": "New {network} messages will stop arriving in Sennit. Chats you already have stay, and you can connect again any time.",
+  "@bridgesDisconnectBody": {
+    "description": "Body of the disconnect confirmation dialog. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgesDisconnectFailed": "Couldn’t disconnect {network}. Try again.",
+  "@bridgesDisconnectFailed": {
+    "description": "Snackbar when disconnecting failed. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgesAdvanced": "Advanced",
+  "@bridgesAdvanced": {
+    "description": "Heading of the section with technical tools (bridge chat, manual address). Under ~16 chars."
+  },
+  "bridgesAdvancedOpenChat": "Open the {network} bridge chat",
+  "@bridgesAdvancedOpenChat": {
+    "description": "Menu item opening the raw chat with the server's bot for this messenger, for experts. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgesAddManually": "Add a bridge by address",
+  "@bridgesAddManually": {
+    "description": "Menu item to add a bridge by its web address, for experts. Under ~34 chars."
+  },
+  "bridgesMoreActions": "More for {network}",
+  "@bridgesMoreActions": {
+    "description": "Tooltip of the ⋮ button on one messenger's card. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgesNoneOffered": "Your server doesn’t offer any other messengers to connect yet.",
+  "@bridgesNoneOffered": {
+    "description": "Empty state when the user's server offers no messengers to connect."
+  },
+  "bridgeInputPhoneHeading": "What’s your phone number?",
+  "@bridgeInputPhoneHeading": {
+    "description": "Heading of the sign-in step asking for a phone number."
+  },
+  "bridgeInputCodeHeading": "Enter the code you were sent",
+  "@bridgeInputCodeHeading": {
+    "description": "Heading of the sign-in step asking for a verification code."
+  },
+  "bridgeInputEmailHeading": "What’s your email address?",
+  "@bridgeInputEmailHeading": {
+    "description": "Heading of the sign-in step asking for an email address."
+  },
+  "bridgeInputPasswordHeading": "Enter your password",
+  "@bridgeInputPasswordHeading": {
+    "description": "Heading of the sign-in step asking for a password."
+  },
+  "bridgeInputTokenHeading": "Paste your token",
+  "@bridgeInputTokenHeading": {
+    "description": "Heading of the sign-in step asking to paste a token."
+  },
+  "bridgeInputGenericHeading": "Sign in to {network}",
+  "@bridgeInputGenericHeading": {
+    "description": "Heading of a sign-in step with several fields. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeFieldRequired": "{field} is required.",
+  "@bridgeFieldRequired": {
+    "description": "Error under an empty sign-in field. {field} is the field's name.",
+    "placeholders": {
+      "field": {
+        "type": "String",
+        "description": "The field's name as the server gives it, e.g. 'Phone number'. Usually English.",
+        "example": "Phone number"
+      }
+    }
+  },
+  "bridgeFieldPhoneInvalid": "That doesn’t look like a full phone number. Include the country code, as in +49 170 1234567.",
+  "@bridgeFieldPhoneInvalid": {
+    "description": "Error under a phone number field that is not a full international number."
+  },
+  "bridgeFieldEmailInvalid": "That doesn’t look like an email address.",
+  "@bridgeFieldEmailInvalid": {
+    "description": "Error under an email field with an invalid address."
+  },
+  "bridgeFieldCodeInvalid": "That code isn’t the right length.",
+  "@bridgeFieldCodeInvalid": {
+    "description": "Error under a verification code field with the wrong number of digits."
+  },
+  "bridgeFieldInvalid": "{field} isn’t in the expected format.",
+  "@bridgeFieldInvalid": {
+    "description": "Error under a sign-in field the server would reject. {field} is the field's name.",
+    "placeholders": {
+      "field": {
+        "type": "String",
+        "description": "The field's name as the server gives it, e.g. 'Phone number'. Usually English.",
+        "example": "Phone number"
+      }
+    }
   },
   "callStatusEnded": "Call ended",
   "@callStatusEnded": {
