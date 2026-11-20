@@ -1,8 +1,8 @@
 name: Promote to the stores
 
 # Every night at 03:00 Berlin time, the newest build testers have — Play's
-# internal track, TestFlight — goes to Google Play production and to App
-# Review, provided it landed since the night before, is newer than what the
+# internal track, TestFlight — goes to Google Play's open testing track and
+# to App Review, provided it landed since the night before, is newer than what the
 # store has, and CI and its deploy passed on its commit. The rules are
 # tooling/store/promote.py's; why they are what they are is
 # docs/decisions/adr-005-daily-store-promotion.md.
@@ -93,8 +93,10 @@ jobs:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
           GITHUB_TOKEN: ${{ github.token }}
-          # Optional: a fraction below 1 makes Play production a staged
-          # rollout; `true` for the second skips Play's "send for review".
+          # Optional. The Play track: `beta` (open testing) unless this says
+          # `production`. A fraction below 1 makes it a staged rollout; `true`
+          # for the last skips Play's "send for review".
+          PLAY_PROMOTION_TRACK: ${{ vars.PLAY_PROMOTION_TRACK }}
           PLAY_PRODUCTION_ROLLOUT: ${{ vars.PLAY_PRODUCTION_ROLLOUT }}
           PLAY_CHANGES_NOT_SENT_FOR_REVIEW: ${{ vars.PLAY_CHANGES_NOT_SENT_FOR_REVIEW }}
           STORE: ${{ inputs.store || 'all' }}
@@ -103,7 +105,8 @@ jobs:
           # Changes anything only with the switch on, and then only on the
           # schedule or a manual run with dry_run off.
           APPLY: ${{ vars.STORE_PROMOTION_ENABLED == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)) && '--apply' || '' }}
-          AUDIT: ${{ (github.event_name != 'schedule' && inputs.audit != false) && '--audit' || '' }}
+          AUDIT: ${{ (github.event_name == 'push' || inputs.audit) && '--audit' || '' }}
         run: |
           python3 tooling/store/promote.py "$STORE" $APPLY $AUDIT \
-            --schedule "$SCHEDULE" --max-age-hours "$MAX_AGE_HOURS"
+            --schedule "$SCHEDULE" --max-age-hours "$MAX_AGE_HOURS" \
+            --play-track "$PLAY_PROMOTION_TRACK"

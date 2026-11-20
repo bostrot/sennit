@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Promotes the newest tested build to Google Play production and the App Store.
+"""Promotes the newest tested build to Google Play open testing and the App Store.
 
     promote.py [play|appstore|all] [--apply] [--audit]
-               [--schedule CRON] [--max-age-hours N]
+               [--schedule CRON] [--max-age-hours N] [--play-track TRACK]
 
 Run every night by promote_to_stores.yml; see
 docs/decisions/adr-005-daily-store-promotion.md for why it decides what it
 decides. Per store, it takes the newest build on the test track — Play's
 internal track, TestFlight — and promotes it when all of these hold:
 
-1. it is newer, by build number, than anything that store already has in
-   production or in review, which is what makes a second run a no-op;
+1. it is newer, by build number, than anything the target already has —
+   Play's target track, the App Store or App Review — which is what makes a
+   second run a no-op;
 2. it landed on the test track within the last N hours (default 26: one
    night's window, plus GitHub's habit of starting scheduled runs late);
 3. CI passed on the commit it was built from, and the deploy workflow that
@@ -21,8 +22,13 @@ the commit is found again from the number, on the first-parent line of
 origin/main; the checkout needs the full history.
 
 Without `--apply` it reads, prints exactly what it would do, and changes
-nothing. Play's would-be production release is still checked by Play
-itself, in an edit that is validated and then deleted, never committed.
+nothing. Play's would-be release is still checked by Play itself, in an
+edit that is validated and then deleted, never committed.
+
+On Play the target is the open testing track, `beta`; production stays a
+step taken in the Console for now. `--play-track production` (or the
+PLAY_PROMOTION_TRACK variable, in the workflow) points the same steps at
+production instead.
 `--audit` adds the list of what each store still wants before the first
 public release, as far as the APIs can tell.
 
@@ -56,6 +62,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BERLIN = ZoneInfo('Europe/Berlin')
 PROMOTION_HOUR = 3
 DEFAULT_MAX_AGE_HOURS = 26
+# Open testing. Production later, through --play-track.
+DEFAULT_PLAY_TRACK = 'beta'
 
 PLAY_LIMIT = 500
 
@@ -119,7 +127,7 @@ class Decision:
 
 def decide(candidate, store_build, now, max_age_hours):
     """The checks both stores share. `store_build` is the highest build
-    number the store has in production or in review, or None for none."""
+    number the target already has, or None for none."""
     if candidate is None:
         return Decision(False, 'nothing on the test track')
     label = f'{candidate.version} ({candidate.build})'
@@ -144,11 +152,11 @@ def decide(candidate, store_build, now, max_age_hours):
     return Decision(True, f'{label} goes out')
 
 
-def play_current(production):
-    """The highest version code Play production serves or is rolling out."""
+def play_current(track):
+    """The highest version code a Play track serves or is rolling out."""
     codes = [
         int(code)
-        for release in (production or {}).get('releases', [])
+        for release in (track or {}).get('releases', [])
         if release.get('status') in ('completed', 'inProgress', 'halted')
         for code in release.get('versionCodes', [])
     ]
@@ -165,8 +173,8 @@ def play_candidate_release(internal):
     return max(releases, key=lambda r: max(int(c) for c in r['versionCodes']), default=None)
 
 
-def play_production_releases(release, production, rollout):
-    """What the production track should list after the promotion.
+def play_track_releases(release, target, rollout):
+    """What the target track should list after the promotion.
 
     All of it at once, by default. A staged rollout (`rollout` < 1) keeps
     the release everyone else has beside it, as Play requires."""
@@ -182,7 +190,7 @@ def play_production_releases(release, production, rollout):
     new['status'] = 'inProgress'
     new['userFraction'] = rollout
     kept = [
-        r for r in (production or {}).get('releases', []) if r.get('status') == 'completed'
+        r for r in (target or {}).get('releases', []) if r.get('status') == 'completed'
     ]
     return [new] + kept[:1]
 
@@ -325,14 +333,14 @@ def log(store, message):
     print(f'{store}: {message}', flush=True)
 
 
-def play(apply, audit, now, max_age_hours, rollout):
+def play(apply, audit, now, max_age_hours, rollout, track):
     token = play_token()
     edit = call('POST', f'{PLAY}/edits', token, body={})['id']
     committed = False
     try:
         base = f'{PLAY}/edits/{edit}'
         internal = call('GET', f'{base}/tracks/internal', token)
-        production = call('GET', f'{base}/tracks/production', token)
+        target = call('GET', f'{base}/tracks/{track}', token)
         release = play_candidate_release(internal)
         candidate = None
         if release:
@@ -340,8 +348,8 @@ def play(apply, audit, now, max_age_hours, rollout):
             candidate = Candidate(release.get('name') or '?', code)
             log('play', f'internal track: {release.get("name")} ({code})')
             check_commit(candidate, 'play')
-        current = play_current(production)
-        log('play', f'production: {"build " + str(current) if current else "nothing yet"}')
+        current = play_current(target)
+        log('play', f'{track}: {"build " + str(current) if current else "nothing yet"}')
         decision = decide(candidate, current, now, max_age_hours)
         if candidate is not None:
             log('play', f'commit {candidate.sha or "?"}, CI '
@@ -354,22 +362,22 @@ def play(apply, audit, now, max_age_hours, rollout):
             if not release.get('releaseNotes') and candidate.sha:
                 notes = release_notes(candidate.sha, candidate.version, '--play-dir')
                 release['releaseNotes'] = [{'language': 'en-US', 'text': notes[:PLAY_LIMIT]}]
-            releases = play_production_releases(release, production, rollout)
-            body = {'track': 'production', 'releases': releases}
-            log('play', 'production track would become:')
+            releases = play_track_releases(release, target, rollout)
+            body = {'track': track, 'releases': releases}
+            log('play', f'{track} track would become:')
             for r in releases:
                 text = ' / '.join(n.get('text', '').replace('\n', ' ⏎ ')[:120] + '…'
                                   for n in r.get('releaseNotes', []))
                 log('play', f'  {r["name"]} {r["versionCodes"]} {r["status"]}'
                             f'{" " + str(r["userFraction"]) if "userFraction" in r else ""}'
                             f' notes: {text or "none"}')
-            call('PUT', f'{base}/tracks/production', token, body=body)
+            call('PUT', f'{base}/tracks/{track}', token, body=body)
             # Play's own verdict on the release, without publishing it.
             try:
                 call('POST', f'{base}:validate', token, body={})
-                log('play', 'Play validated the production release')
+                log('play', f'Play validated the {track} release')
             except ApiError as error:
-                log('play', f'Play refuses the production release:\n{error}')
+                log('play', f'Play refuses the {track} release:\n{error}')
                 decision.failed = True
                 decision.promote = False
             if decision.promote and apply:
@@ -378,12 +386,12 @@ def play(apply, audit, now, max_age_hours, rollout):
                     params = '?changesNotSentForReview=true'
                 call('POST', f'{base}:commit{params}', token, body={})
                 committed = True
-                log('play', f'PROMOTED {release.get("name")} to production')
+                log('play', f'PROMOTED {release.get("name")} to {track}')
             elif decision.promote:
                 log('play', 'dry run: not committed')
 
         if audit:
-            play_audit(token, base, production)
+            play_audit(token, base, track)
         return decision
     finally:
         if not committed:
@@ -395,8 +403,8 @@ def play(apply, audit, now, max_age_hours, rollout):
                 pass
 
 
-def play_audit(token, base, production):
-    print('play: --- before the first production release ---')
+def play_audit(token, base, track):
+    print(f'play: --- before the first public release on {track} ---')
     details = call('GET', f'{base}/details', token) or {}
     for key in ('defaultLanguage', 'contactEmail', 'contactWebsite'):
         print(f'play: [{"x" if details.get(key) else " "}] details.{key}')
@@ -414,9 +422,9 @@ def play_audit(token, base, production):
             mark = 'x' if len(images) >= needed else ' '
             print(f'play: [{mark}] listing {language} {kind}: {len(images)}'
                   f'{f" (needs {needed})" if needed else " (optional)"}')
-    countries = call('GET', f'{base}/countryAvailability/production', token) or {}
+    countries = call('GET', f'{base}/countryAvailability/{track}', token) or {}
     regions = [c.get('countryCode') for c in countries.get('countries', [])]
-    print(f'play: [{"x" if regions else " "}] production countries: {len(regions)}'
+    print(f'play: [{"x" if regions else " "}] {track} countries: {len(regions)}'
           f'{" (" + ", ".join(sorted(regions)[:12]) + "…)" if regions else ""}'
           f'{" restOfWorld" if countries.get("restOfWorld") else ""}')
     tracks = (call('GET', f'{base}/tracks', token) or {}).get('tracks', [])
@@ -465,6 +473,13 @@ def appstore(apply, audit, now, max_age_hours):
     versions = appstore_versions(token, app)
     for vid, string, state, build in versions:
         log('appstore', f'App Store version {string}: {state}, build {build}')
+    if newest and best is not newest and newest['state'] == 'VALID':
+        # What tonight would have done, had the newest build been eligible.
+        what_if = Candidate(newest['version'], newest['build'], landed=newest['uploaded'])
+        check_commit(what_if, 'appstore')
+        plan = appstore_plan(what_if, versions, now, max_age_hours)
+        log('appstore', f'were {newest["version"]} ({newest["build"]}) eligible: {plan.reason}'
+                        + ''.join(f'; {describe(step)}' for step in plan.steps))
     decision = appstore_plan(candidate, versions, now, max_age_hours)
     log('appstore', decision.reason)
     if decision.promote:
@@ -710,10 +725,14 @@ def appstore_audit(token, app, versions):
     else:
         print('appstore: [ ] availability: not set')
 
+    # The open version, or else the one on sale: a new version starts as a
+    # copy of its listing.
     editable = [v for v in versions if v[2] in EDITABLE]
-    if not editable:
-        print('appstore: no open App Store version to check the listing on')
-    for vid, string, state, build in editable[:1]:
+    live = sorted((v for v in versions if v[2] in LIVE), key=lambda v: version_key(v[1]))
+    shown = editable[:1] or live[-1:]
+    if not shown:
+        print('appstore: no App Store version to check the listing on')
+    for vid, string, state, build in shown:
         print(f'appstore: listing of version {string} ({state}):')
         for loc in call('GET', f'{ASC}/v1/appStoreVersions/{vid}/appStoreVersionLocalizations',
                         token)['data']:
@@ -774,6 +793,7 @@ def main(argv):
     audit = '--audit' in args
     schedule = None
     max_age_hours = DEFAULT_MAX_AGE_HOURS
+    play_track = DEFAULT_PLAY_TRACK
     targets = []
     while args:
         arg = args.pop(0)
@@ -781,6 +801,8 @@ def main(argv):
             continue
         if arg == '--schedule' and args:
             schedule = args.pop(0) or None
+        elif arg == '--play-track' and args:
+            play_track = args.pop(0) or DEFAULT_PLAY_TRACK
         elif arg == '--max-age-hours' and args:
             max_age_hours = int(args.pop(0) or DEFAULT_MAX_AGE_HOURS)
         elif arg in ('play', 'appstore', 'all'):
@@ -796,13 +818,14 @@ def main(argv):
         return
     rollout = float(os.environ.get('PLAY_PRODUCTION_ROLLOUT') or 1)
     print(f'{"APPLY" if apply else "DRY RUN"} at {now.astimezone(BERLIN):%Y-%m-%d %H:%M %Z}, '
-          f'window {max_age_hours or "unlimited"} h, Play rollout {rollout:.0%}')
+          f'window {max_age_hours or "unlimited"} h, Play track {play_track}, '
+          f'rollout {rollout:.0%}')
 
     failed = False
     for name in chosen:
         try:
             if name == 'play':
-                decision = play(apply, audit, now, max_age_hours, rollout)
+                decision = play(apply, audit, now, max_age_hours, rollout, play_track)
             else:
                 decision = appstore(apply, audit, now, max_age_hours)
             failed |= decision.failed

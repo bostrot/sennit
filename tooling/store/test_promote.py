@@ -14,7 +14,7 @@ from unittest import mock
 import promote
 from promote import (
     Candidate, appstore_plan, decide, play_candidate_release, play_current,
-    play_production_releases, promotion_slot,
+    play_track_releases, promotion_slot,
 )
 
 UTC = datetime.timezone.utc
@@ -133,7 +133,7 @@ class PlayTest(unittest.TestCase):
         self.assertIsNone(play_candidate_release({'track': 'internal'}))
         self.assertIsNone(play_candidate_release(None))
 
-    def test_production_counts_what_is_out_or_rolling_out(self):
+    def test_the_target_counts_what_is_out_or_rolling_out(self):
         self.assertIsNone(play_current({'track': 'production'}))
         self.assertIsNone(play_current(None))
         self.assertEqual(play_current({'releases': [
@@ -144,7 +144,7 @@ class PlayTest(unittest.TestCase):
 
     def test_a_full_release_replaces_the_track(self):
         release = play_candidate_release(self.internal)
-        releases = play_production_releases(release, None, 1)
+        releases = play_track_releases(release, None, 1)
         self.assertEqual(releases, [{
             'name': '1.0.16', 'versionCodes': ['412'],
             'releaseNotes': [{'language': 'en-US', 'text': '• Faster'}],
@@ -155,7 +155,7 @@ class PlayTest(unittest.TestCase):
         release = play_candidate_release(self.internal)
         production = {'releases': [{'name': '1.0.10', 'versionCodes': ['300'],
                                     'status': 'completed'}]}
-        new, kept = play_production_releases(release, production, 0.2)
+        new, kept = play_track_releases(release, production, 0.2)
         self.assertEqual((new['status'], new['userFraction']), ('inProgress', 0.2))
         self.assertEqual(kept['versionCodes'], ['300'])
 
