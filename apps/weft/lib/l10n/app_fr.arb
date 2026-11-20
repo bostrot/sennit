@@ -877,7 +877,7 @@
   "bridgeFlowWaiting": "En attente de l’autre côté…",
   "bridgeFlowCookiesTitle": "Cette méthode nécessite un navigateur",
   "bridgeFlowCookiesBody": "Cette connexion ne fonctionne que dans une page web, que Sennit ne peut pas encore ouvrir ici. Reviens en arrière et choisis une autre façon de te connecter.",
-  "bridgeFlowOpenManagementChat": "Ouvrir la conversation d’administration",
+  "bridgeFlowCookiesOnlyWay": "{network} ne peut être connecté qu’en se connectant sur une page web, que Sennit ne peut pas encore ouvrir ici. La personne qui gère ton serveur peut activer une méthode sans navigateur.",
   "bridgeFlowConnected": "{network} est connecté",
   "bridgeFlowConnectedBody": "Tes discussions arrivent maintenant et apparaissent dans la boîte au fur et à mesure. Un gros compte peut prendre quelques minutes — inutile de garder cet écran ouvert.",
   "bridgeFlowFailed": "Connexion impossible",

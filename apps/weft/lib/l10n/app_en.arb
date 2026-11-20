@@ -5027,10 +5027,15 @@
   "@bridgeFlowCookiesBody": {
     "description": "The explanation of the browser-only sign-in step, and the way round it. 'Sennit' is the app's name and is never translated."
   },
-  "bridgeFlowOpenManagementChat": "Open the management chat",
-  "@bridgeFlowOpenManagementChat": {
-    "description": "Button that leaves the guided flow for the bridge's management chat. Keep under ~34 chars.",
-    "maxLength": 55
+  "bridgeFlowCookiesOnlyWay": "{network} can only be connected by signing in on a web page, which Sennit can’t open here yet. Whoever runs your server can make a way without a browser available.",
+  "@bridgeFlowCookiesOnlyWay": {
+    "description": "Shown when the only way the server offers to connect a messenger needs a sign-in inside a web browser, which the app cannot do. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
   },
   "bridgeFlowConnected": "{network} is connected",
   "@bridgeFlowConnected": {

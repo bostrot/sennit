@@ -878,7 +878,7 @@
   "bridgeFlowWaiting": "正在等待对方…",
   "bridgeFlowCookiesTitle": "此方式需要网页浏览器",
   "bridgeFlowCookiesBody": "此登录方式只能在网页中完成，Sennit 暂时无法在此打开。请返回并选择其他连接方式。",
-  "bridgeFlowOpenManagementChat": "打开管理聊天",
+  "bridgeFlowCookiesOnlyWay": "{network} 只能通过在网页中登录来连接，Sennit 暂时无法在此打开网页。你的服务器管理员可以开启无需浏览器的方式。",
   "bridgeFlowConnected": "{network} 已连接",
   "bridgeFlowConnectedBody": "你的聊天正在同步，会陆续出现在收件箱中。大账号可能需要几分钟，无需保持此页面打开。",
   "bridgeFlowFailed": "无法登录",

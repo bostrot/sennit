@@ -276,6 +276,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
     final Widget body;
     if (_loadError != null) {
       body = _Failed(
+        networkName: _networkName,
         message: friendlyLoginError(
           context.l10n,
           widget.network,
@@ -292,6 +293,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
       );
     } else if (methods.isEmpty) {
       body = _Failed(
+        networkName: _networkName,
         message: context.l10n.bridgeFlowNoMethods(_networkName),
         onClose: () => _leave(false),
         onUseAdminRoom: widget.onUseAdminRoom,
@@ -310,6 +312,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
           onClose: () => Navigator.of(context).pop(true),
         ),
         (BridgeLoginStatus.failed, _) => _Failed(
+          networkName: _networkName,
           message: friendlyLoginError(
             context.l10n,
             widget.network,
@@ -325,6 +328,7 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
         (BridgeLoginStatus.waitingForUser, final s?)
             when s.type == LoginStepType.cookies =>
           _CookiesUnsupported(
+            networkName: _networkName,
             onTryAnother: _hasAlternatives ? _chooseAnother : null,
             onUseAdminRoom: widget.onUseAdminRoom,
           ),
@@ -603,6 +607,13 @@ class _InputStep extends StatelessWidget {
     caseSensitive: false,
   ).hasMatch(step.instructions ?? '');
 
+  /// The bridge's words with a capital, since they are shown as a sentence
+  /// and mautrix writes its validation errors in lower case.
+  static String? _sentence(String? text) {
+    if (text == null || text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final single = step.fields.length == 1 ? step.fields.single : null;
@@ -612,7 +623,9 @@ class _InputStep extends StatelessWidget {
     // The guide's words lead; the bridge's instruction is kept when the guide
     // has none, and promoted to a warning when it reports a failed try.
     final subtitle = _isRetry ? hint : (hint ?? step.instructions);
-    final warning = bridgeError ?? (_isRetry ? step.instructions : null);
+    final warning = _sentence(
+      bridgeError ?? (_isRetry ? step.instructions : null),
+    );
 
     return ListView(
       shrinkWrap: true,
@@ -1095,7 +1108,13 @@ class _Notice extends StatelessWidget {
 
 /// The one step type Sennit cannot render.
 class _CookiesUnsupported extends StatelessWidget {
-  const _CookiesUnsupported({this.onTryAnother, this.onUseAdminRoom});
+  const _CookiesUnsupported({
+    required this.networkName,
+    this.onTryAnother,
+    this.onUseAdminRoom,
+  });
+
+  final String networkName;
 
   final VoidCallback? onTryAnother;
   final VoidCallback? onUseAdminRoom;
@@ -1120,7 +1139,10 @@ class _CookiesUnsupported extends StatelessWidget {
         ),
         const SizedBox(height: WeftSpace.sm),
         Text(
-          context.l10n.bridgeFlowCookiesBody,
+          // "Pick another way" only when there is one to pick.
+          onTryAnother != null
+              ? context.l10n.bridgeFlowCookiesBody
+              : context.l10n.bridgeFlowCookiesOnlyWay(networkName),
           textAlign: TextAlign.center,
           style: context.text.bodySmall?.copyWith(
             color: context.colors.onSurfaceVariant,
@@ -1135,7 +1157,7 @@ class _CookiesUnsupported extends StatelessWidget {
         if (onUseAdminRoom != null)
           TextButton(
             onPressed: onUseAdminRoom,
-            child: Text(context.l10n.bridgeFlowOpenManagementChat),
+            child: Text(context.l10n.bridgesAdvancedOpenChat(networkName)),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
@@ -1195,6 +1217,7 @@ class _Done extends StatelessWidget {
 
 class _Failed extends StatefulWidget {
   const _Failed({
+    required this.networkName,
     required this.message,
     required this.onClose,
     this.details,
@@ -1203,6 +1226,7 @@ class _Failed extends StatefulWidget {
     this.onUseAdminRoom,
   });
 
+  final String networkName;
   final String message;
 
   /// The bridge's own words, kept for whoever has to work out what happened.
@@ -1281,7 +1305,9 @@ class _FailedState extends State<_Failed> {
           if (widget.onUseAdminRoom != null)
             TextButton(
               onPressed: widget.onUseAdminRoom,
-              child: Text(context.l10n.bridgeFlowOpenManagementChat),
+              child: Text(
+                context.l10n.bridgesAdvancedOpenChat(widget.networkName),
+              ),
             ),
           TextButton(
             onPressed: widget.onClose,

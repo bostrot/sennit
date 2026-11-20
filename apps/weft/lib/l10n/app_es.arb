@@ -877,7 +877,7 @@
   "bridgeFlowWaiting": "Esperando al otro lado…",
   "bridgeFlowCookiesTitle": "Esta forma necesita un navegador",
   "bridgeFlowCookiesBody": "Este inicio de sesión solo funciona en una página web que Sennit aún no puede abrir aquí. Vuelve y elige otra forma de conectar.",
-  "bridgeFlowOpenManagementChat": "Abrir el chat de gestión",
+  "bridgeFlowCookiesOnlyWay": "{network} solo se puede conectar iniciando sesión en una página web, que Sennit aún no puede abrir aquí. Quien gestiona tu servidor puede habilitar una forma sin navegador.",
   "bridgeFlowConnected": "{network} está conectado",
   "bridgeFlowConnectedBody": "Tus chats se están trayendo ahora y aparecen en la bandeja a medida que llegan. Una cuenta grande puede tardar unos minutos; no hace falta dejar esto abierto.",
   "bridgeFlowFailed": "No se ha podido iniciar sesión",

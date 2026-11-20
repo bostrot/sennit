@@ -877,7 +877,7 @@
   "bridgeFlowWaiting": "Warte auf die Gegenseite…",
   "bridgeFlowCookiesTitle": "Dieser Weg braucht einen Webbrowser",
   "bridgeFlowCookiesBody": "Diese Anmeldung funktioniert nur auf einer Webseite, die Sennit hier noch nicht öffnen kann. Geh zurück und wähle einen anderen Weg.",
-  "bridgeFlowOpenManagementChat": "Verwaltungschat öffnen",
+  "bridgeFlowCookiesOnlyWay": "{network} lässt sich nur über eine Anmeldung auf einer Webseite verbinden, die Sennit hier noch nicht öffnen kann. Wer deinen Server betreibt, kann einen Weg ohne Browser freischalten.",
   "bridgeFlowConnected": "{network} ist verbunden",
   "bridgeFlowConnectedBody": "Deine Chats kommen jetzt rüber und erscheinen nach und nach im Posteingang. Bei einem großen Konto kann das ein paar Minuten dauern – du musst hier nichts offen lassen.",
   "bridgeFlowFailed": "Anmeldung nicht möglich",

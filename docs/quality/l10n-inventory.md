@@ -35,7 +35,7 @@ Marked with `// l10n-ignore:` at the call site. Not outstanding work: each is a 
 | `apps/weft/lib/data/demo_repository.dart` | 1091 | `'Design Team'` | demo fixture, never shipped to a real inbox. |
 | `apps/weft/lib/features/auth/auth_gate.dart` | 189 | `'$error'` | the underlying error, in English, from the SDK. |
 | `apps/weft/lib/features/auth/login_screen.dart` | 571 | `'Sennit'` | the app's own name, never translated. |
-| `apps/weft/lib/features/bridges/bridge_login_flow.dart` | 1033 | `'${index + 1}'` | a step number, the same in every language. |
+| `apps/weft/lib/features/bridges/bridge_login_flow.dart` | 1050 | `'${index + 1}'` | a step number, the same in every language. |
 | `apps/weft/lib/features/chat/media_gallery.dart` | 317 | `'+${widget.more}'` | a count, the same in every language this app ships; its screen-reader label is translated. |
 | `apps/weft/lib/features/chat/thread_indicator.dart` | 104 | `'$title · $count'` | an interpolation of a room name and a count already formatted. |
 | `apps/weft/lib/features/chat/thread_indicator.dart` | 176 | `'$count'` | a bare number, not a sentence. |
