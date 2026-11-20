@@ -23,20 +23,23 @@ const List<Duration> kReplyReminderIntervals = [
 /// that it is still the same day.
 const Duration kDefaultReplyReminderInterval = Duration(hours: 3);
 
-/// How long after a message arrived reminders about it give up.
+/// How old a message may already be when it is first seen read for reminders
+/// about it to start.
 ///
-/// "Until they reply" with no end is a promise to buzz about a "thanks!" from
-/// last spring every three hours for ever. A week is long enough that a
-/// conversation that really was waiting gets a fair number of nudges, and
-/// short enough that switching the feature on does not dredge up the whole
-/// inbox.
+/// Once started, reminders go on until the user answers, says "stop
+/// reminding" or excludes the chat — that is the feature. This only keeps
+/// switching it on from dredging up the whole inbox: a "thanks!" from last
+/// spring, read long ago, does not start buzzing every three hours.
 const Duration kReplyReminderMaxAge = Duration(days: 7);
 
 /// How many reminders one chat may have queued with the OS at a time.
 ///
-/// The rest are scheduled the next time the app runs. Bounded because iOS
-/// keeps at most 64 pending local notifications for an app — shared with
-/// every "remind me" the user set by hand — and silently drops the rest.
+/// The rest are scheduled the next time the app runs, and the last of them
+/// repeats daily until then (see [PlannedReplyReminder.repeatsDaily]), so a
+/// chat is still reminded about with Sennit closed for longer than these
+/// cover. Bounded because iOS keeps at most 64 pending local notifications
+/// for an app — shared with every "remind me" the user set by hand — and
+/// silently drops the rest.
 const int kReplyRemindersPerChat = 6;
 
 /// How many reminders may be queued with the OS across all chats. Below the
@@ -195,7 +198,9 @@ enum ReplyReminderSkip {
   /// change, a redaction, a bridge narrating its connection.
   notAMessage,
 
-  /// The message is older than [kReplyReminderMaxAge].
+  /// The message was already older than [kReplyReminderMaxAge] when it was
+  /// first seen read. A message that grows old while being reminded about is
+  /// not stale: reminders go on until it is answered.
   stale,
 
   /// A conversation the user has not accepted.
@@ -267,7 +272,13 @@ ReplyReminderSkip? replyReminderSkipFor(
   }
   final awaiting = _awaitingSkip(chat);
   if (awaiting != null) return awaiting;
-  if (now.difference(chat.lastMessage!.timestamp) > kReplyReminderMaxAge) {
+  final last = chat.lastMessage!;
+  // Measured when the reminders started, not now: one that started keeps
+  // going until the message is answered, however old it gets.
+  final startedAt = entry != null && entry.eventId == last.eventId
+      ? entry.readAt
+      : now;
+  if (startedAt.difference(last.timestamp) > kReplyReminderMaxAge) {
     return ReplyReminderSkip.stale;
   }
   if (chat.isPendingRequest) return ReplyReminderSkip.pendingRequest;
@@ -286,9 +297,7 @@ ReplyReminderSkip? replyReminderSkipFor(
     if (chat.muted || mutedByPolicy) return ReplyReminderSkip.muted;
   }
   if (settings.isExcluded(chat.id)) return ReplyReminderSkip.excluded;
-  if (entry != null &&
-      entry.dismissed &&
-      entry.eventId == chat.lastMessage!.eventId) {
+  if (entry != null && entry.dismissed && entry.eventId == last.eventId) {
     return ReplyReminderSkip.dismissed;
   }
   return null;
@@ -417,6 +426,7 @@ class PlannedReplyReminder {
     required this.chatId,
     required this.title,
     required this.at,
+    this.repeatsDaily = false,
   });
 
   final String chatId;
@@ -425,22 +435,31 @@ class PlannedReplyReminder {
   final String title;
   final DateTime at;
 
+  /// Fires at [at] and then every day at the same time until it is taken
+  /// back. The last reminder queued for each chat is one, so a chat is still
+  /// reminded about while Sennit stays closed past the rest; the next run
+  /// plans again and moves it.
+  final bool repeatsDaily;
+
   /// Stable for one chat and one instant, so planning twice yields the same
   /// key and the app can diff what it has scheduled against what it should.
-  String get key => '$chatId@${at.toUtc().millisecondsSinceEpoch}';
+  String get key =>
+      '$chatId@${at.toUtc().millisecondsSinceEpoch}${repeatsDaily ? '+daily' : ''}';
 
   @override
   bool operator ==(Object other) =>
       other is PlannedReplyReminder &&
       other.chatId == chatId &&
       other.title == title &&
-      other.at == at;
+      other.at == at &&
+      other.repeatsDaily == repeatsDaily;
 
   @override
-  int get hashCode => Object.hash(chatId, title, at);
+  int get hashCode => Object.hash(chatId, title, at, repeatsDaily);
 
   @override
-  String toString() => 'PlannedReplyReminder($chatId at $at)';
+  String toString() =>
+      'PlannedReplyReminder($chatId at $at${repeatsDaily ? ', daily' : ''})';
 }
 
 /// What [planReplyReminders] decided: the ledger to persist and the reminders
@@ -458,7 +477,8 @@ class ReplyReminderPlan {
 /// The k-th reminder is due at `readAt + k × interval`, for k ≥ 1 — so the
 /// sequence is anchored to the read and not to whenever the app happened to
 /// plan it, and replanning on every sync moves nothing. Only instants after
-/// [now] and no later than [giveUpAt] are returned, at most [count] of them.
+/// [now] — and no later than [giveUpAt], when one is given — are returned, at
+/// most [count] of them.
 ///
 /// With [quietHours], a reminder due inside the window is moved to its end;
 /// reminders that land on the same instant that way are merged into one.
@@ -466,7 +486,7 @@ List<DateTime> replyReminderTimes({
   required DateTime readAt,
   required Duration interval,
   required DateTime now,
-  required DateTime giveUpAt,
+  DateTime? giveUpAt,
   int count = kReplyRemindersPerChat,
   QuietHours? quietHours,
 }) {
@@ -480,7 +500,7 @@ List<DateTime> replyReminderTimes({
       : elapsed.inMicroseconds ~/ interval.inMicroseconds + 1;
   while (out.length < count) {
     final due = readAt.add(interval * k);
-    if (due.isAfter(giveUpAt)) break;
+    if (giveUpAt != null && due.isAfter(giveUpAt)) break;
     k++;
     final at = quietHours == null ? due : _afterQuietHours(due, quietHours);
     if (!at.isAfter(now)) continue;
@@ -522,6 +542,8 @@ DateTime _afterQuietHours(DateTime at, QuietHours quiet) {
 /// * Every awaiting chat that [replyReminderSkipFor] lets through gets up to
 ///   [perChat] reminders from [replyReminderTimes]; across all chats the
 ///   soonest [total] are kept.
+/// * The last reminder kept for each chat repeats daily, so reminding goes on
+///   until the chat is answered even if the app does not run to plan again.
 ///
 /// Entries are kept for excluded chats that are still awaiting a reply, so
 /// re-including one does not restart its clock.
@@ -569,7 +591,6 @@ ReplyReminderPlan planReplyReminders({
       readAt: entry.readAt,
       interval: settings.interval,
       now: now,
-      giveUpAt: last.timestamp.add(kReplyReminderMaxAge),
       count: perChat,
       quietHours: quiet,
     );
@@ -584,10 +605,26 @@ ReplyReminderPlan planReplyReminders({
     final byTime = a.at.compareTo(b.at);
     return byTime != 0 ? byTime : a.chatId.compareTo(b.chatId);
   });
+  final kept = reminders.length > total
+      ? reminders.sublist(0, total)
+      : reminders;
+  // After the cap, so the repeating one is the last a chat actually has
+  // queued, wherever the cap cut it off.
+  final lastOfChat = <String, int>{
+    for (var i = 0; i < kept.length; i++) kept[i].chatId: i,
+  };
   return ReplyReminderPlan(
     ledger: ReplyReminderLedger(entries),
-    reminders: reminders.length > total
-        ? reminders.sublist(0, total)
-        : reminders,
+    reminders: [
+      for (final (i, r) in kept.indexed)
+        lastOfChat[r.chatId] == i
+            ? PlannedReplyReminder(
+                chatId: r.chatId,
+                title: r.title,
+                at: r.at,
+                repeatsDaily: true,
+              )
+            : r,
+    ],
   );
 }

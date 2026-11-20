@@ -89,10 +89,24 @@ void main() {
       );
     });
 
-    test('a message older than the cut-off is stale', () {
+    test('a message already older than the cut-off when read is stale', () {
       expect(
         skipFor(waiting(age: kReplyReminderMaxAge + const Duration(hours: 1))),
         ReplyReminderSkip.stale,
+      );
+    });
+
+    test('a message that grows old while being reminded about is not', () {
+      final age = kReplyReminderMaxAge * 4;
+      expect(
+        skipFor(
+          waiting(age: age),
+          entry: ReplyReminderEntry(
+            eventId: r'$event_1',
+            readAt: now.subtract(age).add(const Duration(minutes: 5)),
+          ),
+        ),
+        isNull,
       );
     });
   });
@@ -232,6 +246,16 @@ void main() {
       ]);
     });
 
+    test('goes on without a give-up instant', () {
+      final times = replyReminderTimes(
+        readAt: now.subtract(const Duration(days: 30)),
+        interval: const Duration(hours: 1),
+        now: now,
+        count: 2,
+      );
+      expect(times, hasLength(2));
+    });
+
     test('stops at the give-up instant', () {
       final times = replyReminderTimes(
         readAt: readAt,
@@ -291,6 +315,30 @@ void main() {
         ),
       );
       expect(result.reminders, hasLength(kReplyRemindersPerChat));
+    });
+
+    test('the last reminder of a chat repeats daily, the others do not', () {
+      final reminders = plan([waiting()]).reminders;
+      expect(reminders.last.repeatsDaily, isTrue);
+      expect(reminders.where((r) => r.repeatsDaily), hasLength(1));
+      expect(reminders.last.key, endsWith('+daily'));
+    });
+
+    test('keeps reminding until answered, however long that takes', () {
+      final first = plan([waiting()]);
+      final monthLater = now.add(const Duration(days: 30));
+      final later = plan([waiting()], ledger: first.ledger, at: monthLater);
+      expect(later.reminders, hasLength(kReplyRemindersPerChat));
+      expect(later.reminders.first.at.isAfter(monthLater), isTrue);
+      expect(later.ledger, first.ledger);
+      expect(
+        plan(
+          [waiting(isOwn: true)],
+          ledger: later.ledger,
+          at: monthLater,
+        ).reminders,
+        isEmpty,
+      );
     });
 
     test('replanning later keeps the clock and the same instants', () {
@@ -361,6 +409,8 @@ void main() {
       expect(result.reminders, hasLength(3));
       // A was read an hour earlier, so its reminders come first.
       expect(result.reminders.map((r) => r.chatId), ['!a:x', '!b:x', '!a:x']);
+      // Each chat's last reminder within the cap is the one that repeats.
+      expect(result.reminders.map((r) => r.repeatsDaily), [false, true, true]);
       final sorted = [...result.reminders]
         ..sort((a, b) => a.at.compareTo(b.at));
       expect(result.reminders, sorted);
