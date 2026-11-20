@@ -120,31 +120,35 @@ class MergeScorer {
     NetworkHandle a,
     NetworkHandle b, {
     Set<String> sharedGroupRoomIds = const {},
+  }) => _score(
+    _Features.of(a, config),
+    _Features.of(b, config),
+    sharedGroupRoomIds: sharedGroupRoomIds,
+  );
+
+  MergeCandidate? _score(
+    _Features fa,
+    _Features fb, {
+    Set<String> sharedGroupRoomIds = const {},
   }) {
+    final a = fa.handle;
+    final b = fb.handle;
     if (a.id == b.id) return null;
 
     final signals = <MergeSignal>[];
 
-    final phoneA = normalizePhone(
-      a.phoneE164 ?? a.remoteId,
-      defaultCountryCode: config.defaultCountryCode,
-    );
-    final phoneB = normalizePhone(
-      b.phoneE164 ?? b.remoteId,
-      defaultCountryCode: config.defaultCountryCode,
-    );
-    if (phoneA != null && phoneA == phoneB) {
+    final phoneA = fa.phone;
+    if (phoneA != null && phoneA == fb.phone) {
       signals.add(MergeSignal.phoneExact);
     }
 
-    final emailA = normalizeEmail(a.email);
-    final emailB = normalizeEmail(b.email);
-    if (emailA != null && emailA == emailB) {
+    final emailA = fa.email;
+    if (emailA != null && emailA == fb.email) {
       signals.add(MergeSignal.emailExact);
     }
 
-    final nameA = a.displayName == null ? '' : normalizeName(a.displayName!);
-    final nameB = b.displayName == null ? '' : normalizeName(b.displayName!);
+    final nameA = fa.name;
+    final nameB = fb.name;
     // Names are only evidence *across* networks: two same-network handles
     // with one name are usually two people who share it, not one person
     // twice — a bridge gives each person exactly one handle per network.
@@ -156,8 +160,7 @@ class MergeScorer {
       // the same number-shaped string, and one such match poisons a contact
       // that every later merge then drags along.
       final substantial = nameA.contains(' ') || nameB.contains(' ');
-      final identifierShaped =
-          RegExp(r'\d').hasMatch(nameA) || RegExp(r'\d').hasMatch(nameB);
+      final identifierShaped = fa.nameHasDigit || fb.nameHasDigit;
       if (substantial && !identifierShaped) {
         if (nameA == nameB) {
           signals.add(MergeSignal.nameExact);
@@ -215,32 +218,81 @@ class MergeScorer {
     Set<String> rejectedPairs = const {},
     Map<String, Set<String>> sharedGroupsByPair = const {},
   }) {
-    final out = <MergeCandidate>[];
-    for (var i = 0; i < handles.length; i++) {
-      for (var j = i + 1; j < handles.length; j++) {
-        final a = handles[i];
-        final b = handles[j];
+    // Normalised once per handle rather than once per pair: the folding is
+    // regular-expression work, and done inside the pair loop it was most of a
+    // pass — over half a second on the UI thread for a few hundred contacts.
+    final features = [for (final h in handles) _Features.of(h, config)];
 
-        final key = pairKey(a.id, b.id);
-        if (rejectedPairs.contains(key)) continue;
-
-        // Already the same contact — nothing to propose.
-        if (a.unifiedContactId != null &&
-            a.unifiedContactId == b.unifiedContactId) {
-          continue;
+    // Only pairs that share a number, an address or a name can be proposed —
+    // [score] refuses any pair without one of those exact signals — so those
+    // are the only pairs scored, found by bucketing rather than by trying all
+    // n² of them. Visited in the same (i, j) order as before.
+    final buckets = <String, List<int>>{};
+    void bucket(String key, int i) => (buckets[key] ??= []).add(i);
+    for (var i = 0; i < features.length; i++) {
+      final f = features[i];
+      if (f.phone case final phone?) bucket('p:$phone', i);
+      if (f.email case final email?) bucket('e:$email', i);
+      if (f.name.isNotEmpty) bucket('n:${f.name}', i);
+    }
+    final pairs = <int>{};
+    for (final members in buckets.values) {
+      for (var x = 0; x < members.length; x++) {
+        for (var y = x + 1; y < members.length; y++) {
+          pairs.add(members[x] * handles.length + members[y]);
         }
-
-        final candidate = score(
-          a,
-          b,
-          sharedGroupRoomIds: sharedGroupsByPair[key] ?? const {},
-        );
-        if (candidate != null) out.add(candidate);
       }
+    }
+
+    final out = <MergeCandidate>[];
+    for (final pair in pairs.toList()..sort()) {
+      final a = handles[pair ~/ handles.length];
+      final b = handles[pair % handles.length];
+
+      final key = pairKey(a.id, b.id);
+      if (rejectedPairs.contains(key)) continue;
+
+      // Already the same contact — nothing to propose.
+      if (a.unifiedContactId != null &&
+          a.unifiedContactId == b.unifiedContactId) {
+        continue;
+      }
+
+      final candidate = _score(
+        features[pair ~/ handles.length],
+        features[pair % handles.length],
+        sharedGroupRoomIds: sharedGroupsByPair[key] ?? const {},
+      );
+      if (candidate != null) out.add(candidate);
     }
     out.sort((x, y) => y.score.compareTo(x.score));
     return out;
   }
+}
+
+/// What [MergeScorer] compares of one handle, normalised once.
+class _Features {
+  _Features._(this.handle, this.phone, this.email, this.name)
+    : nameHasDigit = _digit.hasMatch(name);
+
+  factory _Features.of(NetworkHandle h, MergeScoringConfig config) =>
+      _Features._(
+        h,
+        normalizePhone(
+          h.phoneE164 ?? h.remoteId,
+          defaultCountryCode: config.defaultCountryCode,
+        ),
+        normalizeEmail(h.email),
+        h.displayName == null ? '' : normalizeName(h.displayName!),
+      );
+
+  static final RegExp _digit = RegExp(r'\d');
+
+  final NetworkHandle handle;
+  final String? phone;
+  final String? email;
+  final String name;
+  final bool nameHasDigit;
 }
 
 /// Order-independent key for a handle pair, so a decision recorded as (a, b)

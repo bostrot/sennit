@@ -1907,6 +1907,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   void _rebuild() {
+    _mutedRoomIds = null;
     _refreshIdentityGraph();
     _applyAutoMerges();
     _mergedContactIds = null;
@@ -2045,6 +2046,15 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   void _refreshIdentityGraph() {
+    // One handle per person, whatever number of rooms they are the peer of.
+    // A handle names one room, and the last room listed for a peer is the one
+    // it has always ended up naming; but written once per room, a peer with an
+    // old DM next to the bridge's portal was stored twice a pass — once
+    // naming each room — and every pass "changed" it. That marked the handles
+    // dirty on every sync, and a dirty pass scores every pair of handles for
+    // a merge: on an account with a few hundred contacts, over half a second
+    // on the UI thread after each sync, which is what typing ran into.
+    final handles = <String, NetworkHandle>{};
     for (final room in _client.rooms) {
       if (room.isSpace) continue;
 
@@ -2077,6 +2087,9 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         // Signal account id or a Discord snowflake simply doesn't set it.
         phoneE164: _phoneOf(peerId, network),
       );
+      handles[peerId] = handle;
+    }
+    for (final handle in handles.values) {
       _graph.upsertHandle(handle);
       // Written to SQLite only when something actually changed: the graph
       // refresh runs on every (debounced) sync, and re-writing several dozen
@@ -2347,7 +2360,13 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   }
 
   String? _avatarFor(sdk.Room room) {
-    final roomAvatar = _thumbnail(room.avatar?.toString());
+    // The room's own picture only, not `Room.avatar`: its fallback is the
+    // direct-chat partner's, which is what the lines below already find, and
+    // the way it finds that partner copies the whole of `m.direct` — for
+    // every room, on every rebuild.
+    final roomAvatar = _thumbnail(
+      room.getState(sdk.EventTypes.RoomAvatar)?.content.tryGet<String>('url'),
+    );
     if (roomAvatar != null) return roomAvatar;
 
     final peerId = _peerOf(room);
@@ -2369,6 +2388,39 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
     _ensureProfile(peerId, room: room);
     return null;
+  }
+
+  /// Whether [room]'s push rules silence it — `Room.pushRuleState` other
+  /// than `notify`, answered from one reading of the account's rules.
+  ///
+  /// `Room.pushRuleState` parses every push rule the account has each time it
+  /// is asked, and an account that has muted a few hundred rooms has a rule
+  /// for each: asked once per room per rebuild, that was most of the cost of
+  /// every sync once the inbox was live.
+  bool _isMuted(sdk.Room room) =>
+      (_mutedRoomIds ??= _readMutedRoomIds()).contains(room.id);
+
+  /// Read at most once per rebuild; [_rebuild] drops it.
+  Set<String>? _mutedRoomIds;
+
+  Set<String> _readMutedRoomIds() {
+    final rules = _client.globalPushRules;
+    if (rules == null) return const {};
+    // The rule `Room.pushRuleState` reads for a room is the first one carrying
+    // its id, in the override list and then in the room list; it silences the
+    // room when nothing is left of its actions once "dont_notify" and
+    // "coalesce" are set aside.
+    final muted = <String>{};
+    for (final list in [rules.override, rules.room]) {
+      final seen = <String>{};
+      for (final rule in list ?? const <sdk.PushRule>[]) {
+        if (!seen.add(rule.ruleId)) continue;
+        if (rule.actions.every((a) => a == 'dont_notify' || a == 'coalesce')) {
+          muted.add(rule.ruleId);
+        }
+      }
+    }
+    return muted;
   }
 
   /// The inbox preview, re-mapped only when the room's last event moves —
@@ -2452,7 +2504,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
           // WhatsApp and live on Signal reads as unmuted at chat level. This
           // is what `evaluateNotification`'s `sourceMuted` rule tests, and
           // without it that rule can never fire against a real chat.
-          muted: room.pushRuleState != sdk.PushRuleState.notify,
+          muted: _isMuted(room),
         ),
       ],
       avatarUrl: _avatarFor(room),
@@ -2472,7 +2524,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       isGroup: _peerOf(room) == null,
       pinned: room.isFavourite,
       archived: room.membership == sdk.Membership.leave,
-      muted: room.pushRuleState != sdk.PushRuleState.notify,
+      muted: _isMuted(room),
       request: _requestStateOf(room),
       participantCount: _peerCountOf(room),
       preferredSendNetwork: _sendNetworks[room.id],
