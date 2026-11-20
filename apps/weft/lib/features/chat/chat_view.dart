@@ -2276,6 +2276,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                       ),
                                       child: _MessageBubble(
                                         message: message,
+                                        conversation: () => _view.messages,
                                         delivery: delivery,
                                         deliveryIsComplete:
                                             deliveryStateIsComplete(
@@ -4023,7 +4024,12 @@ class _MessageBubble extends StatelessWidget {
     this.onTapMention,
     this.thread,
     this.onOpenThread,
+    this.conversation,
   });
+
+  /// The loaded messages of this conversation, for the calendar chip's title.
+  /// Read only when the chip is tapped.
+  final Iterable<WeftMessage> Function()? conversation;
 
   /// The thread hanging off this message, when one does. Null for the
   /// overwhelming majority of bubbles, and null inside a thread view — where
@@ -4657,7 +4663,7 @@ class _MessageBubble extends StatelessWidget {
           // message. It renders nothing unless the detector found a date
           // worth offering — see [AgendaChip].
           if (content == null && !message.redacted)
-            AgendaChip(message: message),
+            AgendaChip(message: message, conversation: conversation),
           // Outside the bubble's decoration, deliberately. A chip on the own
           // bubble's primary fill would have to fight it for contrast, and the
           // bar belongs to the message rather than being part of what it says.
