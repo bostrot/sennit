@@ -43,8 +43,10 @@ Sennit talks exclusively to servers **you** configure:
   third-party networks (for example WhatsApp or Telegram). Those networks
   see what any client on them sees; the bridge runs under your control.
 - **Optional AI endpoints.** Voice transcription, semantic search
-  embeddings, reply suggestions and auto-reply only run if you configure an
-  endpoint for them. On-device models never send audio or text anywhere. If
+  embeddings, reply suggestions, quick messages and auto-reply only run if you
+  configure an endpoint for them. A quick message sends the last twelve
+  messages of the chat you picked it in, only when you pick it, and its
+  draft lands in the composer — nothing is sent to the chat until you do. On-device models never send audio or text anywhere. If
   you point Sennit at a remote endpoint, the content you asked it to process
   is sent to that endpoint — which, again, you chose and control.
 

@@ -8150,7 +8150,7 @@
   "@proIntro": {
     "description": "Opening paragraph of the Sennit Pro screen: what it unlocks and what stays free."
   },
-  "proFeatureAi": "Auto-replies, reply suggestions and the to-do assistant",
+  "proFeatureAi": "Auto-replies, reply suggestions, quick messages and the to-do assistant",
   "@proFeatureAi": {
     "description": "List item on the Sennit Pro screen: the AI writing features."
   },
@@ -8761,5 +8761,152 @@
         "example": "Alex"
       }
     }
+  },
+  "attachSourceQuickMessage": "Quick message",
+  "@attachSourceQuickMessage": {
+    "description": "Row in the composer's attach menu that opens the list of AI-written quick messages (birthday wish, thank you…). Keep under ~24 chars."
+  },
+  "quickMessageSheetTitle": "Quick messages",
+  "@quickMessageSheetTitle": {
+    "description": "Heading of the sheet listing quick messages, opened from the attach menu. Keep under ~24 chars."
+  },
+  "quickMessageSheetSubtitle": "Your AI writes a draft from this chat. You check it before sending.",
+  "@quickMessageSheetSubtitle": {
+    "description": "One line under the quick message sheet heading: the AI writes a draft from this chat, and nothing is sent until the user sends it. About 80 chars."
+  },
+  "quickMessageEditList": "Edit quick messages",
+  "@quickMessageEditList": {
+    "description": "Last row of the quick message sheet: opens the settings screen where quick messages are added, edited, reordered and deleted. Keep under ~30 chars."
+  },
+  "quickMessagePresetBirthday": "Happy Birthday",
+  "@quickMessagePresetBirthday": {
+    "description": "Title of a built-in quick message: a short happy-birthday wish. Keep under ~24 chars."
+  },
+  "quickMessagePresetCongratulations": "Congratulations",
+  "@quickMessagePresetCongratulations": {
+    "description": "Title of a built-in quick message: congratulations. Keep under ~24 chars."
+  },
+  "quickMessagePresetGetWell": "Get well soon",
+  "@quickMessagePresetGetWell": {
+    "description": "Title of a built-in quick message: get well soon. Keep under ~24 chars."
+  },
+  "quickMessagePresetThanks": "Thank you",
+  "@quickMessagePresetThanks": {
+    "description": "Title of a built-in quick message: a thank-you. Keep under ~24 chars."
+  },
+  "quickMessagePresetOnMyWay": "Running late, on my way",
+  "@quickMessagePresetOnMyWay": {
+    "description": "Title of a built-in quick message: the user is running late and on the way. Keep under ~24 chars."
+  },
+  "quickMessagePresetNewYear": "Happy New Year",
+  "@quickMessagePresetNewYear": {
+    "description": "Title of a built-in quick message: happy new year. Keep under ~24 chars."
+  },
+  "quickMessageWriting": "Writing “{title}”…",
+  "@quickMessageWriting": {
+    "description": "Bar above the composer while the AI writes a quick message. {title} is the quick message's title, e.g. 'Happy Birthday'. About 40 chars.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "description": "The quick message's title.",
+        "example": "Happy Birthday"
+      }
+    }
+  },
+  "quickMessageWritten": "“{title}” is in the composer: check it, then send",
+  "@quickMessageWritten": {
+    "description": "Bar above the composer after the AI has put a quick message into the composer, reminding the user to read it before sending. {title} is the quick message's title. About 50 chars.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "description": "The quick message's title.",
+        "example": "Happy Birthday"
+      }
+    }
+  },
+  "quickMessageRegenerate": "Regenerate",
+  "@quickMessageRegenerate": {
+    "description": "Button on the quick message bar above the composer: asks the AI for a different version. Keep under ~16 chars."
+  },
+  "quickMessageFailed": "No quick message written. {reason}.",
+  "@quickMessageFailed": {
+    "description": "Toast when the AI could not write a quick message. {reason} is a short reason such as 'Your model took too long'. About 60 chars.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "description": "Why, from the autoReplyOutcome strings.",
+        "example": "Your model took too long"
+      }
+    }
+  },
+  "quickMessageNoEndpoint": "Quick messages need an AI model. Add one under {section}.",
+  "@quickMessageNoEndpoint": {
+    "description": "Toast when a quick message is picked but no AI model is set up. {section} is the name of the settings screen where one is added. About 80 chars.",
+    "placeholders": {
+      "section": {
+        "type": "String",
+        "description": "settingsEndpointsTitle.",
+        "example": "Search & transcription"
+      }
+    }
+  },
+  "quickMessageSetUp": "Set up",
+  "@quickMessageSetUp": {
+    "description": "Action on the toast saying no AI model is set up: opens the screen where one is added. Keep under ~12 chars."
+  },
+  "quickMessagesSettingsSubtitle": "Wishes and short notes your AI drafts from the attach menu",
+  "@quickMessagesSettingsSubtitle": {
+    "description": "Subtitle of the 'Quick messages' row on the AI settings screen. About 60 chars."
+  },
+  "quickMessagesExplainer": "Picking a quick message sends the last {count} messages of that chat to your AI model, which writes a draft into the composer. Nothing is sent to the chat until you press Send.",
+  "@quickMessagesExplainer": {
+    "description": "Privacy notice at the top of the quick messages settings screen. {count} is how many recent messages are sent. About 220 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Number of recent messages sent.",
+        "example": "12"
+      }
+    }
+  },
+  "quickMessagesRestoreDefaults": "Restore defaults",
+  "@quickMessagesRestoreDefaults": {
+    "description": "App bar action and dialog button on the quick messages settings screen: puts the built-in list back. Keep under ~22 chars."
+  },
+  "quickMessagesRestoreConfirm": "Replace your quick messages with the built-in ones? Your own and your edits are removed.",
+  "@quickMessagesRestoreConfirm": {
+    "description": "Dialog body asking whether to replace the user's quick messages with the built-in ones. About 90 chars."
+  },
+  "quickMessagesAdd": "New quick message",
+  "@quickMessagesAdd": {
+    "description": "Floating button on the quick messages settings screen, and the editor's title for a new one. Keep under ~24 chars."
+  },
+  "quickMessagesEditOne": "Edit quick message",
+  "@quickMessagesEditOne": {
+    "description": "Editor title, and tooltip on a row's edit button, for changing an existing quick message. Keep under ~24 chars."
+  },
+  "quickMessagesEmpty": "No quick messages. Add one, or restore the defaults.",
+  "@quickMessagesEmpty": {
+    "description": "Shown on the quick messages settings screen and sheet when the list is empty. About 60 chars."
+  },
+  "quickMessageFieldTitle": "Title",
+  "@quickMessageFieldTitle": {
+    "description": "Label of the title field in the quick message editor; the title is shown in the menu. Keep under ~16 chars."
+  },
+  "quickMessageFieldEmoji": "Emoji (optional)",
+  "@quickMessageFieldEmoji": {
+    "description": "Label of the optional emoji field in the quick message editor. Keep under ~16 chars."
+  },
+  "quickMessageFieldPrompt": "What should your AI write?",
+  "@quickMessageFieldPrompt": {
+    "description": "Label of the prompt field in the quick message editor: the instruction the AI follows. Keep under ~30 chars."
+  },
+  "quickMessageFieldPromptHint": "Ask if they want to get coffee this week.",
+  "@quickMessageFieldPromptHint": {
+    "description": "Example shown inside the empty prompt field of the quick message editor. About 50 chars."
+  },
+  "quickMessageFieldPromptHelper": "Your AI is told the chat partner's first name and the chat's language for you.",
+  "@quickMessageFieldPromptHelper": {
+    "description": "Helper text under the prompt field: the chat partner's first name and the chat's language are added automatically. About 90 chars."
   }
 }

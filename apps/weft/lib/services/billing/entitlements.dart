@@ -39,7 +39,8 @@ enum SennitEdition {
 /// different set without touching the gates themselves.
 enum ProFeature {
   /// Anything that sends a conversation to the user's LLM endpoint:
-  /// auto-replies, reply suggestions on notifications, the to-do assistant.
+  /// auto-replies, reply suggestions on notifications, quick messages, the
+  /// to-do assistant.
   aiReplies,
 
   /// Meaning-based search, on-device or through an embedding endpoint.

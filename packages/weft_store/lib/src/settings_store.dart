@@ -250,6 +250,14 @@ abstract final class WeftSettings {
   /// that a message is going out.
   static const String autoReplyRules = 'ai.auto_reply_rules';
 
+  /// The quick messages offered in the composer's attach menu, as one JSON
+  /// blob under a `messages` key, in the order they are shown.
+  ///
+  /// Absent means the built-in list, which is also what "Restore defaults"
+  /// writes by removing the key — so an untouched list keeps following the
+  /// app's language and any improvement to a shipped prompt.
+  static const String quickMessages = 'ai.quick_messages';
+
   /// Whether incoming-message notifications carry one or two AI-suggested
   /// answers. Its own gate on top of the endpoint existing, because
   /// configuring an LLM for anything sends every notified message's text to

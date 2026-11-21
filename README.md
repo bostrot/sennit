@@ -63,6 +63,9 @@ infrastructure you don't own.
   you host. Nothing leaves your machines either way.
 - 🤖 **AI reply suggestions** from your own OpenAI-compatible LLM (Ollama,
   llama.cpp, vLLM…), rendered as tappable chips on notifications.
+- ⚡ **Quick messages** in the attach menu — a birthday wish, a thank-you,
+  "on my way" — drafted by your LLM in the chat's language with the other
+  person's first name, into the composer for you to check and send.
 - 🔕 Read receipts, typing indicators and presence — sent and shown, with a
   privacy switch for each.
 - ⏳ **Disappearing messages**, per conversation: erase after an hour, a day or
@@ -225,7 +228,7 @@ release page are free for messaging — every network, merged chats, calls, SMS,
 keyword search, backups — and sell the parts that take the most work to build
 and keep working as **Sennit Pro**, a single payment with no subscription:
 
-- AI auto-replies, reply suggestions and the to-do assistant
+- AI auto-replies, reply suggestions, quick messages and the to-do assistant
 - semantic search and voice-note transcription
 - the MCP server
 - the Home Assistant, paperless-ngx and shared-calendar integrations

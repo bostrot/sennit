@@ -25,6 +25,7 @@ import 'package:weft_search/weft_search.dart';
 
 import '../services/ai/auto_reply_service.dart';
 import '../services/ai/auto_reply_writer.dart';
+import '../services/ai/quick_messages.dart';
 import 'localisation.dart';
 
 extension WeftDomainLabels on AppL10n {
@@ -224,5 +225,26 @@ extension WeftCallLabels on AppL10n {
         names.last,
       ),
     };
+  }
+}
+
+/// The words for a quick message: the preset titles live in the ARB, so an
+/// untouched default follows the app language.
+extension WeftQuickMessageLabels on AppL10n {
+  String quickMessagePreset(QuickMessagePreset preset) => switch (preset) {
+    QuickMessagePreset.birthday => quickMessagePresetBirthday,
+    QuickMessagePreset.congratulations => quickMessagePresetCongratulations,
+    QuickMessagePreset.getWell => quickMessagePresetGetWell,
+    QuickMessagePreset.thanks => quickMessagePresetThanks,
+    QuickMessagePreset.onMyWay => quickMessagePresetOnMyWay,
+    QuickMessagePreset.newYear => quickMessagePresetNewYear,
+  };
+
+  /// The title [message] is shown under: the user's, else its preset's.
+  String quickMessageTitle(QuickMessage message) {
+    final own = message.title?.trim() ?? '';
+    if (own.isNotEmpty) return own;
+    final preset = message.preset;
+    return preset == null ? '' : quickMessagePreset(preset);
   }
 }
