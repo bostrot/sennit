@@ -186,6 +186,8 @@ class WeftMessage {
     this.mediaSizeBytes,
     this.mediaMimeType,
     this.playsAsGif = false,
+    this.encrypted = false,
+    this.bridgedLinkPreviews,
   });
 
   final String eventId;
@@ -398,6 +400,29 @@ class WeftMessage {
   /// `fi.mau.gif`, `fi.mau.loop` and `fi.mau.autoplay` in `info`.
   final bool playsAsGif;
 
+  /// Whether the room this arrived in was end-to-end encrypted.
+  ///
+  /// Read by exactly one thing that cannot be decided without it: whether the
+  /// homeserver may be asked for a link preview. Asking tells the server the
+  /// url, and in an encrypted room that is something it would otherwise never
+  /// see — so previews there are a separate, off-by-default choice.
+  final bool encrypted;
+
+  /// Link previews the *sender* attached to the event, raw from the wire.
+  ///
+  /// `com.beeper.linkpreviews` from the mautrix bridges and Beeper, or MSC4095's
+  /// `m.url_previews`: a list of OpenGraph-shaped objects, one per link. Kept
+  /// raw on purpose — like [formattedBody] they are a stranger's content, and
+  /// `weft_richtext` is where they are cleaned (`embeddedLinkPreview`).
+  ///
+  /// Null means the event said nothing, and the app may ask its homeserver. An
+  /// *empty* list is an answer: the sender looked and chose to show nothing,
+  /// and a reader's client that previewed anyway would be overruling them.
+  ///
+  /// Not part of equality: it is fixed for the life of an event, and an edit
+  /// that changes it also changes [body], which is.
+  final List<Map<String, Object?>>? bridgedLinkPreviews;
+
   /// Whether the bubble should loop this attachment inline, muted.
   bool get loopsInline => kind == MessageKind.video && playsAsGif;
 
@@ -492,6 +517,8 @@ class WeftMessage {
       mediaSizeBytes: mediaSizeBytes,
       mediaMimeType: mediaMimeType,
       playsAsGif: playsAsGif,
+      encrypted: encrypted,
+      bridgedLinkPreviews: bridgedLinkPreviews,
     );
   }
 

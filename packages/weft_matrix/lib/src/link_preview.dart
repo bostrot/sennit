@@ -4,8 +4,9 @@ import 'package:weft_richtext/weft_richtext.dart';
 /// Asks the homeserver what is behind [url].
 ///
 /// **The homeserver fetches the page, not the app.** That is the entire point
-/// of routing through `/_matrix/media/v3/preview_url` (or its authenticated
-/// successor, which the SDK picks between) instead of issuing an HTTP GET here.
+/// of routing through `/_matrix/client/v1/media/preview_url` (falling back to
+/// the legacy `/_matrix/media/v3/preview_url`, see [_askHomeserver]) instead of
+/// issuing an HTTP GET here.
 /// A client that fetched the url itself would hand every site named in every
 /// message the reader's IP address, their user agent, and the moment the
 /// message arrived — from a request they never made, triggered by a link a
@@ -28,8 +29,8 @@ Future<LinkPreview?> fetchLinkPreview(sdk.Client client, Uri url) async {
   if (safe == null) return null;
 
   try {
-    final response = await client.getUrlPreview(Uri.parse(safe));
-    final preview = LinkPreview.fromOpenGraph(safe, response.toJson());
+    final og = await _askHomeserver(client, Uri.parse(safe));
+    final preview = LinkPreview.fromOpenGraph(safe, og);
     return preview.hasContent ? preview : null;
   } on Object catch (_) {
     // Deliberately Object: the SDK throws `MatrixException` for a refusal but
@@ -48,3 +49,32 @@ Future<LinkPreview?> fetchLinkPreview(sdk.Client client, Uri url) async {
 /// and get an app whose cards are simply absent.
 LinkPreviewFetch homeserverLinkPreviews(sdk.Client client) =>
     (url) => fetchLinkPreview(client, url);
+
+/// The authenticated endpoint first, the legacy one only if it does not exist.
+///
+/// Not the SDK's own `getUrlPreview`, which picks once from the advertised
+/// spec versions and never looks back: a server that advertises v1.11 but
+/// routes `/client/v1/media/preview_url` nowhere answers 404 or
+/// `M_UNRECOGNIZED`, and that is the one answer worth a second try. A refusal
+/// (`M_FORBIDDEN`, which is what a homeserver with previews switched off or
+/// with an empty domain allowlist says) is not — the legacy route on the same
+/// server would only say it again.
+Future<Map<String, Object?>> _askHomeserver(sdk.Client client, Uri url) async {
+  if (await client.authenticatedMediaSupported()) {
+    try {
+      return (await client.getUrlPreviewAuthed(url)).toJson();
+    } on sdk.MatrixException catch (e) {
+      if (!_unrouted(e)) rethrow;
+    }
+  }
+  return client.request(
+    sdk.RequestType.GET,
+    '/media/v3/preview_url',
+    query: {'url': url.toString()},
+  );
+}
+
+bool _unrouted(sdk.MatrixException e) =>
+    e.errcode == 'M_UNRECOGNIZED' ||
+    e.response?.statusCode == 404 ||
+    e.response?.statusCode == 405;

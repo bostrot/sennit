@@ -232,11 +232,11 @@ const weftAccessibilityVariants = <WeftGoldenVariant>[
 /// asked about a link.
 ///
 /// [stores] and [linkPreviewFetch] are what make a link-preview card drawable
-/// at all: the card is off until a setting says otherwise and silent until a
-/// homeserver answers, so a golden of one has to state both. They are applied
-/// only when non-null — a scene that passes neither is a scene where the
-/// preview path is off, which is the app's default and the right background for
-/// every other image here.
+/// at all: with no settings store the gate fails closed, and the card is silent
+/// until a homeserver answers, so a golden of one has to state both. They are
+/// applied only when non-null — a scene that passes neither is a scene where
+/// the preview path is off, which is the right background for every other
+/// image here.
 ///
 /// [deviceManager] and [keyBackup] are the same idea for the two settings
 /// screens that draw the *account* rather than a room. Both providers reach for

@@ -41,16 +41,53 @@ void main() {
   tearDown(() => stores.dispose());
 
   group('LinkPreviewSettings', () {
-    test('is off with nothing excluded before anyone configures it', () {
+    test('is on for plain rooms and off for encrypted ones before anyone '
+        'configures it', () {
+      final settings = LinkPreviewSettings.fromStore(stores.settings);
+      expect(settings.enabled, isTrue);
+      expect(settings.encryptedRooms, isFalse);
+      expect(settings.excludedNetworks, isEmpty);
+      expect(settings.allows(ChatNetwork.signal), isTrue);
+      // The disclosure that is not free — a url the homeserver could not
+      // otherwise read — is the one that waits for the user.
+      expect(settings.allows(ChatNetwork.signal, encrypted: true), isFalse);
+      expect(settings.showsCards(ChatNetwork.signal), isTrue);
+    });
+
+    test('a user who switched previews off stays switched off', () {
+      // Written by a build where off was the default, or by the user today:
+      // either way an explicit "false" is an answer and the new default must
+      // not overrule it.
+      stores.settings.setBool(WeftSettings.linkPreviewEnabled, value: false);
       final settings = LinkPreviewSettings.fromStore(stores.settings);
       expect(settings.enabled, isFalse);
-      expect(settings.excludedNetworks, isEmpty);
+      expect(settings.allows(ChatNetwork.matrix), isFalse);
+      expect(settings.showsCards(ChatNetwork.matrix), isFalse);
+    });
+
+    test('off is off everywhere, encrypted switch or not', () {
+      const settings = LinkPreviewSettings(
+        enabled: false,
+        encryptedRooms: true,
+      );
+      expect(settings.allows(ChatNetwork.matrix), isFalse);
+      expect(settings.allows(ChatNetwork.matrix, encrypted: true), isFalse);
+      expect(settings.showsCards(ChatNetwork.matrix), isFalse);
+    });
+
+    test('the encrypted switch opens encrypted rooms and nothing else', () {
+      const settings = LinkPreviewSettings(
+        encryptedRooms: true,
+        excludedNetworks: {'signal'},
+      );
+      expect(settings.allows(ChatNetwork.matrix, encrypted: true), isTrue);
+      expect(settings.allows(ChatNetwork.signal, encrypted: true), isFalse);
       expect(settings.allows(ChatNetwork.signal), isFalse);
     });
 
     test('round-trips through the settings store', () {
       const written = LinkPreviewSettings(
-        enabled: true,
+        encryptedRooms: true,
         excludedNetworks: {'signal', 'whatsapp'},
       );
       written.writeTo(stores.settings);
@@ -85,6 +122,55 @@ void main() {
   });
 
   group('the gate', () {
+    test('asks nothing about a link in an encrypted room by default', () async {
+      final fetcher = _Fetcher(answer: (_) => _preview());
+      final service = LinkPreviewService(
+        settings: const LinkPreviewSettings(),
+        cache: stores.linkPreviews,
+        fetch: fetcher.call,
+      );
+
+      expect(
+        await service.previewFor(
+          _url,
+          network: ChatNetwork.matrix,
+          encrypted: true,
+        ),
+        isNull,
+      );
+      expect(
+        service.peek(_url, network: ChatNetwork.matrix, encrypted: true).known,
+        isTrue,
+        reason: 'a closed gate is a known "nothing", not a reason to ask',
+      );
+      expect(fetcher.calls, 0);
+
+      // The same url in a plain room is a different question.
+      expect(
+        (await service.previewFor(_url, network: ChatNetwork.matrix))?.title,
+        'A title',
+      );
+      expect(fetcher.calls, 1);
+    });
+
+    test('asks about an encrypted room once the user allowed it', () async {
+      final fetcher = _Fetcher(answer: (_) => _preview());
+      final service = LinkPreviewService(
+        settings: const LinkPreviewSettings(encryptedRooms: true),
+        fetch: fetcher.call,
+      );
+
+      expect(
+        (await service.previewFor(
+          _url,
+          network: ChatNetwork.matrix,
+          encrypted: true,
+        ))?.title,
+        'A title',
+      );
+      expect(fetcher.calls, 1);
+    });
+
     test('asks nothing at all while previews are off', () async {
       final fetcher = _Fetcher(answer: (_) => _preview());
       final service = LinkPreviewService(
@@ -290,6 +376,92 @@ void main() {
         expect(fetcher.calls, 1);
       },
     );
+  });
+
+  group('the memory cache', () {
+    test(
+      'a rebuilt service remembers without asking or reading disk',
+      () async {
+        final fetcher = _Fetcher(answer: (_) => _preview());
+        final memory = LinkPreviewMemoryCache();
+        LinkPreviewService build() => LinkPreviewService(
+          settings: const LinkPreviewSettings(),
+          cache: stores.linkPreviews,
+          memory: memory,
+          fetch: fetcher.call,
+        );
+
+        await build().previewFor(_url, network: ChatNetwork.matrix);
+        // The disk row goes, the memory stays: what a settings change that
+        // rebuilds the service — any settings change — must not cost.
+        stores.linkPreviews.clear();
+        final peek = build().peek(_url, network: ChatNetwork.matrix);
+
+        expect(peek.known, isTrue);
+        expect(peek.preview?.title, 'A title');
+        expect(fetcher.calls, 1);
+      },
+    );
+
+    test('peek reads the disk cache, so a restart draws in one frame', () {
+      stores.linkPreviews.write(_url, _preview().toJson());
+      final service = LinkPreviewService(
+        settings: const LinkPreviewSettings(),
+        cache: stores.linkPreviews,
+      );
+
+      final peek = service.peek(_url, network: ChatNetwork.matrix);
+      expect(peek.known, isTrue);
+      expect(peek.preview?.title, 'A title');
+      expect(service.memory.length, 1);
+    });
+
+    test('peek of a url nobody asked about is unknown', () {
+      final service = LinkPreviewService(
+        settings: const LinkPreviewSettings(),
+        cache: stores.linkPreviews,
+      );
+      expect(service.peek(_url, network: ChatNetwork.matrix).known, isFalse);
+    });
+
+    test('a stale memory entry is not trusted', () async {
+      var now = DateTime.utc(2026, 11, 1);
+      final fetcher = _Fetcher(answer: (_) => _preview());
+      final service = LinkPreviewService(
+        settings: const LinkPreviewSettings(),
+        fetch: fetcher.call,
+        now: () => now,
+      );
+
+      await service.previewFor(_url, network: ChatNetwork.matrix);
+      now = now.add(const Duration(days: 8));
+      expect(service.peek(_url, network: ChatNetwork.matrix).known, isFalse);
+      await service.previewFor(_url, network: ChatNetwork.matrix);
+      expect(fetcher.calls, 2);
+    });
+
+    test('evicts the oldest entry past its capacity', () {
+      final memory = LinkPreviewMemoryCache(capacity: 2);
+      final at = DateTime.utc(2026, 11, 1);
+      for (final url in ['https://a.example', 'https://b.example']) {
+        memory.write(CachedLinkPreview(url: url, preview: null, fetchedAt: at));
+      }
+      // Reading `a` makes `b` the oldest.
+      memory
+        ..read('https://a.example')
+        ..write(
+          CachedLinkPreview(
+            url: 'https://c.example',
+            preview: null,
+            fetchedAt: at,
+          ),
+        );
+
+      expect(memory.read('https://a.example'), isNotNull);
+      expect(memory.read('https://b.example'), isNull);
+      expect(memory.read('https://c.example'), isNotNull);
+      expect(memory.length, 2);
+    });
   });
 
   group('LinkPreviewStore', () {

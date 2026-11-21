@@ -309,9 +309,17 @@ class SharedLinkTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final network = link.message.network;
-    final preview = ref.watch(linkPreviewServiceProvider).allows(network)
+    final encrypted = link.message.encrypted;
+    final preview =
+        ref
+            .watch(linkPreviewServiceProvider)
+            .allows(network, encrypted: encrypted)
         ? ref
-              .watch(linkPreviewProvider(LinkPreviewRequest(link.url, network)))
+              .watch(
+                linkPreviewProvider(
+                  LinkPreviewRequest(link.url, network, encrypted: encrypted),
+                ),
+              )
               .value
         : null;
     final host = Uri.tryParse(link.url)?.host ?? link.url;

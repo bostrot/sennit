@@ -266,12 +266,20 @@ abstract final class WeftSettings {
 
   /// Whether a link in a message may be previewed.
   ///
-  /// Off unless set, like every other gate that sends something off the device.
-  /// A preview is fetched by the *homeserver*, so it never exposes the reader's
-  /// IP to the site — but it does tell the homeserver which links they were
-  /// sent and when, including links inside end-to-end encrypted rooms it would
-  /// otherwise never see. That is a trade only the user can make.
+  /// On unless set. A preview is fetched by the *homeserver*, so it never
+  /// exposes the reader's IP to the site, and in a room that is not encrypted
+  /// the homeserver already holds the link — asking it about one tells it
+  /// nothing new. The trade that is not free, encrypted rooms, has its own
+  /// key: [linkPreviewEncryptedRooms].
   static const String linkPreviewEnabled = 'privacy.link_previews';
+
+  /// Whether links in end-to-end encrypted rooms may be previewed too.
+  ///
+  /// Off unless set, like every other gate that sends something off the
+  /// device: asking the homeserver about a link in an encrypted room tells it
+  /// a url it would otherwise never see.
+  static const String linkPreviewEncryptedRooms =
+      'privacy.link_previews_encrypted';
 
   /// Networks whose messages are never previewed, as a JSON list of ids under
   /// a `networks` key. The escape hatch the transcription gate already has:

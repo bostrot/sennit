@@ -296,7 +296,7 @@ the room at once, which is indistinguishable from noise and trains the badge
 away within a day. Own replies never count either, whichever device they were
 sent from.
 
-## Link previews are asked of the homeserver, and only if asked for
+## Link previews are asked of the homeserver, never of the site
 
 A link in a message is a thing *received*. A client that fetched the url itself
 to build a preview card would hand every site named in every message the
@@ -304,33 +304,61 @@ reader's IP address, their user agent, and the moment the message arrived — fr
 a request they never made, triggered by a link a stranger chose to send them.
 That is a disclosure the reader cannot decline by not tapping.
 
-So previews go through the homeserver's `/_matrix/media/v3/preview_url` (or its
-authenticated successor; the SDK picks). The homeserver fetches the page and
-returns the OpenGraph tags. The cost is stated rather than hidden: **the
-homeserver learns which links the user is being sent, including ones in
-end-to-end encrypted rooms whose contents it otherwise never sees.** Which is
-why the whole feature is off until switched on, why the switch says exactly
-that in the same voice as the remote-embedding and remote-STT warnings, and why
-there is a per-network exclusion consistent with the other privacy gates.
+So previews go through the homeserver's authenticated
+`/_matrix/client/v1/media/preview_url`, falling back to the legacy
+`/_matrix/media/v3/preview_url` only when the first is not routed (404 or
+`M_UNRECOGNIZED`; a refusal is not retried). The homeserver fetches the page and
+returns the OpenGraph tags, and the thumbnail is an `mxc://` it re-hosted,
+loaded through authenticated media.
 
-Four rules the implementation holds to:
+The cost depends on the room. In a room that is not end-to-end encrypted the
+homeserver already holds every message, link included, so asking it about one
+tells it nothing new — previews there are **on by default**. In an encrypted
+room it does: **the homeserver learns a url it could otherwise never read.** So
+encrypted rooms have their own switch, **off by default** and carrying the same
+red warning as the remote-embedding and remote-STT gates — the split Element
+makes, and the one the spec's own note on `preview_url` asks for. The
+per-network exclusion stays, consistent with the other privacy gates.
+
+### Previews the sender attached
+
+The mautrix bridges relay the preview the remote app showed as
+`com.beeper.linkpreviews` (MSC4095 names the same list `m.url_previews`). When an
+event carries one, the card is drawn from it and the homeserver is never asked —
+in an encrypted room too, since showing it discloses nothing. An image the
+bridge attached encrypted (`beeper:image:encryption`) is dropped, keeping the
+words, because the thumbnail path does not decrypt. An *empty* list is the
+sender saying "no card" and is honoured. The master switch and the network
+exclusion still apply; the encrypted-rooms switch does not, because it is only
+about asking.
+
+Rules the implementation holds to:
 
 * **Absence is the default and absence is not an error.** Gate off, network
-  excluded, no homeserver, request refused, no tags on the page, fetch still in
-  flight — six cases, one appearance. A card that announced its own failure
-  would turn a setting the user chose into a row of apologies down the
-  conversation, and would leak which links the homeserver declined to look at.
-* **The gate is asked before the document is walked**, and the network is part
-  of the cache key: the same article forwarded from Signal and from Slack is two
-  questions when Signal is excluded.
+  excluded, encrypted room not opted into, no homeserver, request refused, no
+  tags on the page, fetch still in flight — seven cases, one appearance. A card
+  that announced its own failure would turn a setting the user chose into a row
+  of apologies down the conversation, and would leak which links the homeserver
+  declined to look at.
+* **The gate is asked before the document is walked**, and the network and the
+  room's encryption are part of the provider key: the same article forwarded
+  from Signal and from Slack is two questions when Signal is excluded.
 * **A miss is a real answer**, cached with a shorter TTL — seven days for a hit,
   six hours for a miss. `preview IS NULL` records that the homeserver was asked
   and had nothing; treating it as "not cached" would re-ask on every scroll,
   which is both a request the reader never made and a fresh disclosure. A miss
   is also what a rate-limited homeserver says, and pinning that for a week makes
   a bad minute look permanent.
-* **Switching the setting off clears the cache.** Rows left behind would keep
-  drawing cards from consent just withdrawn.
+* **Two caches, one record.** `LinkPreviewMemoryCache` lives for the run, in
+  front of the sqlite cache, and holds the requests in flight. It outlives the
+  service, which is rebuilt whenever a setting changes, so a rebuild neither
+  re-reads disk nor re-asks. `LinkPreviewService.peek` answers from either
+  synchronously, which is what lets a card scrolled back into view draw in its
+  first frame. A card that has to wait for the homeserver grows in with
+  `AnimatedSize` rather than shoving the bubbles below it in one frame.
+* **Switching a setting off clears the cache**, the master switch and the
+  encrypted-rooms one alike: rows left behind would keep drawing cards from
+  consent just withdrawn.
 
 The cache is `link_preview` in `weft_store`, appended as the last migration —
 the list is append-only and gated on `PRAGMA user_version`, and entries are
@@ -378,7 +406,9 @@ additive and the merge suite needed no changes.
 | `apps/weft/test/rich_text_view_test.dart` | The renderer, and the injection battery re-asserted inside a real bubble |
 | `apps/weft/test/reactions_test.dart` | Chips, toggling, and that a reaction names an event on the leg it lives on |
 | `apps/weft/test/reply_edit_test.dart` | Composer reply and edit modes, the edited marker, the stub chip |
-| `apps/weft/test/link_preview_test.dart` | The six absences, the opt-in screen, per-network exclusion |
+| `apps/weft/test/link_preview_test.dart` | The absences, encrypted-room gating, attached previews, switching off, the settings screen |
+| `apps/weft/test/link_preview_service_test.dart` | Request counting: the gate, both caches, `peek` |
+| `apps/weft/test/goldens/link_preview_golden_test.dart` | Thumbnail, long title, own side, right to left, a bridge's card in an encrypted chat |
 | `apps/weft/test/search_index_test.dart` | That the index stores words and not markup |
 | `apps/weft/test/goldens/rich_content_golden_test.dart` | Four scenes, light and dark, captured inside `ChatView` |
 

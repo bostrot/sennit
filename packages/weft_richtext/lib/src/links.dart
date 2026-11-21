@@ -219,6 +219,34 @@ class LinkPreview {
     );
   }
 
+  /// Reads one preview the *sender* attached to the event, or null.
+  ///
+  /// The entry is a `com.beeper.linkpreviews` / `m.url_previews` object:
+  /// OpenGraph keys plus `matched_url`, the text in the body it describes. It
+  /// goes through the same cleaning as a homeserver answer, because it is the
+  /// same kind of stranger's content — only delivered by a different stranger.
+  ///
+  /// [fallbackUrl] is used when the entry names no url of its own. An entry
+  /// whose image is end-to-end encrypted (`beeper:image:encryption`) keeps its
+  /// words and loses its picture: the `mxc://` behind it is ciphertext, and
+  /// the card's thumbnail path does not decrypt.
+  static LinkPreview? fromEmbedded(
+    Map<String, Object?> entry, {
+    String? fallbackUrl,
+  }) {
+    final url =
+        previewableUrl(_asString(entry['matched_url'])) ??
+        previewableUrl(_asString(entry['og:url'])) ??
+        previewableUrl(fallbackUrl);
+    if (url == null) return null;
+    final encryptedImage = entry['beeper:image:encryption'] is Map;
+    final preview = LinkPreview.fromOpenGraph(url, {
+      ...entry,
+      if (encryptedImage) 'og:image': null,
+    });
+    return preview.hasContent ? preview : null;
+  }
+
   /// Reads a preview back out of the cache.
   ///
   /// Runs the same cleaning as [LinkPreview.fromOpenGraph] rather than trusting
@@ -300,6 +328,31 @@ class LinkPreview {
 
   @override
   String toString() => 'LinkPreview($url, ${title ?? '—'})';
+}
+
+/// The preview a bubble should show from what the sender attached, or null.
+///
+/// [entries] is `WeftMessage.bridgedLinkPreviews`; [firstUrl] is the link the
+/// card would otherwise have asked the homeserver about. The entry that
+/// describes [firstUrl] wins, so a message with two links shows the card for
+/// the same one either way; failing that the first usable entry does, because
+/// a bridge that rewrote the url (a tracking parameter dropped, a redirect
+/// followed) is still describing the link the reader can see.
+///
+/// Null for an empty list — the sender's "no preview" — and for a list where
+/// nothing survives cleaning.
+LinkPreview? embeddedLinkPreview(
+  List<Map<String, Object?>> entries, {
+  String? firstUrl,
+}) {
+  LinkPreview? fallback;
+  for (final entry in entries) {
+    final preview = LinkPreview.fromEmbedded(entry, fallbackUrl: firstUrl);
+    if (preview == null) continue;
+    if (firstUrl != null && preview.url == firstUrl) return preview;
+    fallback ??= preview;
+  }
+  return fallback;
 }
 
 /// Asks something for a preview of [url].

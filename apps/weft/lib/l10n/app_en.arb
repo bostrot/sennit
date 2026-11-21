@@ -2740,21 +2740,29 @@
     "description": "App bar title of the link previews screen. Keep under ~22 chars.",
     "maxLength": 40
   },
-  "linkPreviewsNotice": "A preview is fetched by your homeserver, not by this device, so the site is never told your IP address or when you read the message. The cost is on the other side: your homeserver learns every link you are sent and when, including links inside end-to-end encrypted chats it can otherwise never read. Leave this off unless you run the homeserver yourself or trust whoever does.",
+  "linkPreviewsNotice": "A preview is fetched by your homeserver, not by this device, so the site is never told your IP address or when you read the message. In a chat that is not end-to-end encrypted your homeserver already holds every message, links included, so asking it tells it nothing new. In an encrypted chat it does: the homeserver learns a link it could otherwise never read, which is why previews there have their own switch, off until you turn it on.",
   "@linkPreviewsNotice": {
-    "description": "The privacy notice at the top of the link previews screen. The trade it describes is the whole point of the screen: the site learns nothing, the homeserver learns everything. Long — it is a paragraph in a red box."
+    "description": "The privacy notice at the top of the link previews screen. It explains the trade: the site learns nothing, the homeserver learns links it could not otherwise read only in encrypted chats, which is why those have their own switch. Long — it is a paragraph in a box."
   },
   "linkPreviewsShowTitle": "Show link previews",
   "@linkPreviewsShowTitle": {
     "description": "The main toggle on the link previews screen. Keep under ~30 chars."
   },
-  "linkPreviewsShowWarning": "Turning this on tells your homeserver every link you are sent, including links inside encrypted chats.",
-  "@linkPreviewsShowWarning": {
-    "description": "The red warning attached to the 'Show link previews' toggle, shown because turning it on gives the homeserver information it could not otherwise have. Two lines."
-  },
-  "linkPreviewsShowSubtitle": "Off means no link in any message is ever looked up. Nothing is requested until you switch this on.",
+  "linkPreviewsShowSubtitle": "A card under a message with a link: title, description and picture. Off means no link is ever looked up and no card is drawn, including ones a bridge attached.",
   "@linkPreviewsShowSubtitle": {
-    "description": "One-line subtitle under the main link previews toggle. Reassures that nothing is requested while it is off."
+    "description": "Subtitle under the main link previews toggle (on by default): what a preview card is, and that off means nothing is looked up or shown."
+  },
+  "linkPreviewsEncryptedTitle": "Show previews in encrypted chats",
+  "@linkPreviewsEncryptedTitle": {
+    "description": "Second toggle on the link previews screen, off by default: whether links in end-to-end encrypted chats may be previewed too. Keep under ~36 chars."
+  },
+  "linkPreviewsEncryptedWarning": "Turning this on tells your homeserver the links you are sent in end-to-end encrypted chats.",
+  "@linkPreviewsEncryptedWarning": {
+    "description": "The red warning attached to the 'Show previews in encrypted chats' toggle, shown because turning it on gives the homeserver information it could not otherwise have. Two lines."
+  },
+  "linkPreviewsEncryptedSubtitle": "Previews a bridge already attached to a message are shown either way. This switch is only about asking your homeserver.",
+  "@linkPreviewsEncryptedSubtitle": {
+    "description": "Subtitle under the encrypted-chats toggle: previews a bridge attached to the message are shown regardless; the switch only governs asking the homeserver."
   },
   "settingsNetworksSectionTitle": "Networks",
   "@settingsNetworksSectionTitle": {

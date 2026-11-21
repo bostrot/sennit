@@ -307,6 +307,24 @@ void main() {
       );
     }
 
+    test('carries the attached link previews and the room\'s encryption', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'look https://example.org/a',
+        'com.beeper.linkpreviews': [
+          {'matched_url': 'https://example.org/a', 'og:title': 'A'},
+        ],
+      })!;
+
+      expect(message.bridgedLinkPreviews, hasLength(1));
+      expect(message.encrypted, isFalse);
+      // And through a copy, which is how edits and tallies reach the bubble.
+      expect(
+        message.copyWith(body: 'edited').bridgedLinkPreviews,
+        hasLength(1),
+      );
+    });
+
     test('a bridge bot notice is flagged as bridge chatter', () {
       // The exact shape mautrix writes into its management room, twice per
       // reconnect.
@@ -1167,6 +1185,57 @@ void main() {
       };
       expect(editTargetEventId(editContent), r'$original:example.org');
       expect(replyTargetEventId(editContent), isNull);
+    });
+  });
+
+  group('bridgedLinkPreviewsOf', () {
+    test('reads the list mautrix bridges attach', () {
+      final previews = bridgedLinkPreviewsOf({
+        'msgtype': 'm.text',
+        'body': 'https://example.org/a',
+        'com.beeper.linkpreviews': [
+          {'matched_url': 'https://example.org/a', 'og:title': 'A'},
+        ],
+      });
+      expect(previews, hasLength(1));
+      expect(previews!.single['og:title'], 'A');
+    });
+
+    test("reads MSC4095's m.url_previews the same way", () {
+      final previews = bridgedLinkPreviewsOf({
+        'm.url_previews': [
+          {'matched_url': 'https://example.org/a', 'og:title': 'A'},
+        ],
+      });
+      expect(previews!.single['matched_url'], 'https://example.org/a');
+    });
+
+    test('an empty list survives as empty, not as absent', () {
+      // A sender saying "no preview for this one": the app must not ask its
+      // homeserver instead.
+      expect(
+        bridgedLinkPreviewsOf({'com.beeper.linkpreviews': <Object>[]}),
+        isEmpty,
+      );
+    });
+
+    test('absent, or not a list, is null', () {
+      expect(bridgedLinkPreviewsOf({'body': 'hi'}), isNull);
+      expect(
+        bridgedLinkPreviewsOf({'com.beeper.linkpreviews': 'nonsense'}),
+        isNull,
+      );
+    });
+
+    test('entries that are not objects are dropped', () {
+      final previews = bridgedLinkPreviewsOf({
+        'com.beeper.linkpreviews': [
+          7,
+          null,
+          {'og:title': 'kept'},
+        ],
+      });
+      expect(previews, hasLength(1));
     });
   });
 

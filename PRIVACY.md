@@ -39,6 +39,13 @@ Sennit talks exclusively to servers **you** configure:
 - **Your Matrix homeserver.** Messages, media, contacts and encryption keys
   sync with the homeserver you sign in to. That server is operated by you or
   by whoever you chose — its privacy practices are its operator's.
+  **Link previews** are fetched by that homeserver, never by your device, so
+  the linked site does not see your IP address. They are on for chats that
+  are not end-to-end encrypted (the homeserver already holds those messages)
+  and off for encrypted chats unless you turn them on in Settings → Link
+  previews, because asking tells the homeserver a link it could not otherwise
+  read. Previews a bridge attached to a message are shown without asking
+  anyone. You can switch previews off entirely.
 - **Bridges you install** on your own infrastructure relay messages to
   third-party networks (for example WhatsApp or Telegram). Those networks
   see what any client on them sees; the bridge runs under your control.

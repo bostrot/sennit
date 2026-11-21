@@ -386,6 +386,8 @@ WeftMessage? mapEvent(
     mediaSizeBytes: _positiveInfoInt(content, 'size'),
     mediaMimeType: _infoMimeType(content),
     playsAsGif: isGifVideo(content),
+    encrypted: event.room.encrypted,
+    bridgedLinkPreviews: event.redacted ? null : bridgedLinkPreviewsOf(content),
   );
 
   // A redacted event has no content left to relate to. Its edits and its
@@ -406,6 +408,30 @@ WeftMessage? mapEvent(
     reactions: reactions,
   );
 }
+
+/// The link previews the sender attached, or null when they attached none.
+///
+/// `com.beeper.linkpreviews` is what the mautrix bridges write — WhatsApp,
+/// Signal and Telegram all carry the preview the remote app showed — and
+/// `m.url_previews` is MSC4095's name for the same list. Either is read as-is;
+/// cleaning happens in `embeddedLinkPreview`, which is where the rest of the
+/// preview path's sanitising lives.
+///
+/// An empty list is returned as an empty list, not as null: it is a sender
+/// saying "no preview for this one", which the card honours.
+List<Map<String, Object?>>? bridgedLinkPreviewsOf(
+  Map<String, Object?> content,
+) {
+  final raw = content[_beeperLinkPreviews] ?? content[_urlPreviews];
+  if (raw is! List) return null;
+  return [
+    for (final entry in raw)
+      if (entry is Map) entry.cast<String, Object?>(),
+  ];
+}
+
+const String _beeperLinkPreviews = 'com.beeper.linkpreviews';
+const String _urlPreviews = 'm.url_previews';
 
 /// The sender's HTML body, when they sent one in the format Matrix defines.
 ///
