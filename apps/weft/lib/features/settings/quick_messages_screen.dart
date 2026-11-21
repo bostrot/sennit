@@ -41,15 +41,14 @@ class QuickMessagesScreen extends ConsumerWidget {
       ),
       body: WeftReadingPane(
         child: ReorderableListView.builder(
-          padding: const EdgeInsets.fromLTRB(
-            WeftSpace.lg,
-            WeftSpace.lg,
-            WeftSpace.lg,
-            WeftSpace.fabClearance,
-          ),
+          // Symmetric, because this list takes no directional padding; the
+          // top and the room under the button are the header and footer.
+          padding: const EdgeInsets.symmetric(horizontal: WeftSpace.lg),
+          footer: const SizedBox(height: WeftSpace.fabClearance),
           header: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: WeftSpace.lg),
               PrivacyNotice(
                 message: l10n.quickMessagesExplainer(
                   kQuickMessageContextMessages,
