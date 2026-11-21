@@ -2,9 +2,9 @@
 ///
 /// Everything here is built around one rule: **absence is the default and
 /// absence is not an error.** The gate being off, the network being excluded,
-/// no homeserver, a request the homeserver refused, a page with no OpenGraph
-/// tags, a fetch still in flight — the reader sees the same thing in all six
-/// cases, which is their message and nothing else. A card that announced its
+/// an encrypted room the user has not opted into, no homeserver, a request the
+/// homeserver refused, a page with no OpenGraph tags, a fetch still in flight —
+/// the reader sees the same thing in all seven cases, which is their message and nothing else. A card that announced its
 /// own failure would turn a privacy setting the user chose into a row of
 /// apologies down the conversation, and would leak which links the homeserver
 /// declined to look at.
@@ -63,28 +63,66 @@ class LinkPreviewCard extends ConsumerWidget {
 
     // Asked before the document is even looked at: with the gate closed there
     // is no reason to walk a tree looking for something that will not be
-    // fetched.
-    if (!ref.watch(linkPreviewServiceProvider).allows(message.network)) {
-      return const SizedBox.shrink();
-    }
+    // shown.
+    final settings = ref.watch(linkPreviewSettingsProvider);
+    if (!settings.showsCards(message.network)) return const SizedBox.shrink();
 
     final url = firstPreviewableUrl(messageDocument(message));
-    if (url == null) return const SizedBox.shrink();
+    final attached = message.bridgedLinkPreviews;
 
-    final preview = ref
-        .watch(linkPreviewProvider(LinkPreviewRequest(url, message.network)))
-        .value;
-    if (preview == null || !preview.hasContent) {
+    final LinkPreview? preview;
+    if (attached != null) {
+      // The sender — a bridge relaying what WhatsApp showed, or a client that
+      // supports MSC4095 — already said what is behind the link. That answer
+      // costs no request, needs no gate beyond the master switch, and wins
+      // over anything the homeserver could add; an empty list is the sender
+      // saying "no card", and is honoured.
+      preview = embeddedLinkPreview(attached, firstUrl: url);
+    } else if (url == null) {
       return const SizedBox.shrink();
+    } else {
+      // A known answer — from this run, or from the disk cache — draws in the
+      // first frame, so a card scrolled back into view does not pop in again.
+      // Only an unknown one goes through the provider and its request.
+      final peek = ref
+          .watch(linkPreviewServiceProvider)
+          .peek(url, network: message.network, encrypted: message.encrypted);
+      preview = peek.known
+          ? peek.preview
+          : ref
+                .watch(
+                  linkPreviewProvider(
+                    LinkPreviewRequest(
+                      url,
+                      message.network,
+                      encrypted: message.encrypted,
+                    ),
+                  ),
+                )
+                .value;
     }
 
-    return LinkPreviewCardBody(
-      preview: preview,
-      own: own,
-      network: message.network,
-      onTap: onTapUrl == null
-          ? null
-          : () => onTapUrl!(preview.url, preview.title ?? preview.url),
+    final shown = preview != null && preview.hasContent ? preview : null;
+
+    // Grows into place rather than jumping in. A card that arrives with the
+    // homeserver's answer would otherwise shove every bubble below it by its
+    // own height in a single frame, under the reader's eye. One that is
+    // already known when the bubble is built has no previous size to grow
+    // from, and appears without moving anything.
+    return AnimatedSize(
+      duration: context.motion.normal,
+      curve: WeftMotion.enter,
+      alignment: AlignmentDirectional.topStart,
+      child: shown == null
+          ? const SizedBox.shrink()
+          : LinkPreviewCardBody(
+              preview: shown,
+              own: own,
+              network: message.network,
+              onTap: onTapUrl == null
+                  ? null
+                  : () => onTapUrl!(shown.url, shown.title ?? shown.url),
+            ),
     );
   }
 }

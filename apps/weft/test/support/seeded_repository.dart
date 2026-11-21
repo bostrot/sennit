@@ -188,6 +188,8 @@ WeftMessage seededMessage({
   DateTime? editedAt,
   List<EditRecord> editHistory = const [],
   DeliveryState? deliveryState,
+  bool encrypted = false,
+  List<Map<String, Object?>>? bridgedLinkPreviews,
 }) {
   return WeftMessage(
     eventId: eventId,
@@ -211,5 +213,7 @@ WeftMessage seededMessage({
     // test varies when it is asking about ticks.
     deliveryState:
         deliveryState ?? (isOwn ? DeliveryState.delivered : DeliveryState.sent),
+    encrypted: encrypted,
+    bridgedLinkPreviews: bridgedLinkPreviews,
   );
 }

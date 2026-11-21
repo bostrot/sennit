@@ -367,4 +367,150 @@ void main() {
       expect(const LinkPreview(url: 'not a url').host, isNull);
     });
   });
+
+  group('preview_url answers', () {
+    test('reads what tuwunel and Synapse return', () {
+      // The shape of `GET /_matrix/client/v1/media/preview_url`: OpenGraph keys
+      // as the page wrote them, the image already re-hosted as an mxc.
+      final preview = LinkPreview.fromOpenGraph('https://github.com/a/b', {
+        'og:title': 'GitHub - a/b: A thing',
+        'og:description': 'A thing.\n\n  Contribute on GitHub.',
+        'og:site_name': 'GitHub',
+        'og:type': 'object',
+        'og:url': 'https://github.com/a/b',
+        'og:image': 'mxc://example.org/abcdef',
+        'og:image:width': 1200,
+        'og:image:height': '600',
+        'og:image:type': 'image/png',
+        'matrix:image:size': 41200,
+      });
+
+      expect(preview.title, 'GitHub - a/b: A thing');
+      expect(preview.description, 'A thing. Contribute on GitHub.');
+      expect(preview.siteName, 'GitHub');
+      expect(preview.imageUrl, 'mxc://example.org/abcdef');
+      expect(preview.imageWidth, 1200);
+      expect(preview.imageHeight, 600);
+      expect(preview.hasContent, isTrue);
+    });
+
+    test('an empty answer is no content', () {
+      expect(
+        LinkPreview.fromOpenGraph('https://a.example', {}).hasContent,
+        isFalse,
+      );
+    });
+
+    test('a long title is clamped on a word', () {
+      final preview = LinkPreview.fromOpenGraph('https://a.example', {
+        'og:title': List.filled(60, 'word').join(' '),
+      });
+      expect(preview.title!.length, lessThanOrEqualTo(141));
+      expect(preview.title, endsWith('word…'));
+    });
+
+    test('survives a round trip through the cache', () {
+      final preview = LinkPreview.fromOpenGraph('https://a.example', {
+        'og:title': 'T',
+        'og:image': 'mxc://example.org/x',
+        'og:image:width': 10,
+      });
+      expect(
+        LinkPreview.fromJson('https://a.example', preview.toJson()),
+        preview,
+      );
+    });
+  });
+
+  group('previews the sender attached', () {
+    Map<String, Object?> entry(String url, String title) => {
+      'matched_url': url,
+      'og:title': title,
+    };
+
+    test('reads a com.beeper.linkpreviews entry', () {
+      final preview = LinkPreview.fromEmbedded({
+        'matched_url': 'https://example.org/a',
+        'og:title': 'A',
+        'og:description': 'What WhatsApp showed',
+        'og:image': 'mxc://bridge.example/img',
+        'matrix:image:size': 3000,
+      });
+      expect(preview?.url, 'https://example.org/a');
+      expect(preview?.title, 'A');
+      expect(preview?.imageUrl, 'mxc://bridge.example/img');
+    });
+
+    test('drops an end-to-end encrypted image but keeps the words', () {
+      final preview = LinkPreview.fromEmbedded({
+        'matched_url': 'https://example.org/a',
+        'og:title': 'A',
+        'og:image': 'mxc://bridge.example/ciphertext',
+        'beeper:image:encryption': {'url': 'mxc://bridge.example/ciphertext'},
+      });
+      expect(preview?.title, 'A');
+      expect(preview?.imageUrl, isNull);
+    });
+
+    test('a remote image never survives', () {
+      final preview = LinkPreview.fromEmbedded({
+        'matched_url': 'https://example.org/a',
+        'og:title': 'A',
+        'og:image': 'https://tracker.example/px.gif',
+      });
+      expect(preview?.imageUrl, isNull);
+    });
+
+    test('falls back to og:url, then to the link in the body', () {
+      expect(
+        LinkPreview.fromEmbedded({
+          'og:url': 'https://example.org/b',
+          'og:title': 'B',
+        })?.url,
+        'https://example.org/b',
+      );
+      expect(
+        LinkPreview.fromEmbedded({
+          'og:title': 'C',
+        }, fallbackUrl: 'https://example.org/c')?.url,
+        'https://example.org/c',
+      );
+    });
+
+    test('an entry naming an unsafe url is refused', () {
+      expect(
+        LinkPreview.fromEmbedded({
+          'matched_url': 'javascript:alert(1)',
+          'og:title': 'x',
+        }),
+        isNull,
+      );
+    });
+
+    test('an entry with nothing to show is no preview', () {
+      expect(
+        LinkPreview.fromEmbedded({'matched_url': 'https://example.org/a'}),
+        isNull,
+      );
+    });
+
+    test('the entry for the first link wins', () {
+      final preview = embeddedLinkPreview([
+        entry('https://example.org/second', 'Second'),
+        entry('https://example.org/first', 'First'),
+      ], firstUrl: 'https://example.org/first');
+      expect(preview?.title, 'First');
+    });
+
+    test('a bridge that rewrote the url still describes the link', () {
+      final preview = embeddedLinkPreview([
+        entry('https://example.org/a?utm_source=x', 'A'),
+      ], firstUrl: 'https://example.org/a');
+      expect(preview?.title, 'A');
+    });
+
+    test('an empty list is no preview', () {
+      expect(embeddedLinkPreview(const []), isNull);
+    });
+  });
 }

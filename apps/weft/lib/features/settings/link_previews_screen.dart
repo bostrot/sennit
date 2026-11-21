@@ -9,13 +9,16 @@ import '../../app/stores.dart';
 import '../../services/links/link_preview_service.dart';
 import 'settings_section.dart';
 
-/// The opt-in for link previews, and the per-network escape hatch under it.
+/// The switch for link previews, the separate opt-in for encrypted chats, and
+/// the per-network escape hatch under them.
 ///
 /// Its own screen rather than a row on the endpoints screen: that one is about
 /// software the user runs, and this is about what their *homeserver* is asked
 /// to do on their behalf. The copy follows the same rule either way — the
-/// sentence next to the switch says what turning it on discloses, in the words
-/// the user would use, before they can turn it on.
+/// sentence next to a switch that discloses something says what, in the words
+/// the user would use, before they can turn it on. The master switch is on by
+/// default and carries no such warning because, outside encrypted chats, the
+/// homeserver already holds every link it would be asked about.
 class LinkPreviewsScreen extends ConsumerWidget {
   const LinkPreviewsScreen({super.key});
 
@@ -34,10 +37,7 @@ class LinkPreviewsScreen extends ConsumerWidget {
             const SizedBox(height: WeftSpace.lg),
 
             SwitchListTile(
-              title: PrivacyGatedTitle(
-                title: context.l10n.linkPreviewsShowTitle,
-                warning: context.l10n.linkPreviewsShowWarning,
-              ),
+              title: Text(context.l10n.linkPreviewsShowTitle),
               subtitle: Text(context.l10n.linkPreviewsShowSubtitle),
               value: settings.enabled,
               onChanged: (v) =>
@@ -46,6 +46,25 @@ class LinkPreviewsScreen extends ConsumerWidget {
             ),
 
             if (settings.enabled) ...[
+              SwitchListTile(
+                title: PrivacyGatedTitle(
+                  title: context.l10n.linkPreviewsEncryptedTitle,
+                  warning: context.l10n.linkPreviewsEncryptedWarning,
+                ),
+                subtitle: Text(context.l10n.linkPreviewsEncryptedSubtitle),
+                value: settings.encryptedRooms,
+                // Switching it off empties the cache for the same reason the
+                // master switch does: rows left behind would keep drawing
+                // cards for encrypted chats from consent just withdrawn. The
+                // cache is keyed by url alone, so it cannot forget only those.
+                onChanged: (v) => _write(
+                  ref,
+                  settings.copyWith(encryptedRooms: v),
+                  clearCache: !v,
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+
               const Divider(height: WeftSpace.xl),
               SettingsSectionHeader(
                 title: context.l10n.settingsNetworksSectionTitle,
@@ -107,13 +126,17 @@ class LinkPreviewsScreen extends ConsumerWidget {
   }) {
     final stores = ref.read(storesProvider);
     next.writeTo(stores.settings);
-    if (clearCache) stores.linkPreviews.clear();
+    if (clearCache) {
+      stores.linkPreviews.clear();
+      ref.read(linkPreviewMemoryProvider).clear();
+    }
     ref.read(settingsRevisionProvider.notifier).bump();
   }
 
   void _clearCache(BuildContext context, WidgetRef ref) {
     final removed = ref.read(storesProvider).linkPreviews.count;
     ref.read(storesProvider).linkPreviews.clear();
+    ref.read(linkPreviewMemoryProvider).clear();
     ref.read(settingsRevisionProvider.notifier).bump();
     // The count is the entire confirmation that anything happened — the button
     // looks identical before and after — and a bare snackbar said it to nobody

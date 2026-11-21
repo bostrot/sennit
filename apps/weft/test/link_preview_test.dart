@@ -28,6 +28,8 @@ WeftMessage _message({
   String? formattedBody,
   ChatNetwork network = ChatNetwork.signal,
   bool redacted = false,
+  bool encrypted = false,
+  List<Map<String, Object?>>? bridged,
 }) => WeftMessage(
   eventId: r'$m1',
   roomId: '!r:example.org',
@@ -40,6 +42,8 @@ WeftMessage _message({
   isOwn: false,
   kind: MessageKind.text,
   redacted: redacted,
+  encrypted: encrypted,
+  bridgedLinkPreviews: bridged,
 );
 
 /// Pumps one card with a settings store and a scripted homeserver behind it.
@@ -116,6 +120,159 @@ void main() {
 
     expect(find.text('A title'), findsOneWidget);
     expect(find.text('A description'), findsOneWidget);
+    expect(asked, 1);
+  });
+
+  testWidgets('a link in an encrypted room is not asked about by default', (
+    tester,
+  ) async {
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(),
+      message: _message(encrypted: true),
+      answer: _found,
+    );
+
+    expect(find.byType(LinkPreviewCardBody), findsNothing);
+    expect(asked, 0);
+  });
+
+  testWidgets('an encrypted room is previewed once the user allowed it', (
+    tester,
+  ) async {
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(encryptedRooms: true),
+      message: _message(encrypted: true),
+      answer: _found,
+    );
+
+    expect(find.text('A title'), findsOneWidget);
+    expect(asked, 1);
+  });
+
+  testWidgets('a preview the bridge attached is shown without asking', (
+    tester,
+  ) async {
+    // Encrypted, and the encrypted switch off: the bridge's card costs no
+    // request and discloses nothing, so it is shown anyway.
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(),
+      message: _message(
+        encrypted: true,
+        bridged: [
+          {
+            'matched_url': 'https://example.org/a',
+            'og:title': 'From the bridge',
+            'og:description': 'What WhatsApp showed',
+          },
+        ],
+      ),
+      answer: _found,
+    );
+
+    expect(find.text('From the bridge'), findsOneWidget);
+    expect(find.text('A title'), findsNothing);
+    expect(asked, 0);
+  });
+
+  testWidgets('an empty attached list is the sender saying "no card"', (
+    tester,
+  ) async {
+    final asked = await _pumpCard(
+      tester,
+      settings: const LinkPreviewSettings(),
+      message: _message(bridged: const []),
+      answer: _found,
+    );
+
+    expect(find.byType(LinkPreviewCardBody), findsNothing);
+    expect(asked, 0);
+  });
+
+  testWidgets('the master switch hides attached previews too', (tester) async {
+    await _pumpCard(
+      tester,
+      settings: LinkPreviewSettings.off,
+      message: _message(
+        bridged: [
+          {'matched_url': 'https://example.org/a', 'og:title': 'Bridged'},
+        ],
+      ),
+    );
+
+    expect(find.text('Bridged'), findsNothing);
+  });
+
+  testWidgets('switching previews off removes the cards and stops asking', (
+    tester,
+  ) async {
+    final stores = WeftStores.inMemory();
+    addTearDown(stores.dispose);
+    var asked = 0;
+    final messages = ValueNotifier<List<WeftMessage>>([_message()]);
+    addTearDown(messages.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storesBootstrapProvider.overrideWith((ref) async => stores),
+          linkPreviewFetchProvider.overrideWithValue((url) async {
+            asked++;
+            return _found(url);
+          }),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
+          theme: WeftTheme.build(),
+          home: Scaffold(
+            body: ValueListenableBuilder(
+              valueListenable: messages,
+              builder: (context, list, _) => Column(
+                children: [
+                  for (final m in list)
+                    LinkPreviewCard(
+                      key: ValueKey(m.eventId),
+                      message: m,
+                      own: false,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('A title'), findsOneWidget);
+    expect(asked, 1);
+
+    LinkPreviewSettings.off.writeTo(stores.settings);
+    ProviderScope.containerOf(
+      tester.element(find.byType(Scaffold)),
+    ).read(settingsRevisionProvider.notifier).bump();
+    await tester.pumpAndSettle();
+    expect(find.byType(LinkPreviewCardBody), findsNothing);
+
+    // A new message with a new link, after the switch: nothing is asked.
+    messages.value = [
+      ...messages.value,
+      WeftMessage(
+        eventId: r'$m2',
+        roomId: '!r:example.org',
+        network: ChatNetwork.signal,
+        senderId: '@anna:example.org',
+        senderName: 'Anna',
+        body: 'and https://example.org/b',
+        timestamp: DateTime.utc(2026, 8, 18, 15),
+        isOwn: false,
+        kind: MessageKind.text,
+      ),
+    ];
+    await tester.pumpAndSettle();
+    expect(find.byType(LinkPreviewCardBody), findsNothing);
     expect(asked, 1);
   });
 
@@ -384,34 +541,54 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('says what the homeserver learns before it can be turned on', (
-      tester,
-    ) async {
+    testWidgets('says what the homeserver learns before encrypted chats '
+        'can be turned on', (tester) async {
       await pumpScreen(tester);
 
       // The cost, in the words the user would use, next to the switch rather
       // than behind a link — the same shape as the endpoints screen's notices.
       expect(find.byType(PrivacyNotice), findsOneWidget);
       expect(
-        find.textContaining('your homeserver learns every link'),
+        find.textContaining('the homeserver learns a link it could otherwise'),
         findsOneWidget,
       );
+      final switches = tester
+          .widgetList<SwitchListTile>(find.byType(SwitchListTile))
+          .toList();
+      expect(switches.first.value, isTrue, reason: 'on for plain rooms');
       expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile).first).value,
+        switches[1].value,
         isFalse,
-        reason: 'a gate that starts open is not a gate',
+        reason: 'the disclosure that is not free starts closed',
+      );
+      expect(find.byType(PrivacyGatedTitle), findsOneWidget);
+    });
+
+    testWidgets('turning encrypted chats on is what writes the setting', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.text('Show previews in encrypted chats'));
+      await tester.pumpAndSettle();
+
+      expect(
+        LinkPreviewSettings.fromStore(stores.settings).encryptedRooms,
+        isTrue,
       );
     });
 
-    testWidgets('turning it on is what writes the setting', (tester) async {
+    testWidgets('switching previews off hides everything under it', (
+      tester,
+    ) async {
       await pumpScreen(tester);
+      expect(find.text('Networks'), findsOneWidget);
+
       await tester.tap(find.text('Show link previews'));
       await tester.pumpAndSettle();
 
-      expect(LinkPreviewSettings.fromStore(stores.settings).enabled, isTrue);
-      // The per-network escape hatch only exists once there is something to
-      // escape from.
-      expect(find.text('Networks'), findsOneWidget);
+      expect(LinkPreviewSettings.fromStore(stores.settings).enabled, isFalse);
+      expect(find.text('Show previews in encrypted chats'), findsNothing);
+      expect(find.text('Networks'), findsNothing);
     });
 
     testWidgets('excluding a network keeps the rest previewable', (
@@ -420,6 +597,11 @@ void main() {
       const LinkPreviewSettings(enabled: true).writeTo(stores.settings);
       await pumpScreen(tester);
 
+      await tester.scrollUntilVisible(
+        find.text(ChatNetwork.signal.label),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text(ChatNetwork.signal.label));
       await tester.pumpAndSettle();
 
