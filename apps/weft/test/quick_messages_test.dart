@@ -209,6 +209,15 @@ void main() {
       );
     });
 
+    test('a salutation on its own line keeps the line after it', () {
+      expect(
+        parseQuickMessage(
+          'Queridos todos,\n\n¡Que os mejoréis pronto!\n\nUn abrazo',
+        ),
+        'Queridos todos,\n¡Que os mejoréis pronto!',
+      );
+    });
+
     test('reasoning is dropped, and reasoning alone is nothing', () {
       expect(
         parseQuickMessage('<think>German, short.</think>Alles Gute!'),

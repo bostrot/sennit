@@ -742,7 +742,14 @@ String? parseQuickMessage(String content) {
   }
   final fence = RegExp(r'```(?:\w+)?\s*([\s\S]*?)```').firstMatch(text);
   if (fence != null) text = fence[1]!.trim();
-  text = text.split(RegExp(r'\n\s*\n')).first.trim();
+  // The first paragraph — what follows is usually the model explaining
+  // itself — unless it is only a salutation ("Queridos todos,"), which a
+  // model writing a letter puts on a line of its own.
+  final paragraphs = text.split(RegExp(r'\n\s*\n'));
+  text = paragraphs.first.trim();
+  if (paragraphs.length > 1 && RegExp(r'[,:]$').hasMatch(text)) {
+    text = '$text\n${paragraphs[1].trim()}';
+  }
   text = text
       .replaceFirst(
         RegExp(
