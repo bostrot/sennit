@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:test/test.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -216,6 +218,77 @@ void main() {
       ];
 
       expect(scorer.scoreAll(handles), isEmpty);
+    });
+
+    test('finds exactly what scoring every pair finds, in the same order', () {
+      // scoreAll only scores pairs that share a number, an address or a
+      // name. That is a shortcut, and it is only safe while every pair it
+      // skips is one `score` would have refused anyway — so this compares it
+      // against scoring all n² pairs on an account-shaped mix: shared and
+      // formatted numbers, cased emails, same and similar names, names that
+      // are numbers, avatars, contacts already merged.
+      final random = Random(7);
+      const names = [
+        'Anna Maven',
+        'anna maven',
+        'Änna Maven',
+        'Anna Mavens',
+        'Michael Johnson',
+        'Michael',
+        '+49 151 1234',
+        'Jon Smith',
+      ];
+      const phones = ['+4915112345678', '+49 151 12345678', '+4917011122233'];
+      const emails = [
+        'anna@example.org',
+        'Anna@Example.ORG',
+        'jon@example.org',
+      ];
+      final networks = [
+        ChatNetwork.whatsapp,
+        ChatNetwork.signal,
+        ChatNetwork.telegram,
+        ChatNetwork.slack,
+      ];
+      T? some<T>(List<T> from, double p) =>
+          random.nextDouble() < p ? from[random.nextInt(from.length)] : null;
+      final handles = [
+        for (var i = 0; i < 120; i++)
+          handle(
+            'h$i',
+            networks[random.nextInt(networks.length)],
+            displayName: some(names, 0.8),
+            phone: some(phones, 0.2),
+            email: some(emails, 0.1),
+            remoteId: random.nextBool() ? '4915112345678' : null,
+            avatarDHash: some([0x0F0F0F0F0F0F0F0F, 0x0F0F0F0F0F0F0F0E], 0.3),
+            contactId: some(['c1', 'c2'], 0.1),
+          ),
+      ];
+      final rejected = {pairKey('h1', 'h2'), pairKey('h3', 'h9')};
+
+      final everyPair = <MergeCandidate>[];
+      for (var i = 0; i < handles.length; i++) {
+        for (var j = i + 1; j < handles.length; j++) {
+          final a = handles[i];
+          final b = handles[j];
+          if (rejected.contains(pairKey(a.id, b.id))) continue;
+          if (a.unifiedContactId != null &&
+              a.unifiedContactId == b.unifiedContactId) {
+            continue;
+          }
+          if (scorer.score(a, b) case final candidate?) {
+            everyPair.add(candidate);
+          }
+        }
+      }
+      everyPair.sort((x, y) => y.score.compareTo(x.score));
+
+      String describe(MergeCandidate c) =>
+          '${c.a.id}~${c.b.id} ${c.score} ${c.signals}';
+      final found = scorer.scoreAll(handles, rejectedPairs: rejected);
+      expect(everyPair, isNotEmpty);
+      expect(found.map(describe), everyPair.map(describe));
     });
   });
 
