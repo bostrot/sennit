@@ -13,11 +13,12 @@ void main() {
 
   List<(String, LoginMethodKind, bool, bool)> methods(
     ChatNetwork network,
-    List<String> ids,
-  ) => [
+    List<String> ids, {
+    bool browser = false,
+  }) => [
     for (final m in loginMethodsFor(network, [
       for (final id in ids) BridgeLoginFlow(id: id, name: id),
-    ]))
+    ], browser: browser))
       (m.flow.id, m.kind, m.recommended, m.advanced),
   ];
 
@@ -58,7 +59,7 @@ void main() {
     );
   });
 
-  test('Instagram: password first, browser and app flows advanced', () {
+  test('Instagram without a browser: password only, the rest folded', () {
     expect(
       methods(ChatNetwork.instagram, [
         'instagram',
@@ -67,8 +68,48 @@ void main() {
       ]),
       [
         ('instagram-password', LoginMethodKind.password, false, false),
-        ('android', LoginMethodKind.password, false, true),
         ('instagram', LoginMethodKind.browser, false, true),
+        ('android', LoginMethodKind.password, false, true),
+      ],
+    );
+  });
+
+  test('Instagram with a browser: password first, the website beside it', () {
+    final offered = loginMethodsFor(ChatNetwork.instagram, const [
+      BridgeLoginFlow(id: 'instagram', name: 'Cookies'),
+      BridgeLoginFlow(id: 'instagram-password', name: 'Native Web'),
+      BridgeLoginFlow(id: 'android', name: 'Native Android'),
+    ], browser: true);
+    expect(
+      [
+        for (final m in offered)
+          (m.flow.id, m.recommended, m.advanced, m.inAppBrowser),
+      ],
+      [
+        ('instagram-password', true, false, false),
+        ('instagram', false, false, true),
+        ('android', false, true, false),
+      ],
+    );
+    expect(
+      methodSubtitle(l10n, ChatNetwork.instagram, offered[1]),
+      l10n.bridgeMethodBrowserSubtitleInApp('Instagram'),
+    );
+  });
+
+  test('Messenger with a browser: messenger.com is an everyday way', () {
+    expect(
+      methods(ChatNetwork.messenger, [
+        'facebook',
+        'messenger',
+        'messenger-lite',
+        'messenger-lite-android',
+      ], browser: true).map((m) => (m.$1, m.$4)),
+      [
+        ('messenger-lite', false),
+        ('messenger', false),
+        ('messenger-lite-android', true),
+        ('facebook', true),
       ],
     );
   });

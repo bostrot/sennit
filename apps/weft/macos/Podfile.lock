@@ -2,6 +2,9 @@ PODS:
   - audio_session (0.0.1):
     - FlutterMacOS
   - CocoaAsyncSocket (7.6.5)
+  - fc_native_video_thumbnail (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - ffmpeg_kit_flutter_new_min (7.1.1):
     - ffmpeg_kit_flutter_new_min/min (= 7.1.1)
     - FlutterMacOS
@@ -44,6 +47,9 @@ PODS:
     - nanopb (~> 3.30910.0)
   - flutter_contacts (0.0.1):
     - FlutterMacOS
+  - flutter_inappwebview_macos (0.0.1):
+    - FlutterMacOS
+    - OrderedSet (~> 6.0.3)
   - flutter_local_notifications (0.0.1):
     - FlutterMacOS
   - flutter_onnxruntime (0.0.1):
@@ -104,6 +110,7 @@ PODS:
     - onnxruntime-objc/Core (= 1.23.0)
   - onnxruntime-objc/Core (1.23.0):
     - onnxruntime-c (= 1.23.0)
+  - OrderedSet (6.0.3)
   - package_info_plus (0.0.1):
     - FlutterMacOS
   - patrol (0.0.1):
@@ -136,11 +143,13 @@ PODS:
 
 DEPENDENCIES:
   - audio_session (from `Flutter/ephemeral/.symlinks/plugins/audio_session/macos`)
+  - fc_native_video_thumbnail (from `Flutter/ephemeral/.symlinks/plugins/fc_native_video_thumbnail/darwin`)
   - ffmpeg_kit_flutter_new_min (from `Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min/macos`)
   - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
   - firebase_core (from `Flutter/ephemeral/.symlinks/plugins/firebase_core/macos`)
   - firebase_messaging (from `Flutter/ephemeral/.symlinks/plugins/firebase_messaging/macos`)
   - flutter_contacts (from `Flutter/ephemeral/.symlinks/plugins/flutter_contacts/macos`)
+  - flutter_inappwebview_macos (from `Flutter/ephemeral/.symlinks/plugins/flutter_inappwebview_macos/macos`)
   - flutter_local_notifications (from `Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos`)
   - flutter_onnxruntime (from `Flutter/ephemeral/.symlinks/plugins/flutter_onnxruntime/macos`)
   - flutter_secure_storage_darwin (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
@@ -175,12 +184,15 @@ SPEC REPOS:
     - nanopb
     - onnxruntime-c
     - onnxruntime-objc
+    - OrderedSet
     - PromisesObjC
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
   audio_session:
     :path: Flutter/ephemeral/.symlinks/plugins/audio_session/macos
+  fc_native_video_thumbnail:
+    :path: Flutter/ephemeral/.symlinks/plugins/fc_native_video_thumbnail/darwin
   ffmpeg_kit_flutter_new_min:
     :path: Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter_new_min/macos
   file_selector_macos:
@@ -191,6 +203,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/firebase_messaging/macos
   flutter_contacts:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_contacts/macos
+  flutter_inappwebview_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/flutter_inappwebview_macos/macos
   flutter_local_notifications:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_local_notifications/macos
   flutter_onnxruntime:
@@ -235,6 +249,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   audio_session: eaca2512cf2b39212d724f35d11f46180ad3a33e
   CocoaAsyncSocket: 065fd1e645c7abab64f7a6a2007a48038fdc6a99
+  fc_native_video_thumbnail: c988394defaf5a9061a91502594826f5561ff80b
   ffmpeg_kit_flutter_new_min: 623d95fe4c00311175a10f9ab3efa312c266ead6
   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
   Firebase: e8400c058702940d53f31fc0653e4e7a06332326
@@ -245,6 +260,7 @@ SPEC CHECKSUMS:
   FirebaseInstallations: bd8e80f51d4c8bdc6c872011dede0b800c5b49ea
   FirebaseMessaging: 313d69fe6529c8846813d1660b65d7d38bc16954
   flutter_contacts: 6f45cdf49f4fb2241793263546f823f7e812668e
+  flutter_inappwebview_macos: c2d68649f9f8f1831bfcd98d73fd6256366d9d1d
   flutter_local_notifications: 1fc7ffb10a83d6a2eeeeddb152d43f1944b0aad0
   flutter_onnxruntime: caa549d495a20032744e7646f5f060b997187614
   flutter_secure_storage_darwin: 46e401699982ee74142909676535e0f6a7321e58
@@ -259,6 +275,7 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   onnxruntime-c: 3174c63a963d9abbc2bf9627e3d622819c0ed5f7
   onnxruntime-objc: 1254d12f8160e562e7693ff17f5aa3dd17dc409e
+  OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94
   package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   patrol: 09773d9cd563ec54230813755b3231b2e8252aac
   pdfium_flutter: e5a6e881af0b182d5b0465ebad23a8a20caa28d4

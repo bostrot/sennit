@@ -6,6 +6,7 @@ import 'package:weft_bridges/weft_bridges.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft/features/bridges/bridge_browser_sign_in.dart';
 import 'package:weft/features/bridges/bridge_login_flow.dart';
 import 'package:weft/app/localisation.dart';
 
@@ -31,6 +32,7 @@ class _FakeBridge implements BridgeLoginBackend {
 
   final List<String> calls = [];
   final List<Map<String, Object?>?> bodies = [];
+  final List<String> stepTypes = [];
   String? reloginId;
   int _next = 0;
 
@@ -70,6 +72,7 @@ class _FakeBridge implements BridgeLoginBackend {
     Map<String, Object?>? body,
   }) {
     calls.add('submit $stepId');
+    stepTypes.add(stepType);
     bodies.add(body);
     return _take();
   }
@@ -90,7 +93,7 @@ class _FakeBridge implements BridgeLoginBackend {
   Future<void> logout(String loginId) async {}
 
   @override
-  bool get supportsCookies => false;
+  bool supportsCookies = false;
 
   @override
   bool acceptsUnlistedFlows = true;
@@ -164,6 +167,7 @@ Future<void> _pump(
   ChatNetwork network, {
   List<BridgeLoginFlow>? flows,
   String? reloginId,
+  BrowserSignIn? browserSignIn,
 }) async {
   // Tall enough that a QR step's every line is built, as on a phone held
   // upright; the default test window is a landscape 800×600.
@@ -179,6 +183,7 @@ Future<void> _pump(
         network: network,
         flows: flows,
         reloginId: reloginId,
+        browserSignIn: browserSignIn,
       ),
     ),
   );
@@ -558,6 +563,114 @@ void main() {
 
       expect(find.text('This way needs a web browser'), findsOneWidget);
       expect(find.text('Try another way'), findsOneWidget);
+    });
+  });
+
+  group('browser sign-in', () {
+    const igCookies = LoginStep(
+      stepId: 'fi.mau.meta.cookies',
+      type: LoginStepType.cookies,
+      loginId: 'lg1',
+      cookies: LoginCookiesParams(
+        url: 'https://www.instagram.com/accounts/login/',
+        fieldIds: ['sessionid', 'csrftoken', 'ds_user_id'],
+      ),
+    );
+
+    testWidgets('the website is offered beside the password', (tester) async {
+      final bridge = _FakeBridge(const [])..supportsCookies = true;
+      await _pump(
+        tester,
+        bridge,
+        ChatNetwork.instagram,
+        flows: _igFlows,
+        browserSignIn: (_, _, _) async => null,
+      );
+
+      expect(find.text('Sign in with username and password'), findsOneWidget);
+      expect(find.text('Recommended'), findsOneWidget);
+      expect(find.text('Sign in on the Instagram website'), findsOneWidget);
+      expect(
+        find.text('Sign in on Instagram’s own page, right here in Sennit.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says whose page opens, then hands the session over', (
+      tester,
+    ) async {
+      final bridge = _FakeBridge([igCookies, _complete])
+        ..supportsCookies = true;
+      LoginCookiesParams? opened;
+      await _pump(
+        tester,
+        bridge,
+        ChatNetwork.instagram,
+        flows: _igFlows,
+        browserSignIn: (_, params, name) async {
+          opened = params;
+          expect(name, 'Instagram');
+          return {'sessionid': 's', 'csrftoken': 'c', 'ds_user_id': '42'};
+        },
+      );
+      await tester.tap(find.text('Sign in on the Instagram website'));
+      await _settle(tester);
+
+      expect(find.textContaining('never reads your password'), findsOneWidget);
+      expect(opened, isNull, reason: 'the page opens only when asked');
+      await tester.tap(find.text('Continue to Instagram'));
+      await _settle(tester);
+
+      expect(opened?.url, 'https://www.instagram.com/accounts/login/');
+      expect(bridge.calls, contains('submit fi.mau.meta.cookies'));
+      expect(bridge.stepTypes.last, 'cookies');
+      expect(bridge.bodies.last, {
+        'sessionid': 's',
+        'csrftoken': 'c',
+        'ds_user_id': '42',
+      });
+      expect(find.text('Instagram is connected'), findsOneWidget);
+    });
+
+    testWidgets('closing the page sends nothing and stays put', (tester) async {
+      final bridge = _FakeBridge([igCookies])..supportsCookies = true;
+      await _pump(
+        tester,
+        bridge,
+        ChatNetwork.instagram,
+        flows: _igFlows,
+        browserSignIn: (_, _, _) async => null,
+      );
+      await tester.tap(find.text('Sign in on the Instagram website'));
+      await _settle(tester);
+      await tester.tap(find.text('Continue to Instagram'));
+      await _settle(tester);
+
+      expect(bridge.calls.where((c) => c.startsWith('submit')), isEmpty);
+      expect(find.text('Continue to Instagram'), findsOneWidget);
+    });
+
+    testWidgets('through the bot chat it still says it needs a browser', (
+      tester,
+    ) async {
+      final bridge = _FakeBridge([
+        _input('fi.mau.meta.instagram.credentials', [_passwordField]),
+        igCookies,
+      ]);
+      await _pump(
+        tester,
+        bridge,
+        ChatNetwork.instagram,
+        flows: _igFlows,
+        browserSignIn: (_, _, _) async => fail('no browser without cookies'),
+      );
+      await tester.tap(find.text('Try another way'));
+      await _settle(tester);
+      await tester.tap(find.text('More ways to connect'));
+      await _settle(tester);
+      await tester.tap(find.text('Sign in on the Instagram website'));
+      await _settle(tester);
+      expect(find.text('This way needs a web browser'), findsOneWidget);
     });
   });
 

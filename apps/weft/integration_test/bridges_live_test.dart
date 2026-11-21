@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:matrix/matrix.dart' as sdk;
@@ -238,6 +239,50 @@ void main() {
         within: const Duration(seconds: 90),
       );
       await shot(tester, 'gmessages-1');
+      await back();
+    }
+
+    if (want('instagram')) {
+      await connect('Instagram');
+      await until(
+        tester,
+        find.text('How do you want to connect Instagram?'),
+        within: const Duration(seconds: 60),
+      );
+      await shot(tester, 'instagram-1-choose');
+      await tester.tap(find.text('Sign in with username and password'));
+      await until(tester, find.text('Sign in to Instagram').last);
+      await until(tester, find.text('Email or username'));
+      await shot(tester, 'instagram-2-password');
+      await tester.tap(find.text('Try another way'));
+      await until(tester, find.text('Sign in on the Instagram website'));
+      await tester.tap(find.text('Sign in on the Instagram website'));
+      await until(tester, find.text('Continue to Instagram'));
+      await shot(tester, 'instagram-3-browser-intro');
+      await tester.tap(find.text('Continue to Instagram'));
+      // The page itself is a native web view, which a Flutter screenshot
+      // draws blank: the run says READY and holds, so the window can be
+      // captured from outside.
+      await wait(tester, const Duration(seconds: 12));
+      debugPrint('READY instagram-webview');
+      // What proves the page is instagram.com, loaded and live: the cookies
+      // its login page sets, read from the same native store the sign-in
+      // harvests from. Names only — never values.
+      final store = CookieManager.instance();
+      final open = await store.getCookies(
+        url: WebUri('https://www.instagram.com/'),
+      );
+      debugPrint('WEBVIEW cookies while open: ${open.map((c) => c.name)}');
+      expect(open, isNotEmpty, reason: 'instagram.com did not load');
+      await wait(tester, const Duration(seconds: 2));
+      await tester.tap(find.byType(CloseButton).first);
+      await wait(tester, const Duration(seconds: 3));
+      final left = await store.getCookies(
+        url: WebUri('https://www.instagram.com/'),
+      );
+      debugPrint('WEBVIEW cookies after close: ${left.map((c) => c.name)}');
+      expect(left, isEmpty, reason: 'the page left a session behind');
+      await shot(tester, 'instagram-4-after-close');
       await back();
     }
 

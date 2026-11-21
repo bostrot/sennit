@@ -576,6 +576,33 @@ void main() {
     // Seen live against mautrix-whatsapp: the cancelled QR login reports its
     // own end a moment after "Login cancelled.", and that report clears the
     // chat's command state — so the next login has to start after it.
+    // Live, mautrix-instagram's password flow through the chat.
+    test('"Email or username" is a username field, not an email one', () async {
+      final bot = _FakeBot((command, bot) {
+        if (command == 'list-logins') {
+          return [_text(bot, "You're not logged in")];
+        }
+        return [
+          _text(bot, 'Enter your Instagram email or username and password.'),
+          _text(
+            bot,
+            'Please enter your Email or username\n'
+            'The email address or username for your Instagram account.',
+          ),
+        ];
+      });
+      final client = _client(bot);
+      addTearDown(client.dispose);
+
+      final step = await client.startLogin('instagram-password');
+      expect(step.fields.single.type, 'username');
+      expect(step.fields.single.name, 'Email or username');
+      expect(
+        step.instructions,
+        'Enter your Instagram email or username and password.',
+      );
+    });
+
     test('a new login waits for a cancelled one to finish dying', () async {
       final bot = _FakeBot((command, bot) {
         if (command == 'list-logins') {

@@ -5264,6 +5264,36 @@
   "@bridgeMethodBrowserSubtitle": {
     "description": "One line under a website sign-in method. Under ~60 chars."
   },
+  "bridgeMethodBrowserSubtitleInApp": "Sign in on {network}’s own page, right here in Sennit.",
+  "@bridgeMethodBrowserSubtitleInApp": {
+    "description": "Under the option to connect a messenger by signing in on its own website, shown inside the app. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
+  },
+  "bridgeBrowserIntro": "{network}’s own sign-in page opens next. Sennit never reads your password: once you’re in, it passes the signed-in session to your server and deletes it from this device.",
+  "@bridgeBrowserIntro": {
+    "description": "Explains, before it opens, that a messenger's own sign-in page will open inside the app and what the app does with it. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
+  },
+  "bridgeBrowserContinue": "Continue to {network}",
+  "@bridgeBrowserContinue": {
+    "description": "Button that opens a messenger's own sign-in page inside the app. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
+  },
   "bridgeMethodBotTitle": "Connect a bot account",
   "@bridgeMethodBotTitle": {
     "description": "Title of a developer sign-in method that connects a bot account instead of a person. Under ~30 chars."
