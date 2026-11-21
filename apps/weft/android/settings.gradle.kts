@@ -34,6 +34,22 @@ plugins {
 
 include(":app")
 
+// flutter_inappwebview_android 1.1.3 asks for `proguard-android.txt`, which
+// AGP 9 refuses while it evaluates the plugin's build file, so a release build
+// stops before it starts. Its Android project is built from a copy that differs
+// only in naming `proguard-android-optimize.txt` instead (see
+// `third_party/flutter_inappwebview_android/README.md`); the plugin's Dart code
+// still comes from pub. Remove this once the plugin ships the fix.
+findProject(":flutter_inappwebview_android")?.let { plugin ->
+    if (!plugin.projectDir.path.contains("flutter_inappwebview_android-1.1.3")) {
+        throw GradleException(
+            "flutter_inappwebview_android is no longer 1.1.3 (${plugin.projectDir}): " +
+                "drop the patched copy in third_party/ and this override, or refresh it.",
+        )
+    }
+    plugin.projectDir = file("third_party/flutter_inappwebview_android")
+}
+
 // The Wear OS companion: a separate APK for a separate device, built by
 // `./gradlew :wear:assembleDebug` and *not* by `flutter build apk`, which only
 // ever asks for `:app`. It applies no Flutter plugin and contains no Dart — see
