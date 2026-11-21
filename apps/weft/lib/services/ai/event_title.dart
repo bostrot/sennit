@@ -135,6 +135,40 @@ List<String> eventTitleTranscript(
   return [?replied, ...before, marked, ...after];
 }
 
+/// The newest of [conversation] as a prompt reads it: one `Name: text` line
+/// per message, oldest first, with no message marked.
+///
+/// [eventTitleTranscript] without a trigger, for a feature that writes the
+/// *next* message rather than naming an earlier one — the room's latest
+/// exchange, thread replies left out as they are there. The same filter and
+/// the same line shape, so every prompt reads one kind of transcript, and the
+/// same budget rule: lines farthest back go first.
+List<String> recentConversationTranscript(
+  Iterable<WeftMessage> conversation, {
+  int maxMessages = kEventTitleContextMessages,
+  int maxChars = kEventTitleContextChars,
+}) {
+  assert(maxMessages > 0 && maxMessages <= kAiContextMessages);
+  final byId = <String, WeftMessage>{};
+  for (final m in conversation) {
+    if (m.threadRootId == null && _wordsOf(m) != null) {
+      byId.putIfAbsent(m.eventId, () => m);
+    }
+  }
+  final ordered = byId.values.toList()..sort(_chronological);
+  final lines = [
+    for (final m in ordered.skip(
+      ordered.length > maxMessages ? ordered.length - maxMessages : 0,
+    ))
+      _line(m, _lineChars),
+  ];
+  var length = lines.fold(0, (n, l) => n + l.length + 1);
+  while (length > maxChars && lines.length > 1) {
+    length -= lines.removeAt(0).length + 1;
+  }
+  return lines;
+}
+
 int _chronological(WeftMessage a, WeftMessage b) {
   final byTime = a.timestamp.compareTo(b.timestamp);
   return byTime != 0 ? byTime : a.eventId.compareTo(b.eventId);

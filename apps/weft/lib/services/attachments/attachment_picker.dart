@@ -58,6 +58,10 @@ enum AttachmentPickSource {
   /// a calendar when pressed a moment too long is a Send that cannot be
   /// trusted.
   sendLater,
+
+  /// Not an attachment either: an AI-written draft from the user's quick
+  /// message list, put into the composer unsent. Chat-view handled.
+  quickMessage,
 }
 
 /// Picks files to send, in whatever way the platform actually does that.
@@ -168,6 +172,7 @@ class PlatformAttachmentPicker implements AttachmentPicker {
       AttachmentPickSource.poll ||
       AttachmentPickSource.paperless ||
       AttachmentPickSource.sendLater ||
+      AttachmentPickSource.quickMessage ||
       AttachmentPickSource.calendar => throw UnsupportedError(
         'Sent as an event, not picked as a file',
       ),

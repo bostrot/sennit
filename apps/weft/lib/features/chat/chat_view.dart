@@ -21,6 +21,9 @@ import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_search/weft_search.dart';
 
 import '../../app/a11y.dart';
+import '../../app/auto_reply_providers.dart' show autoReplyEndpointProvider;
+import '../../app/billing_providers.dart';
+import '../../app/quick_message_providers.dart';
 import '../../app/call_providers.dart';
 import '../../app/intents.dart';
 import '../../app/l10n_labels.dart';
@@ -33,15 +36,22 @@ import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
+import '../../services/ai/event_title.dart' show recentConversationTranscript;
+import '../../services/ai/quick_messages.dart';
 import '../../services/attachments/attachment_picker.dart';
+import '../../services/billing/entitlements.dart';
 import '../../services/attachments/send_attachments.dart';
 import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
 import '../../services/attachments/clipboard_images.dart';
 import '../../services/notifications/open_chats.dart';
 import '../../services/schedule/scheduled_actions.dart';
+import '../settings/endpoints_screen.dart';
 import '../settings/integrations_screen.dart';
+import '../settings/pro_screen.dart';
+import '../settings/quick_messages_screen.dart';
 import 'paperless_picker_sheet.dart';
+import 'quick_message_sheet.dart';
 import '../auth/verification_screen.dart';
 import '../call/external_call.dart';
 import '../call/start_call.dart';
@@ -188,6 +198,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
   String? _unavailable;
 
   final _composer = TextEditingController();
+
+  /// The quick message being written or just written, which the bar above
+  /// the composer shows; null when there is none.
+  _QuickDraft? _quick;
+
+  /// Bumped per request, so a slow answer to a request the user has since
+  /// replaced or dismissed is dropped rather than put into the composer.
+  int _quickGeneration = 0;
 
   /// The composer's focus, held here rather than left to the `TextField` for
   /// one reason: `FocusComposerIntent` is pressed while the user is in the
@@ -406,6 +424,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
   void _onComposerChanged() {
     final repository = ref.read(chatRepositoryProvider);
     final hasText = _composer.text.trim().isNotEmpty;
+    // Sent, or deleted by hand: the bar's "check it, then send" is about a
+    // draft that is no longer there.
+    if (!hasText && _quick != null && !_quick!.busy) {
+      setState(() => _quick = null);
+    }
     if (hasText) {
       final now = DateTime.now();
       if (now.difference(_typingSentAt) > const Duration(seconds: 4)) {
@@ -2489,6 +2512,13 @@ class _ChatViewState extends ConsumerState<ChatView> {
               // A preview is a look, not a place to answer from: no composer,
               // and none of the state that hangs off one.
               if (!widget.preview) _ScheduledSendsBar(chatId: _chatId),
+              if (!widget.preview && _quick != null)
+                _QuickMessageBar(
+                  draft: _quick!,
+                  onRegenerate: () =>
+                      unawaited(_writeQuickMessage(chat, _quick!.message)),
+                  onDismiss: _dismissQuickMessage,
+                ),
               if (!widget.preview)
                 FocusTraversalOrder(
                   order: const NumericFocusOrder(2),
@@ -3018,9 +3048,19 @@ class _ChatViewState extends ConsumerState<ChatView> {
       context,
       picker,
       paperless: ref.read(paperlessProvider) != null,
+      quickMessageLocked: !ref
+          .read(proControllerProvider)
+          .unlocks(ProFeature.aiReplies),
       anchorContext: anchor,
     );
     if (source == null || !mounted) return;
+
+    if (source == AttachmentPickSource.quickMessage) {
+      // Not anchored to the button: the attach menu it pointed from has
+      // closed, as it has before the paperless picker opens.
+      await _pickQuickMessage(chat);
+      return;
+    }
 
     if (source == AttachmentPickSource.location) {
       await _shareLocation(chat);
@@ -3252,6 +3292,141 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// here is the only report of an operation that failed, and a bar that sets
   /// no live region and vanishes on a timer is not a report a screen-reader
   /// user ever receives.
+  /// The quick message sheet, then the draft.
+  ///
+  /// Pro first: the row is badged in a build that charges, and a tap on it
+  /// goes to the Pro screen rather than to a sheet whose every row would fail.
+  Future<void> _pickQuickMessage(Chat chat) async {
+    if (!ref.read(proControllerProvider).unlocks(ProFeature.aiReplies)) {
+      pushProScreen(context);
+      return;
+    }
+    final picked = await showQuickMessageSheet(
+      context,
+      ref.read(quickMessagesProvider),
+      onEdit: () {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const QuickMessagesScreen()),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    await _writeQuickMessage(chat, picked);
+  }
+
+  /// Asks the user's model for [message] and puts the answer into the
+  /// composer — never sends it.
+  ///
+  /// The conversation leaves the device here, on the tap, and no sooner: the
+  /// last [kQuickMessageContextMessages] lines of it, for the language, the
+  /// name, and what the occasion is.
+  Future<void> _writeQuickMessage(Chat chat, QuickMessage message) async {
+    final l10n = context.l10n;
+    final endpoint = ref.read(autoReplyEndpointProvider);
+    if (endpoint == null) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.quickMessageNoEndpoint(l10n.settingsEndpointsTitle),
+            ),
+            action: SnackBarAction(
+              label: l10n.quickMessageSetUp,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const EndpointsScreen(),
+                ),
+              ),
+            ),
+          ),
+        );
+      return;
+    }
+
+    final generation = ++_quickGeneration;
+    final title = l10n.quickMessageTitle(message);
+    setState(
+      () => _quick = _QuickDraft(
+        message: message,
+        title: title,
+        busy: true,
+        written: _quick?.written,
+      ),
+    );
+
+    final transcript = recentConversationTranscript(
+      _view.messages,
+      maxMessages: kQuickMessageContextMessages,
+    );
+    final draft = await composeQuickMessage(
+      baseUrl: endpoint.baseUrl,
+      model: endpoint.model,
+      apiKey: endpoint.apiKey,
+      instruction: message.effectivePrompt,
+      transcript: transcript,
+      language: detectChatLanguage(
+        transcript,
+        fallback: Localizations.localeOf(context).languageCode,
+      ),
+      recipient: chat.isGroup ? null : _quickRecipient(chat),
+      groupName: chat.isGroup ? chat.title : null,
+      client: ref.read(quickMessageClientProvider),
+    );
+    if (!mounted || generation != _quickGeneration) return;
+
+    final text = draft.text;
+    if (text == null) {
+      final written = _quick?.written;
+      setState(
+        () => _quick = written == null
+            ? null
+            : _QuickDraft(message: message, title: title, written: written),
+      );
+      _showMessage(
+        l10n.quickMessageFailed(l10n.autoReplyOutcome(draft.outcome)),
+      );
+      return;
+    }
+
+    // Over the previous draft, or into an empty composer; after anything the
+    // user typed themselves, which is theirs and is not replaced.
+    final current = _composer.text.trimRight();
+    final previous = _quick?.written;
+    final next = current.isEmpty || current == previous?.trimRight()
+        ? text
+        : '$current $text';
+    setState(
+      () => _quick = _QuickDraft(message: message, title: title, written: next),
+    );
+    _composer.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    _composerFocus.requestFocus();
+  }
+
+  /// The first name of whoever a one-to-one chat is with: the chat's own name
+  /// when it is a person's, else the name they last wrote under — a chat
+  /// titled with a phone number still has a sender with a name.
+  String? _quickRecipient(Chat chat) {
+    final fromTitle = firstNameOf(chat.title);
+    if (fromTitle != null) return fromTitle;
+    for (final m in _view.messages) {
+      if (!m.isOwn && !m.isBridgeNotice) {
+        final name = firstNameOf(m.senderName);
+        if (name != null) return name;
+      }
+    }
+    return null;
+  }
+
+  void _dismissQuickMessage() {
+    _quickGeneration++;
+    setState(() => _quick = null);
+  }
+
   void _showMessage(String message) {
     if (!mounted) return;
     showWeftMessage(context, message);
@@ -5464,6 +5639,99 @@ class _ScheduledSendsBar extends ConsumerWidget {
                 ),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A quick message in progress, or the one just put into the composer.
+@immutable
+class _QuickDraft {
+  const _QuickDraft({
+    required this.message,
+    required this.title,
+    this.busy = false,
+    this.written,
+  });
+
+  final QuickMessage message;
+  final String title;
+
+  /// Whether the model is writing it right now.
+  final bool busy;
+
+  /// What was put into the composer, so a regenerated one replaces it rather
+  /// than being added after it.
+  final String? written;
+}
+
+/// The strip above the composer while a quick message is written, and after:
+/// what is happening, a way to ask again, and a way to put it away.
+///
+/// A live region, so a screen reader hears "Writing…" and then "check it,
+/// then send" without having to go looking — the second is the whole point
+/// of the feature never sending by itself.
+class _QuickMessageBar extends StatelessWidget {
+  const _QuickMessageBar({
+    required this.draft,
+    required this.onRegenerate,
+    required this.onDismiss,
+  });
+
+  final _QuickDraft draft;
+  final VoidCallback onRegenerate;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final label = draft.busy
+        ? l10n.quickMessageWriting(draft.title)
+        : l10n.quickMessageWritten(draft.title);
+    return Container(
+      color: context.colors.surfaceContainerHigh,
+      padding: const EdgeInsetsDirectional.only(
+        start: WeftSpace.lg,
+        end: WeftSpace.xs,
+      ),
+      child: Row(
+        children: [
+          if (draft.busy)
+            const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(
+              Icons.auto_awesome_rounded,
+              size: 16,
+              color: context.colors.primary,
+            ),
+          const SizedBox(width: WeftSpace.sm),
+          Expanded(
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.bodySmall,
+              ),
+            ),
+          ),
+          if (!draft.busy)
+            TextButton.icon(
+              onPressed: onRegenerate,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(l10n.quickMessageRegenerate),
+            ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            tooltip: draft.busy ? l10n.commonCancel : l10n.commonClose,
+            visualDensity: VisualDensity.compact,
+            onPressed: onDismiss,
+          ),
         ],
       ),
     );
