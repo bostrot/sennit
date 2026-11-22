@@ -91,13 +91,18 @@ def certificates(_argv):
 
 
 def create_certificate(argv):
-    csr_path, out_path = argv
+    # A third argument picks another type: DEVELOPER_ID_APPLICATION_G2 is the
+    # macOS release's, see tooling/store/renew_macos_signing.sh.
+    csr_path, out_path, *kind = argv
     with open(csr_path) as f:
         csr = ''.join(line.strip() for line in f if '-----' not in line)
     token = asc_token()
     created = call('POST', f'{ASC}/v1/certificates', token, body={'data': {
         'type': 'certificates',
-        'attributes': {'certificateType': 'DISTRIBUTION', 'csrContent': csr},
+        'attributes': {
+            'certificateType': kind[0] if kind else 'DISTRIBUTION',
+            'csrContent': csr,
+        },
     }})['data']
     a = created['attributes']
     with open(out_path, 'wb') as f:
