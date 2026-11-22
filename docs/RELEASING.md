@@ -180,10 +180,13 @@ an internal-only TestFlight build, on the same trigger as the Play upload: a
 version bump on `main`, or a manual run. An internal-only build cannot be
 attached to an App Store version; for the build that goes to review, run the
 workflow by hand with `app_store` ticked
-(`gh workflow run deploy_testflight.yml -f app_store=true`). It signs with an **App Store Connect API key** rather than a
-checked-in certificate and profiles: with the key, `xcodebuild` registers the
-App IDs and creates the certificate and the profiles for all seven targets
-itself.
+(`gh workflow run deploy_testflight.yml -f app_store=true`). It signs
+manually, with one Apple Distribution certificate kept as a secret and an
+App Store profile per target that it fetches from the portal by name; both
+come from `ios_signing.yml`, and nothing in a TestFlight run creates or
+revokes a certificate. The certificate lasts a year: runs warn 30 days ahead,
+and `tooling/store/renew_ios_signing.sh` renews it — see "Renewal" in
+[[adr-002-ios-signing-handoff]].
 
 Before the first run, once:
 
@@ -201,12 +204,14 @@ Before the first run, once:
 | `APP_STORE_CONNECT_ISSUER_ID` | the issuer id shown above the key list |
 | `APP_STORE_CONNECT_KEY_P8_BASE64` | the downloaded `AuthKey_….p8`, base64 |
 | `APPLE_TEAM_ID` | 10-char team id |
+| `IOS_DISTRIBUTION_P12_BASE64` | the Distribution certificate and key, set by `renew_ios_signing.sh` |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | its random password, set by the same |
 
 The build number is the commit count, the same number the Play upload uses.
 
 It runs on a GitHub-hosted `macos-26` runner, which carries Xcode,
-CocoaPods and rustup; the job makes a keychain of its own for the signing
-certificate Xcode creates. A manual run with **dry_run** ticked archives and
+CocoaPods and rustup; the job imports the stored certificate into a keychain
+of its own. A manual run with **dry_run** ticked archives and
 exports a signed IPA without uploading it. Every workflow here runs on
 GitHub-hosted runners — free for a public repository — and none needs a
 self-hosted one.

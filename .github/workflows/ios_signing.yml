@@ -1,0 +1,90 @@
+name: iOS signing
+
+# The portal half of the signing material deploy_testflight.yml uses: the one
+# Apple Distribution certificate and an App Store profile per target, made
+# with the App Store Connect key, which never leaves this job. Run by hand,
+# about once a year — see "Renewal" in
+# docs/decisions/adr-002-ios-signing-handoff.md. Normally through
+# tooling/store/renew_ios_signing.sh, which makes the private key and the CSR
+# on the owner's machine, runs this with `create`, and turns the certificate
+# it returns into the .p12 secret. The private key is never in a workflow.
+#
+# - certificates: list every certificate on the team, and change nothing.
+# - create: a Distribution certificate from `csr`, then the profiles for it.
+# - profiles: the profiles again, for the certificate with `serial` — after a
+#   capability changed on an App ID, which invalidates them.
+# - revoke-ci-development: the Apple Development certificates earlier
+#   TestFlight runs made with automatic signing; lists them unless `apply`.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [certificates, create, profiles, revoke-ci-development]
+        default: certificates
+      csr:
+        description: For create, the certificate signing request as one line of base64 (base64 < request.csr)
+        type: string
+        default: ''
+      serial:
+        description: For profiles, the serial of the Distribution certificate
+        type: string
+        default: ''
+      apply:
+        description: For revoke-ci-development, revoke instead of listing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-signing
+  cancel-in-progress: false
+
+jobs:
+  signing:
+    name: ${{ inputs.action }}
+    # Python 3 and openssl, nothing more: any hosted image will do.
+    runs-on: ubuntu-latest
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List the certificates
+        run: python3 tooling/store/ios_signing.py certificates
+
+      - name: Create the Distribution certificate
+        if: inputs.action == 'create'
+        env:
+          CSR: ${{ inputs.csr }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          echo "$CSR" | base64 -d > "$RUNNER_TEMP/request.csr"
+          python3 tooling/store/ios_signing.py create-certificate \
+            "$RUNNER_TEMP/request.csr" "$RUNNER_TEMP/out/distribution.cer"
+          serial=$(openssl x509 -inform der -in "$RUNNER_TEMP/out/distribution.cer" -noout -serial | cut -d= -f2)
+          echo "SERIAL=$serial" >> "$GITHUB_ENV"
+
+      - name: Create the profiles
+        if: inputs.action == 'create' || inputs.action == 'profiles'
+        env:
+          INPUT_SERIAL: ${{ inputs.serial }}
+        run: python3 tooling/store/ios_signing.py create-profiles "${SERIAL:-$INPUT_SERIAL}"
+
+      - name: Hand back the certificate
+        # The public half only; renew_ios_signing.sh pairs it with the key.
+        if: inputs.action == 'create'
+        uses: actions/upload-artifact@v4
+        with:
+          name: distribution-certificate
+          path: ${{ runner.temp }}/out/distribution.cer
+          retention-days: 1
+
+      - name: Revoke the CI development certificates
+        if: inputs.action == 'revoke-ci-development'
+        run: python3 tooling/store/ios_signing.py revoke-ci-development ${{ inputs.apply && '--apply' || '' }}

@@ -620,3 +620,66 @@ forever, with no error anywhere. When the phone app moves to a real upload key,
 For the record: `:wear` declares no `INTERNET` permission, requests no App Group
 analogue, and applies no Flutter Gradle plugin. There is nothing on a watch to
 provision because there is nothing on the watch that can reach a homeserver.
+
+### 2026-11-22 — CI signs with one stored certificate
+
+`deploy_testflight.yml` signed with automatic signing and an App Store Connect
+API key until 1.0.20. On a hosted runner that made a new Apple Development
+certificate every run, and the run revoked it again at the end so the portal
+would not fill up — and Apple mails the account holder about every revocation.
+It now signs **manually**:
+
+- **One Apple Distribution certificate**, stored as the repository secrets
+  `IOS_DISTRIBUTION_P12_BASE64` and `IOS_DISTRIBUTION_P12_PASSWORD`. The job
+  imports it into a keychain of its own.
+- **One App Store profile per archived target**, named
+  `Sennit CI App Store <bundle id>`, for the six bundle ids in
+  `BUNDLES` in `tooling/store/ios_signing.py` (the app, ShareExtension,
+  NotificationService, WeftWidget, the watch app and its complication). The
+  profiles are not secret: the job fetches them from the portal by name,
+  read-only, and switches only the runner's copy of the project to manual
+  signing with them. The committed project stays automatic for anyone
+  building locally.
+
+Nothing in a TestFlight run creates or revokes anything on the portal. The
+secret names are deliberately not `release.yml`'s `IOS_CERTIFICATE_*`: setting
+those switches that workflow to a signed `flutter build ipa` with a single
+profile, which is a separate decision.
+
+#### Renewal, once a year
+
+An Apple Distribution certificate lasts a year, and its profiles end with it.
+Every TestFlight run prints how long the certificate has left, warns from 30
+days before, and fails once it has expired; `install-profiles` warns the same
+way about each profile. To renew, on a Mac with `gh` logged in as someone who
+can set the repository's secrets:
+
+```sh
+tooling/store/renew_ios_signing.sh
+```
+
+It makes a private key and a CSR in a temporary directory, runs
+`ios_signing.yml` with `action: create` (which creates the certificate from the
+CSR and replaces the six profiles with ones for it), downloads the certificate,
+checks it matches the key, and stores the `.p12` and its random password as the
+two secrets. The key never leaves the machine except inside that encrypted
+secret, and the App Store Connect key never leaves GitHub. Then:
+
+1. Run `deploy_testflight.yml` with `dry_run` ticked; it must sign.
+2. Revoke the **old** Distribution certificate — `ios_signing.yml` with
+   `action: certificates` lists them with serial and expiry; revoke by serial
+   on the portal. That is one email a year, instead of one a build.
+
+Why the key is made locally and not in the workflow: a workflow that made it
+would need a token able to write repository secrets, kept as yet another
+secret. The split keeps each credential in the one place that needs it.
+
+When a capability changes on an App ID (the profiles go *Invalid*), run
+`ios_signing.yml` with `action: profiles` and the current certificate's serial;
+no secret changes. A new archived target is a new entry in `BUNDLES`, then the
+same.
+
+`ios_signing.yml` with `action: revoke-ci-development` lists, and with `apply`
+revokes, the Apple Development certificates the automatic-signing runs left
+behind (named "Created via API"); a person's own development certificate is
+named after them and is left alone.
