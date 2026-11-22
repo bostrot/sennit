@@ -12,12 +12,11 @@ import '../../app/localisation.dart';
 /// Opens a network's own sign-in page and returns what the bridge asked for.
 ///
 /// Null when the person closed the page before getting in.
-typedef BrowserSignIn =
-    Future<Map<String, String>?> Function(
-      BuildContext context,
-      LoginCookiesParams params,
-      String networkName,
-    );
+typedef BrowserSignIn = Future<Map<String, String>?> Function(
+  BuildContext context,
+  LoginCookiesParams params,
+  String networkName,
+);
 
 /// Whether this platform can show the sign-in page at all.
 ///
@@ -90,6 +89,11 @@ class _BridgeBrowserSignInPageState extends State<BridgeBrowserSignInPage> {
 
   /// The sites whose cookies the bridge wants: the page's own, and every
   /// domain a field names.
+  ///
+  /// The page is also asked as it is, scheme, port and path included: a
+  /// self-hosted server — Mattermost on plain http, on its own port or under
+  /// `/mattermost` — scopes its cookies to exactly that, and the store only
+  /// hands a cookie to an address its path and security match.
   List<WebUri> get _cookieUrls {
     final page = Uri.parse(widget.params.url);
     final domains = {
@@ -98,6 +102,14 @@ class _BridgeBrowserSignInPageState extends State<BridgeBrowserSignInPage> {
         for (final source in field.sources) ?source.cookieDomain,
     };
     return [
+      WebUri(
+        Uri(
+          scheme: page.scheme,
+          host: page.host,
+          port: page.hasPort ? page.port : null,
+          path: page.path,
+        ).toString(),
+      ),
       for (final domain in domains) ...[
         WebUri('https://$domain/'),
         if (!domain.startsWith('www.')) WebUri('https://www.$domain/'),

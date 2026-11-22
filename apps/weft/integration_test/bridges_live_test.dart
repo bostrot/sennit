@@ -29,6 +29,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 ///     --dart-define=WEFT_LIVE_USER=someone \
 ///     --dart-define=WEFT_LIVE_PASSWORD=… \
 ///     [--dart-define=WEFT_LIVE_ENDPOINTS=none | whatsapp=http://localhost:29318/_matrix/provision,…]
+///     [--dart-define=WEFT_LIVE_MATTERMOST=mattermost.example.org]
 ///
 /// Without `WEFT_LIVE_ENDPOINTS` the app finds the bridges the way it does for
 /// everyone, in the server's well-known; `none` forces every network through
@@ -51,6 +52,7 @@ void main() {
   const endpointsDefine = String.fromEnvironment('WEFT_LIVE_ENDPOINTS');
   const only = String.fromEnvironment('WEFT_LIVE_ONLY');
   const pass = String.fromEnvironment('WEFT_LIVE_PASS', defaultValue: 'chat');
+  const mattermostServer = String.fromEnvironment('WEFT_LIVE_MATTERMOST');
 
   final endpoints = <String, Uri>{
     for (final entry in endpointsDefine.split(','))
@@ -283,6 +285,45 @@ void main() {
       debugPrint('WEBVIEW cookies after close: ${left.map((c) => c.name)}');
       expect(left, isEmpty, reason: 'the page left a session behind');
       await shot(tester, 'instagram-4-after-close');
+      await back();
+    }
+
+    // Mattermost is self-hosted: the server is asked for first, then its own
+    // login page opens, which is where an unattended run has to stop.
+    if (want('mattermost') && mattermostServer.isNotEmpty) {
+      await connect('Mattermost');
+      await until(
+        tester,
+        find.text('How do you want to connect Mattermost?'),
+        within: const Duration(seconds: 60),
+      );
+      await shot(tester, 'mattermost-1-choose');
+      await tester.tap(find.text('Sign in on the Mattermost website'));
+      await until(tester, find.byType(TextField));
+      await shot(tester, 'mattermost-2-server');
+      await tester.enterText(find.byType(TextField).first, mattermostServer);
+      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+      await until(tester, find.text('Continue to Mattermost'));
+      await shot(tester, 'mattermost-3-browser-intro');
+      await tester.tap(find.text('Continue to Mattermost'));
+      await wait(tester, const Duration(seconds: 12));
+      debugPrint('READY mattermost-webview');
+      final host = Uri.parse(
+        mattermostServer.contains('://')
+            ? mattermostServer
+            : 'https://$mattermostServer',
+      ).host;
+      final store = CookieManager.instance();
+      // Mattermost's login page sets no cookie of its own, so this only
+      // shows what is there; the window capture is the proof it loaded.
+      final open = await store.getCookies(url: WebUri('https://$host/'));
+      debugPrint('WEBVIEW cookies while open: ${open.map((c) => c.name)}');
+      await tester.tap(find.byType(CloseButton).first);
+      await wait(tester, const Duration(seconds: 3));
+      final left = await store.getCookies(url: WebUri('https://$host/'));
+      debugPrint('WEBVIEW cookies after close: ${left.map((c) => c.name)}');
+      expect(left, isEmpty, reason: 'the page left a session behind');
+      await shot(tester, 'mattermost-4-after-close');
       await back();
     }
 
