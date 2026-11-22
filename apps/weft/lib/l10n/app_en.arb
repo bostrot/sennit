@@ -8916,5 +8916,204 @@
   "quickMessageFieldPromptHelper": "Your AI is told the chat partner's first name and the chat's language for you.",
   "@quickMessageFieldPromptHelper": {
     "description": "Helper text under the prompt field: the chat partner's first name and the chat's language are added automatically. About 90 chars."
+  },
+  "settingsSectionAccount": "Account",
+  "@settingsSectionAccount": {
+    "description": "Section heading on the settings screen above the row that deletes the account. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsDeleteAccountTitle": "Delete account",
+  "@settingsDeleteAccountTitle": {
+    "description": "Title of the settings row that opens the account deletion screen. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsDeleteAccountSubtitle": "Permanently delete your account on {server}",
+  "@settingsDeleteAccountSubtitle": {
+    "description": "One-line subtitle under 'Delete account', naming the homeserver the account lives on. Keep under ~50 chars.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountTitle": "Delete account",
+  "@deleteAccountTitle": {
+    "description": "App bar title of the account deletion screen. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountLead": "Deleting {userId} can’t be undone. This is what happens:",
+  "@deleteAccountLead": {
+    "description": "First sentence of the deletion screen, above the list of consequences.",
+    "placeholders": {
+      "userId": {
+        "type": "String",
+        "description": "The full Matrix ID. Never translated.",
+        "example": "@alice:matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointDeactivated": "Your account on {server} is deactivated for good. Nobody can sign in to it again, and its user ID can’t be registered again.",
+  "@deleteAccountPointDeactivated": {
+    "description": "Consequence in the deletion list: the account is deactivated permanently and the user ID cannot be reused.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointErased": "Sennit asks {server} to erase what it can: your profile, your account data, and your messages for anyone who didn’t already receive them.",
+  "@deleteAccountPointErased": {
+    "description": "Consequence in the deletion list: the server is asked to erase data (Matrix 'erase' flag).",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointBridges": "Every bridge you’re signed in to — WhatsApp, Signal, Telegram, Meta and the rest — is signed out first, so those sessions end on the server too.",
+  "@deleteAccountPointBridges": {
+    "description": "Consequence in the deletion list: connected bridges are logged out before the account is deleted. Network names are never translated."
+  },
+  "deleteAccountPointCopies": "People you talked to keep their copies of the messages you sent them.",
+  "@deleteAccountPointCopies": {
+    "description": "Consequence in the deletion list: recipients keep the messages they already received."
+  },
+  "deleteAccountPointDevice": "Everything Sennit stored on this device is deleted, and the app goes back to the welcome screen.",
+  "@deleteAccountPointDevice": {
+    "description": "Consequence in the deletion list: local data is wiped and the app returns to its first screen."
+  },
+  "deleteAccountPointPro": "Sennit Pro belongs to your app store account or licence key, not to this account. Deleting doesn’t cancel or refund it, and you can restore it after signing in again.",
+  "@deleteAccountPointPro": {
+    "description": "Consequence in the deletion list, shown only in builds that sell Sennit Pro: the purchase is not refunded."
+  },
+  "deleteAccountConfirmField": "Type {localpart} to confirm",
+  "@deleteAccountConfirmField": {
+    "description": "Label of the text field the user must type their username into before the delete button unlocks.",
+    "placeholders": {
+      "localpart": {
+        "type": "String",
+        "description": "The username part of the Matrix ID, without @ or server. Never translated.",
+        "example": "alice"
+      }
+    }
+  },
+  "deleteAccountButton": "Delete account",
+  "@deleteAccountButton": {
+    "description": "The destructive button that starts the deletion. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountStepBridges": "Signing out of bridges…",
+  "@deleteAccountStepBridges": {
+    "description": "Progress line while bridges are being logged out."
+  },
+  "deleteAccountStepAccount": "Deleting your account…",
+  "@deleteAccountStepAccount": {
+    "description": "Progress line while the homeserver deactivates the account."
+  },
+  "deleteAccountBridgesFailedTitle": "Some bridges didn’t sign out",
+  "@deleteAccountBridgesFailedTitle": {
+    "description": "Title of the dialog shown when one or more bridges could not be logged out. Keep under ~32 chars."
+  },
+  "deleteAccountBridgesFailedBody": "{networks} didn’t answer. Their sessions may stay on the server until its admin removes them. Delete the account anyway?",
+  "@deleteAccountBridgesFailedBody": {
+    "description": "Body of the bridge-failure dialog.",
+    "placeholders": {
+      "networks": {
+        "type": "String",
+        "description": "Comma-separated network names. Never translated.",
+        "example": "WhatsApp, Signal"
+      }
+    }
+  },
+  "deleteAccountAnyway": "Delete anyway",
+  "@deleteAccountAnyway": {
+    "description": "Destructive button in the bridge-failure dialog. Keep under ~20 chars.",
+    "maxLength": 32
+  },
+  "deleteAccountPasswordTitle": "Confirm it’s you",
+  "@deleteAccountPasswordTitle": {
+    "description": "Title of the password prompt before the account is deleted. Keep under ~26 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountPasswordMessage": "Enter the password for {userId} to delete the account.",
+  "@deleteAccountPasswordMessage": {
+    "description": "Body of the password prompt before deletion.",
+    "placeholders": {
+      "userId": {
+        "type": "String",
+        "description": "The full Matrix ID. Never translated.",
+        "example": "@alice:matrix.org"
+      }
+    }
+  },
+  "deleteAccountPasswordRetry": "That password wasn’t right. Try again.",
+  "@deleteAccountPasswordRetry": {
+    "description": "Shown in the password prompt after the homeserver refused the password."
+  },
+  "deleteAccountPasswordField": "Password",
+  "@deleteAccountPasswordField": {
+    "description": "Label of the password field in the prompt before deletion. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountBrowserTitle": "Finish in your browser",
+  "@deleteAccountBrowserTitle": {
+    "description": "Title of the dialog shown while the homeserver's own sign-in page (single sign-on) is open in the browser. Keep under ~28 chars.",
+    "maxLength": 48
+  },
+  "deleteAccountBrowserBody": "{server} opened a page to confirm it’s you. Come back here once it says you’re done.",
+  "@deleteAccountBrowserBody": {
+    "description": "Body of the browser dialog.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountBrowserDone": "I’m done",
+  "@deleteAccountBrowserDone": {
+    "description": "Button in the browser dialog confirming the web page step is finished. Keep under ~16 chars.",
+    "maxLength": 32
+  },
+  "deleteAccountCancelled": "Your account wasn’t deleted.",
+  "@deleteAccountCancelled": {
+    "description": "Message after the user backed out of re-authentication and no bridge had been signed out."
+  },
+  "deleteAccountCancelledAfterBridges": "Your account wasn’t deleted, but your bridges are signed out. Sign in to them again under Bridges.",
+  "@deleteAccountCancelledAfterBridges": {
+    "description": "Message after the user backed out of re-authentication when bridges had already been signed out."
+  },
+  "deleteAccountUnsupported": "{server} asks for a kind of confirmation Sennit can’t show. Delete the account on {server}’s own website instead.",
+  "@deleteAccountUnsupported": {
+    "description": "Error when the homeserver demands an authentication stage the app cannot complete.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountFailed": "Couldn’t delete the account: {error}",
+  "@deleteAccountFailed": {
+    "description": "Error after the deletion request failed. Nothing was deleted.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "description": "The error as the server or network reported it. Never translated.",
+        "example": "M_FORBIDDEN"
+      }
+    }
+  },
+  "deleteAccountDone": "Your account was deleted.",
+  "@deleteAccountDone": {
+    "description": "Message on the welcome screen after the account was deleted and the device cleared."
   }
 }

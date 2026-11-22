@@ -17,6 +17,7 @@ import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../bridges/bridges_screen.dart';
 import '../../services/backup/backup_service.dart' show kSennitVersion;
+import '../../services/account/account_deletion.dart';
 import '../../services/billing/entitlements.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
@@ -24,6 +25,7 @@ import '../merge/merge_screen.dart';
 import 'appearance_sheet.dart';
 import 'ai_screen.dart';
 import 'backup_screen.dart';
+import 'delete_account_screen.dart';
 import 'integrations_screen.dart';
 import 'devices_screen.dart';
 import 'link_previews_screen.dart';
@@ -55,6 +57,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final pro = ref.watch(proControllerProvider);
+    final userId = ref.watch(ownUserIdProvider);
 
     void push(Widget screen) {
       Navigator.of(
@@ -213,6 +216,25 @@ class SettingsScreen extends ConsumerWidget {
               feature: ProFeature.mcpServer,
               onTap: () => push(const McpScreen()),
             ),
+
+            if (userId != null) ...[
+              header(l10n.settingsSectionAccount),
+              ListTile(
+                leading: Icon(
+                  Icons.person_remove_outlined,
+                  color: context.colors.error,
+                ),
+                title: Text(
+                  l10n.settingsDeleteAccountTitle,
+                  style: TextStyle(color: context.colors.error),
+                ),
+                subtitle: Text(
+                  l10n.settingsDeleteAccountSubtitle(serverOfUserId(userId)),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => push(const DeleteAccountScreen()),
+              ),
+            ],
 
             header(l10n.settingsSectionAbout),
             if (pro.charges)

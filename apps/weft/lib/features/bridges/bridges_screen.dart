@@ -37,6 +37,11 @@ List<_StoredBridge> _loadBridges(SettingsStore settings) {
   ];
 }
 
+/// The bridges added by hand under Advanced, by provisioning URL.
+List<({String id, String url, String networkId})> configuredBridges(
+  SettingsStore settings,
+) => _loadBridges(settings);
+
 void _saveBridges(SettingsStore settings, List<_StoredBridge> bridges) {
   settings.setJson(_bridgesKey, {
     'bridges': [

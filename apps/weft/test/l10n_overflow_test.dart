@@ -8,6 +8,7 @@ import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/chat/rich_text_view.dart';
 import 'package:weft/features/inbox/inbox_shell.dart';
 import 'package:weft/features/search/search_screen.dart';
+import 'package:weft/features/settings/delete_account_screen.dart';
 import 'package:weft/features/settings/notifications_screen.dart';
 import 'package:weft/features/settings/security_screen.dart';
 import 'package:weft/features/settings/settings_screen.dart';
@@ -98,6 +99,7 @@ void main() {
     'notifications': () => const NotificationsScreen(),
     'security': () => const SecurityScreen(),
     'surfaces': () => const SurfacesScreen(),
+    'delete account': () => const DeleteAccountScreen(),
   };
 
   for (final locale in weftSupportedLocales) {
@@ -124,6 +126,10 @@ void main() {
               stores: freshStores(),
               deviceManager: FakeDeviceManager(const []),
               keyBackup: FakeKeyBackup(),
+              // A long one, so the lead sentence and the typed-confirmation
+              // label are measured at the width they will actually have to
+              // wrap. It also brings Settings' Account section into the run.
+              ownUserId: '@alexandra.konstantinopoulou:matrix.example.org',
             );
 
             // Layout alone does not report an overflow — `RenderFlex` raises it
