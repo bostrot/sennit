@@ -51,4 +51,4 @@ git -C "$REPO" commit -m "Release $VERSION"
 git -C "$REPO" tag "v$VERSION"
 
 echo "Tagged v$VERSION (build $BUILD)."
-echo "Publish with:  git push && git push origin v$VERSION"
+echo "Publish with:  git push && git push origin v$VERSION   (the main push alone also releases)"

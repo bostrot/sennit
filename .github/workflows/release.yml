@@ -2,8 +2,13 @@ name: Release
 
 # Cutting a release: run tooling/scripts/release.sh <version>, then
 #   git push && git push origin v<version>
-# The tag drives everything below; pubspec.yaml stays the single source of
-# truth and the verify job refuses a tag that doesn't match it.
+# Either push is enough. The version bump reaching main publishes the
+# release, the same trigger that ships it to Play and TestFlight; the tag is
+# the older trigger and still works. pubspec.yaml stays the single source of
+# truth: the verify job refuses a tag that doesn't match it, and skips the
+# builds when v<version> is already on the release page. 1.0.18 to 1.0.20
+# reached both stores and never the release page, because their tags were
+# never pushed — that is what the main trigger is for.
 #
 # The release notes come from tooling/scripts/release_notes.py — the
 # committed docs/release-notes/<version>.md, or the history since the last
@@ -11,12 +16,27 @@ name: Release
 # deploy_testflight.yml gives App Store Connect, worked out from the same
 # commit. Nothing here has to run before those, or after.
 #
-# workflow_dispatch builds all platforms without publishing — a dry run.
+# workflow_dispatch builds all platforms without publishing — a dry run —
+# unless `publish` is ticked on main, which releases the version main is at
+# if no release has it yet.
 
 on:
   push:
     tags: ['v*.*.*']
+    branches: [main]
+    paths: ['apps/weft/pubspec.yaml']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: On main, publish the pubspec version if it has no release yet
+        type: boolean
+        default: false
+
+# `git push && git push origin v1.2.0` starts two runs for one release. One
+# waits for the other, and its verify job then finds the release and skips.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   FLUTTER_VERSION: '3.44.0'
@@ -41,6 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.publish.outputs.build }}
+      publish: ${{ steps.publish.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +83,29 @@ jobs:
             echo "tag v$TAG != pubspec ${{ steps.version.outputs.version }} — run tooling/scripts/release.sh" >&2
             exit 1
           }
+      - name: Publish only what is not on the release page yet
+        id: publish
+        # A pubspec edit on main that is not a version bump (a dependency,
+        # an asset) lands here too; so does the second of the two pushes
+        # above. Neither rebuilds a release that already exists — replacing
+        # its assets would change the checksum the Homebrew cask pins.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          WANTS: ${{ github.event_name == 'push' || (inputs.publish && github.ref == 'refs/heads/main') }}
+        run: |
+          if [ "$WANTS" != "true" ]; then
+            echo "Dry run: building without publishing."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::notice::v$VERSION is already released; nothing to build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Write the release notes
         # github.md is the release body; release_notes.json is what every
         # build below bundles for the app's "What's new" sheet.
@@ -74,6 +119,7 @@ jobs:
 
   android:
     needs: verify
+    if: needs.verify.outputs.build == 'true'
     # x64 Linux. Not linux-arm64: Flutter's AOT host tooling (gen_snapshot)
     # is published for linux-x64 only, and AGP resolves aapt2 as
     # com.android.tools.build:aapt2:<ver>:linux, which is x86_64. Not the
@@ -178,6 +224,7 @@ jobs:
 
   linux:
     needs: verify
+    if: needs.verify.outputs.build == 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.verify.outputs.version }}
@@ -219,6 +266,7 @@ jobs:
 
   windows:
     needs: verify
+    if: needs.verify.outputs.build == 'true'
     runs-on: windows-latest
     env:
       VERSION: ${{ needs.verify.outputs.version }}
@@ -251,11 +299,25 @@ jobs:
 
   macos:
     needs: verify
+    if: needs.verify.outputs.build == 'true'
     runs-on: macos-latest
+    outputs:
+      # Whether the zip passes Gatekeeper; only then does the cask follow it.
+      notarized: ${{ steps.notarize.outputs.notarized }}
     env:
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' }}
-      HAS_NOTARY: ${{ secrets.APPLE_ID != '' }}
+      # Notarization uses the App Store Connect API key the TestFlight
+      # upload already signs with, rather than an Apple ID and an
+      # app-specific password.
+      HAS_NOTARY: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 != '' }}
       VERSION: ${{ needs.verify.outputs.version }}
+      APP: apps/weft/build/macos/Build/Products/Release/Sennit.app
+      # Signed into the bundle by hand below, because the build runs with
+      # signing off and so never applies them. Without them the release ran
+      # outside the sandbox the debug build runs in, and under the hardened
+      # runtime Developer ID requires, calls would capture no audio or video.
+      APP_ENTITLEMENTS: apps/weft/macos/Runner/Release.entitlements
+      WIDGET_ENTITLEMENTS: apps/weft/ios/WeftWidget/WeftWidget-macOS.entitlements
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -273,40 +335,30 @@ jobs:
       - name: Build (signing deferred)
         # The runner has no signing identity, so the in-build CodeSign step
         # would fail on the first embedded framework. Build with signing off,
-        # then seal the whole bundle ad hoc below; the Developer ID step
-        # re-signs on top when the secrets exist.
+        # then sign the whole bundle below: with the Developer ID certificate
+        # when the secrets exist, ad hoc when they don't.
         run: |
           flutter build macos --release --config-only ${{ env.DIRECT_DEFINES }}
           xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
             -configuration Release -derivedDataPath build/macos \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
         working-directory: apps/weft
-      - name: Ad-hoc sign
-        # Nested code first, then the app — never --deep, and via Versions/A
-        # where one exists: the runner's vodozemac framework loses symlinks in
-        # its bundle, which makes the bundle "ambiguous" to codesign, while
-        # the version directory never is. The repair loop puts the canonical
-        # links back first so the sealed layout is also a valid one.
+      - name: Restore the framework layout
+        # The runner's vodozemac framework loses symlinks in its bundle,
+        # which makes the bundle "ambiguous" to codesign, while the version
+        # directory never is. Put the canonical links back first so the
+        # sealed layout is also a valid one.
         run: |
-          APP=apps/weft/build/macos/Build/Products/Release/Sennit.app
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             name=$(basename "$fw" .framework)
             if [ -d "$fw/Versions/A" ]; then
               ln -sfn A "$fw/Versions/Current"
               [ -e "$fw/$name" ] || ln -s "Versions/Current/$name" "$fw/$name"
-              [ -d "$fw/Versions/A/Resources" ] && { [ -e "$fw/Resources" ] || ln -s "Versions/Current/Resources" "$fw/Resources"; }
-              codesign --force --sign - "$fw/Versions/A"
-            else
-              codesign --force --sign - "$fw"
+              if [ -d "$fw/Versions/A/Resources" ] && [ ! -e "$fw/Resources" ]; then
+                ln -s "Versions/Current/Resources" "$fw/Resources"
+              fi
             fi
           done
-          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
-            -exec codesign --force --sign - {} +
-          for appex in "$APP/Contents/PlugIns"/*.appex; do
-            [ -e "$appex" ] && codesign --force --sign - "$appex"
-          done
-          codesign --force --sign - "$APP"
-          codesign --verify --strict "$APP"
       - name: Import the Developer ID certificate
         if: env.HAS_SIGNING == 'true'
         run: |
@@ -322,47 +374,63 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" login.keychain
           rm "$RUNNER_TEMP/cert.p12"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')
+          [ -n "$IDENTITY" ] || { echo "no Developer ID Application identity in the .p12" >&2; exit 1; }
+          echo "IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
       - name: Codesign
-        if: env.HAS_SIGNING == 'true'
+        # Nested code first, then the app — never --deep, which would give
+        # every framework the app's entitlements — and via Versions/A where
+        # one exists. With the certificate, Developer ID with the hardened
+        # runtime and a timestamp, as notarization requires; without it, ad
+        # hoc, which runs after right-click → Open.
         run: |
-          APP=apps/weft/build/macos/Build/Products/Release/Sennit.app
+          if [ "$HAS_SIGNING" = "true" ]; then
+            SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
+          else
+            SIGN=(codesign --force --sign -)
+          fi
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             if [ -d "$fw/Versions/A" ]; then
-              codesign --force --options runtime --timestamp \
-                --sign "Developer ID Application" "$fw/Versions/A"
+              "${SIGN[@]}" "$fw/Versions/A"
             else
-              codesign --force --options runtime --timestamp \
-                --sign "Developer ID Application" "$fw"
+              "${SIGN[@]}" "$fw"
             fi
           done
-          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' \
-            -exec codesign --force --options runtime --timestamp \
-            --sign "Developer ID Application" {} +
+          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' -print0 \
+            | while IFS= read -r -d '' lib; do "${SIGN[@]}" "$lib"; done
           for appex in "$APP/Contents/PlugIns"/*.appex; do
-            [ -e "$appex" ] && codesign --force --options runtime --timestamp \
-              --sign "Developer ID Application" "$appex"
+            [ -e "$appex" ] && "${SIGN[@]}" --entitlements "$WIDGET_ENTITLEMENTS" "$appex"
           done
-          codesign --force --options runtime --timestamp \
-            --sign "Developer ID Application" "$APP"
+          "${SIGN[@]}" --entitlements "$APP_ENTITLEMENTS" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements - "$APP" 2>/dev/null | grep -q com.apple.security.app-sandbox
+          codesign -d --entitlements - "$APP" 2>/dev/null | grep -q com.apple.security.device.audio-input
+      - name: Notarize and staple
+        id: notarize
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        run: |
+          echo "${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --wait \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --issuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            --output-format json | tee "$RUNNER_TEMP/notary.json"
+          rm "$RUNNER_TEMP/AuthKey.p8"
+          grep -q '"status" *: *"Accepted"' "$RUNNER_TEMP/notary.json" || {
+            echo "notarization was not accepted" >&2
+            exit 1
+          }
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          # What a Homebrew or browser download is judged by.
+          spctl --assess --type execute --verbose=2 "$APP"
+          echo "notarized=true" >> "$GITHUB_OUTPUT"
       - name: Package
         run: |
           mkdir -p dist
-          ditto -c -k --keepParent \
-            apps/weft/build/macos/Build/Products/Release/Sennit.app \
-            "dist/Sennit-$VERSION-macos.zip"
-      - name: Notarize and staple
-        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
-        run: |
-          xcrun notarytool submit "dist/Sennit-$VERSION-macos.zip" --wait \
-            --apple-id "${{ secrets.APPLE_ID }}" \
-            --password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" \
-            --team-id "${{ secrets.APPLE_TEAM_ID }}"
-          xcrun stapler staple \
-            apps/weft/build/macos/Build/Products/Release/Sennit.app
-          rm dist/*.zip
-          ditto -c -k --keepParent \
-            apps/weft/build/macos/Build/Products/Release/Sennit.app \
-            "dist/Sennit-$VERSION-macos.zip"
+          ditto -c -k --keepParent "$APP" "dist/Sennit-$VERSION-macos.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -370,6 +438,7 @@ jobs:
 
   ios:
     needs: verify
+    if: needs.verify.outputs.build == 'true'
     runs-on: macos-latest
     env:
       HAS_SIGNING: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
@@ -455,9 +524,39 @@ jobs:
           rm dist/release_notes.json
           ls -la dist/
       - name: Publish the GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: needs.verify.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          # On a main push this creates the tag, on the commit that was built.
+          tag_name: v${{ needs.verify.outputs.version }}
+          target_commitish: ${{ github.sha }}
           name: Sennit ${{ needs.verify.outputs.version }}
           body_path: ${{ runner.temp }}/release-notes.md
           files: dist/*
+
+  homebrew:
+    # `brew install --cask bostrot/tap/sennit` installs the macOS zip from the
+    # release page, so the cask in bostrot/homebrew-tap follows each release
+    # that carries a notarized one. Homebrew quarantines what it installs:
+    # pointing the cask at an ad hoc build would make every install open as
+    # "damaged", which is worse than leaving it a version behind.
+    #
+    # HOMEBREW_TAP_DEPLOY_KEY is the private half of a deploy key with write
+    # access on bostrot/homebrew-tap. Without it, or without a notarized
+    # build, this job does not run.
+    needs: [verify, macos, publish]
+    if: needs.verify.outputs.publish == 'true' && needs.macos.outputs.notarized == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump the cask to the zip the release serves
+        if: env.TAP_DEPLOY_KEY != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --pattern "Sennit-$VERSION-macos.zip" --dir "$RUNNER_TEMP"
+          tooling/scripts/update_homebrew_cask.sh "$VERSION" "$RUNNER_TEMP/Sennit-$VERSION-macos.zip"
