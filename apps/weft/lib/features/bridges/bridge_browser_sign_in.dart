@@ -12,11 +12,12 @@ import '../../app/localisation.dart';
 /// Opens a network's own sign-in page and returns what the bridge asked for.
 ///
 /// Null when the person closed the page before getting in.
-typedef BrowserSignIn = Future<Map<String, String>?> Function(
-  BuildContext context,
-  LoginCookiesParams params,
-  String networkName,
-);
+typedef BrowserSignIn =
+    Future<Map<String, String>?> Function(
+      BuildContext context,
+      LoginCookiesParams params,
+      String networkName,
+    );
 
 /// Whether this platform can show the sign-in page at all.
 ///

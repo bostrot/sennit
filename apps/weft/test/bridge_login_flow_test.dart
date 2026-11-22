@@ -423,9 +423,11 @@ void main() {
       final bridge = _FakeBridge([
         _input('fi.mau.telegram.login.phone_number', [_phoneField]),
         _input('fi.mau.telegram.login.code', [_codeField]),
-        _input('fi.mau.telegram.login.code_retry', [
-          _codeField,
-        ], instructions: 'Incorrect code, please try again.'),
+        _input(
+          'fi.mau.telegram.login.code_retry',
+          [_codeField],
+          instructions: 'Incorrect code, please try again.',
+        ),
         _input('fi.mau.telegram.login.password', [_passwordField]),
         _complete,
       ]);
