@@ -674,6 +674,84 @@ void main() {
     });
   });
 
+  group('Mattermost', () {
+    const mmFlows = [
+      BridgeLoginFlow(id: 'mm-login-pat', name: 'Personal Access Token'),
+      BridgeLoginFlow(id: 'mm-login-password', name: 'Email & Password'),
+      BridgeLoginFlow(id: 'mm-login-cookie', name: 'Browser Cookie (SSO)'),
+      BridgeLoginFlow(id: 'mm-login-webview', name: 'Browser Window (SSO)'),
+    ];
+    const serverUrl = LoginInputField(
+      id: 'server_url',
+      type: 'url',
+      name: 'Server URL (e.g. https://mattermost.example.com)',
+    );
+    // What mautrix-mattermost answers once it has the server URL.
+    const mmCookies = LoginStep(
+      stepId: 'com.bostrot.mattermost.webview_cookie',
+      type: LoginStepType.cookies,
+      loginId: 'lg1',
+      cookies: LoginCookiesParams(
+        url: 'https://mm.example.com/login',
+        fieldIds: ['token'],
+        fields: [
+          LoginCookieField(
+            id: 'token',
+            required: true,
+            sources: [
+              LoginCookieSource(
+                type: 'cookie',
+                name: 'MMAUTHTOKEN',
+                cookieDomain: 'mm.example.com',
+              ),
+            ],
+          ),
+        ],
+        waitForUrlPattern:
+            r'^https://mm\.example\.com/[^/]+/(channels|messages)/',
+      ),
+    );
+
+    testWidgets('the server first, then its own page hands over the token', (
+      tester,
+    ) async {
+      final bridge = _FakeBridge([
+        _input('com.bostrot.mattermost.enter_server_url', [serverUrl]),
+        mmCookies,
+        _complete,
+      ])..supportsCookies = true;
+      LoginCookiesParams? opened;
+      await _pump(
+        tester,
+        bridge,
+        ChatNetwork.mattermost,
+        flows: mmFlows,
+        browserSignIn: (_, params, name) async {
+          opened = params;
+          expect(name, 'Mattermost');
+          // As the page would collect it from the web view's cookie store.
+          return params.collect({'MMAUTHTOKEN': 'sess', 'MMUSERID': 'u1'});
+        },
+      );
+
+      expect(find.text('Recommended'), findsOneWidget);
+      await tester.tap(find.text('Sign in on the Mattermost website'));
+      await _settle(tester);
+      expect(bridge.calls, contains('start mm-login-webview'));
+
+      await _type(tester, 'mm.example.com');
+      expect(bridge.bodies.last, {'server_url': 'mm.example.com'});
+
+      await tester.tap(find.text('Continue to Mattermost'));
+      await _settle(tester);
+
+      expect(opened?.url, 'https://mm.example.com/login');
+      expect(bridge.stepTypes.last, 'cookies');
+      expect(bridge.bodies.last, {'token': 'sess'});
+      expect(find.text('Mattermost is connected'), findsOneWidget);
+    });
+  });
+
   group('Google Messages', () {
     testWidgets('offers the QR code the bridge stopped listing', (
       tester,

@@ -155,6 +155,25 @@ const Map<ChatNetwork, NetworkLoginGuide> networkLoginGuides = {
       'messenger': LoginMethodKind.browser,
     },
   ),
+  // Self-hosted, so most people sign in through their company's SSO: the
+  // webview flow covers that and plain passwords alike. The token and pasted
+  // cookie flows keep the bridge's own names — as two "paste a token" rows
+  // they would read the same — and stay folded away.
+  ChatNetwork.mattermost: NetworkLoginGuide(
+    order: [
+      'mm-login-webview',
+      'mm-login-password',
+      'mm-login-pat',
+      'mm-login-cookie',
+    ],
+    advanced: {'mm-login-pat', 'mm-login-cookie'},
+    kinds: {
+      'mm-login-webview': LoginMethodKind.browser,
+      'mm-login-password': LoginMethodKind.password,
+      'mm-login-pat': LoginMethodKind.other,
+      'mm-login-cookie': LoginMethodKind.other,
+    },
+  ),
 };
 
 /// A flow's kind from its id, name and description, for flows no guide names.
