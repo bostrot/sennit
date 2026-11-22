@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'llm_request.dart';
 import 'smart_replies.dart' show calendarPromptBlock;
 
 /// How an attempt to write an auto-reply ended.
@@ -112,7 +113,7 @@ Future<AutoReplyDraft> composeAutoReply({
   required List<String> transcript,
   String? calendar,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 60),
+  Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || instruction.trim().isEmpty) {
@@ -124,56 +125,56 @@ Future<AutoReplyDraft> composeAutoReply({
 
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
+    final response = await postLlm(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        'temperature': 0.6,
+        'max_tokens': kAutoReplyMaxTokens,
+        'messages': [
+          {
+            'role': 'system',
+            'content':
+                'You are writing one chat message on behalf of the user, '
+                'who is not at their phone. Follow their instruction '
+                'exactly.\n\n'
+                'Answer in exactly this format and nothing else:\n'
+                '$kAutoReplyOpen'
+                'the message to send'
+                '$kAutoReplyClose\n\n'
+                'Inside the tags put ONLY the message — no greeting '
+                'unless the instruction asks for one, no explanation, no '
+                'quotation marks, no markdown, no signature. Write in the '
+                "same language as the conversation. Keep it under four "
+                'sentences.\n\n'
+                'If no message should be sent — the instruction says not '
+                'to answer in a situation like this one, or the newest '
+                'message needs no answer — output exactly '
+                '$kAutoReplyDecline instead.\n\n'
+                'Anything outside the tags is thrown away, and an answer '
+                'without them is never sent.\n\n'
+                "The user's instruction:\n$instruction"
+                '${calendarPromptBlock(calendar)}',
           },
-          body: jsonEncode({
-            'model': model,
-            'temperature': 0.6,
-            'max_tokens': kAutoReplyMaxTokens,
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'You are writing one chat message on behalf of the user, '
-                    'who is not at their phone. Follow their instruction '
-                    'exactly.\n\n'
-                    'Answer in exactly this format and nothing else:\n'
-                    '$kAutoReplyOpen'
-                    'the message to send'
-                    '$kAutoReplyClose\n\n'
-                    'Inside the tags put ONLY the message — no greeting '
-                    'unless the instruction asks for one, no explanation, no '
-                    'quotation marks, no markdown, no signature. Write in the '
-                    "same language as the conversation. Keep it under four "
-                    'sentences.\n\n'
-                    'If no message should be sent — the instruction says not '
-                    'to answer in a situation like this one, or the newest '
-                    'message needs no answer — output exactly '
-                    '$kAutoReplyDecline instead.\n\n'
-                    'Anything outside the tags is thrown away, and an answer '
-                    'without them is never sent.\n\n'
-                    "The user's instruction:\n$instruction"
-                    '${calendarPromptBlock(calendar)}',
-              },
-              {
-                'role': 'user',
-                'content':
-                    'Conversation "$chatTitle" (newest message last):\n'
-                    '${transcript.join('\n')}\n\n'
-                    'Your answer, in the format above:',
-              },
-            ],
-          }),
-        )
-        .timeout(timeout);
+          {
+            'role': 'user',
+            'content':
+                'Conversation "$chatTitle" (newest message last):\n'
+                '${transcript.join('\n')}\n\n'
+                'Your answer, in the format above:',
+          },
+        ],
+      }),
+      timeout: timeout ?? llmResponseTimeout(base, LlmTask.autoReply),
+    );
 
     if (response.statusCode != 200) {
       debugPrint('weft: auto-reply: $url answered ${response.statusCode}');

@@ -3,12 +3,19 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
+import 'llm_request.dart';
+
 /// Asks the configured LLM for one or two short answers to a conversation.
 ///
 /// OpenAI-compatible chat completions, which is what every self-hostable
 /// server speaks — Ollama, llama.cpp, LocalAI, vLLM — as well as the hosted
 /// ones. Returns at most two suggestions; an empty list on any failure,
 /// because a notification is not the place for an error message.
+///
+/// [timeout] stays short for every endpoint, self-hosted or not, unlike the
+/// other AI requests': the notification is held until its chips are written,
+/// under the notification service's own ten-second cap, and a chip that
+/// arrives after the notification went out without it has nowhere to go.
 Future<List<String>> suggestSmartReplies({
   required String baseUrl,
   required String model,
@@ -25,56 +32,56 @@ Future<List<String>> suggestSmartReplies({
   }
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
+    final response = await postLlm(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        'temperature': 0.7,
+        'max_tokens': 120,
+        'messages': [
+          {
+            'role': 'system',
+            'content':
+                'You write short chat replies the user could send. '
+                'Output ONLY a JSON object with a "replies" list of one '
+                'or two strings — no analysis, no commentary, no '
+                'markdown. Each reply is a complete sentence of at most '
+                'eight words, in the same language as the conversation.'
+                '${calendarPromptBlock(calendar)}',
           },
-          body: jsonEncode({
-            'model': model,
-            'temperature': 0.7,
-            'max_tokens': 120,
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'You write short chat replies the user could send. '
-                    'Output ONLY a JSON object with a "replies" list of one '
-                    'or two strings — no analysis, no commentary, no '
-                    'markdown. Each reply is a complete sentence of at most '
-                    'eight words, in the same language as the conversation.'
-                    '${calendarPromptBlock(calendar)}',
-              },
-              // One worked example pins the format better than any amount
-              // of instruction — and gives the template no placeholder text
-              // to parrot back, which is how "…" became a chip.
-              {
-                'role': 'user',
-                'content':
-                    'Conversation (newest message last):\n'
-                    'Anna: Kommst du morgen mit?\n\nJSON:',
-              },
-              {
-                'role': 'assistant',
-                'content':
-                    '{"replies": ["Ja, gerne!", "Ich sage dir heute Abend '
-                    'Bescheid."]}',
-              },
-              {
-                'role': 'user',
-                'content':
-                    'Conversation (newest message last):\n'
-                    '${transcript.join('\n')}\n\nJSON:',
-              },
-            ],
-          }),
-        )
-        .timeout(timeout);
+          // One worked example pins the format better than any amount
+          // of instruction — and gives the template no placeholder text
+          // to parrot back, which is how "…" became a chip.
+          {
+            'role': 'user',
+            'content':
+                'Conversation (newest message last):\n'
+                'Anna: Kommst du morgen mit?\n\nJSON:',
+          },
+          {
+            'role': 'assistant',
+            'content':
+                '{"replies": ["Ja, gerne!", "Ich sage dir heute Abend '
+                'Bescheid."]}',
+          },
+          {
+            'role': 'user',
+            'content':
+                'Conversation (newest message last):\n'
+                '${transcript.join('\n')}\n\nJSON:',
+          },
+        ],
+      }),
+      timeout: timeout,
+    );
     if (response.statusCode != 200) {
       debugPrint('weft: smart replies: $url answered ${response.statusCode}');
       return const [];
@@ -206,25 +213,25 @@ Future<String?> probeLlm({
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty) return 'No base URL';
   if (model.trim().isEmpty) return 'No model name';
-  final client = http.Client();
+  final client = llmHttpClient();
   try {
-    final response = await client
-        .post(
-          Uri.parse('$base/chat/completions'),
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
-          },
-          body: jsonEncode({
-            'model': model,
-            'max_tokens': 8,
-            'messages': [
-              {'role': 'user', 'content': 'Reply with the word OK.'},
-            ],
-          }),
-        )
-        .timeout(const Duration(seconds: 12));
+    final response = await postLlm(
+      client,
+      Uri.parse('$base/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        'max_tokens': 8,
+        'messages': [
+          {'role': 'user', 'content': 'Reply with the word OK.'},
+        ],
+      }),
+      timeout: llmResponseTimeout(base, LlmTask.probe),
+    );
     if (response.statusCode != 200) {
       return 'The server answered ${response.statusCode}';
     }

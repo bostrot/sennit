@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'auto_reply_writer.dart'
     show AutoReplyDraft, AutoReplyOutcome, parseAutoReply;
+import 'llm_request.dart';
 
 /// The quick messages Sennit ships with.
 ///
@@ -653,6 +654,11 @@ List<Map<String, String>> quickMessageRequest({
 /// not need the guarantee that a message sent unseen does. A thinking model's
 /// `<think>` block is still never let through. [AutoReplyOutcome.sent] here
 /// only means "written".
+///
+/// [timeout] defaults to [llmResponseTimeout]'s, which gives a self-hosted
+/// model minutes. Completing [cancel] aborts the request, for the bar's
+/// Cancel: the user waiting on a slow model must be able to stop it, and
+/// stopping must free the model rather than only stop listening to it.
 Future<AutoReplyDraft> composeQuickMessage({
   required String baseUrl,
   required String model,
@@ -663,7 +669,8 @@ Future<AutoReplyDraft> composeQuickMessage({
   String? recipient,
   String? groupName,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 60),
+  Duration? timeout,
+  Future<void>? cancel,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || instruction.trim().isEmpty) {
@@ -671,31 +678,32 @@ Future<AutoReplyDraft> composeQuickMessage({
   }
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
-          },
-          body: jsonEncode({
-            'model': model,
-            // Warmer than a title: "regenerate" should give a different wish.
-            'temperature': 0.7,
-            'max_tokens': kQuickMessageMaxTokens,
-            'messages': quickMessageRequest(
-              instruction: instruction,
-              transcript: transcript,
-              language: language,
-              recipient: recipient,
-              groupName: groupName,
-            ),
-          }),
-        )
-        .timeout(timeout);
+    final response = await postLlm(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        // Warmer than a title: "regenerate" should give a different wish.
+        'temperature': 0.7,
+        'max_tokens': kQuickMessageMaxTokens,
+        'messages': quickMessageRequest(
+          instruction: instruction,
+          transcript: transcript,
+          language: language,
+          recipient: recipient,
+          groupName: groupName,
+        ),
+      }),
+      timeout: timeout ?? llmResponseTimeout(base, LlmTask.quickMessage),
+      cancel: cancel,
+    );
     if (response.statusCode != 200) {
       debugPrint('weft: quick message: $url answered ${response.statusCode}');
       return const AutoReplyDraft.failed(AutoReplyOutcome.unreachable);
