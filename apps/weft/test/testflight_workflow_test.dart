@@ -43,6 +43,8 @@ void main() {
       'APP_STORE_CONNECT_ISSUER_ID',
       'APP_STORE_CONNECT_KEY_P8_BASE64',
       'APPLE_TEAM_ID',
+      'IOS_DISTRIBUTION_P12_BASE64',
+      'IOS_DISTRIBUTION_P12_PASSWORD',
     ]) {
       expect(workflow, contains('secrets.$secret'), reason: secret);
     }
@@ -121,6 +123,36 @@ void main() {
     );
     expect(cleanup, contains('if: always()'));
     expect(cleanup, contains(r'rm -rf "$RUNNER_TEMP/asc"'));
+  });
+
+  test('it signs with the stored certificate and makes none', () {
+    // Automatic signing made a certificate on every hosted runner and had to
+    // revoke it again, and Apple mails the owner about each revocation.
+    expect(workflow, isNot(contains('-allowProvisioningUpdates')));
+    expect(workflow, isNot(contains('CODE_SIGN_STYLE=Automatic')));
+    expect(workflow, isNot(contains('revoke_keychain_certificates')));
+    expect(
+      workflow,
+      contains('<key>signingStyle</key><string>manual</string>'),
+    );
+    expect(
+      workflow,
+      contains(r'$(python3 tooling/store/ios_signing.py export-profiles)'),
+    );
+    final install = workflow.indexOf(
+      '      - name: Install the profiles and sign manually',
+    );
+    expect(install, isNot(-1));
+    expect(install, lessThan(workflow.indexOf('      - name: Archive')));
+    expect(workflow, contains('ios_signing.py configure-project'));
+  });
+
+  test('it warns a month before the certificate runs out', () {
+    expect(workflow, contains(r'elif [ "$left" -lt 30 ]; then'));
+    expect(
+      workflow,
+      contains('::warning::The distribution certificate expires'),
+    );
   });
 
   test('it builds with the Flutter the other workflows build with', () {
