@@ -163,9 +163,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       context: context,
       builder: (_) => TextPromptDialog(
         title: l10n.deleteAccountPasswordTitle,
-        message: retry
-            ? '${l10n.deleteAccountPasswordRetry}\n\n$message'
-            : message,
+        message: message,
+        // Under the field, where the eye already is after a refused password.
+        helperText: retry ? l10n.deleteAccountPasswordRetry : null,
         fieldLabel: l10n.deleteAccountPasswordField,
         confirmLabel: l10n.deleteAccountButton,
         obscure: true,
