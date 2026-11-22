@@ -101,6 +101,9 @@ class SecretStore {
   }
 
   Future<void> delete(String key) => _storage.delete(key: key);
+
+  /// Forgets every credential Sennit stored on this device.
+  Future<void> deleteAll() => _storage.deleteAll();
 }
 
 /// Setting keys, gathered so a typo is a compile error rather than a silently

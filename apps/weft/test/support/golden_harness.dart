@@ -25,6 +25,7 @@ import 'package:weft/data/chat_repository.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/data/matrix_chat_repository.dart'
     show AttachmentBytesLoader;
+import 'package:weft/services/account/account_deletion.dart';
 import 'package:weft/services/backup/backup_service.dart';
 import 'package:weft/services/links/link_preview_service.dart';
 
@@ -288,6 +289,11 @@ Future<void> pumpWeft(
   /// defaults to on.
   bool? readReceipts,
 
+  /// The signed-in account's Matrix ID. Null leaves the real provider, which
+  /// finds no session in a test and so draws Settings without its Account
+  /// section — the scene every settings golden was captured with.
+  String? ownUserId,
+
   /// Whether the scene is still waiting on its first sync of the run.
   ///
   /// Overridden even when false: the real provider waits on the session
@@ -345,6 +351,7 @@ Future<void> pumpWeft(
         // not looked at it", and the bubble says so.
         if (readReceipts != null)
           sendReadReceiptsProvider.overrideWithValue(readReceipts),
+        if (ownUserId != null) ownUserIdProvider.overrideWithValue(ownUserId),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

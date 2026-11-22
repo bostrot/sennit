@@ -151,6 +151,12 @@ removes its local data; your homeserver's data is managed through your
 homeserver. There is nothing held by the developer to request, export, or
 delete.
 
+**Deleting your account.** Settings → Account → *Delete account* signs
+every bridge out, asks your homeserver to deactivate the account and erase
+what it can, and then deletes everything Sennit stored on the device. How
+that works, and how to ask for deletion without the app, is at
+<https://erictrenkel.com/apps/sennit/delete-account.html>.
+
 ## Changes and contact
 
 Changes to this policy are published in this repository with the app's
