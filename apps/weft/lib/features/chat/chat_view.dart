@@ -53,6 +53,7 @@ import '../settings/quick_messages_screen.dart';
 import 'paperless_picker_sheet.dart';
 import 'quick_message_sheet.dart';
 import '../auth/verification_screen.dart';
+import '../call/call_labels.dart' show formatCallDuration;
 import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../contact/contact_profile.dart';
@@ -5791,8 +5792,7 @@ class _QuickMessageBarState extends State<_QuickMessageBar> {
           if (draft.busy && waited >= _countAfter)
             ExcludeSemantics(
               child: Text(
-                '${waited.inMinutes}:'
-                '${(waited.inSeconds % 60).toString().padLeft(2, '0')}',
+                formatCallDuration(waited)!,
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                   fontFeatures: const [FontFeature.tabularFigures()],
