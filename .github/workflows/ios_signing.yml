@@ -13,9 +13,6 @@ name: iOS signing
 # - create: a Distribution certificate from `csr`, then the profiles for it.
 # - profiles: the profiles again, for the certificate with `serial` — after a
 #   capability changed on an App ID, which invalidates them.
-# - developer-id: a Developer ID Application certificate from `csr`, for the
-#   macOS build release.yml notarizes; through
-#   tooling/store/renew_macos_signing.sh. No profile: Developer ID needs none.
 # - revoke-ci-development: the Apple Development certificates earlier
 #   TestFlight runs made with automatic signing; lists them unless `apply`.
 on:
@@ -24,10 +21,10 @@ on:
       action:
         description: What to do
         type: choice
-        options: [certificates, create, profiles, developer-id, revoke-ci-development]
+        options: [certificates, create, profiles, revoke-ci-development]
         default: certificates
       csr:
-        description: For create and developer-id, the certificate signing request as one line of base64 (base64 < request.csr)
+        description: For create, the certificate signing request as one line of base64 (base64 < request.csr)
         type: string
         default: ''
       serial:
@@ -86,25 +83,6 @@ jobs:
         with:
           name: distribution-certificate
           path: ${{ runner.temp }}/out/distribution.cer
-          retention-days: 1
-
-      - name: Create the Developer ID certificate
-        if: inputs.action == 'developer-id'
-        env:
-          CSR: ${{ inputs.csr }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/out"
-          echo "$CSR" | base64 -d > "$RUNNER_TEMP/request.csr"
-          python3 tooling/store/ios_signing.py create-certificate \
-            "$RUNNER_TEMP/request.csr" "$RUNNER_TEMP/out/developer_id.cer" \
-            DEVELOPER_ID_APPLICATION_G2
-
-      - name: Hand back the Developer ID certificate
-        if: inputs.action == 'developer-id'
-        uses: actions/upload-artifact@v4
-        with:
-          name: developer-id-certificate
-          path: ${{ runner.temp }}/out/developer_id.cer
           retention-days: 1
 
       - name: Revoke the CI development certificates
