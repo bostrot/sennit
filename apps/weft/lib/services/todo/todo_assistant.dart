@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../ai/llm_request.dart';
 import 'todo_item.dart';
 
 /// How many new entries one conversation may add at once.
@@ -69,62 +70,62 @@ Future<TodoChanges?> proposeTodoChanges({
   required List<TodoItem> open,
   required DateTime today,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 20),
+  Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) return null;
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
+    final response = await postLlm(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        'temperature': 0.2,
+        'max_tokens': 300,
+        'messages': [
+          {'role': 'system', 'content': todoSystemPrompt},
+          // One worked example, for the same reason the reply chips carry
+          // one: it pins the format better than any instruction does.
+          {
+            'role': 'user',
+            'content': todoUserPrompt(
+              chatTitle: 'Anna',
+              transcript: const [
+                'Anna: Kannst du morgen die Fotos von Samstag schicken?',
+                'You: Klar, mache ich',
+                'Anna: Und das Buch hast du ja schon zurückgebracht, danke!',
+              ],
+              open: const ['Buch an Anna zurückgeben'],
+              today: DateTime(2026, 5, 4),
+            ),
           },
-          body: jsonEncode({
-            'model': model,
-            'temperature': 0.2,
-            'max_tokens': 300,
-            'messages': [
-              {'role': 'system', 'content': todoSystemPrompt},
-              // One worked example, for the same reason the reply chips carry
-              // one: it pins the format better than any instruction does.
-              {
-                'role': 'user',
-                'content': todoUserPrompt(
-                  chatTitle: 'Anna',
-                  transcript: const [
-                    'Anna: Kannst du morgen die Fotos von Samstag schicken?',
-                    'You: Klar, mache ich',
-                    'Anna: Und das Buch hast du ja schon zurückgebracht, danke!',
-                  ],
-                  open: const ['Buch an Anna zurückgeben'],
-                  today: DateTime(2026, 5, 4),
-                ),
-              },
-              {
-                'role': 'assistant',
-                'content':
-                    '{"add": [{"title": "Fotos von Samstag an Anna schicken", '
-                    '"due": "2026-05-05"}], "done": [1]}',
-              },
-              {
-                'role': 'user',
-                'content': todoUserPrompt(
-                  chatTitle: chatTitle,
-                  transcript: transcript,
-                  open: [for (final item in open) item.title],
-                  today: today,
-                ),
-              },
-            ],
-          }),
-        )
-        .timeout(timeout);
+          {
+            'role': 'assistant',
+            'content':
+                '{"add": [{"title": "Fotos von Samstag an Anna schicken", '
+                '"due": "2026-05-05"}], "done": [1]}',
+          },
+          {
+            'role': 'user',
+            'content': todoUserPrompt(
+              chatTitle: chatTitle,
+              transcript: transcript,
+              open: [for (final item in open) item.title],
+              today: today,
+            ),
+          },
+        ],
+      }),
+      timeout: timeout ?? llmResponseTimeout(base, LlmTask.todo),
+    );
     if (response.statusCode != 200) {
       debugPrint('weft: to-do: $url answered ${response.statusCode}');
       return null;
