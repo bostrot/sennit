@@ -7,6 +7,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../data/auto_reply_transport.dart';
 import 'auto_reply_writer.dart';
 import 'conversation_context.dart';
+import 'person_memory.dart' show AiMemory;
 
 /// One attempt, kept so the user can see what happened.
 ///
@@ -109,6 +110,7 @@ class AutoReplyService {
     AutoReplyLedger? ledger,
     DateTime Function()? now,
     Future<String?> Function(List<String> transcript)? calendar,
+    AiMemory? Function(Chat chat, List<WeftMessage> recent)? memory,
   }) : _incoming = incoming,
        _transport = transport,
        _chatForRoom = chatForRoom,
@@ -122,7 +124,8 @@ class AutoReplyService {
        _composer = composer ?? composeAutoReply,
        _ledger = ledger ?? AutoReplyLedger(),
        _now = now ?? DateTime.now,
-       _calendar = calendar;
+       _calendar = calendar,
+       _memory = memory;
 
   final Stream<WeftMessage> _incoming;
   final AutoReplyTransport _transport;
@@ -142,6 +145,11 @@ class AutoReplyService {
   /// `aiCalendarContext`. Asked once per attempt, before the first request, so
   /// a format retry is the same question asked again.
   final Future<String?> Function(List<String> transcript)? _calendar;
+
+  /// What the user noted about [Chat] and the people in [recent], or null —
+  /// null for everyone while the memory switch is off. Read per reply, like
+  /// the rules, so the switch takes effect on the next message.
+  final AiMemory? Function(Chat chat, List<WeftMessage> recent)? _memory;
 
   StreamSubscription<WeftMessage>? _sub;
 
@@ -319,6 +327,7 @@ class AutoReplyService {
     }
     final transcript = transcriptFor(chat.id);
     final calendar = await _calendarFor(transcript);
+    final memory = _memory?.call(chat, _context.of(chat.id));
     Future<AutoReplyDraft> ask() => _composer(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
@@ -327,6 +336,7 @@ class AutoReplyService {
       chatTitle: chat.title,
       transcript: transcript,
       calendar: calendar,
+      memory: memory,
     );
 
     var draft = await ask();
@@ -450,4 +460,5 @@ typedef AutoReplyComposer =
       required String chatTitle,
       required List<String> transcript,
       String? calendar,
+      AiMemory? memory,
     });

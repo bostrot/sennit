@@ -90,6 +90,12 @@ class SecretStore {
   /// token that grants read access in the URL itself.
   static const String calendarIcsUrl = 'calendar_ics_url';
 
+  /// What the user noted about the people they write to, as one JSON blob —
+  /// see `PersonMemoryBook`. A secret not because it opens anything but
+  /// because it is the most personal thing Sennit keeps outside a message: a
+  /// birthday, a partner's name, what someone is going through.
+  static const String personMemory = 'person_memory';
+
   Future<String?> read(String key) => _storage.read(key: key);
 
   Future<void> write(String key, String? value) async {
@@ -260,6 +266,29 @@ abstract final class WeftSettings {
   /// writes by removing the key — so an untouched list keeps following the
   /// app's language and any improvement to a shipped prompt.
   static const String quickMessages = 'ai.quick_messages';
+
+  /// Whether what the user noted about a person goes to the model with the
+  /// quick messages, auto-replies and reply chips written for them.
+  ///
+  /// Off unless set, like every other gate that sends something off the
+  /// device. The notes themselves are not here — they are in [SecretStore]
+  /// under [SecretStore.personMemory] — and writing one never needs this on:
+  /// a note nobody sends is still a note.
+  static const String personMemoryInAi = 'ai.person_memory';
+
+  /// Whether the model is asked, after it wrote a quick message, what it
+  /// learned about the person from the conversation. What it answers is only
+  /// ever offered for the user to accept; nothing is written to a note on its
+  /// own. Off unless set.
+  static const String personMemorySuggest = 'ai.person_memory_suggest';
+
+  /// Whether facts may be learned from end-to-end encrypted chats too.
+  ///
+  /// Off unless set, the same trade as [linkPreviewEncryptedRooms]: learning
+  /// sends the conversation to the endpoint for a purpose the user did not
+  /// start a quick message or an auto-reply for.
+  static const String personMemoryEncryptedChats =
+      'privacy.person_memory_encrypted';
 
   /// Whether incoming-message notifications carry one or two AI-suggested
   /// answers. Its own gate on top of the endpoint existing, because

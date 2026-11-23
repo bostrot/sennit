@@ -28,7 +28,9 @@ import 'package:weft_backup/weft_backup.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/localisation.dart';
+import '../../app/person_memory_providers.dart';
 import '../../app/stores.dart';
+import '../ai/person_memory.dart' show MemoryBook;
 import '../attachments/media_exporter.dart';
 import '../background/background_work.dart';
 
@@ -116,13 +118,17 @@ class BackupService {
     Future<Directory> Function()? stagingDirectory,
     DateTime Function()? now,
     BackgroundWork? background,
+    Map<String, String> Function()? personNotes,
+    PersonNotesRestorer? restorePersonNotes,
   }) : _stores = stores,
        _exporter = exporter,
        _picker = picker,
        _mediaDirectory = mediaDirectory ?? _defaultMediaDirectory,
        _stagingDirectory = stagingDirectory ?? _defaultStagingDirectory,
        _now = now ?? DateTime.now,
-       _background = background;
+       _background = background,
+       _personNotes = personNotes,
+       _restorePersonNotes = restorePersonNotes;
 
   final WeftStores _stores;
   final MediaExporter _exporter;
@@ -135,6 +141,25 @@ class BackupService {
   /// when the user leaves the app to wait for it. Null in tests and on
   /// platforms that do not need it.
   final BackgroundWork? _background;
+
+  /// The user's notes about people, by key — they live in the keychain, not
+  /// in a table [StoreBackupSource] reads, so they are handed in. Null in
+  /// tests that have none.
+  final Map<String, String> Function()? _personNotes;
+
+  /// Where restored notes go: merged under the keys that have none here, or,
+  /// for a replacing restore, instead of everything.
+  final PersonNotesRestorer? _restorePersonNotes;
+
+  /// [StoreBackupSource] with the person notes after it.
+  BackupSource _source(Directory media) {
+    final store = StoreBackupSource(
+      database: _stores.db,
+      mediaDirectory: media,
+    );
+    final notes = _personNotes?.call() ?? const {};
+    return notes.isEmpty ? store : _WithPersonNotes(store, notes);
+  }
 
   /// Recorded in the manifest, for a support conversation. Never parsed.
   final String appVersion;
@@ -159,10 +184,7 @@ class BackupService {
       Directory.systemTemp.createTemp('sennit-backup');
 
   Future<BackupEstimate> estimate({required bool includeMedia}) async {
-    final source = StoreBackupSource(
-      database: _stores.db,
-      mediaDirectory: await _mediaDirectory(),
-    );
+    final source = _source(await _mediaDirectory());
     return BackupEstimate(
       summary: await source.summarise(includeMedia: includeMedia),
       includeMedia: includeMedia,
@@ -205,10 +227,7 @@ class BackupService {
         weftPlatformL10n().backgroundWorkBackingUp,
         onProgress,
         (onProgress) async => exportArchiveToFile(
-          source: StoreBackupSource(
-            database: _stores.db,
-            mediaDirectory: await _mediaDirectory(),
-          ),
+          source: _source(await _mediaDirectory()),
           passphrase: passphrase,
           target: target,
           appVersion: appVersion,
@@ -269,9 +288,12 @@ class BackupService {
         onProgress,
         (onProgress) async => importArchive(
           reader: reader,
-          sink: StoreBackupSink(
-            database: _stores.db,
-            mediaDirectory: await _mediaDirectory(),
+          sink: _PersonNoteSink(
+            StoreBackupSink(
+              database: _stores.db,
+              mediaDirectory: await _mediaDirectory(),
+            ),
+            _restorePersonNotes,
           ),
           mode: mode,
           onProgress: onProgress,
@@ -338,6 +360,83 @@ class BackupService {
   }
 }
 
+/// Takes the person notes a restore read, once it has committed.
+typedef PersonNotesRestorer =
+    void Function(Map<String, String> notes, {required bool replace});
+
+/// A source that writes [_notes] as [PersonNoteRecord]s after everything
+/// [_inner] has.
+class _WithPersonNotes implements BackupSource {
+  _WithPersonNotes(this._inner, this._notes);
+
+  final BackupSource _inner;
+  final Map<String, String> _notes;
+
+  @override
+  Future<BackupSummary> summarise({required bool includeMedia}) async {
+    final inner = await _inner.summarise(includeMedia: includeMedia);
+    return BackupSummary(
+      networks: inner.networks,
+      chatCount: inner.chatCount,
+      messageCount: inner.messageCount,
+      mediaCount: inner.mediaCount,
+      mediaBytes: inner.mediaBytes,
+      otherRecordCount: inner.otherRecordCount + _notes.length,
+    );
+  }
+
+  @override
+  Stream<BackupRecord> records({required bool includeMedia}) async* {
+    yield* _inner.records(includeMedia: includeMedia);
+    for (final MapEntry(:key, :value) in _notes.entries) {
+      yield PersonNoteRecord(key: key, note: value);
+    }
+  }
+}
+
+/// A sink that keeps [PersonNoteRecord]s out of [_inner]'s tables and hands
+/// them to [_restore] only once the rest of the restore has committed — a
+/// restore that fails leaves the notes as they were, like everything else.
+class _PersonNoteSink implements BackupSink {
+  _PersonNoteSink(this._inner, this._restore);
+
+  final BackupSink _inner;
+  final PersonNotesRestorer? _restore;
+  final Map<String, String> _notes = {};
+  bool _replace = false;
+
+  @override
+  Future<void> begin(ImportMode mode) {
+    _replace = mode == ImportMode.replace;
+    return _inner.begin(mode);
+  }
+
+  @override
+  Future<bool> apply(BackupRecord record) async {
+    if (record is PersonNoteRecord) {
+      if (_restore == null) return false;
+      _notes[record.key] = record.note;
+      return true;
+    }
+    return _inner.apply(record);
+  }
+
+  @override
+  Future<MediaWriter?> beginMedia(String sha256, int sizeBytes) =>
+      _inner.beginMedia(sha256, sizeBytes);
+
+  @override
+  Future<void> commit() async {
+    await _inner.commit();
+    if (_notes.isNotEmpty || _replace) {
+      _restore?.call(Map.unmodifiable(_notes), replace: _replace);
+    }
+  }
+
+  @override
+  Future<void> rollback() => _inner.rollback();
+}
+
 /// Picks archives to restore. Overridden in tests; the real one is a method
 /// channel.
 final archivePickerProvider = Provider<ArchivePicker>(
@@ -352,6 +451,10 @@ final backupServiceProvider = Provider<BackupService>((ref) {
     picker: ref.watch(archivePickerProvider),
     appVersion: kSennitVersion,
     background: ref.watch(backgroundWorkProvider),
+    personNotes: () => ref.read(personMemoryProvider).notes,
+    restorePersonNotes: (notes, {required replace}) => ref
+        .read(personMemoryProvider.notifier)
+        .restore(MemoryBook(notes: notes), replace: replace),
   );
 });
 

@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft/services/ai/auto_reply_service.dart';
 import 'package:weft/services/ai/auto_reply_writer.dart';
 import 'package:weft/services/ai/conversation_context.dart';
+import 'package:weft/services/ai/person_memory.dart' show AiMemory;
 
 import 'support/auto_reply_fakes.dart';
 
@@ -623,6 +624,45 @@ void main() {
         attempt(refusal: AutoReplyRefusal.conversationCap).canRetry,
         isFalse,
       );
+    });
+  });
+
+  group('personal memory', () {
+    test('what is noted reaches the model, asked about this chat', () async {
+      Chat? askedFor;
+      List<WeftMessage>? recent;
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        memory: (chat, messages) {
+          askedFor = chat;
+          recent = messages;
+          return const AiMemory(people: [(name: 'Grace', note: 'Formal: Sie')]);
+        },
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(askedFor?.id, room);
+      expect(recent?.single.body, 'are you around?');
+      expect(h.composer.memories.single?.people.single.note, 'Formal: Sie');
+    });
+
+    test('a switched-off memory sends nothing', () async {
+      final h = buildAutoReplyService(
+        chat: chat(),
+        rules: const [away],
+        memory: (_, _) => null,
+      );
+      addTearDown(h.incoming.close);
+      addTearDown(h.service.dispose);
+
+      await h.service.handleMessage(msg());
+
+      expect(h.composer.memories.single, isNull);
+      expect(h.transport.sent, hasLength(1));
     });
   });
 
