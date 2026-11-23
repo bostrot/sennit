@@ -100,6 +100,28 @@ Duration llmResponseTimeout(String baseUrl, LlmTask task) {
   };
 }
 
+/// What asks [baseUrl]'s thinking model to answer straight away, for a task
+/// too small to reason about and too urgent to wait for it.
+///
+/// Every server spells it differently and ignores the spellings it does not
+/// know, so a self-hosted one is sent both that matter:
+/// `reasoning_effort: none` — litellm, Ollama and vLLM — and the chat
+/// template's `enable_thinking: false` — llama.cpp, vLLM and the Qwen
+/// templates litellm passes it on to. A Qwen behind litellm went from five to
+/// twelve seconds of thinking to one or two with these.
+///
+/// A hosted API gets only `low`: the one effort every reasoning model there
+/// accepts — `none` and `minimal` are refused by some — and no template
+/// switch, which a strict API refuses as an unknown field. A model that is
+/// not a reasoning one refuses `reasoning_effort` outright, which is why
+/// [requestCompletion] asks once more without these on a 400.
+Map<String, Object?> noThinkingOptions(String baseUrl) => isHostedLlm(baseUrl)
+    ? const {'reasoning_effort': 'low'}
+    : const {
+        'reasoning_effort': 'none',
+        'chat_template_kwargs': {'enable_thinking': false},
+      };
+
 /// A hosted API's limit for a written message.
 const Duration kHostedReplyTimeout = Duration(seconds: 60);
 
@@ -183,6 +205,9 @@ class LlmAnswer {
 /// is, and the caller tells the user it was cut off if it was. [timeout] is
 /// per request, so a retry on a slow local model can take as long again.
 ///
+/// [optional] is merged into [body] until the server refuses a request with
+/// a 400 or 422 — it is then asked once more, and from then on, without it.
+///
 /// A timeout throws [TimeoutException] and a cancel
 /// [http.RequestAbortedException], as [postLlm] does; anything else that is
 /// not JSON throws too.
@@ -197,16 +222,30 @@ Future<LlmAnswer> requestCompletion(
   required Duration timeout,
   Future<void>? cancel,
   String what = 'llm',
+  Map<String, Object?> optional = const {},
 }) async {
+  var extra = optional;
   Future<LlmAnswer> ask(int tokens) async {
-    final response = await postLlm(
+    Future<http.Response> post() => postLlm(
       client,
       url,
       headers: headers,
-      body: jsonEncode({...body, 'max_tokens': tokens}),
+      body: jsonEncode({...body, ...extra, 'max_tokens': tokens}),
       timeout: timeout,
       cancel: cancel,
     );
+    var response = await post();
+    // A server that does not know one of the [optional] fields and says so:
+    // the request is worth more than the option.
+    if (extra.isNotEmpty &&
+        (response.statusCode == 400 || response.statusCode == 422)) {
+      debugPrint(
+        'weft: $what: ${response.statusCode} with ${extra.keys.join(', ')}, '
+        'asking without',
+      );
+      extra = const {};
+      response = await post();
+    }
     if (response.statusCode != 200) {
       return LlmAnswer(status: response.statusCode);
     }
