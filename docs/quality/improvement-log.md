@@ -15,6 +15,8 @@ and what was noticed but not done.
 
 - 2026-11-20 · Bug fix · Older history asked for from inside layout waits for the frame to finish, so reaching the top of a chat no longer rebuilds it mid-frame · https://github.com/bostrot/sennit/pull/9
 
+- 2026-11-23 · Localization · The share sheet's title, summary line ("Reading 3 files…", "2 files", "Nothing to send", the quoted text), "via WhatsApp" and the networks a screen reader hears on each row follow the app's language · PR_LINK
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -42,6 +44,12 @@ and what was noticed but not done.
   wall-clock cooldown, failing about one run in five. A test that sets up
   the state directly (reader past the end, cooldown elapsed) made it fail
   every time.
+
+- 2026-11-23 · #9 merged with only CI notes; nothing closed unmerged, and
+  no issues open. Strings built in a helper method (`_title`, `_summary`)
+  rather than passed straight to a `Text` are as invisible to the l10n audit
+  as the ones passed through a parameter: grep a screen for `'[A-Z]` and
+  `' and '` before trusting the audit's silence.
 
 ## Ideas backlog
 
@@ -105,8 +113,22 @@ and what was noticed but not done.
   and need a code-to-words mapping in `l10n_labels.dart`. Also: the audit's
   `_isMachineValue` treats any lowercase single word (`'you'`, `'deleted'`) as
   an identifier, which is how two of the action sheet's words slipped by.
-- **Share sheet leftovers.** `share_target_sheet.dart` still builds "Nothing to
-  send", "{n} files" and the network list joined with " and " by hand.
+- ~~**Share sheet leftovers.**~~ Done 2026-11-23. Was: `share_target_sheet.dart`
+  still builds "Nothing to send", "{n} files" and the network list joined with
+  " and " by hand.
+- **File sizes ignore the language's decimal mark.** `formatAttachmentSize`
+  (`packages/weft_attachments/lib/src/format.dart`) writes "2.4 MB" in every
+  language; German and French expect "2,4 MB". It is pure Dart with no locale,
+  so the fix is either a locale-aware twin in the app using `NumberFormat`, or
+  a `decimalSeparator` parameter. Used by the share sheet, the attachment
+  sheet and message bubbles.
+- **Chinese lists of three networks use ", ".** `networkNames` in
+  `l10n_labels.dart` joins all but the last with `', '`; Chinese wants `、`.
+  A `networkNamesSeparator` key (", " in most files, "、" in zh) would fix it.
+- **Tap an avatar to see it full size.** Element X Android 26.06.3 made the
+  avatar in a member sheet open a preview
+  (https://newreleases.io/project/github/element-hq/element-x-android/release/v26.06.3).
+  Check whether `contact_profile.dart`'s avatar does anything on tap.
 - **Copy a link to a message — needs the other half first.** A copied
   `matrix.to/#/!room/$event` link opens only the room in Sennit:
   `links.dart` turns an event permalink into a room `RichMention` and drops

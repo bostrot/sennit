@@ -1553,5 +1553,10 @@
   "deleteAccountCancelledAfterBridges": "Tu cuenta no se eliminó, pero tus puentes cerraron sesión. Vuelve a conectarlos en Puentes.",
   "deleteAccountUnsupported": "{server} pide un tipo de confirmación que Sennit no puede mostrar. Elimina la cuenta desde el sitio web de {server}.",
   "deleteAccountFailed": "No se pudo eliminar la cuenta: {error}",
-  "deleteAccountDone": "Tu cuenta se eliminó."
+  "deleteAccountDone": "Tu cuenta se eliminó.",
+  "shareTitle": "Compartir en…",
+  "shareReadingFiles": "{count, plural, =1{Leyendo 1 archivo…} other{Leyendo {count} archivos…}}",
+  "shareFileCount": "{count, plural, other{{count} archivos}}",
+  "shareNothingToSend": "Nada que enviar",
+  "shareQuotedText": "«{text}»"
 }

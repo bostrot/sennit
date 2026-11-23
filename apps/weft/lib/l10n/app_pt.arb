@@ -1554,5 +1554,10 @@
   "deleteAccountCancelledAfterBridges": "Sua conta não foi excluída, mas suas pontes foram desconectadas. Conecte-as de novo em Pontes.",
   "deleteAccountUnsupported": "{server} pede um tipo de confirmação que o Sennit não consegue mostrar. Exclua a conta no site de {server}.",
   "deleteAccountFailed": "Não foi possível excluir a conta: {error}",
-  "deleteAccountDone": "Sua conta foi excluída."
+  "deleteAccountDone": "Sua conta foi excluída.",
+  "shareTitle": "Compartilhar com…",
+  "shareReadingFiles": "{count, plural, =1{Lendo 1 arquivo…} other{Lendo {count} arquivos…}}",
+  "shareFileCount": "{count, plural, other{{count} arquivos}}",
+  "shareNothingToSend": "Nada para enviar",
+  "shareQuotedText": "“{text}”"
 }
