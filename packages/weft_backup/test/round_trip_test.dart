@@ -914,6 +914,29 @@ void main() {
       }
     });
   });
+
+  group('person notes', () {
+    test('decode to their own record, never to a setting', () {
+      const note = PersonNoteRecord(
+        key: 'handle:h1',
+        note: '## Kids\nMia and Ben',
+      );
+      final back = decodeBackupRecord(
+        jsonDecode(utf8.decode(encodeBackupRecord(note))),
+      );
+      expect(back, isA<PersonNoteRecord>());
+      back as PersonNoteRecord;
+      expect(back.key, 'handle:h1');
+      expect(back.note, '## Kids\nMia and Ben');
+    });
+
+    test('without a key are dropped', () {
+      expect(
+        decodeBackupRecord({'type': 'person_note', 'note': 'orphan'}),
+        isNull,
+      );
+    });
+  });
 }
 
 /// A sink that measures instead of storing, so the streaming test does not

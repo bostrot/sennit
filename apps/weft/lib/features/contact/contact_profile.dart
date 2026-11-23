@@ -11,6 +11,7 @@ import '../../app/retention_providers.dart';
 import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
+import 'person_memory_screen.dart';
 import 'shared_media.dart';
 
 /// Who this conversation is with, across every network at once.
@@ -112,6 +113,7 @@ class ContactProfileScreen extends ConsumerWidget {
                 subtitle: Text(context.l10n.contactMatrixUser),
               ),
             SharedContentSections(chatId: chat.id),
+            ChatMemorySections(chat: chat, header: _SectionHeader.new),
             if (handles.isNotEmpty) ...[
               _SectionHeader(context.l10n.contactOnTheseNetworks),
               for (final handle in handles)

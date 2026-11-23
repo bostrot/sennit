@@ -8,6 +8,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/session_providers.dart';
+import '../../app/person_memory_providers.dart';
 import '../../app/stores.dart';
 import '../../features/bridges/bridges_screen.dart';
 
@@ -144,8 +145,9 @@ Future<List<BridgeSignOutTarget>> bridgeSignOutTargets(Ref ref) async {
 /// indexer that would otherwise write the next message into a database that
 /// was just emptied. It also signs the app out, which is what puts the welcome
 /// screen back. Then Sennit's own database, emptied in place — settings, the
-/// merge graph, the search index — the credentials in the platform keychain,
-/// and the downloaded attachments and notification avatars.
+/// merge graph, the search index — the credentials and the notes about people
+/// in the platform keychain, and the downloaded attachments and notification
+/// avatars.
 ///
 /// Downloaded on-device AI models stay. They are the same files for everyone,
 /// hold nothing about the account, and are gigabytes to fetch again.
@@ -159,7 +161,11 @@ Future<void> wipeLocalData(Ref ref) async {
     ..homeAssistantToken = null
     ..paperlessToken = null
     ..llmApiKey = null
-    ..calendarIcsUrl = null;
+    ..calendarIcsUrl = null
+    ..personMemory = null;
+  // The notes about people are in the keychain, which `deleteAll` empties
+  // below; this drops the copy the running app holds.
+  ref.invalidate(personMemoryProvider);
   try {
     await stores.secrets.deleteAll();
   } on Object {
