@@ -277,9 +277,13 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       debugPrint('weft: smart replies: the setting is off');
       return const [];
     }
+    // Android is the one platform that draws them: its reply action takes
+    // them as choices, and no other platform's notification has a place for
+    // them. Anywhere else the completion would be spent on nothing.
+    if (defaultTargetPlatform != TargetPlatform.android) return const [];
     final baseUrl = settings.getString(WeftSettings.llmBaseUrl) ?? '';
-    final model = settings.getString(WeftSettings.llmModel) ?? '';
-    if (baseUrl.trim().isEmpty || model.trim().isEmpty) {
+    final model = smartReplyModel(settings);
+    if (baseUrl.trim().isEmpty || model.isEmpty) {
       debugPrint('weft: smart replies: no LLM endpoint is configured');
       return const [];
     }
@@ -305,8 +309,8 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       transcript: transcript,
       // The same calendar section, under the same gate, as the auto-reply —
       // so "Friday works!" is not offered for a Friday that does not. Two
-      // seconds at most: the notification waits for these chips, under a ten
-      // second cap that the model's own eight already mostly spends.
+      // seconds at most: the chips are worth most while the notification is
+      // still being looked at.
       calendar: await aiCalendarContext(
         ref,
         transcript,
@@ -327,6 +331,15 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   });
   return service;
 });
+
+/// The model the reply chips ask: the one set for them, or the AI model.
+String smartReplyModel(SettingsStore settings) {
+  final own = (settings.getString(WeftSettings.llmSuggestionModel) ?? '')
+      .trim();
+  return own.isNotEmpty
+      ? own
+      : (settings.getString(WeftSettings.llmModel) ?? '').trim();
+}
 
 /// Registers this device's pusher, and says why it did not when it did not.
 ///

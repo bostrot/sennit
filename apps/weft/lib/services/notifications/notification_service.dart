@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
+
 import '../../app/localisation.dart';
 
 import '../ai/conversation_context.dart';
@@ -487,11 +488,17 @@ class WeftNotificationService {
   /// delivery path.
   void Function(NotificationActivation activation)? onAction;
 
-  /// Asks for AI answer suggestions for a message about to be posted, given
-  /// the conversation's recent messages (oldest first, the new message last).
-  /// Unset, or returning an empty list, means the notification goes out
-  /// without them. Failures are the callee's to swallow — a notification never
-  /// waits on an error message.
+  /// Asks for AI answer suggestions for a message just posted, given the
+  /// conversation's recent messages (oldest first, the new message last).
+  /// Unset, or returning an empty list, means the notification stays as it is.
+  ///
+  /// The notification never waits for them: it is posted first, and posted
+  /// again — quietly, under the same id — with the chips when they come, as
+  /// long as it is still showing that message. A self-hosted model that takes
+  /// twenty seconds still gets its chips on the row; it used to lose them to
+  /// a ten-second hold that also held the notification itself. A
+  /// [TimeoutException] is counted as late, anything else as failed; see
+  /// [smartReplyStats].
   ///
   /// What is passed is [aiContextFor], not the window drawn in the shade. The
   /// two are different questions: the shade shows as much as a row can hold,
@@ -502,6 +509,22 @@ class WeftNotificationService {
     List<WeftMessage> thread,
   )?
   suggestReplies;
+
+  /// The longest the service waits for [suggestReplies] itself, whatever
+  /// timeout the callee keeps: the callee's own is the one that should fire.
+  Duration suggestionCap = const Duration(seconds: 30);
+
+  /// Chips already written, by the event they answer, so posting the same
+  /// message again — a push and the sync behind it, a re-post after a
+  /// restart of the service — does not ask the model twice.
+  final Map<String, List<String>> _chipsByEvent = {};
+
+  /// Chips being written, by event: a second post of the message while the
+  /// first request runs leaves the update to that one.
+  final Map<String, Future<List<String>?>> _chipsPending = {};
+
+  /// How the chips have fared since this service started, for the log.
+  final SmartReplyStats smartReplyStats = SmartReplyStats();
 
   /// Notifications currently posted for [groupKey], oldest first.
   @visibleForTesting
@@ -686,6 +709,12 @@ class WeftNotificationService {
     _aiContext.clear();
   }
 
+  /// Posts [notification] as if the pipeline had decided it, past the
+  /// pipeline's per-event dedupe — the way a second process or a restarted
+  /// pipeline posts a message again.
+  @visibleForTesting
+  void postForTest(MatrixNotification notification) => _enqueue(notification);
+
   /// Posts one after another rather than all at once.
   ///
   /// [_post] awaits an avatar download and several plugin calls, and two
@@ -748,11 +777,6 @@ class WeftNotificationService {
     if (thread.length > kMaxTrackedNotificationsPerChat) {
       thread.removeRange(0, thread.length - kMaxTrackedNotificationsPerChat);
     }
-    // One notification per conversation, re-posted under the same id with
-    // the thread's newest lines — the platform replaces it in place, which
-    // is what keeps one chat one row however many messages arrive.
-    final windowStart = thread.length - kMaxNotificationsPerChat;
-    final visible = thread.sublist(windowStart < 0 ? 0 : windowStart);
 
     // Before the notification that names it: Android drops a `shortcutId`
     // pointing at a shortcut that does not exist, and the conversation loses
@@ -766,36 +790,122 @@ class WeftNotificationService {
       isGroup: _chatForRoom?.call(content.roomId)?.isGroup ?? false,
     );
 
-    var aiReplies = const <String>[];
-    final suggest = suggestReplies;
-    if (suggest != null && !notification.isSilent) {
-      try {
-        aiReplies = await suggest(
-          content,
-          aiThread,
-        ).timeout(const Duration(seconds: 10));
-      } on Object catch (error) {
-        debugPrint('weft: reply suggestions failed: $error');
-      }
-    }
-
+    final cached = _chipsByEvent[content.eventId];
     await _sink.show(
-      NotificationPresentation.forMessage(
-        content: content,
+      _presentationFor(
+        content,
         silent: notification.isSilent,
-        isGroup: _chatForRoom?.call(content.roomId)?.isGroup ?? false,
-        conversation: visible,
-        aiReplies: aiReplies,
-        avatarPaths: {
-          for (final entry in _avatars.entries)
-            if (visible.any((c) => c.eventId == entry.key))
-              entry.key: entry.value,
-        },
+        aiReplies: cached ?? const [],
       ),
     );
 
+    final suggest = suggestReplies;
+    if (suggest != null && !notification.isSilent && cached == null) {
+      // Not awaited: the queue moves on to the next message while the model
+      // writes, and the update joins the queue when it is ready.
+      unawaited(_addChips(notification, () => suggest(content, aiThread)));
+    }
+
     // No per-chat summary any more: the conversation *is* one notification
     // now, and a summary row beside it would say the same thing twice.
+  }
+
+  /// The conversation's notification as it stands, ending with [content].
+  NotificationPresentation _presentationFor(
+    NotificationContent content, {
+    required bool silent,
+    List<String> aiReplies = const [],
+    bool update = false,
+  }) {
+    final thread = _posted[content.groupKey] ?? [content];
+    // One notification per conversation, re-posted under the same id with
+    // the thread's newest lines — the platform replaces it in place, which
+    // is what keeps one chat one row however many messages arrive.
+    final windowStart = thread.length - kMaxNotificationsPerChat;
+    final visible = thread.sublist(windowStart < 0 ? 0 : windowStart);
+    return NotificationPresentation.forMessage(
+      content: content,
+      silent: silent,
+      update: update,
+      isGroup: _chatForRoom?.call(content.roomId)?.isGroup ?? false,
+      conversation: visible,
+      aiReplies: aiReplies,
+      avatarPaths: {
+        for (final entry in _avatars.entries)
+          if (visible.any((c) => c.eventId == entry.key))
+            entry.key: entry.value,
+      },
+    );
+  }
+
+  /// Asks for [notification]'s chips and, when they come while its
+  /// notification still ends with that message, posts it again with them.
+  Future<void> _addChips(
+    MatrixNotification notification,
+    Future<List<String>> Function() suggest,
+  ) async {
+    final content = notification.content;
+    final eventId = content.eventId;
+    // Already being written: that request posts the update.
+    if (_chipsPending.containsKey(eventId)) return;
+    final request = _askForChips(suggest);
+    _chipsPending[eventId] = request;
+    final List<String>? replies;
+    try {
+      replies = await request;
+    } finally {
+      unawaited(_chipsPending.remove(eventId));
+    }
+    if (replies == null || replies.isEmpty) return;
+    _chipsByEvent[eventId] = replies;
+    while (_chipsByEvent.length > _kChipCacheSize) {
+      _chipsByEvent.remove(_chipsByEvent.keys.first);
+    }
+
+    final ready = replies;
+    _queue = _queue
+        .then((_) async {
+          // Read, answered or overtaken by a newer message while the model
+          // wrote: the chips answer a row that is not there any more.
+          final thread = _posted[content.groupKey];
+          if (thread == null ||
+              thread.isEmpty ||
+              thread.last.eventId != eventId) {
+            smartReplyStats.record(SmartReplyOutcome.late);
+            return;
+          }
+          await _sink.show(
+            _presentationFor(
+              content,
+              silent: notification.isSilent,
+              aiReplies: ready,
+              update: true,
+            ),
+          );
+          smartReplyStats.record(SmartReplyOutcome.inTime);
+        })
+        .catchError((Object error) {
+          debugPrint('weft: could not add reply chips: $error');
+        });
+  }
+
+  /// One request for chips, counted: null when it timed out or failed.
+  Future<List<String>?> _askForChips(
+    Future<List<String>> Function() suggest,
+  ) async {
+    smartReplyStats.record(SmartReplyOutcome.requested);
+    try {
+      final replies = await suggest().timeout(suggestionCap);
+      if (replies.isEmpty) smartReplyStats.record(SmartReplyOutcome.failed);
+      return replies;
+    } on TimeoutException {
+      smartReplyStats.record(SmartReplyOutcome.late);
+      return null;
+    } on Object catch (error) {
+      debugPrint('weft: reply suggestions failed: $error');
+      smartReplyStats.record(SmartReplyOutcome.failed);
+      return null;
+    }
   }
 
   void _onActivation(NotificationActivation activation) {
@@ -805,4 +915,47 @@ class WeftNotificationService {
     }
     onOpenLink?.call(activation.payload.link);
   }
+}
+
+/// How many messages' chips are kept for a second post of the same message.
+const int _kChipCacheSize = 64;
+
+/// What happened to one message's reply chips.
+enum SmartReplyOutcome {
+  /// The model was asked.
+  requested,
+
+  /// The chips were added to the notification.
+  inTime,
+
+  /// They came after the model's time was up, or after the notification had
+  /// moved on to a newer message or been read.
+  late,
+
+  /// The model answered with an error, or with nothing usable.
+  failed,
+}
+
+/// Counts of [SmartReplyOutcome]s, written to the local log as they change.
+///
+/// Nothing leaves the device: this is for someone wondering why their model's
+/// chips are rare to read in `adb logcat`, not telemetry.
+class SmartReplyStats {
+  final Map<SmartReplyOutcome, int> _counts = {
+    for (final outcome in SmartReplyOutcome.values) outcome: 0,
+  };
+
+  int operator [](SmartReplyOutcome outcome) => _counts[outcome]!;
+
+  void record(SmartReplyOutcome outcome) {
+    _counts[outcome] = _counts[outcome]! + 1;
+    if (outcome != SmartReplyOutcome.requested) debugPrint('weft: $this');
+  }
+
+  @override
+  String toString() =>
+      'smart replies: requested ${this[SmartReplyOutcome.requested]}, '
+      'in time ${this[SmartReplyOutcome.inTime]}, '
+      'late ${this[SmartReplyOutcome.late]}, '
+      'failed ${this[SmartReplyOutcome.failed]}';
 }

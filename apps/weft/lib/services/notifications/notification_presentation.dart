@@ -200,6 +200,7 @@ class NotificationPresentation {
     List<NotificationContent> conversation = const [],
     Map<String, String> avatarPaths = const {},
     List<String> aiReplies = const [],
+    bool update = false,
   }) {
     final thread = conversation.isEmpty ? [content] : conversation;
     final avatarPath = avatarPaths[content.eventId];
@@ -257,6 +258,10 @@ class NotificationPresentation {
           // Quiet hours with `deliverSilently`: waiting in the shade in the
           // morning, and nothing happened at 3am.
           silent: silent,
+          // [update] is the same message again with its reply chips added:
+          // the row changes in place, and the phone does not buzz twice for
+          // one message.
+          onlyAlertOnce: update,
           // The shortcut is what makes this notification bubble-capable and
           // what puts the conversation in the launcher's share sheet.
           // Publishing it is native; only the id is agreed here.
@@ -276,7 +281,8 @@ class NotificationPresentation {
           // failure `notificationGroupKey` exists to prevent.
           threadIdentifier: content.threadId,
           categoryIdentifier: kMessageCategoryId,
-          presentSound: !silent,
+          presentSound: !silent && !update,
+          presentBanner: update ? false : null,
           interruptionLevel: content.isMention
               ? InterruptionLevel.timeSensitive
               : InterruptionLevel.active,
