@@ -7,6 +7,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'package:weft/features/bridges/bridge_browser_sign_in.dart';
+import 'package:weft/features/bridges/bridge_external_sign_in.dart';
 import 'package:weft/features/bridges/bridge_login_flow.dart';
 import 'package:weft/app/localisation.dart';
 
@@ -168,6 +169,7 @@ Future<void> _pump(
   List<BridgeLoginFlow>? flows,
   String? reloginId,
   BrowserSignIn? browserSignIn,
+  ExternalSignIn? externalSignIn,
 }) async {
   // Tall enough that a QR step's every line is built, as on a phone held
   // upright; the default test window is a landscape 800×600.
@@ -184,10 +186,37 @@ Future<void> _pump(
         flows: flows,
         reloginId: reloginId,
         browserSignIn: browserSignIn,
+        externalSignIn: externalSignIn,
       ),
     ),
   );
   await _settle(tester);
+}
+
+/// The person's browser, scripted: offers [found] and signs in with
+/// [result], or throws it when it is an exception.
+class _FakeExternal implements ExternalSignIn {
+  _FakeExternal(this.found, {this.result});
+
+  final List<ExternalSignInProvider> found;
+  final Object? result;
+  final List<String> opened = [];
+
+  @override
+  Future<List<ExternalSignInProvider>> providers(
+    LoginCookiesParams params,
+  ) async => found;
+
+  @override
+  Future<Map<String, String>?> signIn(
+    LoginCookiesParams params,
+    ExternalSignInProvider provider,
+  ) async {
+    opened.add(provider.id);
+    final result = this.result;
+    if (result is Exception) throw result;
+    return result as Map<String, String>?;
+  }
 }
 
 /// Lets the scripted bridge answer and the screen redraw. Not
@@ -749,6 +778,126 @@ void main() {
       expect(bridge.stepTypes.last, 'cookies');
       expect(bridge.bodies.last, {'token': 'sess'});
       expect(find.text('Mattermost is connected'), findsOneWidget);
+    });
+    group('in the browser', () {
+      final gitlab = ExternalSignInProvider(
+        id: 'gitlab',
+        label: 'GitLab',
+        url: Uri.parse(
+          'https://mm.example.com/oauth/gitlab/mobile_login?redirect_to=mmauth://callback',
+        ),
+      );
+      final saml = ExternalSignInProvider(
+        id: 'saml',
+        label: 'Company SSO',
+        url: Uri.parse('https://mm.example.com/login/sso/saml?action=mobile'),
+      );
+
+      Future<_FakeBridge> toCookies(
+        WidgetTester tester,
+        _FakeExternal external, {
+        BrowserSignIn? browserSignIn,
+      }) async {
+        final bridge = _FakeBridge([
+          _input('com.bostrot.mattermost.enter_server_url', [serverUrl]),
+          mmCookies,
+          _complete,
+        ])..supportsCookies = true;
+        await _pump(
+          tester,
+          bridge,
+          ChatNetwork.mattermost,
+          flows: mmFlows,
+          browserSignIn: browserSignIn,
+          externalSignIn: external,
+        );
+        await tester.tap(find.text('Sign in on the Mattermost website'));
+        await _settle(tester);
+        await _type(tester, 'mm.example.com');
+        return bridge;
+      }
+
+      testWidgets('the server\'s SSO leads, and its token goes to the bridge', (
+        tester,
+      ) async {
+        final external = _FakeExternal(
+          [gitlab, saml],
+          result: const {'token': 'sso-sess'},
+        );
+        final bridge = await toCookies(
+          tester,
+          external,
+          browserSignIn: (_, _, _) async => fail('the in-app page opened'),
+        );
+
+        expect(
+          find.text('Sign in with GitLab in your browser'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Sign in with Company SSO in your browser'),
+          findsOneWidget,
+        );
+        // The page inside Sennit stays, for a password.
+        expect(find.text('Open the sign-in page in Sennit'), findsOneWidget);
+
+        await tester.tap(find.text('Sign in with GitLab in your browser'));
+        await _settle(tester);
+
+        expect(external.opened, ['gitlab']);
+        expect(bridge.stepTypes.last, 'cookies');
+        expect(bridge.bodies.last, {'token': 'sso-sess'});
+        expect(find.text('Mattermost is connected'), findsOneWidget);
+      });
+
+      testWidgets('closing the browser leaves the step as it was', (
+        tester,
+      ) async {
+        final external = _FakeExternal([gitlab]);
+        final bridge = await toCookies(tester, external);
+
+        await tester.tap(find.text('Sign in with GitLab in your browser'));
+        await _settle(tester);
+
+        expect(external.opened, ['gitlab']);
+        expect(bridge.stepTypes, isNot(contains('cookies')));
+        expect(
+          find.text('Sign in with GitLab in your browser'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('a callback without a session says so and stays', (
+        tester,
+      ) async {
+        final external = _FakeExternal([
+          gitlab,
+        ], result: const ExternalSignInException('no token'));
+        final bridge = await toCookies(tester, external);
+
+        await tester.tap(find.text('Sign in with GitLab in your browser'));
+        await _settle(tester);
+
+        expect(bridge.stepTypes, isNot(contains('cookies')));
+        expect(
+          find.textContaining('through your browser didn’t work'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('a server without SSO keeps the page inside Sennit', (
+        tester,
+      ) async {
+        await toCookies(
+          tester,
+          _FakeExternal(const []),
+          browserSignIn: (_, params, _) async =>
+              params.collect({'MMAUTHTOKEN': 'sess'}),
+        );
+
+        expect(find.textContaining('in your browser'), findsNothing);
+        expect(find.text('Continue to Mattermost'), findsOneWidget);
+      });
     });
   });
 
