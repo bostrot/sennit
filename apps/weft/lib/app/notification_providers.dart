@@ -265,18 +265,17 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     // so "Friday works!" is not offered for a Friday that does not. Two
     // seconds at most: the chips are worth most while the notification is
     // still being looked at.
-    calendar: (transcript) => aiCalendarContext(
-      ref,
-      transcript,
-      timeout: const Duration(seconds: 2),
-    ),
+    calendar: (transcript) {
+      const wait = Duration(seconds: 2);
+      return aiCalendarContext(ref, transcript, timeout: wait);
+    },
     // What the user noted about this chat and the people writing in it,
     // under the same switch as every other AI feature's.
-    memory: (content, thread) =>
-        switch (repository.chatForRoom(content.roomId)) {
-          final Chat chat => ref.read(aiMemoryForPromptProvider)(chat, thread),
-          null => null,
-        },
+    memory: (content, thread) {
+      final chat = repository.chatForRoom(content.roomId);
+      if (chat == null) return null;
+      return ref.read(aiMemoryForPromptProvider)(chat, thread);
+    },
   );
 
   ref.onDispose(() {
