@@ -1599,5 +1599,10 @@
   "personMemoryPromoteTo": "添加到谁的资料？",
   "personMemoryCondense": "用 AI 精简",
   "personMemoryCondensed": "建议的精简版本",
-  "personMemoryReplace": "替换笔记"
+  "personMemoryReplace": "替换笔记",
+  "shareTitle": "分享到…",
+  "shareReadingFiles": "{count, plural, other{正在读取 {count} 个文件…}}",
+  "shareFileCount": "{count, plural, other{{count} 个文件}}",
+  "shareNothingToSend": "没有可发送的内容",
+  "shareQuotedText": "“{text}”"
 }

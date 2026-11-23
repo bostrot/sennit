@@ -1598,5 +1598,10 @@
   "personMemoryPromoteTo": "In wessen Profil?",
   "personMemoryCondense": "Mit KI kürzen",
   "personMemoryCondensed": "Vorgeschlagene Kurzfassung",
-  "personMemoryReplace": "Notiz ersetzen"
+  "personMemoryReplace": "Notiz ersetzen",
+  "shareTitle": "Teilen mit…",
+  "shareReadingFiles": "{count, plural, =1{1 Datei wird gelesen…} other{{count} Dateien werden gelesen…}}",
+  "shareFileCount": "{count, plural, other{{count} Dateien}}",
+  "shareNothingToSend": "Nichts zu senden",
+  "shareQuotedText": "„{text}“"
 }

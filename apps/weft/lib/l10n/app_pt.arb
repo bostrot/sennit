@@ -1599,5 +1599,10 @@
   "personMemoryPromoteTo": "Ao perfil de quem?",
   "personMemoryCondense": "Resumir com IA",
   "personMemoryCondensed": "Versão curta sugerida",
-  "personMemoryReplace": "Substituir nota"
+  "personMemoryReplace": "Substituir nota",
+  "shareTitle": "Compartilhar com…",
+  "shareReadingFiles": "{count, plural, =1{Lendo 1 arquivo…} other{Lendo {count} arquivos…}}",
+  "shareFileCount": "{count, plural, other{{count} arquivos}}",
+  "shareNothingToSend": "Nada para enviar",
+  "shareQuotedText": "“{text}”"
 }

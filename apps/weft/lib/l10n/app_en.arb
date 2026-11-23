@@ -9342,5 +9342,47 @@
   "personMemoryReplace": "Replace note",
   "@personMemoryReplace": {
     "description": "Button replacing the person's note with the AI's short version. Keep under ~16 chars."
+  },
+  "shareTitle": "Share to…",
+  "@shareTitle": {
+    "description": "Title of the share sheet while the user picks which conversations get what another app shared. Keep under ~20 chars.",
+    "maxLength": 36
+  },
+  "shareReadingFiles": "{count, plural, =1{Reading 1 file…} other{Reading {count} files…}}",
+  "@shareReadingFiles": {
+    "description": "Line under the share sheet's title while the files another app shared are still being read, before their names and sizes are known.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files were shared.",
+        "example": "3"
+      }
+    }
+  },
+  "shareFileCount": "{count, plural, other{{count} files}}",
+  "@shareFileCount": {
+    "description": "Part of the share sheet's summary line when several files are shared, followed by ' · ' and their total size (e.g. '3 files · 2.4 MB').",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files are shared, always 2 or more.",
+        "example": "3"
+      }
+    }
+  },
+  "shareNothingToSend": "Nothing to send",
+  "@shareNothingToSend": {
+    "description": "Line under the share sheet's title when every shared file failed to load and there was no text."
+  },
+  "shareQuotedText": "\"{text}\"",
+  "@shareQuotedText": {
+    "description": "The shared text quoted in the share sheet's summary line. Use your language's own quotation marks.",
+    "placeholders": {
+      "text": {
+        "type": "String",
+        "description": "The start of the text another app shared. Never translated.",
+        "example": "look at this"
+      }
+    }
   }
 }
