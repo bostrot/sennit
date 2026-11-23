@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
 import 'llm_request.dart';
+import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
 /// Asks the configured LLM for one or two short answers to a conversation.
 ///
@@ -23,6 +24,7 @@ Future<List<String>> suggestSmartReplies({
   required String chatTitle,
   required List<String> transcript,
   String? calendar,
+  AiMemory? memory,
   http.Client? client,
   Duration timeout = const Duration(seconds: 8),
 }) async {
@@ -55,7 +57,8 @@ Future<List<String>> suggestSmartReplies({
                 'or two strings — no analysis, no commentary, no '
                 'markdown. Each reply is a complete sentence of at most '
                 'eight words, in the same language as the conversation.'
-                '${calendarPromptBlock(calendar)}',
+                '${calendarPromptBlock(calendar)}'
+                '${memoryPromptBlock(memory, baseUrl: base)}',
           },
           // One worked example pins the format better than any amount
           // of instruction — and gives the template no placeholder text

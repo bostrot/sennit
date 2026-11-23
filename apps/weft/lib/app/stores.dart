@@ -27,6 +27,7 @@ class WeftStores {
     this.paperlessToken,
     this.llmApiKey,
     this.calendarIcsUrl,
+    this.personMemory,
   });
 
   final WeftDatabase db;
@@ -54,6 +55,11 @@ class WeftStores {
   /// with the secrets because a private ICS address carries its access token
   /// in the URL.
   String? calendarIcsUrl;
+
+  /// What the user noted about the people they write to, as the keychain
+  /// holds it — `MemoryBook.encode`'s blob. Read here with the secrets,
+  /// so a prompt written in the background never waits on the keychain.
+  String? personMemory;
 
   /// Test construction: everything in memory, no platform channels.
   ///
@@ -94,21 +100,21 @@ class WeftStores {
     //
     // Issued together rather than one after another. None of them depends on
     // another's answer, and the auth gate holds its splash on this future — so
-    // awaited in a row they put six channel round trips end to end in front of
-    // the first frame of every cold start, for six values the inbox does not
-    // even use.
+    // awaited in a row they put seven channel round trips end to end in front
+    // of the first frame of every cold start, for seven values the inbox does
+    // not even use.
     //
     // What this buys is the round trips overlapping, not the keychain work: the
     // Android plugin posts every call to one worker `HandlerThread`, so the
     // decryptions still happen in a row on the far side. That also makes this
     // safe — the platform serialises, and the map it reads is synchronised.
     //
-    // `Future.wait` rather than six bare futures awaited in turn, because it
-    // subscribes to all six at once: a keychain that refuses then fails the
+    // `Future.wait` rather than seven bare futures awaited in turn, because it
+    // subscribes to all seven at once: a keychain that refuses then fails the
     // bootstrap exactly as it does today, instead of failing it once and
-    // leaving five unhandled errors behind it.
+    // leaving six unhandled errors behind it.
     final secretValues = kDemoMode
-        ? const <String?>[null, null, null, null, null, null]
+        ? const <String?>[null, null, null, null, null, null, null]
         : await Future.wait<String?>([
             secrets.read(SecretStore.embeddingApiKey),
             secrets.read(SecretStore.transcriptionApiKey),
@@ -116,6 +122,7 @@ class WeftStores {
             secrets.read(SecretStore.paperlessToken),
             secrets.read(SecretStore.llmApiKey),
             secrets.read(SecretStore.calendarIcsUrl),
+            secrets.read(SecretStore.personMemory),
           ]);
     final [
       embeddingKey,
@@ -124,6 +131,7 @@ class WeftStores {
       paperlessKey,
       llmKey,
       calendarUrl,
+      memoryBlob,
     ] = secretValues;
 
     return WeftStores._(
@@ -141,6 +149,7 @@ class WeftStores {
       paperlessToken: paperlessKey,
       llmApiKey: llmKey,
       calendarIcsUrl: calendarUrl,
+      personMemory: memoryBlob,
     );
   }
 
@@ -172,6 +181,11 @@ class WeftStores {
   Future<void> setCalendarIcsUrl(String? value) async {
     calendarIcsUrl = value;
     await secrets.write(SecretStore.calendarIcsUrl, value);
+  }
+
+  Future<void> setPersonMemory(String? value) async {
+    personMemory = value;
+    await secrets.write(SecretStore.personMemory, value);
   }
 
   void dispose() => db.dispose();

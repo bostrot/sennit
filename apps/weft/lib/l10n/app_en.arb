@@ -9143,5 +9143,274 @@
   "deleteAccountDone": "Your account was deleted.",
   "@deleteAccountDone": {
     "description": "Message on the welcome screen after the account was deleted and the device cleared."
+  },
+  "personMemoryTitle": "About this person",
+  "@personMemoryTitle": {
+    "description": "Heading of the person's note on the contact screen, and the label of the note field. Keep under ~24 chars."
+  },
+  "personMemoryScreenTitle": "About {name}",
+  "@personMemoryScreenTitle": {
+    "description": "App bar title of the screen where the user edits their note about a person. Keep under ~28 chars.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "The chat's name for the person.",
+        "example": "Anna"
+      }
+    }
+  },
+  "personMemoryEmpty": "Nothing noted yet. Tap to add what you want to remember.",
+  "@personMemoryEmpty": {
+    "description": "Row on the contact screen when nothing is noted about the person yet. About 60 chars."
+  },
+  "personMemoryHint": "## Name or nickname\n## Relationship\n## Birthday\n## Language, formal or casual\n## Key facts",
+  "@personMemoryHint": {
+    "description": "Placeholder of the person note field: short suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "personMemoryUseTemplate": "Start from headings",
+  "@personMemoryUseTemplate": {
+    "description": "Button that fills an empty note with the suggested headings. Keep under ~24 chars."
+  },
+  "personMemoryOnNotice": "Stored only on this device. Quick messages, auto-replies and reply suggestions send it to your AI model.",
+  "@personMemoryOnNotice": {
+    "description": "Notice above the note when personal memory is on. About 140 chars."
+  },
+  "personMemoryOffNotice": "Stored only on this device, and never sent anywhere until you turn on personal memory for AI.",
+  "@personMemoryOffNotice": {
+    "description": "Notice above the note when personal memory is off. About 120 chars."
+  },
+  "personMemoryLearn": "Learn from chat",
+  "@personMemoryLearn": {
+    "description": "Button that asks the AI model to suggest facts about the person from the recent conversation. Keep under ~22 chars."
+  },
+  "personMemorySuggestionsTitle": "Suggested by AI",
+  "@personMemorySuggestionsTitle": {
+    "description": "Heading over the facts the AI suggested adding to the note. Keep under ~24 chars."
+  },
+  "personMemorySuggestionsHint": "From your recent conversation. Nothing is added until you accept it, to this chat or to a person’s profile.",
+  "@personMemorySuggestionsHint": {
+    "description": "Line under the suggestions heading. About 80 chars."
+  },
+  "personMemoryAccept": "Add to note",
+  "@personMemoryAccept": {
+    "description": "Tooltip of the button that adds a suggested fact to the note. Keep under ~20 chars."
+  },
+  "personMemoryDismiss": "Dismiss",
+  "@personMemoryDismiss": {
+    "description": "Tooltip of the button that throws a suggested fact away. Keep under ~16 chars."
+  },
+  "personMemoryLearned": "{count, plural, =1{1 new fact from {name} to review} other{{count} new facts from {name} to review}}",
+  "@personMemoryLearned": {
+    "description": "Toast after the AI suggested new facts from a chat. {name} is the chat's name. About 60 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      },
+      "name": {
+        "type": "String",
+        "description": "The chat's name for the person.",
+        "example": "Anna"
+      }
+    }
+  },
+  "personMemoryReview": "Review",
+  "@personMemoryReview": {
+    "description": "Action on the toast that opens the person's note to review suggestions. Keep under ~12 chars."
+  },
+  "personMemorySuggestionCount": "{count, plural, =1{1 suggestion to review} other{{count} suggestions to review}}",
+  "@personMemorySuggestionCount": {
+    "description": "Line on the contact screen's note row when AI suggestions are waiting. About 30 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryNothingNew": "Nothing new to remember.",
+  "@personMemoryNothingNew": {
+    "description": "Toast when the AI found nothing new to remember. About 40 chars."
+  },
+  "personMemoryLearnOff": "Turn on personal memory for AI in its settings first.",
+  "@personMemoryLearnOff": {
+    "description": "Toast when Learn from chat is tapped while personal memory is off. About 80 chars."
+  },
+  "personMemoryLearnEncrypted": "This chat is end-to-end encrypted. Allow learning from encrypted chats in the personal memory settings first.",
+  "@personMemoryLearnEncrypted": {
+    "description": "Toast when Learn from chat is tapped in an end-to-end encrypted chat while learning from encrypted chats is off. About 110 chars."
+  },
+  "personMemoryLearnNothing": "There is nothing in this chat to learn from yet.",
+  "@personMemoryLearnNothing": {
+    "description": "Toast when there are no messages to learn from. About 50 chars."
+  },
+  "personMemoryLearnFailed": "Your AI model did not answer. Try again later.",
+  "@personMemoryLearnFailed": {
+    "description": "Toast when the AI model could not be reached or failed while suggesting facts. About 50 chars."
+  },
+  "personMemorySettingsTitle": "Personal memory",
+  "@personMemorySettingsTitle": {
+    "description": "Title of the personal memory settings screen, its row in AI settings, and a button leading there. Keep under ~24 chars."
+  },
+  "personMemorySettingsSubtitle": "Notes about people that make AI messages personal",
+  "@personMemorySettingsSubtitle": {
+    "description": "Subtitle of the personal memory row in AI settings. About 60 chars."
+  },
+  "personMemoryExplainer": "Sennit keeps two kinds of notes. Each chat, groups included, has its own: what is going on, plans, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual, the key facts. Both are stored only on this device, encrypted in the system keychain, and are not synced to your other devices. When personal memory is on, quick messages, auto-replies and reply suggestions send the chat’s note and the notes of the people in it, shortened (more so for a model on your own computer), to your AI model, along with the messages those features already send. Learn from chat sends the last {count} messages to the same model and only ever suggests facts. Nothing is added until you accept it. Notes are included in backups and deleted with your account.",
+  "@personMemoryExplainer": {
+    "description": "Privacy notice at the top of the personal memory settings screen: the two kinds of notes, what is stored where and what is sent where. {count} is how many recent messages Learn from chat sends. About 800 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryUseInAi": "Use personal memory in AI",
+  "@personMemoryUseInAi": {
+    "description": "Master switch: whether notes about people are ever sent to the AI model. Keep under ~36 chars."
+  },
+  "personMemoryUseInAiSubtitle": "Quick messages, auto-replies and reply suggestions include what you noted about the chat and its people",
+  "@personMemoryUseInAiSubtitle": {
+    "description": "Subtitle of the master switch. About 90 chars."
+  },
+  "personMemorySuggestTitle": "Suggest facts after quick messages",
+  "@personMemorySuggestTitle": {
+    "description": "Switch: whether the AI suggests facts after writing a quick message. Keep under ~40 chars."
+  },
+  "personMemorySuggestSubtitle": "Your AI model proposes what to remember; you accept or dismiss each one",
+  "@personMemorySuggestSubtitle": {
+    "description": "Subtitle of the suggest switch. About 90 chars."
+  },
+  "personMemoryEncryptedTitle": "Learn from encrypted chats",
+  "@personMemoryEncryptedTitle": {
+    "description": "Switch: whether facts may be learned from end-to-end encrypted chats. Keep under ~36 chars."
+  },
+  "personMemoryEncryptedSubtitle": "Off by default, like link previews: learning sends an encrypted conversation to your AI model",
+  "@personMemoryEncryptedSubtitle": {
+    "description": "Subtitle of the encrypted-chats switch. About 110 chars."
+  },
+  "personMemoryStoredTitle": "Only on this device",
+  "@personMemoryStoredTitle": {
+    "description": "Row title saying where the notes are kept. Keep under ~30 chars."
+  },
+  "personMemoryStoredBody": "{count, plural, =0{No notes yet. Notes are not synced to other devices.} =1{1 note. Notes are not synced to other devices.} other{{count} notes. Notes are not synced to other devices.}}",
+  "@personMemoryStoredBody": {
+    "description": "Row subtitle: how many notes are kept, and that notes are not synced. About 80 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryForgetAllTitle": "Delete all notes",
+  "@personMemoryForgetAllTitle": {
+    "description": "Destructive row and dialog title: delete every note about every person. Keep under ~30 chars."
+  },
+  "personMemoryForgetAllBody": "Every note about every person, and every waiting suggestion, is removed from this device.",
+  "@personMemoryForgetAllBody": {
+    "description": "Body of the dialog confirming deletion of every note. About 90 chars."
+  },
+  "personMemoryForgotAll": "All notes deleted.",
+  "@personMemoryForgotAll": {
+    "description": "Toast after all notes were deleted. About 30 chars."
+  },
+  "memoryThisChat": "This chat",
+  "@memoryThisChat": {
+    "description": "Section header on the contact screen over the memory of this chat. Keep under ~20 chars."
+  },
+  "chatMemoryScreenTitle": "Memory: {name}",
+  "@chatMemoryScreenTitle": {
+    "description": "App bar title of the screen editing a chat's memory. Keep under ~28 chars.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "The chat's or the person's name.",
+        "example": "Anna"
+      }
+    }
+  },
+  "chatMemoryLabel": "About this chat",
+  "@chatMemoryLabel": {
+    "description": "Label of the chat memory field. Keep under ~24 chars."
+  },
+  "chatMemoryHint": "## Ongoing topics\n## Plans\n## Tone in this chat\n## Inside jokes",
+  "@chatMemoryHint": {
+    "description": "Placeholder of the chat memory field: suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "chatMemoryEmpty": "Nothing noted for this chat yet. Tap to add topics, plans or the tone you use here.",
+  "@chatMemoryEmpty": {
+    "description": "Row on the contact screen when nothing is noted for the chat yet. About 60 chars."
+  },
+  "personMemorySharedHint": "Used in every chat with this person. Keep it to a few lines.",
+  "@personMemorySharedHint": {
+    "description": "Helper text under the person note field. About 70 chars."
+  },
+  "personMemoryPromote": "Add to profile",
+  "@personMemoryPromote": {
+    "description": "Tooltip of the button that adds a suggested fact to a person's profile note instead of the chat's. Keep under ~24 chars."
+  },
+  "personMemoryPromoteTo": "Add to whose profile?",
+  "@personMemoryPromoteTo": {
+    "description": "Title of the sheet asking which person's profile a fact goes to, in a group. Keep under ~30 chars."
+  },
+  "personMemoryCondense": "Condense with AI",
+  "@personMemoryCondense": {
+    "description": "Button asking the AI to suggest a shorter version of a person's note. Keep under ~22 chars."
+  },
+  "personMemoryCondensed": "Suggested short version",
+  "@personMemoryCondensed": {
+    "description": "Heading over the AI's suggested short version of a person's note. Keep under ~30 chars."
+  },
+  "personMemoryReplace": "Replace note",
+  "@personMemoryReplace": {
+    "description": "Button replacing the person's note with the AI's short version. Keep under ~16 chars."
+  },
+  "shareTitle": "Share to…",
+  "@shareTitle": {
+    "description": "Title of the share sheet while the user picks which conversations get what another app shared. Keep under ~20 chars.",
+    "maxLength": 36
+  },
+  "shareReadingFiles": "{count, plural, =1{Reading 1 file…} other{Reading {count} files…}}",
+  "@shareReadingFiles": {
+    "description": "Line under the share sheet's title while the files another app shared are still being read, before their names and sizes are known.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files were shared.",
+        "example": "3"
+      }
+    }
+  },
+  "shareFileCount": "{count, plural, other{{count} files}}",
+  "@shareFileCount": {
+    "description": "Part of the share sheet's summary line when several files are shared, followed by ' · ' and their total size (e.g. '3 files · 2.4 MB').",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files are shared, always 2 or more.",
+        "example": "3"
+      }
+    }
+  },
+  "shareNothingToSend": "Nothing to send",
+  "@shareNothingToSend": {
+    "description": "Line under the share sheet's title when every shared file failed to load and there was no text."
+  },
+  "shareQuotedText": "\"{text}\"",
+  "@shareQuotedText": {
+    "description": "The shared text quoted in the share sheet's summary line. Use your language's own quotation marks.",
+    "placeholders": {
+      "text": {
+        "type": "String",
+        "description": "The start of the text another app shared. Never translated.",
+        "example": "look at this"
+      }
+    }
   }
 }

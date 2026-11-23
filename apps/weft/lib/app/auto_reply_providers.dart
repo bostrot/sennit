@@ -13,6 +13,7 @@ import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import 'billing_providers.dart';
 import 'calendar_providers.dart';
 import 'labels.dart';
+import 'person_memory_providers.dart';
 import 'providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
@@ -179,6 +180,9 @@ final autoReplyServiceProvider = Provider<AutoReplyService?>((ref) {
     // Busy times, when the conversation is about meeting up — "are you free
     // on Friday?" answered from the calendar rather than guessed.
     calendar: (transcript) => aiCalendarContext(ref, transcript),
+    // What the user noted about the chat and its people, when they let it be
+    // sent.
+    memory: (chat, recent) => ref.read(aiMemoryForPromptProvider)(chat, recent),
   );
 
   ref.onDispose(() => unawaited(service.dispose()));

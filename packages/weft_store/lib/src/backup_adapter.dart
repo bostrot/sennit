@@ -525,8 +525,11 @@ class StoreBackupSink implements BackupSink {
 
       case MediaRecord():
       case UnknownRecord():
+      case PersonNoteRecord():
         // Media bytes go through [beginMedia]; unknown types are counted by
-        // `importArchive` and never reach here.
+        // `importArchive` and never reach here. Person notes belong to the
+        // keychain, not to a table: the app's sink takes them before this one
+        // is asked.
         return false;
     }
 

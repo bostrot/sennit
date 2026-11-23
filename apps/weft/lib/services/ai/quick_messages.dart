@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'auto_reply_writer.dart'
     show AutoReplyDraft, AutoReplyOutcome, parseAutoReply;
 import 'llm_request.dart';
+import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
 /// The quick messages Sennit ships with.
 ///
@@ -563,12 +564,18 @@ const int kQuickMessageContextMessages = 12;
 /// follows. Given the chat first and the task after, a 1.5B model answered
 /// the chat ("Super, bis Samstag!") instead of wishing anyone a happy
 /// birthday; told "in the language of the conversation", it wrote English.
+///
+/// [memory] is what the user noted about the chat and the recipient, already
+/// through `memoryPromptBlock` — the paragraph, or empty. It goes last in the
+/// system message, after the rules, so the worked examples that follow still
+/// read as examples and not as the person.
 List<Map<String, String>> quickMessageRequest({
   required String instruction,
   required List<String> transcript,
   required String language,
   String? recipient,
   String? groupName,
+  String memory = '',
 }) {
   final languageName =
       _languageNames[language] ?? 'the language of the recent messages';
@@ -601,7 +608,8 @@ List<Map<String, String>> quickMessageRequest({
           'friend: one or two sentences, an emoji at most. Use the first '
           'name given once; never invent a name. Output only the message '
           'itself — no quotation marks, no preamble, no explanation, no '
-          'signature, no placeholders like [name].',
+          'signature, no placeholders like [name].'
+          '$memory',
     },
     {
       'role': 'user',
@@ -668,6 +676,7 @@ Future<AutoReplyDraft> composeQuickMessage({
   required String language,
   String? recipient,
   String? groupName,
+  AiMemory? memory,
   http.Client? client,
   Duration? timeout,
   Future<void>? cancel,
@@ -699,6 +708,7 @@ Future<AutoReplyDraft> composeQuickMessage({
           language: language,
           recipient: recipient,
           groupName: groupName,
+          memory: memoryPromptBlock(memory, baseUrl: base),
         ),
       }),
       timeout: timeout ?? llmResponseTimeout(base, LlmTask.quickMessage),

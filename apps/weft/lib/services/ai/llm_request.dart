@@ -20,6 +20,10 @@ enum LlmTask {
   /// title stands when it does not come.
   eventTitle,
 
+  /// Facts about a person the model proposes for their note, asked for on a
+  /// tap or after a quick message — never waited on by a message.
+  personFacts,
+
   /// The endpoints screen's test button.
   probe,
 }
@@ -77,7 +81,7 @@ Duration llmResponseTimeout(String baseUrl, LlmTask task) {
   return switch (task) {
     LlmTask.quickMessage ||
     LlmTask.autoReply => hosted ? kHostedReplyTimeout : kSelfHostedReplyTimeout,
-    LlmTask.todo =>
+    LlmTask.todo || LlmTask.personFacts =>
       hosted ? const Duration(seconds: 20) : kSelfHostedReplyTimeout,
     // Someone is looking at a spinner on the chip, and a title is not worth
     // ten minutes of it.

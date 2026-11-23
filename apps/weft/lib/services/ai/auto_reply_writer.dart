@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'llm_request.dart';
+import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 import 'smart_replies.dart' show calendarPromptBlock;
 
 /// How an attempt to write an auto-reply ended.
@@ -104,6 +105,10 @@ const int kAutoReplyMaxTokens = 1024;
 /// or null. Given only when the conversation is about when someone is free, so
 /// "are you around on Friday?" is answered from the calendar instead of
 /// guessed, and a busy slot is met with a free one.
+///
+/// [memory] is what the user noted about this chat and the people in it, or
+/// null — null whenever the "use personal memory" switch is off. Trimmed to
+/// the endpoint's budget by `memoryPromptBlock`.
 Future<AutoReplyDraft> composeAutoReply({
   required String baseUrl,
   required String model,
@@ -112,6 +117,7 @@ Future<AutoReplyDraft> composeAutoReply({
   required String chatTitle,
   required List<String> transcript,
   String? calendar,
+  AiMemory? memory,
   http.Client? client,
   Duration? timeout,
 }) async {
@@ -162,7 +168,8 @@ Future<AutoReplyDraft> composeAutoReply({
                 'Anything outside the tags is thrown away, and an answer '
                 'without them is never sent.\n\n'
                 "The user's instruction:\n$instruction"
-                '${calendarPromptBlock(calendar)}',
+                '${calendarPromptBlock(calendar)}'
+                '${memoryPromptBlock(memory, baseUrl: base)}',
           },
           {
             'role': 'user',

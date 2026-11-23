@@ -22,6 +22,7 @@ import '../services/notifications/open_chats.dart';
 import '../services/notifications/push_registration.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';
+import 'person_memory_providers.dart';
 import 'providers.dart';
 import 'snapshot_providers.dart';
 import 'session_providers.dart';
@@ -301,6 +302,12 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
         transcript,
         timeout: const Duration(seconds: 2),
       ),
+      // What the user noted about this chat and the people writing in it,
+      // under the same switch as every other AI feature's.
+      memory: switch (repository.chatForRoom(content.roomId)) {
+        final Chat chat => ref.read(aiMemoryForPromptProvider)(chat, thread),
+        null => null,
+      },
     );
   };
 

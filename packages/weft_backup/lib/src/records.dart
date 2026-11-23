@@ -40,6 +40,13 @@ abstract final class BackupRecordType {
   /// stored once and pointed at four times. Without the split, dedup would have
   /// to rewrite events, and a backup is the wrong place to be editing history.
   static const String mediaRef = 'media_ref';
+
+  /// What the user noted about one person, filed under one key.
+  ///
+  /// A type of its own rather than a [setting], because a build that predates
+  /// it must skip it — the notes live in the keychain, and an older reader
+  /// that took them for a setting would write them into a plaintext table.
+  static const String personNote = 'person_note';
 }
 
 /// One entry in the archive body.
@@ -561,6 +568,29 @@ final class MediaRefRecord extends BackupRecord {
   }
 }
 
+/// One note from the user's personal memory: the text filed under [key], a
+/// network handle or a room. See `PersonMemoryBook` in the app.
+@immutable
+final class PersonNoteRecord extends BackupRecord {
+  const PersonNoteRecord({required this.key, required this.note});
+
+  final String key;
+  final String note;
+
+  @override
+  String get type => BackupRecordType.personNote;
+
+  @override
+  Map<String, Object?> toJson() => {'key': key, 'note': note};
+
+  static PersonNoteRecord? fromJson(Map<Object?, Object?> raw) {
+    final key = raw['key'];
+    final note = raw['note'];
+    if (key is! String || key.isEmpty || note is! String) return null;
+    return PersonNoteRecord(key: key, note: note);
+  }
+}
+
 // ---------------------------------------------------------------- decoding
 
 /// [json] as a record, or null when it is not usable at all.
@@ -587,6 +617,7 @@ BackupRecord? decodeBackupRecord(Object? json) {
     BackupRecordType.transcript => TranscriptRecord.fromJson(json),
     BackupRecordType.media => MediaRecord.fromJson(json),
     BackupRecordType.mediaRef => MediaRefRecord.fromJson(json),
+    BackupRecordType.personNote => PersonNoteRecord.fromJson(json),
     _ => UnknownRecord(type, {
       for (final entry in json.entries)
         if (entry.key is String && entry.key != 'type')

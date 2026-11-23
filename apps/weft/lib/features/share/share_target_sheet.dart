@@ -12,6 +12,7 @@ import 'package:weft_share/weft_share.dart';
 
 import '../../app/a11y.dart';
 import '../../app/intents.dart';
+import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/share_providers.dart';
@@ -511,17 +512,18 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   }
 
   String _title(bool confirming, List<Chat> targets) {
-    if (!confirming) return 'Share to…';
+    final l10n = context.l10n;
+    if (!confirming) return l10n.shareTitle;
     return targets.length == 1
-        ? 'Send to ${targets.single.title}'
-        : 'Send to ${targets.length} chats';
+        ? l10n.shareSendToOne(targets.single.title)
+        : l10n.shareSendToMany(targets.length);
   }
 
   /// What is about to be sent, in one line.
   String _summary(String text, ResolvedShare? resolved) {
+    final l10n = context.l10n;
     if (resolved == null) {
-      final count = widget.payload.uris.length;
-      return count == 1 ? 'Reading 1 file…' : 'Reading $count files…';
+      return l10n.shareReadingFiles(widget.payload.uris.length);
     }
 
     final files = resolved.sources;
@@ -529,11 +531,13 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     final fileSummary = switch (files.length) {
       0 => null,
       1 => '${files.single.basename} · ${formatAttachmentSize(bytes)}',
-      _ => '${files.length} files · ${formatAttachmentSize(bytes)}',
+      _ =>
+        '${l10n.shareFileCount(files.length)} · '
+            '${formatAttachmentSize(bytes)}',
     };
 
-    if (text.isEmpty) return fileSummary ?? 'Nothing to send';
-    final quoted = '"${_preview(text)}"';
+    if (text.isEmpty) return fileSummary ?? l10n.shareNothingToSend;
+    final quoted = l10n.shareQuotedText(_preview(text));
     return fileSummary == null ? quoted : '$quoted · $fileSummary';
   }
 
@@ -680,7 +684,7 @@ class _TargetTile extends ConsumerWidget {
       checked: reason != null ? null : selected,
       label: semanticsSentence([
         chat.title,
-        chat.networks.map((n) => n.label).join(' and '),
+        chat.networks.isEmpty ? null : context.l10n.networkNames(chat.networks),
         reason == null ? null : context.l10n.shareTargetBlocked(reason!),
         reason != null ? null : subtitle,
       ]),
@@ -955,8 +959,8 @@ class _ConfirmTargetTile extends ConsumerWidget {
       title: Text(chat.title),
       subtitle: Text(
         switch (network) {
-          null => 'No network here takes this file',
-          final n => 'via ${n.label}',
+          null => context.l10n.shareTargetNoNetworkForFile,
+          final n => context.l10n.attachmentPreviewVia(n.label),
         },
         style: network == null
             ? context.text.bodySmall?.copyWith(color: context.colors.error)
