@@ -9250,6 +9250,25 @@
   "@personMemoryLearnFailed": {
     "description": "Toast when the AI model could not be reached or failed while suggesting facts. About 50 chars."
   },
+  "personMemoryLearnHttpError": "Your AI model answered with error {status}. Check the endpoint in its settings.",
+  "@personMemoryLearnHttpError": {
+    "description": "Toast when the AI endpoint answered Learn from chat with an HTTP error. {status} is the number, such as 401 or 500. About 80 chars.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+  "personMemoryLearnTimedOut": "Your AI model took too long to answer. Try again later.",
+  "@personMemoryLearnTimedOut": {
+    "description": "Toast when the AI model did not answer Learn from chat in time. About 60 chars."
+  },
+  "personMemoryLearnCutOff": "Your AI model was still thinking when it hit its length limit. Try again, or use a model that thinks less.",
+  "@personMemoryLearnCutOff": {
+    "description": "Toast when a reasoning AI model spent its whole answer budget thinking and gave no answer to Learn from chat. About 110 chars."
+  },
+  "personMemoryLearnUnreadable": "Your AI model answered, but not with a list of facts. Try again, or use another model.",
+  "@personMemoryLearnUnreadable": {
+    "description": "Toast when the AI model answered Learn from chat with text that is not the JSON list it was asked for. About 90 chars."
+  },
   "personMemorySettingsTitle": "Personal memory",
   "@personMemorySettingsTitle": {
     "description": "Title of the personal memory settings screen, its row in AI settings, and a button leading there. Keep under ~24 chars."

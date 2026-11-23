@@ -261,11 +261,27 @@ enum PersonFactsOutcome {
   /// A conversation with nothing to learn from. Nothing was sent.
   nothingToSend,
 
-  /// The request failed.
+  /// The request failed: the server could not be reached, or answered with an
+  /// error status, which is [PersonFactsResult.status].
   failed,
+
+  /// The model did not answer in the time it is given.
+  timedOut,
+
+  /// The model used its whole budget before it wrote an answer.
+  cutOff,
+
+  /// The model answered, but with no list of facts in it.
+  unreadable,
 }
 
-typedef PersonFactsResult = ({PersonFactsOutcome outcome, int added});
+typedef PersonFactsResult = ({
+  PersonFactsOutcome outcome,
+  int added,
+
+  /// The HTTP status a [PersonFactsOutcome.failed] request was answered with.
+  int? status,
+});
 
 /// Asks the model what is worth remembering from [chat]'s [messages], and
 /// files the answer as facts waiting for the user under the chat's memory.
@@ -287,8 +303,11 @@ Future<PersonFactsResult> learnPersonFacts({
   http.Client? client,
   Future<void>? cancel,
 }) async {
-  PersonFactsResult done(PersonFactsOutcome outcome, [int added = 0]) =>
-      (outcome: outcome, added: added);
+  PersonFactsResult done(
+    PersonFactsOutcome outcome, {
+    int added = 0,
+    int? status,
+  }) => (outcome: outcome, added: added, status: status);
   if (!settings.useInAi) return done(PersonFactsOutcome.memoryOff);
   final keys = chatMemoryKeys(chat);
   if (keys.isEmpty) return done(PersonFactsOutcome.nothingToSend);
@@ -301,9 +320,14 @@ Future<PersonFactsResult> learnPersonFacts({
     recent,
     maxMessages: kAiContextMessages,
   );
-  if (transcript.isEmpty) return done(PersonFactsOutcome.nothingToSend);
+  if (transcript.isEmpty) {
+    debugPrint(
+      'weft: learn facts: ${recent.length} messages loaded, none in words',
+    );
+    return done(PersonFactsOutcome.nothingToSend);
+  }
 
-  var failed = false;
+  Object? failure;
   final before = memory.book.suggestionsFor(keys).length;
   final facts = await suggestPersonFacts(
     baseUrl: endpoint.baseUrl,
@@ -315,12 +339,36 @@ Future<PersonFactsResult> learnPersonFacts({
     known: aiMemoryFrom(memory.book, chat, people),
     client: client,
     cancel: cancel,
-    onError: (_) => failed = true,
+    onError: (error) => failure = error,
   );
-  if (failed) return done(PersonFactsOutcome.failed);
+  if (failure != null) {
+    debugPrint(
+      'weft: learn facts: ${recent.length} messages loaded, '
+      '${transcript.length} sent, failed: '
+      '${failure is PersonFactsFailure ? failure : failure.runtimeType}',
+    );
+    return switch (failure) {
+      PersonFactsFailure(error: PersonFactsError.cutOff) => done(
+        PersonFactsOutcome.cutOff,
+      ),
+      PersonFactsFailure(error: PersonFactsError.unreadable) => done(
+        PersonFactsOutcome.unreadable,
+      ),
+      PersonFactsFailure(:final status) => done(
+        PersonFactsOutcome.failed,
+        status: status,
+      ),
+      TimeoutException() => done(PersonFactsOutcome.timedOut),
+      _ => done(PersonFactsOutcome.failed),
+    };
+  }
   memory.propose(keys, facts);
   final added = memory.book.suggestionsFor(keys).length - before;
+  debugPrint(
+    'weft: learn facts: ${recent.length} messages loaded, '
+    '${transcript.length} sent, ${facts.length} facts read, $added new',
+  );
   return added > 0
-      ? done(PersonFactsOutcome.proposed, added)
+      ? done(PersonFactsOutcome.proposed, added: added)
       : done(PersonFactsOutcome.nothingNew);
 }

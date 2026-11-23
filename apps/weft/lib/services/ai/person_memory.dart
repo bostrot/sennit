@@ -479,8 +479,41 @@ String memoryPromptBlock(AiMemory? memory, {required String baseUrl}) {
       '${[...people, if (chat.isNotEmpty) '$chatHeading$chat'].join('\n\n')}';
 }
 
-/// The completion budget for proposing facts: a short JSON list.
-const int kPersonFactsMaxTokens = 400;
+/// The completion budget for proposing facts.
+///
+/// The list itself is a few hundred tokens, but a thinking model spends the
+/// budget on its reasoning first: a Qwen behind litellm used a thousand on a
+/// six-line chat, and handed 400 it returned no answer at all, which read as
+/// "nothing new". A model that needs none of it stops at the list.
+const int kPersonFactsMaxTokens = 4096;
+
+/// Why asking for facts got no list, passed to `onError` of
+/// [suggestPersonFacts].
+enum PersonFactsError {
+  /// The server answered with an error status; see [PersonFactsFailure.status].
+  http,
+
+  /// The model stopped at the budget before it wrote an answer — a thinking
+  /// model still thinking.
+  cutOff,
+
+  /// The model answered, but not with the JSON it was asked for.
+  unreadable,
+}
+
+/// A [PersonFactsError] as `onError` receives it.
+class PersonFactsFailure implements Exception {
+  const PersonFactsFailure(this.error, {this.status});
+
+  final PersonFactsError error;
+
+  /// The HTTP status, for [PersonFactsError.http].
+  final int? status;
+
+  @override
+  String toString() =>
+      'PersonFactsFailure(${error.name}${status == null ? '' : ' $status'})';
+}
 
 /// The chat completion messages that ask for facts worth remembering from the
 /// conversation [chatTitle].
@@ -542,7 +575,9 @@ List<Map<String, String>> personFactsRequest({
 /// The answer is only ever a proposal: it is merged into the facts waiting for
 /// the user by `MemoryBook.withProposals`, never into a note. An empty list on
 /// any failure — the user asked for suggestions, and "none" is an answer they
-/// can live with; the caller learns which it was through [onError].
+/// can live with; the caller learns which it was through [onError], which gets
+/// a [PersonFactsFailure] for an answer with no list in it and the thrown
+/// error for a request that failed.
 Future<List<String>> suggestPersonFacts({
   required String baseUrl,
   required String model,
@@ -560,7 +595,7 @@ Future<List<String>> suggestPersonFacts({
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return const [];
   }
-  final content = await _complete(
+  final answer = await _complete(
     base: base,
     model: model,
     apiKey: apiKey,
@@ -578,8 +613,23 @@ Future<List<String>> suggestPersonFacts({
     cancel: cancel,
     onError: onError,
   );
-  final facts = content == null ? const <String>[] : parsePersonFacts(content);
-  debugPrint('weft: person facts: ${facts.length} proposed');
+  if (answer == null) return const [];
+  final facts = parsePersonFacts(answer.content ?? '');
+  // Counts and the finish reason only: never what the model said.
+  debugPrint(
+    'weft: person facts: ${transcript.length} lines sent, '
+    '${facts?.length ?? 'no'} facts read, finish ${answer.finishReason}',
+  );
+  if (facts == null) {
+    onError?.call(
+      PersonFactsFailure(
+        answer.finishReason == 'length'
+            ? PersonFactsError.cutOff
+            : PersonFactsError.unreadable,
+      ),
+    );
+    return const [];
+  }
   return facts;
 }
 
@@ -621,7 +671,7 @@ Future<String?> condensePersonMemory({
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || note.trim().isEmpty) return null;
-  final content = await _complete(
+  final answer = await _complete(
     base: base,
     model: model,
     apiKey: apiKey,
@@ -634,6 +684,7 @@ Future<String?> condensePersonMemory({
     cancel: cancel,
     onError: onError,
   );
+  final content = answer?.content;
   return content == null ? null : parseCondensed(content);
 }
 
@@ -666,9 +717,11 @@ String? parseCondensed(String content) {
   return trimPersonMemory(text, maxChars: kPersonMemoryHostedChars);
 }
 
-/// One completion, its text or null. Logs the status and the error type only:
-/// what was said, and what the user wrote about anyone, stay out of the log.
-Future<String?> _complete({
+/// One completion: its text, null when the model gave none, and why it
+/// stopped. Null for a request that failed. Logs the status and the error type
+/// only: what was said, and what the user wrote about anyone, stay out of the
+/// log.
+Future<({String? content, String? finishReason})?> _complete({
   required String base,
   required String model,
   String? apiKey,
@@ -704,14 +757,19 @@ Future<String?> _complete({
     );
     if (response.statusCode != 200) {
       debugPrint('weft: $what: $url answered ${response.statusCode}');
-      onError?.call(StateError('HTTP ${response.statusCode}'));
+      onError?.call(
+        PersonFactsFailure(PersonFactsError.http, status: response.statusCode),
+      );
       return null;
     }
     final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    return ((decoded as Map)['choices'] as List?)
-            ?.cast<Map>()
-            .firstOrNull?['message']?['content']
-        as String?;
+    final choice = ((decoded as Map)['choices'] as List?)
+        ?.cast<Map>()
+        .firstOrNull;
+    return (
+      content: choice?['message']?['content'] as String?,
+      finishReason: choice?['finish_reason'] as String?,
+    );
   } on Object catch (error) {
     debugPrint('weft: $what against $url failed: ${error.runtimeType}');
     onError?.call(error);
@@ -725,17 +783,24 @@ Future<String?> _complete({
 /// asks for, or a bare list, through a code fence or `<think>` block. JSON or
 /// nothing, for the reason `parseSmartReplies` gives — a model's analysis
 /// turned into "facts" would be worse than none.
-List<String> parsePersonFacts(String content) {
+///
+/// Null when there is no list in it at all, which is not the same answer as
+/// an empty one: "nothing worth keeping" is `[]`, and reasoning that never
+/// ended, or prose, is null. Facts written as objects — `{"person": "Tom",
+/// "fact": "Runs"}` — are read too; a small model adds the shape it likes.
+List<String>? parsePersonFacts(String content) {
   var text = content
       .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
       .trim();
-  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) {
-    return const [];
-  }
-  final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(text);
+  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) return null;
+  // A chat template that opens the <think> itself leaves only the closing tag
+  // in the answer, after reasoning that may quote a list of its own.
+  final close = text.toLowerCase().lastIndexOf('</think>');
+  if (close >= 0) text = text.substring(close + '</think>'.length).trim();
+  final fence = RegExp(r'```[\w-]*\s*([\s\S]*?)```').firstMatch(text);
   if (fence != null) text = fence[1]!.trim();
 
-  List<Object?> raw = const [];
+  List<Object?>? raw;
   final objStart = text.indexOf('{');
   final objEnd = text.lastIndexOf('}');
   if (objStart >= 0 && objEnd > objStart) {
@@ -748,7 +813,7 @@ List<String> parsePersonFacts(String content) {
       // Try the bare list below.
     }
   }
-  if (raw.isEmpty) {
+  if (raw == null) {
     final start = text.indexOf('[');
     final end = text.lastIndexOf(']');
     if (start >= 0 && end > start) {
@@ -760,14 +825,35 @@ List<String> parsePersonFacts(String content) {
       }
     }
   }
+  if (raw == null) return null;
   final seen = <String>{};
   return [
-    for (final fact in raw.whereType<String>())
+    for (final fact in raw.map(_factText).whereType<String>())
       if (fact.trim().isNotEmpty &&
           fact.trim().length <= kPersonFactMaxChars &&
           seen.add(factKey(fact)))
         fact.trim().replaceAll(RegExp(r'\s+'), ' '),
   ].take(kPersonMemoryMaxSuggestions).toList(growable: false);
+}
+
+/// One entry of the list as a sentence: a string as it is, or an object's
+/// fact, after the name of whoever it is about when it says.
+String? _factText(Object? entry) {
+  if (entry is String) return entry;
+  if (entry is! Map) return null;
+  final fact = [
+    'fact',
+    'text',
+    'content',
+  ].map((k) => entry[k]).whereType<String>().firstOrNull;
+  if (fact == null) return null;
+  final who = [
+    'person',
+    'name',
+    'about',
+  ].map((k) => entry[k]).whereType<String>().firstOrNull?.trim();
+  if (who == null || who.isEmpty || fact.trim().startsWith(who)) return fact;
+  return '$who: ${fact.trim()}';
 }
 
 /// The longest fact offered; past this the model is writing a summary.

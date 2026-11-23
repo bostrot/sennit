@@ -231,24 +231,40 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
         client: ref.read(quickMessageClientProvider),
       );
     } on Object {
-      result = (outcome: PersonFactsOutcome.failed, added: 0);
+      result = (outcome: PersonFactsOutcome.failed, added: 0, status: null);
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    showWeftMessage(context, switch (result.outcome) {
-      PersonFactsOutcome.proposed => l10n.personMemoryLearned(
-        result.added,
-        chat.title,
-      ),
-      PersonFactsOutcome.nothingNew => l10n.personMemoryNothingNew,
-      PersonFactsOutcome.memoryOff => l10n.personMemoryLearnOff,
-      PersonFactsOutcome.encrypted => l10n.personMemoryLearnEncrypted,
-      PersonFactsOutcome.noEndpoint => l10n.quickMessageNoEndpoint(
-        l10n.settingsEndpointsTitle,
-      ),
-      PersonFactsOutcome.nothingToSend => l10n.personMemoryLearnNothing,
-      PersonFactsOutcome.failed => l10n.personMemoryLearnFailed,
-    });
+    // Both are fixed by a switch on the memory settings screen.
+    final toSettings =
+        result.outcome == PersonFactsOutcome.memoryOff ||
+        result.outcome == PersonFactsOutcome.encrypted;
+    showWeftMessage(
+      context,
+      action: toSettings
+          ? SnackBarAction(label: l10n.settingsTitle, onPressed: _openSettings)
+          : null,
+      switch (result.outcome) {
+        PersonFactsOutcome.proposed => l10n.personMemoryLearned(
+          result.added,
+          chat.title,
+        ),
+        PersonFactsOutcome.nothingNew => l10n.personMemoryNothingNew,
+        PersonFactsOutcome.memoryOff => l10n.personMemoryLearnOff,
+        PersonFactsOutcome.encrypted => l10n.personMemoryLearnEncrypted,
+        PersonFactsOutcome.noEndpoint => l10n.quickMessageNoEndpoint(
+          l10n.settingsEndpointsTitle,
+        ),
+        PersonFactsOutcome.nothingToSend => l10n.personMemoryLearnNothing,
+        PersonFactsOutcome.failed => switch (result.status) {
+          final status? => l10n.personMemoryLearnHttpError(status),
+          null => l10n.personMemoryLearnFailed,
+        },
+        PersonFactsOutcome.timedOut => l10n.personMemoryLearnTimedOut,
+        PersonFactsOutcome.cutOff => l10n.personMemoryLearnCutOff,
+        PersonFactsOutcome.unreadable => l10n.personMemoryLearnUnreadable,
+      },
+    );
   }
 
   Future<void> _condense() async {
