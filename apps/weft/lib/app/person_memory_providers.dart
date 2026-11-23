@@ -151,10 +151,9 @@ class PersonMemoryNotifier extends Notifier<MemoryBook> {
       _publish(replace ? archived : state.mergedWith(archived));
 }
 
-final personMemoryProvider =
-    NotifierProvider<PersonMemoryNotifier, MemoryBook>(
-      PersonMemoryNotifier.new,
-    );
+final personMemoryProvider = NotifierProvider<PersonMemoryNotifier, MemoryBook>(
+  PersonMemoryNotifier.new,
+);
 
 /// The keys the person [chat] is with is filed under — see
 /// [personMemoryKeys]. Empty for a group.
@@ -208,11 +207,7 @@ List<MemoryPerson> memoryPeopleFor(
 
 /// What the prompts for [chat] are told, from [book]: the chat's note and the
 /// notes of [people]. Null when there is none of either.
-AiMemory? aiMemoryFrom(
-  MemoryBook book,
-  Chat chat,
-  List<MemoryPerson> people,
-) {
+AiMemory? aiMemoryFrom(MemoryBook book, Chat chat, List<MemoryPerson> people) {
   final memory = AiMemory(
     chat: book.noteFor(chatMemoryKeys(chat)),
     people: [

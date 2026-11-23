@@ -286,9 +286,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
   }
 
   void _openSettings() => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => const PersonMemorySettingsScreen(),
-    ),
+    MaterialPageRoute<void>(builder: (_) => const PersonMemorySettingsScreen()),
   );
 
   @override
