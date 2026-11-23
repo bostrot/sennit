@@ -9487,6 +9487,14 @@
   "@endpointsThinkingSubtitle": {
     "description": "Subtitle of the thinking model switch. About 110 chars."
   },
+  "endpointsSuggestionModelField": "Model for reply suggestions",
+  "@endpointsSuggestionModelField": {
+    "description": "Text field label: an optional second AI model used only for the reply suggestions on notifications. Keep under ~30 chars."
+  },
+  "endpointsSuggestionModelHelper": "Optional. A small or non-thinking model at the same address writes the notification chips faster, e.g. a \"-nothink\" alias. Empty uses the model above.",
+  "@endpointsSuggestionModelHelper": {
+    "description": "Helper under the reply-suggestion model field. About 160 chars."
+  },
   "endpointsDetectLimits": "Detect",
   "@endpointsDetectLimits": {
     "description": "Button that asks the AI server for the model's context window and answer length. Keep under ~20 chars."

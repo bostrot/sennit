@@ -12,15 +12,18 @@ import 'package:weft_domain/weft_domain.dart' show Chat;
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
+import '../../app/billing_providers.dart' show kProOwnershipSetting;
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 
 import '../../app/stores.dart';
 import '../../data/matrix_chat_repository.dart';
+import '../billing/entitlements.dart';
 import '../status/status_feed.dart' show isStatusBroadcastChat;
 import 'background_actions.dart';
 import 'notification_actions.dart';
 import 'notification_service.dart';
+import 'reply_suggester.dart';
 
 /// The headless half of push.
 ///
@@ -156,6 +159,25 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
       pipeline: pipeline,
       chatForRoom: chatForRoom,
     );
+    // The same chips the UI engine adds, posted the same way — now, then
+    // updated — under the same settings and budgets. On a phone without
+    // Google services this boot is what posts nearly every notification, and
+    // it used to post them all without chips. No calendar and no notes: both
+    // live in the UI engine's providers.
+    service.suggestReplies = notificationReplySuggester(
+      settings: () => stores.settings,
+      apiKey: () => stores.llmApiKey,
+      proUnlocked: () => ProStatus(
+        edition: SennitEdition.current,
+        storeBillingPlatform:
+            defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS,
+        ownership: ProOwnership.fromJson(
+          stores.settings.getJson(kProOwnershipSetting),
+        ),
+      ).unlocks(ProFeature.aiReplies),
+      serviceChatIds: () => repository.serviceChatIds,
+    );
     // Actions are served from here too: a reply sent from the car while the
     // daemon is running goes out on the daemon's client, not on a second one.
     final actions = NotificationActionHandler(
@@ -196,4 +218,8 @@ Future<void> _onMessage(PushMessage message, String _) async {
   // Posting runs through the service's queue and several plugin calls; give
   // it a beat before the platform decides the wake-up is over.
   await Future<void>.delayed(const Duration(seconds: 3));
+  // Then the chips: the notification is already up, and this process is
+  // reaped once the handler returns. The service gives up on them after its
+  // own cap, so this is bounded by it.
+  await service.chipsSettled();
 }

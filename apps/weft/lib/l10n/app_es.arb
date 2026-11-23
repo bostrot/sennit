@@ -1621,6 +1621,8 @@
   "endpointsAnswerHelper": "Déjalo vacío para {tokens}. Un modelo que razona también lo gasta en razonar.",
   "endpointsThinkingTitle": "Modelo que razona",
   "endpointsThinkingSubtitle": "Da a cada función de IA espacio para razonar antes de responder. Activado por defecto en modelos autoalojados.",
+  "endpointsSuggestionModelField": "Modelo para sugerencias",
+  "endpointsSuggestionModelHelper": "Opcional. Un modelo pequeño o sin razonamiento en la misma dirección escribe antes las sugerencias de las notificaciones, p. ej. un alias «-nothink». Vacío usa el modelo de arriba.",
   "endpointsDetectLimits": "Detectar",
   "endpointsLimitsDetected": "{source}: ventana {context}, respuesta hasta {output}",
   "endpointsLimitsNotDetected": "El servidor no lo ha dicho. Escribe los valores.",

@@ -1622,6 +1622,8 @@
   "endpointsAnswerHelper": "Deixe vazio para {tokens}. Um modelo que raciocina também gasta isto a raciocinar.",
   "endpointsThinkingTitle": "Modelo que raciocina",
   "endpointsThinkingSubtitle": "Dá a cada função de IA espaço para raciocinar antes de responder. Ativado por padrão em modelos auto-hospedados.",
+  "endpointsSuggestionModelField": "Modelo para sugestões",
+  "endpointsSuggestionModelHelper": "Opcional. Um modelo pequeno ou sem raciocínio no mesmo endereço escreve mais rápido as sugestões das notificações, por ex. um alias \"-nothink\". Vazio usa o modelo acima.",
   "endpointsDetectLimits": "Detectar",
   "endpointsLimitsDetected": "{source}: janela {context}, resposta até {output}",
   "endpointsLimitsNotDetected": "O servidor não indicou. Escreva os valores.",

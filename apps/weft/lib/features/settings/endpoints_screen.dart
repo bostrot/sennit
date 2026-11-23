@@ -83,6 +83,9 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     text: _settings.getString(WeftSettings.llmModel) ?? '',
   );
   final _llmKey = TextEditingController();
+  late final _llmSuggestionModel = TextEditingController(
+    text: _settings.getString(WeftSettings.llmSuggestionModel) ?? '',
+  );
 
   /// What is stored for the model as it was when the screen opened; the
   /// detected numbers in it are replaced by [_detect].
@@ -133,6 +136,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       _llmUrl,
       _llmModel,
       _llmKey,
+      _llmSuggestionModel,
       _llmContext,
       _llmAnswer,
     ]) {
@@ -439,6 +443,10 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     }
     _settings.setString(WeftSettings.llmBaseUrl, _llmUrl.text.trim());
     _settings.setString(WeftSettings.llmModel, _llmModel.text.trim());
+    _settings.setString(
+      WeftSettings.llmSuggestionModel,
+      _llmSuggestionModel.text.trim(),
+    );
     if (_llmUrl.text.trim().isNotEmpty && _llmModel.text.trim().isNotEmpty) {
       int? tokens(TextEditingController c) {
         final n = int.tryParse(c.text.replaceAll(RegExp(r'[^0-9]'), ''));
@@ -703,6 +711,21 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
         value: _llmThinking ?? !hosted,
         onChanged: (v) => setState(() => _llmThinking = v),
         contentPadding: EdgeInsets.zero,
+      ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.md),
+        child: TextField(
+          key: const ValueKey('llm-suggestion-model'),
+          controller: _llmSuggestionModel,
+          autocorrect: false,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: l10n.endpointsSuggestionModelField,
+            hintText: _llmModel.text.trim(),
+            helperText: l10n.endpointsSuggestionModelHelper,
+            helperMaxLines: 4,
+          ),
+        ),
       ),
       Row(
         children: [

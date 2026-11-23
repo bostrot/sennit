@@ -7,8 +7,8 @@ import 'llm_request.dart';
 /// The AI features that ask the model something, as far as how much they may
 /// send and how long the answer may be.
 enum AiFeature {
-  /// The chips on a notification: two short answers, written while the
-  /// notification waits.
+  /// The chips on a notification: two short answers, added to it when they
+  /// are written.
   smartReplies,
 
   /// A quick message the user tapped for.
@@ -297,7 +297,7 @@ class LlmBudget {
   /// and a 200k window filled to the brim would be minutes of that for a
   /// birthday wish. Learning from a chat is the one feature the user waits
   /// for knowing it reads a lot, so it gets most; the chips get least, since
-  /// the notification is held until they are written.
+  /// they are worth most the moment the message arrives.
   static ({double share, int localCap, int hostedCap}) _inputShare(
     AiFeature feature,
   ) => switch (feature) {
@@ -327,9 +327,10 @@ class LlmBudget {
     final int first;
     final int retry;
     if (feature == AiFeature.smartReplies) {
-      // Short and fast whatever the model: the notification waits for these.
-      // A thinking model gets enough to think briefly, and no retry — the
-      // second try would arrive after the notification went out.
+      // Short and fast whatever the model: they are worth most while the
+      // notification is new. A thinking model is asked not to think, and gets
+      // enough to think briefly should the server ignore that; no retry — the
+      // second try would arrive after the notification was read.
       first = thinking ? math.min(cap, 1024) : math.min(cap, natural);
       retry = first;
     } else {
