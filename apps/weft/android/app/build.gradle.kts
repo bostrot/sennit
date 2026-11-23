@@ -165,6 +165,10 @@ dependencies {
     // exactly that, because a device with no Play services and no watch is not
     // an error state, it is most Weft users.
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    // Sign-in in the person's own browser (BrowserAuth.kt). 1.9 is the
+    // first with Auth Tabs, which return the redirect to Sennit alone; the
+    // in-app web view plugin brings 1.8, and this lifts it.
+    implementation("androidx.browser:browser:1.9.0")
     // The other half of `isCoreLibraryDesugaringEnabled` above.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // The other half of `execution = "ANDROIDX_TEST_ORCHESTRATOR"`. It is an

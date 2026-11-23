@@ -5302,6 +5302,34 @@
       }
     }
   },
+  "bridgeBrowserExternalIntro": "Sign in to {network} in your browser, with your company’s sign-in. Sennit never sees your password: your browser hands back the signed-in session, and Sennit passes it straight to your server.",
+  "@bridgeBrowserExternalIntro": {
+    "description": "Explains, before the person picks a sign-in, that the messenger's sign-in (usually a company single sign-on such as GitLab, Google or Entra ID) happens in the device's web browser and what the app does with the result. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
+  },
+  "bridgeBrowserExternal": "Sign in with {provider} in your browser",
+  "@bridgeBrowserExternal": {
+    "description": "Button that opens the device's web browser to sign in to a messenger through one single sign-on provider. {provider} is the provider's name as the server labels it.",
+    "placeholders": {
+      "provider": {
+        "type": "String",
+        "description": "A sign-in provider's name, such as GitLab, Google, Entra ID or a company name; never translated."
+      }
+    }
+  },
+  "bridgeBrowserInApp": "Open the sign-in page in Sennit",
+  "@bridgeBrowserInApp": {
+    "description": "Secondary button, under the browser sign-in buttons, that opens the messenger's whole sign-in page inside the app instead, where a password works too."
+  },
+  "bridgeBrowserExternalFailed": "Signing in through your browser didn’t work. Try again, or open the sign-in page in Sennit.",
+  "@bridgeBrowserExternalFailed": {
+    "description": "Short message shown when a sign-in in the device's web browser came back without a usable session."
+  },
   "bridgeMethodBotTitle": "Connect a bot account",
   "@bridgeMethodBotTitle": {
     "description": "Title of a developer sign-in method that connects a bot account instead of a person. Under ~30 chars."

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Flutter
 import Intents
 import UIKit
@@ -73,6 +74,10 @@ import flutter_local_notifications
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftSiriChannel") {
       WeftSiriChannel.register(with: registrar)
     }
+    // Sign-in in the person's own browser. Costs nothing until used.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftBrowserAuth") {
+      WeftBrowserAuth.register(with: registrar)
+    }
   }
 }
 
@@ -113,5 +118,83 @@ enum WeftBackgroundWork {
     guard task != .invalid else { return }
     UIApplication.shared.endBackgroundTask(task)
     task = .invalid
+  }
+}
+
+/// `com.bostrot.weft/browser_auth`: a web sign-in in Safari's own sheet, and
+/// the address it finishes on. The iOS end of `BrowserAuth.kt`.
+///
+/// `ASWebAuthenticationSession` watches for the callback scheme itself and
+/// hands the address to this session alone — the official Mattermost app's
+/// `mmauth://` registration is never consulted. It shares Safari's cookies,
+/// so a company SSO the person is already signed in to does not ask again.
+final class WeftBrowserAuth: NSObject, ASWebAuthenticationPresentationContextProviding {
+  private static let shared = WeftBrowserAuth()
+
+  private var session: ASWebAuthenticationSession?
+  private var pending: FlutterResult?
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(
+      name: "com.bostrot.weft/browser_auth", binaryMessenger: registrar.messenger())
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "authenticate":
+        let args = call.arguments as? [String: Any]
+        guard let raw = args?["url"] as? String, let url = URL(string: raw),
+          let scheme = args?["callbackScheme"] as? String
+        else {
+          result(FlutterError(code: "bad_args", message: "url and callbackScheme are required", details: nil))
+          return
+        }
+        shared.authenticate(url: url, scheme: scheme, result: result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private func authenticate(url: URL, scheme: String, result: @escaping FlutterResult) {
+    // A second tap while the first sheet is up abandons the first.
+    session?.cancel()
+    finish(nil)
+    pending = result
+    let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) {
+      [weak self] callback, error in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.session = nil
+        if let callback {
+          self.finish(callback.absoluteString)
+        } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+          self.finish(nil)
+        } else {
+          let pending = self.pending
+          self.pending = nil
+          pending?(FlutterError(code: "failed", message: error?.localizedDescription, details: nil))
+        }
+      }
+    }
+    session.presentationContextProvider = self
+    self.session = session
+    if !session.start() {
+      self.session = nil
+      let pending = self.pending
+      self.pending = nil
+      pending?(FlutterError(code: "no_browser", message: "The sign-in sheet could not open", details: nil))
+    }
+  }
+
+  private func finish(_ url: String?) {
+    let pending = self.pending
+    self.pending = nil
+    pending?(url)
+  }
+
+  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+    UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+      .first { $0.isKeyWindow } ?? ASPresentationAnchor()
   }
 }

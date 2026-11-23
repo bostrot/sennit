@@ -10,6 +10,7 @@ import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../components/qr_card.dart';
 import 'bridge_browser_sign_in.dart';
+import 'bridge_external_sign_in.dart';
 import 'bridge_guides.dart';
 
 /// Connecting an account, as one guided flow.
@@ -43,6 +44,7 @@ class BridgeLoginFlowScreen extends StatefulWidget {
     this.reloginId,
     this.onUseAdminRoom,
     this.browserSignIn,
+    this.externalSignIn,
   });
 
   final BridgeLoginBackend client;
@@ -64,6 +66,11 @@ class BridgeLoginFlowScreen extends StatefulWidget {
   /// Opens a network's sign-in page for a `cookies` step. Defaults to the
   /// in-app browser where the platform has one; tests hand in a fake.
   final BrowserSignIn? browserSignIn;
+
+  /// Signs in to a network's single sign-on in the person's own browser, for
+  /// a `cookies` step. Defaults to Mattermost's where the platform can catch
+  /// the redirect; tests hand in a fake.
+  final ExternalSignIn? externalSignIn;
 
   @override
   State<BridgeLoginFlowScreen> createState() => _BridgeLoginFlowScreenState();
@@ -100,6 +107,16 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
 
   /// The refresh count last announced, so each fresh QR is said once.
   int _announcedRefreshes = 0;
+
+  /// The browser sign-ins the `cookies` step on screen offers, once asked,
+  /// and which step they were asked for.
+  List<ExternalSignInProvider>? _providers;
+  String? _providersForStep;
+
+  /// A browser sign-in is open; its buttons wait for it.
+  bool _externalBusy = false;
+
+  late final ExternalSignIn _defaultExternal = MattermostExternalSignIn();
 
   String get _networkName => widget.bridgeLabel ?? widget.network.label;
 
@@ -213,6 +230,55 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
         (browserSignInAvailable ? openBrowserSignIn : null);
   }
 
+  /// How a `cookies` step is done in the person's own browser, or null when
+  /// it cannot be. Like [_browser], it needs a backend that takes cookies.
+  ExternalSignIn? get _external {
+    if (!widget.client.supportsCookies) return null;
+    return widget.externalSignIn ??
+        (externalSignInAvailable ? _defaultExternal : null);
+  }
+
+  /// The browser sign-ins for [step], or none while they are being asked.
+  List<ExternalSignInProvider> _providersFor(LoginStep step) =>
+      _providersForStep == step.stepId ? _providers ?? const [] : const [];
+
+  /// Whether [step]'s browser sign-ins are still being asked for.
+  bool _askingProviders(LoginStep step) =>
+      _external != null && _providersForStep != step.stepId;
+
+  Future<void> _loadProviders(LoginStep step) async {
+    final external = _external;
+    final params = step.cookies;
+    if (external == null || params == null) return;
+    final found = await external.providers(params);
+    if (!mounted || _session?.currentStep?.stepId != step.stepId) return;
+    setState(() {
+      _providers = found;
+      _providersForStep = step.stepId;
+    });
+  }
+
+  Future<void> _openExternal(
+    LoginStep step,
+    ExternalSignInProvider provider,
+  ) async {
+    final external = _external;
+    final params = step.cookies;
+    if (external == null || params == null || _externalBusy) return;
+    setState(() => _externalBusy = true);
+    try {
+      final values = await external.signIn(params, provider);
+      if (!mounted || values == null) return;
+      unawaited(_session?.submitCookies(values));
+    } on ExternalSignInException {
+      if (mounted) {
+        showWeftMessage(context, context.l10n.bridgeBrowserExternalFailed);
+      }
+    } finally {
+      if (mounted) setState(() => _externalBusy = false);
+    }
+  }
+
   Future<void> _openBrowser(LoginStep step) async {
     final browser = _browser;
     final params = step.cookies;
@@ -233,6 +299,9 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
     _fieldErrors.clear();
     _submitted = false;
     _inputsForStep = step.stepId;
+    _providers = null;
+    _providersForStep = null;
+    if (step.type == LoginStepType.cookies) unawaited(_loadProviders(step));
   }
 
   TextEditingController _controllerFor(LoginInputField field) =>
@@ -352,12 +421,22 @@ class _BridgeLoginFlowScreenState extends State<BridgeLoginFlowScreen> {
           onTryAnother: _hasAlternatives ? _chooseAnother : null,
           onClose: () => _leave(false),
         ),
+        // Which buttons the step gets depends on what the server offers in
+        // the browser, so it waits for that answer — a moment, and only on
+        // the platforms that can open one.
         (BridgeLoginStatus.waitingForUser, final s?)
-            when s.type == LoginStepType.cookies && _browser != null =>
+            when s.type == LoginStepType.cookies && _askingProviders(s) =>
+          _Working(label: context.l10n.bridgeFlowLoadingMethods(_networkName)),
+        (BridgeLoginStatus.waitingForUser, final s?)
+            when s.type == LoginStepType.cookies &&
+                (_browser != null || _providersFor(s).isNotEmpty) =>
           _BrowserStep(
             network: widget.network,
             networkName: _networkName,
-            onOpen: () => _openBrowser(s),
+            onOpen: _browser != null ? () => _openBrowser(s) : null,
+            providers: _providersFor(s),
+            onOpenExternal: (provider) => _openExternal(s, provider),
+            externalBusy: _externalBusy,
             onTryAnother: _hasAlternatives ? _chooseAnother : null,
           ),
         (BridgeLoginStatus.waitingForUser, final s?)
@@ -1151,31 +1230,66 @@ class _BrowserStep extends StatelessWidget {
     required this.network,
     required this.networkName,
     required this.onOpen,
+    this.providers = const [],
+    this.onOpenExternal,
+    this.externalBusy = false,
     this.onTryAnother,
   });
 
   final ChatNetwork network;
   final String networkName;
-  final VoidCallback onOpen;
+
+  /// Opens the sign-in page inside Sennit; null where there is none.
+  final VoidCallback? onOpen;
+
+  /// The single sign-ons the server offers in the person's own browser.
+  ///
+  /// When there are any they lead: they are what most people on a company
+  /// server sign in with, Google's refuses to open inside an app at all, and
+  /// the browser usually remembers the person already. The page inside
+  /// Sennit stays under them for a password.
+  final List<ExternalSignInProvider> providers;
+  final ValueChanged<ExternalSignInProvider>? onOpenExternal;
+  final bool externalBusy;
+
   final VoidCallback? onTryAnother;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final external = providers.isNotEmpty && onOpenExternal != null;
+    final onOpen = this.onOpen;
     return ListView(
       shrinkWrap: true,
       children: [
         _Header(
           network: network,
           title: l10n.bridgeMethodBrowserTitle(networkName),
-          subtitle: l10n.bridgeBrowserIntro(networkName),
+          subtitle: external
+              ? l10n.bridgeBrowserExternalIntro(networkName)
+              : l10n.bridgeBrowserIntro(networkName),
         ),
         const SizedBox(height: WeftSpace.lg),
-        FilledButton.icon(
-          onPressed: onOpen,
-          icon: const Icon(Icons.open_in_new_rounded, size: 18),
-          label: Text(l10n.bridgeBrowserContinue(networkName)),
-        ),
+        if (external) ...[
+          for (final provider in providers) ...[
+            FilledButton.icon(
+              onPressed: externalBusy ? null : () => onOpenExternal!(provider),
+              icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+              label: Text(l10n.bridgeBrowserExternal(provider.label)),
+            ),
+            const SizedBox(height: WeftSpace.sm),
+          ],
+          if (onOpen != null)
+            OutlinedButton(
+              onPressed: externalBusy ? null : onOpen,
+              child: Text(l10n.bridgeBrowserInApp),
+            ),
+        ] else if (onOpen != null)
+          FilledButton.icon(
+            onPressed: onOpen,
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: Text(l10n.bridgeBrowserContinue(networkName)),
+          ),
         if (onTryAnother != null) ...[
           const SizedBox(height: WeftSpace.sm),
           TextButton(
