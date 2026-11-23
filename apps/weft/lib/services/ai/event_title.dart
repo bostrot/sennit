@@ -7,6 +7,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'conversation_context.dart' show kAiContextMessages;
 import 'llm_budget.dart';
 import 'llm_request.dart';
+import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
 /// How many messages of the conversation the title model is shown, the one
 /// with the date included.
@@ -216,14 +217,17 @@ String _format(String sender, String text, int limit, {required bool own}) {
 ///
 /// [transcript] is [eventTitleTranscript]'s output. The same
 /// OpenAI-compatible chat completions call as [suggestSmartReplies], for the
-/// same reason. Returns null on any failure: the caller already has a
-/// rule-made title, and a calendar entry is not the place for an error.
+/// same reason. [memory] is what the user noted and Sennit learned about the
+/// chat and its people — which is how "Lea" becomes "Lea (sister)" or a
+/// nickname the user uses. Returns null on any failure: the caller already has
+/// a rule-made title, and a calendar entry is not the place for an error.
 Future<String?> suggestEventTitle({
   required String baseUrl,
   required String model,
   String? apiKey,
   required List<String> transcript,
   LlmBudget? budget,
+  AiMemory? memory,
   http.Client? client,
   Duration? timeout,
 }) async {
@@ -231,9 +235,8 @@ Future<String?> suggestEventTitle({
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return null;
   }
-  final room = (budget ?? LlmBudget.resolve(base)).forFeature(
-    AiFeature.eventTitle,
-  );
+  final limits = budget ?? LlmBudget.resolve(base);
+  final room = limits.forFeature(AiFeature.eventTitle);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
@@ -264,7 +267,8 @@ Future<String?> suggestEventTitle({
                 '"Dinner with Sam at Luigi\'s", not "Meeting". At most '
                 'eight words, in the same language as the chat, without '
                 'the date or time, never "You" and never a copied '
-                'message.',
+                'message.'
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits, feature: AiFeature.eventTitle)}',
           },
           // Worked examples, as in the reply prompt: they pin the format
           // and leave no placeholder to parrot back. The second has

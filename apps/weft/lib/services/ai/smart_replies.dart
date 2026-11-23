@@ -63,7 +63,7 @@ Future<List<String>> suggestSmartReplies({
                 'markdown. Each reply is a complete sentence of at most '
                 'eight words, in the same language as the conversation.'
                 '${calendarPromptBlock(calendar)}'
-                '${memoryPromptBlock(memory, baseUrl: base, budget: limits)}',
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits, feature: AiFeature.smartReplies)}',
           },
           // One worked example pins the format better than any amount
           // of instruction — and gives the template no placeholder text

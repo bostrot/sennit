@@ -6,6 +6,7 @@ import 'package:weft_domain/weft_domain.dart';
 import '../ai/auto_reply_service.dart' show AutoReplyEndpoint;
 import '../ai/conversation_context.dart';
 import '../ai/llm_budget.dart' show AiFeature;
+import '../ai/person_memory.dart' show AiMemory;
 import 'todo_assistant.dart';
 import 'todo_item.dart';
 
@@ -39,6 +40,7 @@ class TodoAgent {
     required AutoReplyEndpoint? Function() endpoint,
     required List<TodoItem> Function(String chatId) openItemsFor,
     required void Function(Chat chat, TodoChanges changes) apply,
+    AiMemory? Function(Chat chat, List<WeftMessage> recent)? memory,
     TodoProposer? proposer,
     Duration settle = kTodoSettle,
     DateTime Function()? now,
@@ -50,6 +52,7 @@ class TodoAgent {
        _endpoint = endpoint,
        _openItemsFor = openItemsFor,
        _apply = apply,
+       _memory = memory,
        _proposer = proposer ?? proposeTodoChanges,
        _settle = settle,
        _now = now ?? DateTime.now;
@@ -62,6 +65,10 @@ class TodoAgent {
   final AutoReplyEndpoint? Function() _endpoint;
   final List<TodoItem> Function(String chatId) _openItemsFor;
   final void Function(Chat chat, TodoChanges changes) _apply;
+
+  /// What the prompt is told about [Chat] and its people, or null — the
+  /// personal memory gate, read per review.
+  final AiMemory? Function(Chat chat, List<WeftMessage> recent)? _memory;
   final TodoProposer _proposer;
   final Duration _settle;
   final DateTime Function() _now;
@@ -148,6 +155,7 @@ class TodoAgent {
         open: open,
         today: _now(),
         budget: endpoint.budget,
+        memory: _memory?.call(chat, recent),
       );
       if (changes == null || changes.isEmpty) return;
       // Switched off while the model was thinking: drop the answer.

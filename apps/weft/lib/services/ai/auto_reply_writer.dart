@@ -172,7 +172,7 @@ Future<AutoReplyDraft> composeAutoReply({
                 'without them is never sent.\n\n'
                 "The user's instruction:\n$instruction"
                 '${calendarPromptBlock(calendar)}'
-                '${memoryPromptBlock(memory, baseUrl: base, budget: limits)}',
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits, feature: AiFeature.autoReply)}',
           },
           {
             'role': 'user',

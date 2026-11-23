@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../ai/llm_budget.dart';
 import '../ai/llm_request.dart';
+import '../ai/person_memory.dart' show AiMemory, memoryPromptBlock;
 import 'todo_item.dart';
 
 /// How many new entries one conversation may add at once.
@@ -53,6 +54,7 @@ typedef TodoProposer =
       required List<TodoItem> open,
       required DateTime today,
       LlmBudget? budget,
+      AiMemory? memory,
     });
 
 /// Asks the user's model what the conversation adds to, or ticks off, the
@@ -61,8 +63,11 @@ typedef TodoProposer =
 /// The same OpenAI-compatible endpoint the reply chips and auto-replies use.
 /// The model is shown the conversation and the entries still open *for that
 /// conversation*, numbered — small local models copy a number back far more
-/// reliably than an id. Null on any failure: the list is a convenience, and a
-/// model that is down must never surface as an error in the chat.
+/// reliably than an id. [memory] — what the user noted and Sennit learned about
+/// the chat and its people — goes at the end of the system message, so a
+/// title names "Mia's birthday present" rather than "the present". Null on any
+/// failure: the list is a convenience, and a model that is down must never
+/// surface as an error in the chat.
 Future<TodoChanges?> proposeTodoChanges({
   required String baseUrl,
   required String model,
@@ -72,12 +77,14 @@ Future<TodoChanges?> proposeTodoChanges({
   required List<TodoItem> open,
   required DateTime today,
   LlmBudget? budget,
+  AiMemory? memory,
   http.Client? client,
   Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) return null;
-  final room = (budget ?? LlmBudget.resolve(base)).forFeature(AiFeature.todo);
+  final limits = budget ?? LlmBudget.resolve(base);
+  final room = limits.forFeature(AiFeature.todo);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
@@ -94,7 +101,12 @@ Future<TodoChanges?> proposeTodoChanges({
         'model': model,
         'temperature': 0.2,
         'messages': [
-          {'role': 'system', 'content': todoSystemPrompt},
+          {
+            'role': 'system',
+            'content':
+                '$todoSystemPrompt'
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits, feature: AiFeature.todo)}',
+          },
           // One worked example, for the same reason the reply chips carry
           // one: it pins the format better than any instruction does.
           {

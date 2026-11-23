@@ -14,6 +14,7 @@ import '../services/todo/todo_agent.dart';
 import '../services/todo/todo_assistant.dart';
 import '../services/todo/todo_item.dart';
 import 'auto_reply_providers.dart' show autoReplyEndpointProvider;
+import 'person_memory_providers.dart' show aiMemoryForPromptProvider;
 import 'providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
@@ -257,6 +258,7 @@ final todoAgentProvider = Provider<TodoAgent?>((ref) {
         ref.read(todoListProvider.notifier).openFor(chatId),
     apply: (chat, changes) =>
         ref.read(todoListProvider.notifier).applyChanges(chat, changes),
+    memory: (chat, recent) => ref.read(aiMemoryForPromptProvider)(chat, recent),
   );
 
   ref.onDispose(() => unawaited(agent.dispose()));

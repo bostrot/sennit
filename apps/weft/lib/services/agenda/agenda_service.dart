@@ -6,9 +6,12 @@ import 'package:weft_search/weft_search.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/auto_reply_providers.dart';
+import '../../app/person_memory_providers.dart' show aiMemoryForPromptProvider;
+import '../../app/providers.dart' show chatRepositoryProvider;
 import '../../app/search_providers.dart';
 import '../../app/stores.dart';
 import '../ai/event_title.dart';
+import '../ai/person_memory.dart' show AiMemory;
 import '../ai/llm_budget.dart' show AiFeature;
 import 'event_detector.dart';
 
@@ -109,6 +112,7 @@ class AgendaService {
             .transcriptChars,
       ),
       budget: endpoint.budget,
+      memory: _memoryFor(message, conversation),
     );
     final title = chooseEventTitle(
       model: suggested,
@@ -117,6 +121,27 @@ class AgendaService {
     );
     if (title == candidate.title) return title;
     return _titles[message.eventId] = title;
+  }
+
+  /// What the title prompt is told about [message]'s chat and its people, or
+  /// null — off, nothing noted, or no chat to look it up for.
+  AiMemory? _memoryFor(
+    WeftMessage message,
+    Iterable<WeftMessage> conversation,
+  ) {
+    try {
+      final chat = _ref
+          .read(chatRepositoryProvider)
+          .chatForRoom(message.roomId);
+      if (chat == null) return null;
+      return _ref.read(aiMemoryForPromptProvider)(chat, [
+        ...conversation,
+        message,
+      ]);
+    } on Object {
+      // No repository — a widget test, or a session still starting.
+      return null;
+    }
   }
 
   Future<AgendaCandidate?> _examine(WeftMessage message) async {

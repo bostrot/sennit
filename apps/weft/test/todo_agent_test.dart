@@ -10,6 +10,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/services/ai/auto_reply_service.dart';
+import 'package:weft/services/ai/person_memory.dart' show AiMemory;
 import 'package:weft/services/todo/todo_agent.dart';
 import 'package:weft/services/todo/todo_assistant.dart';
 import 'package:weft/services/todo/todo_item.dart';
@@ -40,6 +41,8 @@ void main() {
       );
 
   late List<List<String>> asked;
+  late List<AiMemory?> told;
+  late AiMemory? remembered;
   late List<TodoChanges> applied;
   late bool enabled;
   late AutoReplyEndpoint? configured;
@@ -57,6 +60,7 @@ void main() {
     endpoint: () => configured,
     openItemsFor: (_) => open,
     apply: (_, changes) => applied.add(changes),
+    memory: (_, _) => remembered,
     settle: Duration.zero,
     proposer:
         ({
@@ -68,8 +72,10 @@ void main() {
           required open,
           required today,
           budget,
+          memory,
         }) async {
           asked.add(transcript);
+          told.add(memory);
           if (failure != null) throw failure!;
           return answer;
         },
@@ -77,6 +83,8 @@ void main() {
 
   setUp(() {
     asked = [];
+    told = [];
+    remembered = null;
     applied = [];
     enabled = true;
     configured = endpoint;
@@ -101,6 +109,12 @@ void main() {
       expect(applied.single.add.single.title, 'Bring the cable');
     },
   );
+
+  test('the chat\'s memory goes along with the review', () async {
+    remembered = const AiMemory(chat: '- Mia is Grace’s daughter');
+    await agent().handleMessage(msg('could you get Mia a present?'));
+    expect(told.single?.chat, '- Mia is Grace’s daughter');
+  });
 
   test('a promise the user makes counts too', () async {
     await agent().handleMessage(msg("I'll send it tonight", own: true));
@@ -169,6 +183,7 @@ void main() {
             required open,
             required today,
             budget,
+            memory,
           }) async {
             asked.add(transcript);
             return answer;
