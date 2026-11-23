@@ -1,48 +1,64 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_matrix/weft_matrix.dart' show MatrixNotificationSession;
 import 'package:weft_merge/weft_merge.dart' show IdentityGraph, MergedTimeline;
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/auto_reply_service.dart' show AutoReplyEndpoint;
+import '../services/ai/conversation_context.dart' show kAiContextMessages;
 import '../services/ai/event_title.dart' show recentConversationTranscript;
 import '../services/ai/llm_budget.dart' show AiFeature;
+import '../services/ai/memory_learner.dart';
 import '../services/ai/person_memory.dart';
+import '../services/status/status_feed.dart' show isStatusBroadcastChat;
+import 'auto_reply_providers.dart' show autoReplyEndpointProvider;
 import 'providers.dart';
+import 'search_providers.dart' show appInForegroundProvider;
+import 'session_providers.dart';
 import 'stores.dart';
 
 /// The three switches of personal memory, read out of the settings store.
 ///
-/// Every one of them off unless set — see [WeftSettings.personMemoryInAi] —
-/// and every one read per use rather than captured, so turning the memory
+/// The master switch and the encrypted-chat one off unless set — see
+/// [WeftSettings.personMemoryInAi] — automatic learning on, under the master
+/// switch; every one read per use rather than captured, so turning the memory
 /// off affects the next reply chip and not the next launch.
 @immutable
 class PersonMemorySettings {
   const PersonMemorySettings({
     this.useInAi = false,
-    this.suggestFacts = false,
+    this.autoLearn = true,
     this.encryptedChats = false,
   });
 
   factory PersonMemorySettings.fromStore(SettingsStore settings) =>
       PersonMemorySettings(
         useInAi: settings.getBool(WeftSettings.personMemoryInAi),
-        suggestFacts: settings.getBool(WeftSettings.personMemorySuggest),
+        autoLearn: settings.getBool(
+          WeftSettings.personMemoryAutoLearn,
+          fallback: true,
+        ),
         encryptedChats: settings.getBool(
           WeftSettings.personMemoryEncryptedChats,
         ),
       );
 
-  /// The master switch: whether a note is ever sent to the model, with
-  /// anything. Off means no note in any prompt and no facts proposed.
+  /// The master switch: whether memory is ever sent to the model, with
+  /// anything. Off means no memory in any prompt and nothing learned.
   final bool useInAi;
 
-  /// Whether facts are proposed on their own after a quick message, on top of
-  /// the "Learn from chat" button that always proposes when asked.
-  final bool suggestFacts;
+  /// Whether the memory keeps itself up to date in the background, on top of
+  /// the "Learn now" button that always learns when asked. See
+  /// `MemoryLearner`.
+  final bool autoLearn;
+
+  /// Whether learning runs on its own now: both switches on.
+  bool get learnsAutomatically => useInAi && autoLearn;
 
   /// Whether an end-to-end encrypted conversation may be sent to learn from.
   final bool encryptedChats;
@@ -54,7 +70,7 @@ class PersonMemorySettings {
 
   void writeTo(SettingsStore settings) {
     settings.setBool(WeftSettings.personMemoryInAi, value: useInAi);
-    settings.setBool(WeftSettings.personMemorySuggest, value: suggestFacts);
+    settings.setBool(WeftSettings.personMemoryAutoLearn, value: autoLearn);
     settings.setBool(
       WeftSettings.personMemoryEncryptedChats,
       value: encryptedChats,
@@ -63,11 +79,11 @@ class PersonMemorySettings {
 
   PersonMemorySettings copyWith({
     bool? useInAi,
-    bool? suggestFacts,
+    bool? autoLearn,
     bool? encryptedChats,
   }) => PersonMemorySettings(
     useInAi: useInAi ?? this.useInAi,
-    suggestFacts: suggestFacts ?? this.suggestFacts,
+    autoLearn: autoLearn ?? this.autoLearn,
     encryptedChats: encryptedChats ?? this.encryptedChats,
   );
 }
@@ -88,7 +104,8 @@ void savePersonMemorySettings(WidgetRef ref, PersonMemorySettings settings) {
   ref.read(settingsRevisionProvider.notifier).bump();
 }
 
-/// Every note, waiting fact and dismissal, as the keychain holds them.
+/// Every note, learned fact, waiting fact and dismissal, as the keychain
+/// holds them.
 ///
 /// Published first and written second, unlike the settings-table notifiers:
 /// the keychain is a channel call, and the editor should not wait on it to
@@ -128,8 +145,42 @@ class PersonMemoryNotifier extends Notifier<MemoryBook> {
   void saveNote(List<String> keys, String note) =>
       _publish(state.withNote(keys, note));
 
-  void propose(List<String> keys, List<String> facts) =>
-      _publish(state.withProposals(keys, facts));
+  /// [update] written into the memory of the chat filed under [chatKeys] and
+  /// of its [people] — see [MemoryBook.applyLearning]. Returns how much it
+  /// changed.
+  int learn(
+    MemoryUpdate update, {
+    required List<String> chatKeys,
+    required List<MemoryPerson> people,
+    required List<NumberedFact> numbered,
+    DateTime? now,
+  }) {
+    final result = state.applyLearning(
+      update,
+      chatKeys: chatKeys,
+      people: people,
+      numbered: numbered,
+      now: now ?? DateTime.now(),
+    );
+    final changed = result.added + result.updated + result.dropped;
+    if (changed > 0) _publish(result.book);
+    return changed;
+  }
+
+  void editLearned(List<String> keys, LearnedFact fact, String text) =>
+      _publish(state.editLearned(keys, fact, text, now: DateTime.now()));
+
+  void pinLearned(
+    List<String> keys,
+    LearnedFact fact, {
+    required bool pinned,
+  }) => _publish(state.pinLearned(keys, fact, pinned: pinned));
+
+  void deleteLearned(List<String> keys, LearnedFact fact) =>
+      _publish(state.deleteLearned(keys, fact));
+
+  /// Takes back the last automatic update.
+  void undoAutomatic() => _publish(state.undoAutomatic());
 
   void accept(List<String> keys, String fact) =>
       _publish(state.accept(keys, fact));
@@ -205,14 +256,14 @@ List<MemoryPerson> memoryPeopleFor(
   return people;
 }
 
-/// What the prompts for [chat] are told, from [book]: the chat's note and the
-/// notes of [people]. Null when there is none of either.
+/// What the prompts for [chat] are told, from [book]: the chat's memory and
+/// the memory of [people], notes and learned facts. Null when there is none.
 AiMemory? aiMemoryFrom(MemoryBook book, Chat chat, List<MemoryPerson> people) {
   final memory = AiMemory(
-    chat: book.noteFor(chatMemoryKeys(chat)),
+    chat: book.memoryFor(chatMemoryKeys(chat)),
     people: [
       for (final person in people)
-        if (book.noteFor(person.keys) case final note when note.isNotEmpty)
+        if (book.memoryFor(person.keys) case final note when note.isNotEmpty)
           (name: person.name, note: note),
     ],
   );
@@ -242,10 +293,11 @@ final aiMemoryForPromptProvider =
 
 /// How asking the model about a conversation ended.
 enum PersonFactsOutcome {
-  /// New facts are waiting for the user; how many is [PersonFactsResult.added].
-  proposed,
+  /// The memory was updated; how many facts changed is
+  /// [PersonFactsResult.changed].
+  learned,
 
-  /// The model answered, with nothing that is not already noted or waiting.
+  /// The model answered, with nothing that is not already remembered.
   nothingNew,
 
   /// The memory switch is off. Nothing was sent.
@@ -271,13 +323,15 @@ enum PersonFactsOutcome {
   /// The model used its whole budget before it wrote an answer.
   cutOff,
 
-  /// The model answered, but with no list of facts in it.
+  /// The model answered, but with no changes in a shape that could be read.
   unreadable,
 }
 
 typedef PersonFactsResult = ({
   PersonFactsOutcome outcome,
-  int added,
+
+  /// How many facts were added, rewritten or dropped.
+  int changed,
 
   /// The HTTP status a [PersonFactsOutcome.failed] request was answered with.
   int? status,
@@ -314,17 +368,19 @@ Future<List<WeftMessage>> loadHistoryForAi(
   return messages;
 }
 
-/// Asks the model what is worth remembering from [chat]'s [messages], and
-/// files the answer as facts waiting for the user under the chat's memory.
+/// Asks the model what to change in what is remembered about [chat] from its
+/// [messages], and writes the answer into the chat's and its [people]'s
+/// memory.
 ///
-/// Never writes a note: [PersonMemoryNotifier.propose] only adds to what is
-/// offered, and the user decides whether a fact goes into the chat's memory or
-/// a person's. Every gate is checked here, before anything is sent, so the two
-/// ways in — the "Learn from chat" button and the pass after a quick message —
-/// cannot disagree about what may leave the device: the master switch, the
-/// encrypted-chat switch, and the endpoint (which is also the Pro gate). How
-/// much of the conversation goes is the model's: its window's share for
-/// learning (see `LlmBudget`), up to hundreds of messages on a big one.
+/// Never touches a note the user wrote or a fact they pinned:
+/// [PersonMemoryNotifier.learn] only adds, rewrites and drops learned facts,
+/// and the last update can be undone. Every gate is checked here, before
+/// anything is sent, so the two ways in — the "Learn now" button and the
+/// background `MemoryLearner` — cannot disagree about what may leave the
+/// device: the master switch, the encrypted-chat switch, and the endpoint
+/// (which is also the Pro gate). How much of the conversation goes is the
+/// model's: its window's share for learning (see `LlmBudget`), up to hundreds
+/// of messages on a big one.
 Future<PersonFactsResult> learnPersonFacts({
   required PersonMemorySettings settings,
   required AutoReplyEndpoint? endpoint,
@@ -334,12 +390,13 @@ Future<PersonFactsResult> learnPersonFacts({
   required Iterable<WeftMessage> messages,
   http.Client? client,
   Future<void>? cancel,
+  DateTime? now,
 }) async {
   PersonFactsResult done(
     PersonFactsOutcome outcome, {
-    int added = 0,
+    int changed = 0,
     int? status,
-  }) => (outcome: outcome, added: added, status: status);
+  }) => (outcome: outcome, changed: changed, status: status);
   if (!settings.useInAi) return done(PersonFactsOutcome.memoryOff);
   final keys = chatMemoryKeys(chat);
   if (keys.isEmpty) return done(PersonFactsOutcome.nothingToSend);
@@ -361,22 +418,25 @@ Future<PersonFactsResult> learnPersonFacts({
     return done(PersonFactsOutcome.nothingToSend);
   }
 
+  final book = memory.book;
+  final memoryChars = endpoint.budget.memoryChars;
+  final numbered = book.numberedFacts(keys, people, maxChars: memoryChars);
   Object? failure;
-  final before = memory.book.suggestionsFor(keys).length;
-  final facts = await suggestPersonFacts(
+  final update = await requestMemoryUpdate(
     baseUrl: endpoint.baseUrl,
     model: endpoint.model,
     apiKey: endpoint.apiKey,
     transcript: transcript,
     chatTitle: chat.title,
-    isGroup: chat.isGroup,
-    known: aiMemoryFrom(memory.book, chat, people),
+    people: [for (final p in people) p.name],
+    fixed: fixedMemoryText(book, keys, people, maxChars: memoryChars),
+    numbered: numbered,
     budget: endpoint.budget,
     client: client,
     cancel: cancel,
     onError: (error) => failure = error,
   );
-  if (failure != null) {
+  if (failure != null || update == null) {
     debugPrint(
       'weft: learn facts: ${recent.length} messages loaded, '
       '${transcript.length} sent, failed: '
@@ -397,13 +457,147 @@ Future<PersonFactsResult> learnPersonFacts({
       _ => done(PersonFactsOutcome.failed),
     };
   }
-  memory.propose(keys, facts);
-  final added = memory.book.suggestionsFor(keys).length - before;
+  final changed = memory.learn(
+    update,
+    chatKeys: keys,
+    people: people,
+    // Numbered against the book as it was sent; an edit made meanwhile is
+    // found by its text, or the change to it is skipped.
+    numbered: numbered,
+    now: now,
+  );
   debugPrint(
     'weft: learn facts: ${recent.length} messages loaded, '
-    '${transcript.length} sent, ${facts.length} facts read, $added new',
+    '${transcript.length} sent, $update, $changed changed',
   );
-  return added > 0
-      ? done(PersonFactsOutcome.proposed, added: added)
+  return changed > 0
+      ? done(PersonFactsOutcome.learned, changed: changed)
       : done(PersonFactsOutcome.nothingNew);
+}
+
+/// What the user wrote and pinned about the chat under [chatKeys] and its
+/// [people], for the learning prompt to leave alone: the notes and the pinned
+/// facts, each cut to a share of [maxChars].
+String fixedMemoryText(
+  MemoryBook book,
+  List<String> chatKeys,
+  List<MemoryPerson> people, {
+  required int maxChars,
+}) {
+  String fixed(List<String> keys, int chars) {
+    final pinned = [
+      for (final f in book.learnedFor(keys))
+        if (f.pinned) '- ${f.text}',
+    ];
+    final text = [
+      book.noteFor(keys),
+      if (pinned.isNotEmpty) pinned.join('\n'),
+    ].where((t) => t.isNotEmpty).join('\n');
+    return trimPersonMemory(text, maxChars: chars);
+  }
+
+  final share = people.isEmpty ? maxChars : maxChars ~/ 2;
+  final parts = [
+    if (fixed(chatKeys, share) case final chat when chat.isNotEmpty)
+      'About this chat:\n$chat',
+    for (final p in people)
+      if (fixed(p.keys, math.max(160, share ~/ people.length)) case final note
+          when note.isNotEmpty)
+        'About ${p.name}:\n$note',
+  ];
+  return parts.join('\n\n');
+}
+
+/// Where [MemoryLearner] keeps its per-chat counts: how many messages arrived
+/// since each chat was last read, and when. Counts and times only, never
+/// anything a message said.
+const String kMemoryLearnLogSetting = 'ai.person_memory_learn_log';
+
+/// The background learner, or null when this build cannot have one — demo
+/// mode, or before the session is up. Whether it *acts* is
+/// [PersonMemorySettings.learnsAutomatically] and an endpoint, read per check.
+final memoryLearnerProvider = Provider<MemoryLearner?>((ref) {
+  if (kDemoMode) return null;
+  final session = ref.watch(matrixSessionProvider);
+  if (!session.isInitialized) return null;
+
+  final repository = ref.watch(chatRepositoryProvider);
+  final settings = storesOrNull(ref)?.settings;
+  final learner = MemoryLearner(
+    incoming: MatrixNotificationSession.forClient(
+      session.client,
+    ).incomingMessages,
+    chatForRoom: repository.chatForRoom,
+    chatById: (id) => (ref.read(chatsProvider).value ?? const <Chat>[])
+        .where((c) => c.id == id)
+        .firstOrNull,
+    isServiceChat: repository.serviceChatIds.contains,
+    isBroadcast: isStatusBroadcastChat,
+    enabled: () =>
+        ref.read(personMemorySettingsProvider).learnsAutomatically &&
+        ref.read(autoReplyEndpointProvider) != null,
+    learn: (chat, state) => learnInBackground(ref, chat, state),
+    load: () => {
+      for (final MapEntry(:key, :value)
+          in (settings?.getJson(kMemoryLearnLogSetting) ??
+                  const <String, Object?>{})
+              .entries)
+        key: MemoryLearnState.fromJson(value),
+    },
+    save: settings == null
+        ? null
+        : (states) => settings.setJson(kMemoryLearnLogSetting, {
+            for (final MapEntry(:key, :value) in states.entries)
+              key: value.toJson(),
+          }),
+    foreground: ref.watch(appInForegroundProvider),
+  );
+  ref.onDispose(() => unawaited(learner.dispose()));
+  return learner;
+});
+
+/// One background pass over [chat]: its recent history, as much as the model
+/// has room for on the first pass and what arrived since the last one (with
+/// some of what led up to it) after that, through [learnPersonFacts] and its
+/// gates. True when the pass went through, whatever it learned.
+Future<bool> learnInBackground(
+  Ref ref,
+  Chat chat,
+  MemoryLearnState state,
+) async {
+  final endpoint = ref.read(autoReplyEndpointProvider);
+  if (endpoint == null) return false;
+  final repository = ref.read(chatRepositoryProvider);
+  final most = endpoint.budget.forFeature(AiFeature.learnFacts).maxMessages;
+  final wanted = state.lastLearned == null
+      ? most
+      : (state.newMessages + kAiContextMessages).clamp(
+          kAiContextMessages,
+          most,
+        );
+  final messages = await loadHistoryForAi(
+    await repository.timelineFor(chat.id),
+    wanted,
+  );
+  final result = await learnPersonFacts(
+    settings: ref.read(personMemorySettingsProvider),
+    endpoint: endpoint,
+    memory: ref.read(personMemoryProvider.notifier),
+    chat: chat,
+    people: memoryPeopleFor(repository.identityGraph, chat, messages),
+    // The newest [wanted]: a chat already open has more loaded than that.
+    messages: messages.length > wanted
+        ? messages.sublist(messages.length - wanted)
+        : messages,
+  );
+  debugPrint('weft: memory pass: ${result.outcome.name} ${result.changed}');
+  return switch (result.outcome) {
+    PersonFactsOutcome.failed ||
+    PersonFactsOutcome.timedOut ||
+    PersonFactsOutcome.cutOff ||
+    PersonFactsOutcome.unreadable ||
+    PersonFactsOutcome.noEndpoint ||
+    PersonFactsOutcome.memoryOff => false,
+    _ => true,
+  };
 }

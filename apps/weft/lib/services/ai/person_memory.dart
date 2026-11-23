@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -8,18 +9,25 @@ import 'package:weft_domain/weft_domain.dart';
 import 'llm_budget.dart';
 import 'llm_request.dart';
 
-/// What the user has noted for the AI features, in two layers, and the facts
-/// the model has offered to add, waiting for a yes or a no.
+/// What the user has noted for the AI features, and what Sennit learned on its
+/// own, in two layers.
 ///
 /// * **Chat memory** — detailed, one per conversation, groups included: what
 ///   is going on, plans, the tone used *in this chat*, the in-jokes. Filed
-///   under the chat's rooms, `room:<id>` (see [chatMemoryKeys]). What the
-///   model proposes lands here.
+///   under the chat's rooms, `room:<id>` (see [chatMemoryKeys]).
 /// * **Person memory** — a few lines per person, used in every chat they are
 ///   in: what they like to be called, relationship, birthday, du or Sie,
 ///   language, the facts that matter everywhere. Filed under the person's
 ///   network handles, `handle:<id>`, or `dm:<room>` / `user:<mxid>` for a
 ///   person Sennit has no handle for (see [personMemoryKeys]).
+///
+/// Each layer has the user's own note, which the model never touches, and the
+/// [learned] facts it keeps up to date by itself (see [applyLearning]) — each
+/// with when it was learned, and pinned once the user edits it, after which
+/// the model leaves it alone too. The last automatic update can be undone
+/// ([undo]). [suggestions] are facts an older version offered for a yes or a
+/// no; nothing adds to them any more, and those still waiting are shown until
+/// answered.
 ///
 /// One book for both, keyed by those prefixes, because the operations are the
 /// same and so is where it is kept. A person is whatever set of handles Sennit
@@ -36,8 +44,10 @@ import 'llm_request.dart';
 class MemoryBook {
   const MemoryBook({
     this.notes = const {},
+    this.learned = const {},
     this.suggestions = const {},
     this.dismissed = const {},
+    this.undo,
   });
 
   static const MemoryBook empty = MemoryBook();
@@ -45,12 +55,20 @@ class MemoryBook {
   /// The note under each key, Markdown as the user typed it.
   final Map<String, String> notes;
 
+  /// What the model learned under each key, oldest first.
+  final Map<String, List<LearnedFact>> learned;
+
   /// Facts the model proposed and the user has not answered yet.
   final Map<String, List<String>> suggestions;
 
-  /// Facts the user said no to, so the model is not let offer them again.
-  /// Bounded per key by [kPersonMemoryDismissedLimit].
+  /// Facts the user said no to — dismissed, deleted, or undone — so the model
+  /// is not let learn them again. Bounded per key by
+  /// [kPersonMemoryDismissedLimit].
   final Map<String, List<String>> dismissed;
+
+  /// The last automatic update, for undoing it; null when there is none, or
+  /// it was undone.
+  final MemoryUndo? undo;
 
   /// The note for a person filed under [keys]: the distinct notes the keys
   /// hold, in key order, joined by a blank line. Empty when there is none.
@@ -67,6 +85,35 @@ class MemoryBook {
   /// The facts waiting for an answer for [keys], without duplicates.
   List<String> suggestionsFor(Iterable<String> keys) =>
       _union(suggestions, keys);
+
+  /// The facts learned for [keys], oldest first, without duplicates.
+  List<LearnedFact> learnedFor(Iterable<String> keys) {
+    final seen = <String>{};
+    return [
+      for (final key in keys)
+        for (final fact in learned[key] ?? const <LearnedFact>[])
+          if (seen.add(factKey(fact.text))) fact,
+    ];
+  }
+
+  /// Everything known about [keys], as a prompt is told it: the user's note,
+  /// then the learned facts it does not already say, as a list.
+  String memoryFor(Iterable<String> keys) {
+    final keyList = keys.toList();
+    final note = noteFor(keyList);
+    final facts = [
+      for (final fact in learnedFor(keyList))
+        if (!_noteSays(note, fact.text)) '- ${fact.text}',
+    ];
+    return [
+      if (note.isNotEmpty) note,
+      if (facts.isNotEmpty) facts.join('\n'),
+    ].join('\n\n');
+  }
+
+  /// Whether the last automatic update touched any of [keys].
+  bool undoTouches(Iterable<String> keys) =>
+      undo != null && keys.any(undo!.before.containsKey);
 
   List<String> _dismissedFor(Iterable<String> keys) => _union(dismissed, keys);
 
@@ -164,19 +211,329 @@ class MemoryBook {
   MemoryBook forget(Iterable<String> keys) {
     final keySet = keys.toSet();
     bool drop(String key, Object? _) => keySet.contains(key);
+    final before = {...?undo?.before}..removeWhere(drop);
     return MemoryBook(
       notes: {...notes}..removeWhere(drop),
+      learned: {...learned}..removeWhere(drop),
       suggestions: {...suggestions}..removeWhere(drop),
       dismissed: {...dismissed}..removeWhere(drop),
+      undo: before.isEmpty ? null : undo!._only(before),
     );
   }
 
-  /// [other]'s notes added under the keys this book has none for — the restore
-  /// rule every table in a backup follows: what is here wins.
-  MemoryBook mergedWith(MemoryBook other) =>
-      _copy(notes: {...other.notes, ...notes});
+  /// [other]'s notes and learned facts added under the keys this book has
+  /// none for — the restore rule every table in a backup follows: what is
+  /// here wins.
+  MemoryBook mergedWith(MemoryBook other) => _copy(
+    notes: {...other.notes, ...notes},
+    learned: {...other.learned, ...learned},
+  );
 
-  bool get isEmpty => notes.isEmpty && suggestions.isEmpty && dismissed.isEmpty;
+  /// The note for every key, learned facts included — what a backup carries.
+  /// Restored, the facts come back as part of the note: the user's from then
+  /// on.
+  Map<String, String> get notesWithLearned => {
+    for (final key in {...notes.keys, ...learned.keys})
+      if (memoryFor([key]) case final memory when memory.isNotEmpty)
+        key: memory,
+  };
+
+  bool get isEmpty =>
+      notes.isEmpty &&
+      learned.isEmpty &&
+      suggestions.isEmpty &&
+      dismissed.isEmpty;
+
+  /// [fact] under [keys] changed to [text] by the user, and pinned: the model
+  /// never changes or drops it again. An empty [text] deletes it.
+  MemoryBook editLearned(
+    Iterable<String> keys,
+    LearnedFact fact,
+    String text, {
+    required DateTime now,
+  }) {
+    final words = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (words.isEmpty) return deleteLearned(keys, fact);
+    if (words == fact.text) return pinLearned(keys, fact, pinned: true);
+    final keyList = keys.toList();
+    return _copy(
+      learned: _setAllFacts(learned, keyList, [
+        for (final f in learnedFor(keyList))
+          if (_same(f, fact))
+            LearnedFact(words, at: now, pinned: true, edited: true)
+          else
+            f,
+      ]),
+    );
+  }
+
+  /// [fact] pinned — kept as it is whatever the model learns — or let go.
+  MemoryBook pinLearned(
+    Iterable<String> keys,
+    LearnedFact fact, {
+    required bool pinned,
+  }) {
+    final keyList = keys.toList();
+    return _copy(
+      learned: _setAllFacts(learned, keyList, [
+        for (final f in learnedFor(keyList))
+          _same(f, fact) ? f.copyWith(pinned: pinned) : f,
+      ]),
+    );
+  }
+
+  /// [fact] gone from [keys], and remembered as unwanted so it is not learned
+  /// straight back.
+  MemoryBook deleteLearned(Iterable<String> keys, LearnedFact fact) {
+    final keyList = keys.toList();
+    return _copy(
+      learned: _setAllFacts(learned, keyList, [
+        for (final f in learnedFor(keyList))
+          if (!_same(f, fact)) f,
+      ]),
+      dismissed: _withDismissed(dismissed, keyList, [fact.text]),
+    );
+  }
+
+  /// [update] applied to the learned facts of the chat filed under [chatKeys]
+  /// and of its [people], as the automatic update it is: the user's notes and
+  /// every pinned fact left as they are, what the update replaced kept for
+  /// [undoAutomatic].
+  ///
+  /// [numbered] is what the ids in [update] point at, as [numberedFacts] gave
+  /// them to the prompt. A new fact is filed under the person it is
+  /// [MemoryAddition.about] when that names one of [people], else under the
+  /// chat; it is left out when the note there already says it, the user once
+  /// deleted it, or a learned fact says it already — and when it says more
+  /// than a learned one, it takes that one's place. Each layer then keeps its
+  /// newest [kChatLearnedLimit] or [kPersonLearnedLimit] facts, pinned ones
+  /// always.
+  ({MemoryBook book, int added, int updated, int dropped}) applyLearning(
+    MemoryUpdate update, {
+    required List<String> chatKeys,
+    required List<MemoryPerson> people,
+    required List<NumberedFact> numbered,
+    required DateTime now,
+  }) {
+    // Every layer the update may touch, as lists to change in place.
+    final layers = <String, ({List<String> keys, List<LearnedFact> facts})>{};
+    ({List<String> keys, List<LearnedFact> facts}) layer(List<String> keys) =>
+        layers.putIfAbsent(
+          keys.join('\u0000'),
+          () => (keys: keys, facts: learnedFor(keys).toList()),
+        );
+    var added = 0;
+    var updated = 0;
+    var dropped = 0;
+    final addedTexts = <String, List<String>>{};
+    void remember(List<String> keys, String text) =>
+        (addedTexts[keys.join('\u0000')] ??= []).add(text);
+
+    for (final change in update.updates) {
+      if (change.id < 1 || change.id > numbered.length) continue;
+      final target = numbered[change.id - 1];
+      final facts = layer(target.keys).facts;
+      final i = facts.indexWhere(
+        (f) => factKey(f.text) == factKey(target.text),
+      );
+      if (i < 0 || facts[i].pinned) continue;
+      final text = _cleanFact(change.fact);
+      if (text == null) continue;
+      if (factKey(text) == factKey(facts[i].text)) continue;
+      facts[i] = LearnedFact(text, at: now);
+      remember(target.keys, text);
+      updated++;
+    }
+    for (final id in update.drops) {
+      if (id < 1 || id > numbered.length) continue;
+      final target = numbered[id - 1];
+      final facts = layer(target.keys).facts;
+      final before = facts.length;
+      facts.removeWhere(
+        (f) => !f.pinned && factKey(f.text) == factKey(target.text),
+      );
+      dropped += before - facts.length;
+    }
+    for (final addition in update.adds) {
+      final text = _cleanFact(addition.fact);
+      if (text == null) continue;
+      final person = _personNamed(people, addition.about);
+      final keys = person?.keys ?? chatKeys;
+      if (keys.isEmpty) continue;
+      final key = factKey(text);
+      if (_dismissedFor(keys).any((d) => factKey(d) == key)) continue;
+      if (_noteSays(noteFor(keys), text)) continue;
+      // Said in the chat's memory already counts for a person's fact too.
+      if (person != null && _noteSays(noteFor(chatKeys), text)) continue;
+      final facts = layer(keys).facts;
+      if (facts.any((f) => factKey(f.text).contains(key))) continue;
+      // More than an unpinned fact said: it takes that one's place.
+      final i = facts.indexWhere(
+        (f) => !f.pinned && key.contains(factKey(f.text)),
+      );
+      if (i >= 0) {
+        facts[i] = LearnedFact(text, at: now);
+        updated++;
+      } else {
+        facts.add(LearnedFact(text, at: now));
+        added++;
+      }
+      remember(keys, text);
+    }
+    if (added + updated + dropped == 0) {
+      return (book: this, added: 0, updated: 0, dropped: 0);
+    }
+
+    var next = learned;
+    final before = <String, List<LearnedFact>>{};
+    final addedByKey = <String, List<String>>{};
+    for (final MapEntry(key: id, value: (:keys, :facts)) in layers.entries) {
+      for (final key in keys) {
+        before[key] = learned[key] ?? const [];
+        if (addedTexts[id] case final texts?) addedByKey[key] = texts;
+      }
+      final limit = id == chatKeys.join('\u0000')
+          ? kChatLearnedLimit
+          : kPersonLearnedLimit;
+      next = _setAllFacts(next, keys, _keepNewest(facts, limit));
+    }
+    return (
+      book: _copy(
+        learned: next,
+        undo: MemoryUndo(at: now, before: before, added: addedByKey),
+      ),
+      added: added,
+      updated: updated,
+      dropped: dropped,
+    );
+  }
+
+  /// The last automatic update taken back: the learned facts it changed as
+  /// they were before, minus what the user pinned since, and what it added
+  /// remembered as unwanted. This book itself when there is nothing to undo.
+  MemoryBook undoAutomatic() {
+    final last = undo;
+    if (last == null) return this;
+    final next = {...learned};
+    var no = dismissed;
+    for (final MapEntry(:key, value: was) in last.before.entries) {
+      final since = [
+        for (final f in learned[key] ?? const <LearnedFact>[])
+          if (f.pinned &&
+              f.at.isAfter(last.at) &&
+              !was.any((w) => factKey(w.text) == factKey(f.text)))
+            f,
+      ];
+      final restored = [...was, ...since];
+      if (restored.isEmpty) {
+        next.remove(key);
+      } else {
+        next[key] = List.unmodifiable(restored);
+      }
+      if (last.added[key] case final texts?) {
+        no = _withDismissed(no, [key], texts);
+      }
+    }
+    return MemoryBook(
+      notes: notes,
+      learned: next,
+      suggestions: suggestions,
+      dismissed: no,
+    );
+  }
+
+  /// The learned facts of the chat under [chatKeys] and of its [people] that
+  /// the model may change, numbered from 1 in the order returned — pinned ones
+  /// are not among them. At most [maxChars] of them in all, the chat's first.
+  List<NumberedFact> numberedFacts(
+    List<String> chatKeys,
+    List<MemoryPerson> people, {
+    int maxChars = 6000,
+  }) {
+    final result = <NumberedFact>[];
+    var used = 0;
+    for (final (keys, about) in [
+      (chatKeys, null),
+      for (final p in people) (p.keys, p.name),
+    ]) {
+      for (final fact in learnedFor(keys)) {
+        if (fact.pinned) continue;
+        used += fact.text.length + 12;
+        if (used > maxChars) return result;
+        result.add((keys: keys, about: about, text: fact.text));
+      }
+    }
+    return result;
+  }
+
+  static bool _same(LearnedFact a, LearnedFact b) =>
+      factKey(a.text) == factKey(b.text);
+
+  static MemoryPerson? _personNamed(List<MemoryPerson> people, String? name) {
+    final wanted = name?.trim().toLowerCase() ?? '';
+    if (wanted.isEmpty || wanted == 'chat') return null;
+    return people
+            .where((p) => p.name.trim().toLowerCase() == wanted)
+            .firstOrNull ??
+        // "Anna" for a chat titled "Anna Schmidt".
+        people
+            .where(
+              (p) =>
+                  p.name.trim().toLowerCase().split(RegExp(r'\s+')).first ==
+                  wanted.split(RegExp(r'\s+')).first,
+            )
+            .firstOrNull;
+  }
+
+  static String? _cleanFact(String raw) {
+    final text = raw
+        .replaceAll(RegExp(r'^\s*[-*•]\s*'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (factKey(text).isEmpty || text.length > kPersonFactMaxChars) {
+      return null;
+    }
+    return text;
+  }
+
+  /// [facts] cut to the newest [limit], every pinned one kept, in the order
+  /// they were.
+  static List<LearnedFact> _keepNewest(List<LearnedFact> facts, int limit) {
+    if (facts.length <= limit) return facts;
+    final unpinned = [
+      for (final f in facts)
+        if (!f.pinned) f,
+    ]..sort((a, b) => b.at.compareTo(a.at));
+    final room = math.max(0, limit - (facts.length - unpinned.length));
+    final keep = unpinned.take(room).toSet();
+    return [
+      for (final f in facts)
+        if (f.pinned || keep.contains(f)) f,
+    ];
+  }
+
+  static Map<String, List<LearnedFact>> _setAllFacts(
+    Map<String, List<LearnedFact>> map,
+    List<String> keys,
+    List<LearnedFact> value,
+  ) =>
+      {...map, for (final key in keys) key: List.unmodifiable(value)}
+        ..removeWhere((_, v) => v.isEmpty);
+
+  static Map<String, List<String>> _withDismissed(
+    Map<String, List<String>> map,
+    List<String> keys,
+    List<String> facts,
+  ) {
+    final no = [..._union(map, keys), ...facts];
+    return _setAll(
+      map,
+      keys,
+      no.length > kPersonMemoryDismissedLimit
+          ? no.sublist(no.length - kPersonMemoryDismissedLimit)
+          : no,
+    );
+  }
 
   static Map<String, List<String>> _setAll(
     Map<String, List<String>> map,
@@ -188,20 +545,41 @@ class MemoryBook {
 
   MemoryBook _copy({
     Map<String, String>? notes,
+    Map<String, List<LearnedFact>>? learned,
     Map<String, List<String>>? suggestions,
     Map<String, List<String>>? dismissed,
+    MemoryUndo? undo,
   }) => MemoryBook(
     notes: notes ?? this.notes,
+    learned: learned ?? this.learned,
     suggestions: suggestions ?? this.suggestions,
     dismissed: dismissed ?? this.dismissed,
+    undo: undo ?? this.undo,
   );
 
   Map<String, Object?> toJson() => {
     'version': 1,
     'notes': notes,
+    if (learned.isNotEmpty) 'learned': _factsJson(learned),
     if (suggestions.isNotEmpty) 'suggestions': suggestions,
     if (dismissed.isNotEmpty) 'dismissed': dismissed,
+    if (undo != null) 'undo': undo!.toJson(),
   };
+
+  static Map<String, Object?> _factsJson(Map<String, List<LearnedFact>> map) =>
+      {
+        for (final MapEntry(:key, :value) in map.entries)
+          key: [for (final f in value) f.toJson()],
+      };
+
+  static Map<String, List<LearnedFact>> _factsFromJson(Object? raw) => {
+    if (raw is Map)
+      for (final MapEntry(:key, :value) in raw.entries)
+        if (key is String && value is List)
+          key: List<LearnedFact>.unmodifiable(
+            value.map(LearnedFact.fromJson).whereType<LearnedFact>(),
+          ),
+  }..removeWhere((_, v) => v.isEmpty);
 
   /// Never throws: anything unreadable is dropped, the rest kept.
   static MemoryBook fromJson(Object? json) {
@@ -220,8 +598,10 @@ class MemoryBook {
     }..removeWhere((_, v) => v.isEmpty);
     return MemoryBook(
       notes: strings(json['notes']),
+      learned: _factsFromJson(json['learned']),
       suggestions: lists(json['suggestions']),
       dismissed: lists(json['dismissed']),
+      undo: MemoryUndo.fromJson(json['undo']),
     );
   }
 
@@ -240,9 +620,144 @@ class MemoryBook {
 
   @override
   String toString() =>
-      'MemoryBook(${notes.length} notes, '
+      'MemoryBook(${notes.length} notes, ${learned.length} learned, '
       '${suggestions.length} with suggestions)';
 }
+
+/// Whether a line of [note] says [fact] already, compared through [factKey].
+bool _noteSays(String note, String fact) {
+  final key = factKey(fact);
+  if (key.isEmpty) return false;
+  return note.split('\n').any((line) => factKey(line).contains(key));
+}
+
+/// A fact the model learned on its own, or one the user changed since.
+@immutable
+class LearnedFact {
+  const LearnedFact(
+    this.text, {
+    required this.at,
+    this.pinned = false,
+    this.edited = false,
+  });
+
+  /// One short sentence.
+  final String text;
+
+  /// When the model learned it, or last changed it — or when the user did.
+  final DateTime at;
+
+  /// The user edited or pinned it: the model never changes or drops it.
+  final bool pinned;
+
+  /// The user wrote this version of it.
+  final bool edited;
+
+  LearnedFact copyWith({bool? pinned}) =>
+      LearnedFact(text, at: at, pinned: pinned ?? this.pinned, edited: edited);
+
+  Map<String, Object?> toJson() => {
+    't': text,
+    'at': at.millisecondsSinceEpoch,
+    if (pinned) 'pin': true,
+    if (edited) 'edit': true,
+  };
+
+  static LearnedFact? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final text = json['t'];
+    final at = json['at'];
+    if (text is! String || text.trim().isEmpty || at is! int) return null;
+    return LearnedFact(
+      text,
+      at: DateTime.fromMillisecondsSinceEpoch(at),
+      pinned: json['pin'] == true,
+      edited: json['edit'] == true,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is LearnedFact &&
+      other.text == text &&
+      other.at == at &&
+      other.pinned == pinned &&
+      other.edited == edited;
+
+  @override
+  int get hashCode => Object.hash(text, at, pinned, edited);
+
+  @override
+  String toString() => 'LearnedFact(${text.length} chars, $at)';
+}
+
+/// What the last automatic update replaced, for putting it back.
+@immutable
+class MemoryUndo {
+  const MemoryUndo({
+    required this.at,
+    required this.before,
+    this.added = const {},
+  });
+
+  /// When the update was made.
+  final DateTime at;
+
+  /// The learned facts under every key it touched, as they were — an empty
+  /// list for a key that had none.
+  final Map<String, List<LearnedFact>> before;
+
+  /// What it added or rewrote, per key: remembered as unwanted once undone,
+  /// so the next update does not learn it straight back.
+  final Map<String, List<String>> added;
+
+  MemoryUndo _only(Map<String, List<LearnedFact>> before) => MemoryUndo(
+    at: at,
+    before: before,
+    added: {...added}..removeWhere((k, _) => !before.containsKey(k)),
+  );
+
+  Map<String, Object?> toJson() => {
+    'at': at.millisecondsSinceEpoch,
+    'before': {
+      for (final MapEntry(:key, :value) in before.entries)
+        key: [for (final f in value) f.toJson()],
+    },
+    'added': added,
+  };
+
+  static MemoryUndo? fromJson(Object? json) {
+    if (json is! Map || json['at'] is! int || json['before'] is! Map) {
+      return null;
+    }
+    return MemoryUndo(
+      at: DateTime.fromMillisecondsSinceEpoch(json['at'] as int),
+      before: {
+        for (final MapEntry(:key, :value) in (json['before'] as Map).entries)
+          if (key is String && value is List)
+            key: List<LearnedFact>.unmodifiable(
+              value.map(LearnedFact.fromJson).whereType<LearnedFact>(),
+            ),
+      },
+      added: {
+        if (json['added'] case final Map raw)
+          for (final MapEntry(:key, :value) in raw.entries)
+            if (key is String && value is List)
+              key: List<String>.unmodifiable(value.whereType<String>()),
+      },
+    );
+  }
+}
+
+/// A learned fact as the learning prompt numbers it: where it is filed, who it
+/// is about (null for the chat), and what it says.
+typedef NumberedFact = ({List<String> keys, String? about, String text});
+
+/// The most learned facts one chat keeps; past it the oldest go first.
+const int kChatLearnedLimit = 24;
+
+/// The same for one person, whose memory is meant to stay a few lines.
+const int kPersonLearnedLimit = 10;
 
 /// The keys [MemoryBook] files [chat]'s own memory under: one per room the
 /// chat is made of, so a merged chat finds what was written while its rooms
@@ -439,7 +954,8 @@ int aiMemoryBudget(String baseUrl) =>
 /// reply chips ends with, or nothing when there is nothing to send.
 ///
 /// One wording for every feature, for the reason `calendarPromptBlock` is
-/// shared. The people come first and get at most half of
+/// shared, and each [feature]'s share of the memory budget — see
+/// [LlmBudget.memoryCharsFor]. The people come first and get at most half of
 /// [LlmBudget.memoryChars] between them, each cut to
 /// [LlmBudget.personMemoryChars] — without a [budget], [aiMemoryBudget] and
 /// [kPersonMemoryHostedChars] (or the local figure). In a group the list is in order of who spoke last, and
@@ -453,10 +969,15 @@ String memoryPromptBlock(
   AiMemory? memory, {
   required String baseUrl,
   LlmBudget? budget,
+  AiFeature? feature,
 }) {
   if (memory == null || memory.isEmpty) return '';
   final hosted = isHostedLlm(baseUrl);
-  final chars = budget?.memoryChars ?? aiMemoryBudget(baseUrl);
+  final chars = budget == null
+      ? aiMemoryBudget(baseUrl)
+      : feature == null
+      ? budget.memoryChars
+      : budget.memoryCharsFor(feature);
   final personCap =
       budget?.personMemoryChars ??
       (hosted ? kPersonMemoryHostedChars : kPersonMemoryLocalChars);
@@ -481,15 +1002,15 @@ String memoryPromptBlock(
   );
   if (people.isEmpty && chat.isEmpty) return '';
 
-  return '\n\nWhat the user has noted (private; use it for the names to '
-      'call people, the language, the tone — formal or informal, emojis or '
-      'not — and what matters to them; never quote it and never mention that '
-      'there are notes):\n'
+  return '\n\nWhat the user has noted and what was learned from their chats '
+      '(private; use it for the names to call people, the language, the '
+      'tone — formal or informal, emojis or not — and what matters to them; '
+      'never quote it and never mention that there are notes):\n'
       '${[...people, if (chat.isNotEmpty) '$chatHeading$chat'].join('\n\n')}';
 }
 
 /// Why asking for facts got no list, passed to `onError` of
-/// [suggestPersonFacts].
+/// [requestMemoryUpdate].
 enum PersonFactsError {
   /// The server answered with an error status; see [PersonFactsFailure.status].
   http,
@@ -516,77 +1037,159 @@ class PersonFactsFailure implements Exception {
       'PersonFactsFailure(${error.name}${status == null ? '' : ' $status'})';
 }
 
-/// The chat completion messages that ask for facts worth remembering from the
-/// conversation [chatTitle].
+/// A fact the model wants added, and who it is about: a person's name, or
+/// null for the chat.
+@immutable
+class MemoryAddition {
+  const MemoryAddition(this.fact, {this.about});
+
+  final String fact;
+  final String? about;
+}
+
+/// What the model wants changed in what is remembered about a chat: facts to
+/// add, numbered facts to rewrite, numbered facts to drop. The numbers are
+/// [MemoryBook.numberedFacts]'s, from 1.
+@immutable
+class MemoryUpdate {
+  const MemoryUpdate({
+    this.adds = const [],
+    this.updates = const [],
+    this.drops = const [],
+  });
+
+  final List<MemoryAddition> adds;
+  final List<({int id, String fact})> updates;
+  final List<int> drops;
+
+  bool get isEmpty => adds.isEmpty && updates.isEmpty && drops.isEmpty;
+
+  @override
+  String toString() =>
+      'MemoryUpdate(+${adds.length} ~${updates.length} -${drops.length})';
+}
+
+/// The chat completion messages that ask what to change in what is remembered
+/// about the conversation [chatTitle].
 ///
-/// Separate from [suggestPersonFacts] so the prompt can be tested without an
-/// endpoint. [known] is what is already noted — the chat's memory and its
-/// people's, trimmed like everywhere else — so the model can leave it out. In a
-/// group every fact names the person it is about, which is what lets the user
-/// add it to that person's memory.
-List<Map<String, String>> personFactsRequest({
+/// Separate from [requestMemoryUpdate] so the prompt can be tested without an
+/// endpoint. [fixed] is what the user wrote and pinned — the model is told it
+/// so it does not repeat it, and is given no way to change it. [numbered] is
+/// what was learned before, which it may rewrite or drop by number. [people]
+/// are the names a fact may be filed under; anything else is the chat's.
+List<Map<String, String>> memoryUpdateRequest({
   required List<String> transcript,
   required String chatTitle,
-  required bool isGroup,
-  String? known,
+  required List<String> people,
+  String fixed = '',
+  List<NumberedFact> numbered = const [],
 }) => [
   {
     'role': 'system',
     'content':
-        'You help the user remember things about a chat and the people in '
-        'it. From the conversation, list facts that would still be worth '
-        'knowing in a month: what someone likes to be called, family and '
-        'partner names, birthdays, the language and tone used (du or Sie, '
-        'emojis or not), likes and dislikes, plans, ongoing topics, running '
-        'jokes. Only what the messages say plainly — no guesses, nothing '
-        'about the user ("You"), nothing that only matters today. '
-        '${isGroup ? 'Start every fact with the name of the person it is about. ' : ''}'
-        'Each fact is one short sentence in the language of the '
-        'conversation. Output ONLY a JSON object with a "facts" list — an '
-        'empty list when there is nothing worth keeping.',
+        'You keep what the user\'s assistant remembers about a chat and the '
+        'people in it up to date. From the conversation, find facts that '
+        'would still be worth knowing in a month: what someone likes to be '
+        'called, family and partner names, birthdays, job, the language and '
+        'tone used (du or Sie, emojis or not), likes and dislikes, plans, '
+        'ongoing topics, running jokes. Only what the messages say plainly — '
+        'no guesses, nothing about the user ("You"), nothing that only '
+        'matters today. Compare with what is remembered: add what is new, '
+        'update a numbered fact the conversation changed, drop a numbered '
+        'fact that is no longer true or no longer matters, and never repeat '
+        'what the user wrote. Each fact is one short sentence in the language '
+        'of the conversation. "about" is a person\'s name for what matters in '
+        'every chat with them — name, relationship, birthday, family, job, du '
+        'or Sie, language — and "chat" for plans, topics, the tone here and '
+        'everything else. Output ONLY a JSON object {"add": [{"fact": ..., '
+        '"about": ...}], "update": [{"id": number, "fact": ...}], "drop": '
+        '[numbers]} — empty lists when nothing changes.',
   },
   {
     'role': 'user',
-    'content':
-        'Conversation "Lea" (newest message last):\n'
-        'Lea: Mia hat am 12. März Geburtstag, sie wird 5!\n'
-        'You: Wie schnell die Zeit vergeht\n'
-        'Lea: Ja 🙈 Ich bin übrigens ab Montag im neuen Job bei der Bahn\n\n'
-        'Already noted:\n(nothing)\n\nJSON:',
+    'content': memoryUpdatePrompt(
+      transcript: const [
+        'Lea: Mia hat am 12. März Geburtstag, sie wird 5!',
+        'You: Wie schnell die Zeit vergeht',
+        'Lea: Ja 🙈 Hab bei der Post gekündigt, ab Montag bin ich bei der Bahn',
+      ],
+      chatTitle: 'Lea',
+      people: const ['Lea'],
+      fixed: 'About Lea:\n- Meine Schwester',
+      numbered: const [
+        (keys: [], about: 'Lea', text: 'Arbeitet bei der Post'),
+        (keys: [], about: null, text: 'Schreibt locker, mit Emojis'),
+      ],
+    ),
   },
   {
     'role': 'assistant',
     'content':
-        '{"facts": ["Tochter Mia, Geburtstag am 12. März", '
-        '"Arbeitet seit Kurzem bei der Bahn", "Schreibt locker, mit Emojis"]}',
+        '{"add": [{"fact": "Tochter Mia, Geburtstag am 12. März", '
+        '"about": "Lea"}], "update": [{"id": 1, "fact": "Arbeitet ab '
+        'Montag bei der Bahn"}], "drop": []}',
   },
   {
     'role': 'user',
-    'content':
-        'Conversation "$chatTitle" (newest message last):\n'
-        '${transcript.join('\n')}\n\n'
-        'Already noted:\n'
-        '${known == null || known.trim().isEmpty ? '(nothing)' : known.trim()}'
-        '\n\nJSON:',
+    'content': memoryUpdatePrompt(
+      transcript: transcript,
+      chatTitle: chatTitle,
+      people: people,
+      fixed: fixed,
+      numbered: numbered,
+    ),
   },
 ];
 
-/// Asks the configured LLM what is worth remembering from a conversation.
+/// The user turn of [memoryUpdateRequest].
+String memoryUpdatePrompt({
+  required List<String> transcript,
+  required String chatTitle,
+  required List<String> people,
+  String fixed = '',
+  List<NumberedFact> numbered = const [],
+}) {
+  final buffer = StringBuffer()
+    ..writeln('Conversation "$chatTitle" (newest message last):')
+    ..writeln(transcript.join('\n'))
+    ..writeln()
+    ..writeln(
+      'People: ${people.isEmpty ? '(only the chat)' : people.join(', ')}',
+    )
+    ..writeln()
+    ..writeln('The user wrote (fixed):')
+    ..writeln(fixed.trim().isEmpty ? '(nothing)' : fixed.trim())
+    ..writeln()
+    ..writeln('Learned so far:');
+  if (numbered.isEmpty) buffer.writeln('(nothing)');
+  for (var i = 0; i < numbered.length; i++) {
+    buffer.writeln(
+      '${i + 1}. [${numbered[i].about ?? 'chat'}] ${numbered[i].text}',
+    );
+  }
+  buffer
+    ..writeln()
+    ..write('JSON:');
+  return buffer.toString();
+}
+
+/// Asks the configured LLM what to change in what is remembered about a
+/// conversation.
 ///
-/// The answer is only ever a proposal: it is merged into the facts waiting for
-/// the user by `MemoryBook.withProposals`, never into a note. An empty list on
-/// any failure — the user asked for suggestions, and "none" is an answer they
-/// can live with; the caller learns which it was through [onError], which gets
-/// a [PersonFactsFailure] for an answer with no list in it and the thrown
-/// error for a request that failed.
-Future<List<String>> suggestPersonFacts({
+/// The answer is applied by `MemoryBook.applyLearning`, which keeps the
+/// user's notes and pinned facts out of its reach whatever the model says.
+/// Null on any failure; the caller learns which it was through [onError],
+/// which gets a [PersonFactsFailure] for an answer with nothing readable in it
+/// and the thrown error for a request that failed.
+Future<MemoryUpdate?> requestMemoryUpdate({
   required String baseUrl,
   required String model,
   String? apiKey,
   required List<String> transcript,
   required String chatTitle,
-  bool isGroup = false,
-  AiMemory? known,
+  List<String> people = const [],
+  String fixed = '',
+  List<NumberedFact> numbered = const [],
   LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
@@ -595,36 +1198,37 @@ Future<List<String>> suggestPersonFacts({
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
-    return const [];
+    return null;
   }
   final limits = budget ?? LlmBudget.resolve(base);
   final answer = await _complete(
     base: base,
     model: model,
     apiKey: apiKey,
-    what: 'person facts',
+    what: 'memory update',
     temperature: 0.2,
     budget: limits.forFeature(AiFeature.learnFacts),
-    answered: (content) => parsePersonFacts(content) != null,
-    messages: personFactsRequest(
+    answered: (content) => parseMemoryUpdate(content) != null,
+    messages: memoryUpdateRequest(
       transcript: transcript,
       chatTitle: chatTitle,
-      isGroup: isGroup,
-      known: memoryPromptBlock(known, baseUrl: base, budget: limits).trim(),
+      people: people,
+      fixed: fixed,
+      numbered: numbered,
     ),
     timeout: timeout ?? llmResponseTimeout(base, LlmTask.personFacts),
     client: client,
     cancel: cancel,
     onError: onError,
   );
-  if (answer == null) return const [];
-  final facts = parsePersonFacts(answer.content ?? '');
+  if (answer == null) return null;
+  final update = parseMemoryUpdate(answer.content ?? '');
   // Counts and the finish reason only: never what the model said.
   debugPrint(
-    'weft: person facts: ${transcript.length} lines sent, '
-    '${facts?.length ?? 'no'} facts read, finish ${answer.finishReason}',
+    'weft: memory update: ${transcript.length} lines sent, '
+    '${update ?? 'nothing readable'}, finish ${answer.finishReason}',
   );
-  if (facts == null) {
+  if (update == null) {
     onError?.call(
       PersonFactsFailure(
         answer.finishReason == 'length'
@@ -632,9 +1236,95 @@ Future<List<String>> suggestPersonFacts({
             : PersonFactsError.unreadable,
       ),
     );
-    return const [];
   }
-  return facts;
+  return update;
+}
+
+/// The changes in whatever the model said: the `{"add", "update", "drop"}`
+/// object the prompt asks for, through a code fence or `<think>` block — or,
+/// from a model that answers in the older shape, a `{"facts": [...]}` list,
+/// read as additions to the chat.
+///
+/// Null when there is nothing readable in it, which is not the same as an
+/// empty update: "nothing changes" is three empty lists.
+MemoryUpdate? parseMemoryUpdate(String content) {
+  final text = _answerText(content);
+  if (text == null) return null;
+  final start = text.indexOf('{');
+  final end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    try {
+      final parsed = jsonDecode(text.substring(start, end + 1));
+      if (parsed is Map &&
+          (parsed['add'] is List ||
+              parsed['update'] is List ||
+              parsed['drop'] is List)) {
+        return _memoryUpdateFrom(parsed);
+      }
+    } on FormatException {
+      // The older shape, below.
+    }
+  }
+  final facts = parsePersonFacts(content);
+  if (facts == null) return null;
+  return MemoryUpdate(adds: [for (final f in facts) MemoryAddition(f)]);
+}
+
+MemoryUpdate _memoryUpdateFrom(Map<Object?, Object?> json) {
+  int? number(Object? v) => switch (v) {
+    int() => v,
+    String() => int.tryParse(v.trim()),
+    _ => null,
+  };
+  final adds = <MemoryAddition>[];
+  for (final entry in json['add'] is List ? json['add']! as List : const []) {
+    final fact = _factText(
+      entry is Map ? (Map<Object?, Object?>.of(entry)..remove('about')) : entry,
+    );
+    if (fact == null || fact.trim().isEmpty) continue;
+    final about = entry is Map && entry['about'] is String
+        ? (entry['about'] as String).trim()
+        : null;
+    adds.add(
+      MemoryAddition(
+        fact.trim(),
+        about: about == null || about.isEmpty || about.toLowerCase() == 'chat'
+            ? null
+            : about,
+      ),
+    );
+    if (adds.length >= kPersonMemoryMaxSuggestions) break;
+  }
+  final updates = <({int id, String fact})>[];
+  for (final entry
+      in json['update'] is List ? json['update']! as List : const []) {
+    if (entry is! Map) continue;
+    final id = number(entry['id']);
+    final fact = _factText(entry);
+    if (id == null || fact == null || fact.trim().isEmpty) continue;
+    updates.add((id: id, fact: fact.trim()));
+  }
+  final drops = [
+    for (final entry in json['drop'] is List ? json['drop']! as List : const [])
+      ?number(entry is Map ? entry['id'] : entry),
+  ];
+  return MemoryUpdate(adds: adds, updates: updates, drops: drops);
+}
+
+/// What a model said with its reasoning and a code fence taken off, or null
+/// for reasoning that never ended.
+String? _answerText(String content) {
+  var text = content
+      .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
+      .trim();
+  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) return null;
+  // A chat template that opens the <think> itself leaves only the closing tag
+  // in the answer, after reasoning that may quote a list of its own.
+  final close = text.toLowerCase().lastIndexOf('</think>');
+  if (close >= 0) text = text.substring(close + '</think>'.length).trim();
+  final fence = RegExp(r'```[\w-]*\s*([\s\S]*?)```').firstMatch(text);
+  if (fence != null) text = fence[1]!.trim();
+  return text;
 }
 
 /// The chat completion messages that ask for [note] about [name] cut down to
@@ -789,16 +1479,8 @@ Future<({String? content, String? finishReason})?> _complete({
 /// ended, or prose, is null. Facts written as objects — `{"person": "Tom",
 /// "fact": "Runs"}` — are read too; a small model adds the shape it likes.
 List<String>? parsePersonFacts(String content) {
-  var text = content
-      .replaceAll(RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
-      .trim();
-  if (RegExp(r'^<think>', caseSensitive: false).hasMatch(text)) return null;
-  // A chat template that opens the <think> itself leaves only the closing tag
-  // in the answer, after reasoning that may quote a list of its own.
-  final close = text.toLowerCase().lastIndexOf('</think>');
-  if (close >= 0) text = text.substring(close + '</think>'.length).trim();
-  final fence = RegExp(r'```[\w-]*\s*([\s\S]*?)```').firstMatch(text);
-  if (fence != null) text = fence[1]!.trim();
+  final text = _answerText(content);
+  if (text == null) return null;
 
   List<Object?>? raw;
   final objStart = text.indexOf('{');
