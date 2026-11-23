@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
+import 'llm_budget.dart';
 import 'llm_request.dart';
 import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
@@ -25,6 +26,7 @@ Future<List<String>> suggestSmartReplies({
   required List<String> transcript,
   String? calendar,
   AiMemory? memory,
+  LlmBudget? budget,
   http.Client? client,
   Duration timeout = const Duration(seconds: 8),
 }) async {
@@ -32,11 +34,12 @@ Future<List<String>> suggestSmartReplies({
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return const [];
   }
+  final limits = budget ?? LlmBudget.resolve(base);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -44,10 +47,9 @@ Future<List<String>> suggestSmartReplies({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
+      body: {
         'model': model,
         'temperature': 0.7,
-        'max_tokens': 120,
         'messages': [
           {
             'role': 'system',
@@ -58,7 +60,7 @@ Future<List<String>> suggestSmartReplies({
                 'markdown. Each reply is a complete sentence of at most '
                 'eight words, in the same language as the conversation.'
                 '${calendarPromptBlock(calendar)}'
-                '${memoryPromptBlock(memory, baseUrl: base)}',
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits)}',
           },
           // One worked example pins the format better than any amount
           // of instruction — and gives the template no placeholder text
@@ -82,19 +84,17 @@ Future<List<String>> suggestSmartReplies({
                 '${transcript.join('\n')}\n\nJSON:',
           },
         ],
-      }),
+      },
+      // No retry: the notification does not wait for a second answer.
+      maxTokens: limits.forFeature(AiFeature.smartReplies).maxTokens,
       timeout: timeout,
+      what: 'smart replies',
     );
-    if (response.statusCode != 200) {
-      debugPrint('weft: smart replies: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: smart replies: $url answered ${answer.status}');
       return const [];
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     if (content == null) {
       debugPrint('weft: smart replies: no content in the completion');
       return const [];

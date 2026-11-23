@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../ai/auto_reply_service.dart' show AutoReplyEndpoint;
 import '../ai/conversation_context.dart';
+import '../ai/llm_budget.dart' show AiFeature;
 import 'todo_assistant.dart';
 import 'todo_item.dart';
 
@@ -140,9 +141,13 @@ class TodoAgent {
         model: endpoint.model,
         apiKey: endpoint.apiKey,
         chatTitle: chat.title,
-        transcript: transcriptLinesFor(recent),
+        transcript: fitTranscript(
+          transcriptLinesFor(recent),
+          endpoint.budget.forFeature(AiFeature.todo).transcriptChars,
+        ),
         open: open,
         today: _now(),
+        budget: endpoint.budget,
       );
       if (changes == null || changes.isEmpty) return;
       // Switched off while the model was thinking: drop the answer.

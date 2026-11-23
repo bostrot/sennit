@@ -9,6 +9,7 @@ import '../../app/auto_reply_providers.dart';
 import '../../app/search_providers.dart';
 import '../../app/stores.dart';
 import '../ai/event_title.dart';
+import '../ai/llm_budget.dart' show AiFeature;
 import 'event_detector.dart';
 
 /// Decides which messages deserve an "add to calendar" chip.
@@ -100,7 +101,14 @@ class AgendaService {
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
       apiKey: endpoint.apiKey,
-      transcript: eventTitleTranscript(message, conversation),
+      transcript: eventTitleTranscript(
+        message,
+        conversation,
+        maxChars: endpoint.budget
+            .forFeature(AiFeature.eventTitle)
+            .transcriptChars,
+      ),
+      budget: endpoint.budget,
     );
     final title = chooseEventTitle(
       model: suggested,

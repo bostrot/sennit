@@ -669,9 +669,39 @@ Mia (5), Ben (3)
     test('asks for room to think: a reasoning model needs it', () async {
       late Map<String, Object?> sent;
       await learn(
+        via: const AutoReplyEndpoint(baseUrl: _local, model: 'qwen'),
         client: _answering('{"facts": []}', onRequest: (b) => sent = b),
       );
       expect(sent['max_tokens'], greaterThanOrEqualTo(2048));
+    });
+
+    test('a hosted model cut off is asked once more, with room', () async {
+      final asked = <int>[];
+      var calls = 0;
+      final result = await learn(
+        client: MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, Object?>;
+          asked.add(body['max_tokens']! as int);
+          final first = calls++ == 0;
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content': first ? null : '{"facts": ["Likes jazz"]}',
+                  },
+                  'finish_reason': first ? 'length' : 'stop',
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+      );
+      expect(asked, hasLength(2));
+      expect(asked.last, greaterThan(asked.first));
+      expect(result.outcome, PersonFactsOutcome.proposed);
     });
 
     // What the owner's Qwen behind litellm answered with 400 tokens: all of

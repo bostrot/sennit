@@ -245,6 +245,11 @@ abstract final class WeftSettings {
   static const String llmBaseUrl = 'ai.llm_base_url';
   static const String llmModel = 'ai.llm_model';
 
+  /// Each model's context window and answer length — what the user typed and
+  /// what the server reported — as one JSON object keyed by base URL and
+  /// model (`LlmModelSettings.keyFor`), so switching models keeps each one's.
+  static const String llmModelLimits = 'ai.llm_model_limits';
+
   /// Every auto-reply rule, as one JSON blob under a `rules` key.
   ///
   /// One key rather than a row per rule, for the reasons [notifyPolicy] gives:

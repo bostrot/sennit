@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
 
+import 'llm_budget.dart';
 import 'llm_request.dart';
 
 /// What the user has noted for the AI features, in two layers, and the facts
@@ -429,7 +430,8 @@ String trimPersonMemory(String note, {required int maxChars}) {
   return result.join('\n');
 }
 
-/// The whole budget [memoryPromptBlock] has for [baseUrl].
+/// The whole budget [memoryPromptBlock] has for [baseUrl] when it is given no
+/// [LlmBudget] — the figures from before the window was known.
 int aiMemoryBudget(String baseUrl) =>
     isHostedLlm(baseUrl) ? kAiMemoryHostedChars : kAiMemoryLocalChars;
 
@@ -438,19 +440,26 @@ int aiMemoryBudget(String baseUrl) =>
 ///
 /// One wording for every feature, for the reason `calendarPromptBlock` is
 /// shared. The people come first and get at most half of
-/// [aiMemoryBudget] between them, each cut to [kPersonMemoryHostedChars] (or
-/// the local figure) — in a group the list is in order of who spoke last, and
+/// [LlmBudget.memoryChars] between them, each cut to
+/// [LlmBudget.personMemoryChars] — without a [budget], [aiMemoryBudget] and
+/// [kPersonMemoryHostedChars] (or the local figure). In a group the list is in order of who spoke last, and
 /// whoever does not fit is left out rather than everyone cut to nothing. The
 /// chat memory gets what is left, which is at least the other half.
 ///
 /// "Never quote" is there because a model handed a list of facts likes to
 /// show it read them — "Happy birthday, and say hi to Mia and Ben, your two
 /// kids!" — and a note is there to set the tone, not to be recited.
-String memoryPromptBlock(AiMemory? memory, {required String baseUrl}) {
+String memoryPromptBlock(
+  AiMemory? memory, {
+  required String baseUrl,
+  LlmBudget? budget,
+}) {
   if (memory == null || memory.isEmpty) return '';
   final hosted = isHostedLlm(baseUrl);
-  final budget = aiMemoryBudget(baseUrl);
-  final personCap = hosted ? kPersonMemoryHostedChars : kPersonMemoryLocalChars;
+  final chars = budget?.memoryChars ?? aiMemoryBudget(baseUrl);
+  final personCap =
+      budget?.personMemoryChars ??
+      (hosted ? kPersonMemoryHostedChars : kPersonMemoryLocalChars);
 
   final people = <String>[];
   var used = 0;
@@ -458,7 +467,7 @@ String memoryPromptBlock(AiMemory? memory, {required String baseUrl}) {
     final note = trimPersonMemory(person.note, maxChars: personCap);
     if (note.isEmpty) continue;
     final entry = 'About ${person.name}:\n$note';
-    if (used + entry.length > budget ~/ 2) {
+    if (used + entry.length > chars ~/ 2) {
       if (people.isEmpty) continue;
       break;
     }
@@ -468,7 +477,7 @@ String memoryPromptBlock(AiMemory? memory, {required String baseUrl}) {
   const chatHeading = 'About this chat:\n';
   final chat = trimPersonMemory(
     memory.chat,
-    maxChars: budget - used - chatHeading.length,
+    maxChars: chars - used - chatHeading.length,
   );
   if (people.isEmpty && chat.isEmpty) return '';
 
@@ -478,14 +487,6 @@ String memoryPromptBlock(AiMemory? memory, {required String baseUrl}) {
       'there are notes):\n'
       '${[...people, if (chat.isNotEmpty) '$chatHeading$chat'].join('\n\n')}';
 }
-
-/// The completion budget for proposing facts.
-///
-/// The list itself is a few hundred tokens, but a thinking model spends the
-/// budget on its reasoning first: a Qwen behind litellm used a thousand on a
-/// six-line chat, and handed 400 it returned no answer at all, which read as
-/// "nothing new". A model that needs none of it stops at the list.
-const int kPersonFactsMaxTokens = 4096;
 
 /// Why asking for facts got no list, passed to `onError` of
 /// [suggestPersonFacts].
@@ -586,6 +587,7 @@ Future<List<String>> suggestPersonFacts({
   required String chatTitle,
   bool isGroup = false,
   AiMemory? known,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
   Future<void>? cancel,
@@ -595,18 +597,20 @@ Future<List<String>> suggestPersonFacts({
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return const [];
   }
+  final limits = budget ?? LlmBudget.resolve(base);
   final answer = await _complete(
     base: base,
     model: model,
     apiKey: apiKey,
     what: 'person facts',
     temperature: 0.2,
-    maxTokens: kPersonFactsMaxTokens,
+    budget: limits.forFeature(AiFeature.learnFacts),
+    answered: (content) => parsePersonFacts(content) != null,
     messages: personFactsRequest(
       transcript: transcript,
       chatTitle: chatTitle,
       isGroup: isGroup,
-      known: memoryPromptBlock(known, baseUrl: base).trim(),
+      known: memoryPromptBlock(known, baseUrl: base, budget: limits).trim(),
     ),
     timeout: timeout ?? llmResponseTimeout(base, LlmTask.personFacts),
     client: client,
@@ -664,6 +668,7 @@ Future<String?> condensePersonMemory({
   String? apiKey,
   required String name,
   required String note,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
   Future<void>? cancel,
@@ -677,7 +682,8 @@ Future<String?> condensePersonMemory({
     apiKey: apiKey,
     what: 'condense',
     temperature: 0.2,
-    maxTokens: kPersonFactsMaxTokens,
+    budget: (budget ?? LlmBudget.resolve(base)).forFeature(AiFeature.condense),
+    answered: (content) => parseCondensed(content) != null,
     messages: condenseRequest(name: name, note: note),
     timeout: timeout ?? llmResponseTimeout(base, LlmTask.personFacts),
     client: client,
@@ -718,16 +724,18 @@ String? parseCondensed(String content) {
 }
 
 /// One completion: its text, null when the model gave none, and why it
-/// stopped. Null for a request that failed. Logs the status and the error type
-/// only: what was said, and what the user wrote about anyone, stay out of the
-/// log.
+/// stopped. Null for a request that failed. Cut off before [answered] accepts
+/// what it wrote, the model is asked once more with [budget]'s retry room.
+/// Logs the status and the error type only: what was said, and what the user
+/// wrote about anyone, stay out of the log.
 Future<({String? content, String? finishReason})?> _complete({
   required String base,
   required String model,
   String? apiKey,
   required String what,
   required double temperature,
-  required int maxTokens,
+  required FeatureBudget budget,
+  required bool Function(String content) answered,
   required List<Map<String, String>> messages,
   required Duration timeout,
   http.Client? client,
@@ -738,7 +746,7 @@ Future<({String? content, String? finishReason})?> _complete({
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -746,30 +754,22 @@ Future<({String? content, String? finishReason})?> _complete({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
-        'model': model,
-        'temperature': temperature,
-        'max_tokens': maxTokens,
-        'messages': messages,
-      }),
+      body: {'model': model, 'temperature': temperature, 'messages': messages},
+      maxTokens: budget.maxTokens,
+      retryMaxTokens: budget.retryMaxTokens,
+      answered: answered,
       timeout: timeout,
       cancel: cancel,
+      what: what,
     );
-    if (response.statusCode != 200) {
-      debugPrint('weft: $what: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: $what: $url answered ${answer.status}');
       onError?.call(
-        PersonFactsFailure(PersonFactsError.http, status: response.statusCode),
+        PersonFactsFailure(PersonFactsError.http, status: answer.status),
       );
       return null;
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final choice = ((decoded as Map)['choices'] as List?)
-        ?.cast<Map>()
-        .firstOrNull;
-    return (
-      content: choice?['message']?['content'] as String?,
-      finishReason: choice?['finish_reason'] as String?,
-    );
+    return (content: answer.content, finishReason: answer.finishReason);
   } on Object catch (error) {
     debugPrint('weft: $what against $url failed: ${error.runtimeType}');
     onError?.call(error);

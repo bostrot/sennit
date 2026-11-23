@@ -84,7 +84,7 @@ void main() {
         key: key,
         chat: chat,
         people: const [anna],
-        loadMessages: () async => const [],
+        loadMessages: (_) async => const [],
       ),
     );
   });

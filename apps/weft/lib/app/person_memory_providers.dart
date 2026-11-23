@@ -4,12 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
-import 'package:weft_merge/weft_merge.dart' show IdentityGraph;
+import 'package:weft_merge/weft_merge.dart' show IdentityGraph, MergedTimeline;
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/auto_reply_service.dart' show AutoReplyEndpoint;
-import '../services/ai/conversation_context.dart' show kAiContextMessages;
 import '../services/ai/event_title.dart' show recentConversationTranscript;
+import '../services/ai/llm_budget.dart' show AiFeature;
 import '../services/ai/person_memory.dart';
 import 'providers.dart';
 import 'stores.dart';
@@ -283,6 +283,37 @@ typedef PersonFactsResult = ({
   int? status,
 });
 
+/// [timeline]'s messages, paged back until there are [wanted] of them, the
+/// history runs out, or [patience] is up — whichever comes first.
+///
+/// The time cap is for a chat on a slow homeserver: "Learn from chat" should
+/// read what it could fetch in a few seconds rather than keep the user
+/// waiting for the five-hundredth message.
+Future<List<WeftMessage>> loadHistoryForAi(
+  MergedTimeline timeline,
+  int wanted, {
+  Duration patience = const Duration(seconds: 10),
+}) async {
+  final stop = DateTime.now().add(patience);
+  var messages = timeline.view().messages;
+  while (messages.length < wanted &&
+      timeline.hasMoreHistory &&
+      DateTime.now().isBefore(stop)) {
+    final bool added;
+    try {
+      added = await timeline
+          .loadMore(count: (wanted - messages.length).clamp(30, 100))
+          .timeout(stop.difference(DateTime.now()));
+    } on Object catch (error) {
+      debugPrint('weft: learn facts: history stopped: ${error.runtimeType}');
+      break;
+    }
+    if (!added) break;
+    messages = timeline.view().messages;
+  }
+  return messages;
+}
+
 /// Asks the model what is worth remembering from [chat]'s [messages], and
 /// files the answer as facts waiting for the user under the chat's memory.
 ///
@@ -291,8 +322,9 @@ typedef PersonFactsResult = ({
 /// a person's. Every gate is checked here, before anything is sent, so the two
 /// ways in — the "Learn from chat" button and the pass after a quick message —
 /// cannot disagree about what may leave the device: the master switch, the
-/// encrypted-chat switch, the endpoint (which is also the Pro gate), and the
-/// same [kAiContextMessages] bound on the conversation every AI feature has.
+/// encrypted-chat switch, and the endpoint (which is also the Pro gate). How
+/// much of the conversation goes is the model's: its window's share for
+/// learning (see `LlmBudget`), up to hundreds of messages on a big one.
 Future<PersonFactsResult> learnPersonFacts({
   required PersonMemorySettings settings,
   required AutoReplyEndpoint? endpoint,
@@ -316,9 +348,11 @@ Future<PersonFactsResult> learnPersonFacts({
     return done(PersonFactsOutcome.encrypted);
   }
   if (endpoint == null) return done(PersonFactsOutcome.noEndpoint);
+  final room = endpoint.budget.forFeature(AiFeature.learnFacts);
   final transcript = recentConversationTranscript(
     recent,
-    maxMessages: kAiContextMessages,
+    maxMessages: room.maxMessages,
+    maxChars: room.transcriptChars,
   );
   if (transcript.isEmpty) {
     debugPrint(
@@ -337,6 +371,7 @@ Future<PersonFactsResult> learnPersonFacts({
     chatTitle: chat.title,
     isGroup: chat.isGroup,
     known: aiMemoryFrom(memory.book, chat, people),
+    budget: endpoint.budget,
     client: client,
     cancel: cancel,
     onError: (error) => failure = error,

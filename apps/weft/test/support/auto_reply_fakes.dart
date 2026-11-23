@@ -6,6 +6,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft/data/auto_reply_transport.dart';
 import 'package:weft/services/ai/auto_reply_service.dart';
 import 'package:weft/services/ai/auto_reply_writer.dart';
+import 'package:weft/services/ai/llm_budget.dart' show LlmBudget;
 import 'package:weft/services/ai/person_memory.dart' show AiMemory;
 
 /// A transport that remembers what it was asked to send — and, crucially, what
@@ -80,6 +81,7 @@ class FakeComposer {
     required List<String> transcript,
     String? calendar,
     AiMemory? memory,
+    LlmBudget? budget,
   }) async {
     calls.add((instruction: instruction, transcript: transcript));
     calendars.add(calendar);

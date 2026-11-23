@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:weft/services/ai/auto_reply_writer.dart';
+import 'package:weft/services/ai/llm_budget.dart';
 
 /// What comes back from someone else's model, and what of it may be sent.
 ///
@@ -446,12 +447,14 @@ void main() {
       expect(draft.text, 'Back on Monday.');
     });
 
-    test('a model cut off by the budget mid-message is refused', () async {
+    test('a model cut off by the budget mid-message is not sent', () async {
       final draft = await ask(
         client: answering('<reply>Back on Monday, and', finishReason: 'length'),
       );
 
-      expect(draft.outcome, AutoReplyOutcome.refused);
+      // Asked again with more room, cut off again: said so, never sent.
+      expect(draft.outcome, AutoReplyOutcome.cutOff);
+      expect(draft.text, isNull);
     });
 
     test('the budget leaves a thinking model room to answer', () async {
@@ -464,7 +467,12 @@ void main() {
       await ask(client: client);
 
       final asked = (jsonDecode(body!) as Map)['max_tokens'] as int;
-      expect(asked, kAutoReplyMaxTokens);
+      expect(
+        asked,
+        LlmBudget.resolve(
+          'http://localhost:11434/v1',
+        ).forFeature(AiFeature.autoReply).maxTokens,
+      );
       // Reasoning spends the same budget as the reply. 220 was all spent
       // inside <think>, and nothing was ever sent.
       expect(asked, greaterThanOrEqualTo(1024));

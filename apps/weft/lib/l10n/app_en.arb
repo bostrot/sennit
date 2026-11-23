@@ -9261,9 +9261,9 @@
   "@personMemoryLearnTimedOut": {
     "description": "Toast when the AI model did not answer Learn from chat in time. About 60 chars."
   },
-  "personMemoryLearnCutOff": "Your AI model was still thinking when it hit its length limit. Try again, or use a model that thinks less.",
+  "personMemoryLearnCutOff": "Your AI model was still thinking when it hit its answer length limit, even with more room. Raise Max answer length under Endpoints, or use a model that thinks less.",
   "@personMemoryLearnCutOff": {
-    "description": "Toast when a reasoning AI model spent its whole answer budget thinking and gave no answer to Learn from chat. About 110 chars."
+    "description": "Toast when a reasoning AI model spent its whole answer budget thinking and gave no answer to Learn from chat, even after a retry with more room. About 170 chars."
   },
   "personMemoryLearnUnreadable": "Your AI model answered, but not with a list of facts. Try again, or use another model.",
   "@personMemoryLearnUnreadable": {
@@ -9277,9 +9277,9 @@
   "@personMemorySettingsSubtitle": {
     "description": "Subtitle of the personal memory row in AI settings. About 60 chars."
   },
-  "personMemoryExplainer": "Sennit keeps two kinds of notes. Each chat, groups included, has its own: what is going on, plans, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual, the key facts. Both are stored only on this device, encrypted in the system keychain, and are not synced to your other devices. When personal memory is on, quick messages, auto-replies and reply suggestions send the chat’s note and the notes of the people in it, shortened (more so for a model on your own computer), to your AI model, along with the messages those features already send. Learn from chat sends the last {count} messages to the same model and only ever suggests facts. Nothing is added until you accept it. Notes are included in backups and deleted with your account.",
+  "personMemoryExplainer": "Sennit keeps two kinds of notes. Each chat, groups included, has its own: what is going on, plans, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual, the key facts. Both are stored only on this device, encrypted in the system keychain, and are not synced to your other devices. When personal memory is on, quick messages, auto-replies and reply suggestions send the chat’s note and the notes of the people in it, shortened (more so for a model on your own computer), to your AI model, along with the messages those features already send. Learn from chat sends up to the last {count} messages, as many as your model''s context window has room for, to the same model and only ever suggests facts. Nothing is added until you accept it. Notes are included in backups and deleted with your account.",
   "@personMemoryExplainer": {
-    "description": "Privacy notice at the top of the personal memory settings screen: the two kinds of notes, what is stored where and what is sent where. {count} is how many recent messages Learn from chat sends. About 800 chars.",
+    "description": "Privacy notice at the top of the personal memory settings screen: the two kinds of notes, what is stored where and what is sent where. {count} is the most recent messages Learn from chat sends, which depends on the AI model's context window. About 850 chars.",
     "placeholders": {
       "count": {
         "type": "int",
@@ -9431,5 +9431,90 @@
         "example": "look at this"
       }
     }
+  },
+  "endpointsLimitsTitle": "Context and answer length",
+  "@endpointsLimitsTitle": {
+    "description": "Heading above the AI model's context window and answer length fields on the endpoints screen. Keep under ~40 chars."
+  },
+  "endpointsLimitsSubtitle": "How much of a chat your model can read at once, and how long it may answer. A bigger window lets \"Learn from chat\" read hundreds of messages.",
+  "@endpointsLimitsSubtitle": {
+    "description": "Explains the two fields under endpointsLimitsTitle. About 160 chars."
+  },
+  "endpointsContextField": "Context window (tokens)",
+  "@endpointsContextField": {
+    "description": "Label of the number field for the AI model's context window, in tokens. Keep under ~32 chars."
+  },
+  "endpointsContextDetected": "Detected: {tokens} tokens ({source}). Leave empty to use it.",
+  "@endpointsContextDetected": {
+    "description": "Helper under the context window field when the server reported it. {tokens} is a number such as 172032, {source} the kind of server such as litellm or ollama. About 90 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      },
+      "source": {
+        "type": "String",
+        "example": "litellm"
+      }
+    }
+  },
+  "endpointsContextFallback": "Not detected, so {tokens} tokens are assumed. Type your model''s window to let it read more.",
+  "@endpointsContextFallback": {
+    "description": "Helper under the context window field when the server did not report it. {tokens} is the number assumed, such as 8192. About 110 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      }
+    }
+  },
+  "endpointsAnswerField": "Max answer length (tokens)",
+  "@endpointsAnswerField": {
+    "description": "Label of the number field for the longest answer the AI model may write, in tokens. Keep under ~32 chars."
+  },
+  "endpointsAnswerHelper": "Leave empty for {tokens}. A thinking model spends this on its reasoning too.",
+  "@endpointsAnswerHelper": {
+    "description": "Helper under the answer length field. {tokens} is the default, such as 8192. About 110 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      }
+    }
+  },
+  "endpointsThinkingTitle": "Thinking model",
+  "@endpointsThinkingTitle": {
+    "description": "Switch title: the AI model reasons before it answers. Keep under ~24 chars."
+  },
+  "endpointsThinkingSubtitle": "Gives every AI feature room to reason before it answers. On by default for self-hosted models.",
+  "@endpointsThinkingSubtitle": {
+    "description": "Subtitle of the thinking model switch. About 110 chars."
+  },
+  "endpointsDetectLimits": "Detect",
+  "@endpointsDetectLimits": {
+    "description": "Button that asks the AI server for the model's context window and answer length. Keep under ~20 chars."
+  },
+  "endpointsLimitsDetected": "{source}: window {context}, answer up to {output}",
+  "@endpointsLimitsDetected": {
+    "description": "Shown beside the Detect button after the server answered. {context} and {output} are token counts; either may be shown as a dash. {source} is the server kind, such as litellm. About 70 chars.",
+    "placeholders": {
+      "source": {
+        "type": "String",
+        "example": "litellm"
+      },
+      "context": {
+        "type": "String",
+        "example": "172032"
+      },
+      "output": {
+        "type": "String",
+        "example": "32768"
+      }
+    }
+  },
+  "endpointsLimitsNotDetected": "The server did not say. Type the numbers in.",
+  "@endpointsLimitsNotDetected": {
+    "description": "Shown beside the Detect button when the server did not report the model's limits. About 60 chars."
+  },
+  "autoReplyOutcomeCutOff": "Your model hit its answer length limit. Raise it under Endpoints.",
+  "@autoReplyOutcomeCutOff": {
+    "description": "Why an AI answer failed: the model reached the answer length limit before writing anything usable, even after a retry with more room. Keep under ~70 chars."
   }
 }

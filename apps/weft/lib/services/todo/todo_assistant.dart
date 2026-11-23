@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../ai/llm_budget.dart';
 import '../ai/llm_request.dart';
 import 'todo_item.dart';
 
@@ -51,6 +52,7 @@ typedef TodoProposer =
       required List<String> transcript,
       required List<TodoItem> open,
       required DateTime today,
+      LlmBudget? budget,
     });
 
 /// Asks the user's model what the conversation adds to, or ticks off, the
@@ -69,16 +71,18 @@ Future<TodoChanges?> proposeTodoChanges({
   required List<String> transcript,
   required List<TodoItem> open,
   required DateTime today,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) return null;
+  final room = (budget ?? LlmBudget.resolve(base)).forFeature(AiFeature.todo);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -86,10 +90,9 @@ Future<TodoChanges?> proposeTodoChanges({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
+      body: {
         'model': model,
         'temperature': 0.2,
-        'max_tokens': 300,
         'messages': [
           {'role': 'system', 'content': todoSystemPrompt},
           // One worked example, for the same reason the reply chips carry
@@ -123,19 +126,24 @@ Future<TodoChanges?> proposeTodoChanges({
             ),
           },
         ],
-      }),
+      },
+      maxTokens: room.maxTokens,
+      retryMaxTokens: room.retryMaxTokens,
+      // An object closed after any reasoning is an answer, even an empty one.
+      answered: (content) => content
+          .replaceAll(
+            RegExp(r'<think>[\s\S]*?(</think>|$)', caseSensitive: false),
+            '',
+          )
+          .contains('}'),
       timeout: timeout ?? llmResponseTimeout(base, LlmTask.todo),
+      what: 'to-do',
     );
-    if (response.statusCode != 200) {
-      debugPrint('weft: to-do: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: to-do: $url answered ${answer.status}');
       return null;
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     if (content == null) return null;
     return parseTodoChanges(content, open: open);
   } on Object catch (error) {
