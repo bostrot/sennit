@@ -38,6 +38,7 @@ import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/ai/event_title.dart' show recentConversationTranscript;
+import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/quick_messages.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/billing/entitlements.dart';
@@ -3368,14 +3369,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
       ),
     );
 
+    final room = endpoint.budget.forFeature(AiFeature.quickMessage);
     final transcript = recentConversationTranscript(
       _view.messages,
-      maxMessages: kQuickMessageContextMessages,
+      maxMessages: room.maxMessages,
+      maxChars: room.transcriptChars,
     );
     final draft = await composeQuickMessage(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
       apiKey: endpoint.apiKey,
+      budget: endpoint.budget,
       instruction: message.effectivePrompt,
       transcript: transcript,
       language: detectChatLanguage(

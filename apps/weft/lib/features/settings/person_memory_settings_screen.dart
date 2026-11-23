@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
+import '../../app/auto_reply_providers.dart' show autoReplyEndpointProvider;
 import '../../app/localisation.dart';
 import '../../app/person_memory_providers.dart';
 import '../../services/ai/conversation_context.dart' show kAiContextMessages;
+import '../../services/ai/llm_budget.dart' show AiFeature;
 
 /// Personal memory's switches, and the one place that says what leaves the
 /// device because of it.
@@ -60,7 +62,14 @@ class PersonMemorySettingsScreen extends ConsumerWidget {
                 WeftSpace.sm,
               ),
               child: Text(
-                l10n.personMemoryExplainer(kAiContextMessages),
+                l10n.personMemoryExplainer(
+                  ref
+                          .watch(autoReplyEndpointProvider)
+                          ?.budget
+                          .forFeature(AiFeature.learnFacts)
+                          .maxMessages ??
+                      kAiContextMessages,
+                ),
                 style: context.text.bodyMedium?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),

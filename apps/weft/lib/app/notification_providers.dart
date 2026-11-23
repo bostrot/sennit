@@ -11,6 +11,7 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/conversation_context.dart';
+import '../services/ai/llm_budget.dart';
 import '../services/billing/entitlements.dart';
 import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
@@ -21,6 +22,7 @@ import '../services/notifications/notification_service.dart';
 import '../services/notifications/open_chats.dart';
 import '../services/notifications/push_registration.dart';
 import 'l10n_labels.dart';
+import 'llm_settings.dart';
 import 'localisation.dart';
 import 'person_memory_providers.dart';
 import 'providers.dart';
@@ -281,16 +283,24 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
       debugPrint('weft: smart replies: no LLM endpoint is configured');
       return const [];
     }
-    // Bounded by the service's own buffer, not trimmed again here: one place
-    // decides how much conversation leaves the device, and that place is
-    // `kAiContextMessages`. Projected by the same function the auto-reply
+    // Bounded by the service's own buffer — `kAiContextMessages` decides how
+    // many messages leave the device — and then by the share of the model's
+    // window the chips get, which keeps them fast. Projected by the same function the auto-reply
     // transcript goes through, so the two features send the one endpoint the
     // same shape of conversation.
-    final transcript = transcriptLinesFor(thread);
+    final budget = LlmBudget.resolve(
+      baseUrl,
+      llmModelSettingsOf(settings, baseUrl: baseUrl, model: model),
+    );
+    final transcript = fitTranscript(
+      transcriptLinesFor(thread),
+      budget.forFeature(AiFeature.smartReplies).transcriptChars,
+    );
     return suggestSmartReplies(
       baseUrl: baseUrl,
       model: model,
       apiKey: stores.llmApiKey,
+      budget: budget,
       chatTitle: content.title,
       transcript: transcript,
       // The same calendar section, under the same gate, as the auto-reply —

@@ -67,6 +67,7 @@ void main() {
           required transcript,
           required open,
           required today,
+          budget,
         }) async {
           asked.add(transcript);
           if (failure != null) throw failure!;
@@ -167,6 +168,7 @@ void main() {
             required transcript,
             required open,
             required today,
+            budget,
           }) async {
             asked.add(transcript);
             return answer;

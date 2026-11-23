@@ -45,7 +45,7 @@ void main() {
       MemoryEditor.chat(
         chat: _anna,
         people: const [_person],
-        loadMessages: () async => const [],
+        loadMessages: (_) async => const [],
       ),
       size: size,
       stores: stores,

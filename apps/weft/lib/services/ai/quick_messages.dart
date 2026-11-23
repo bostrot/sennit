@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'auto_reply_writer.dart'
     show AutoReplyDraft, AutoReplyOutcome, parseAutoReply;
+import 'llm_budget.dart';
 import 'llm_request.dart';
 import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
@@ -542,15 +543,13 @@ const Map<String, String> _languageNames = {
   'hi': 'Hindi',
 };
 
-/// The longest a generated quick message may be: a few sentences.
-const int kQuickMessageMaxTokens = 512;
-
-/// How many recent messages a quick message is written in the light of.
+/// How many recent messages a quick message is written in the light of, at
+/// most; a small context window gets fewer (see `LlmBudget`).
 ///
-/// Fewer than the calendar title reads, and well under `kAiContextMessages`:
-/// the message is new, so the conversation is there for the language, a name,
-/// and what the occasion is — the last dozen lines say all three.
-const int kQuickMessageContextMessages = 12;
+/// Few, whatever the window: the message is new, so the conversation is there
+/// for the language, a name, and what the occasion is — the last couple of
+/// dozen lines say all three.
+const int kQuickMessageContextMessages = 20;
 
 /// The chat completion messages for one quick message.
 ///
@@ -677,6 +676,7 @@ Future<AutoReplyDraft> composeQuickMessage({
   String? recipient,
   String? groupName,
   AiMemory? memory,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
   Future<void>? cancel,
@@ -685,11 +685,13 @@ Future<AutoReplyDraft> composeQuickMessage({
   if (base.isEmpty || model.trim().isEmpty || instruction.trim().isEmpty) {
     return const AutoReplyDraft.failed(AutoReplyOutcome.notConfigured);
   }
+  final limits = budget ?? LlmBudget.resolve(base);
+  final room = limits.forFeature(AiFeature.quickMessage);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -697,39 +699,40 @@ Future<AutoReplyDraft> composeQuickMessage({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
+      body: {
         'model': model,
         // Warmer than a title: "regenerate" should give a different wish.
         'temperature': 0.7,
-        'max_tokens': kQuickMessageMaxTokens,
         'messages': quickMessageRequest(
           instruction: instruction,
           transcript: transcript,
           language: language,
           recipient: recipient,
           groupName: groupName,
-          memory: memoryPromptBlock(memory, baseUrl: base),
+          memory: memoryPromptBlock(memory, baseUrl: base, budget: limits),
         ),
-      }),
+      },
+      maxTokens: room.maxTokens,
+      retryMaxTokens: room.retryMaxTokens,
+      answered: (content) => parseQuickMessage(content) != null,
       timeout: timeout ?? llmResponseTimeout(base, LlmTask.quickMessage),
       cancel: cancel,
+      what: 'quick message',
     );
-    if (response.statusCode != 200) {
-      debugPrint('weft: quick message: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: quick message: $url answered ${answer.status}');
       return const AutoReplyDraft.failed(AutoReplyOutcome.unreachable);
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     final text = content == null ? null : parseQuickMessage(content);
     if (text == null) {
       debugPrint(
         'weft: quick message: nothing usable in ${jsonEncode(content)}',
       );
-      return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
+      // Cut off twice is not the model refusing: it needs a longer answer.
+      return AutoReplyDraft.failed(
+        answer.cutOff ? AutoReplyOutcome.cutOff : AutoReplyOutcome.refused,
+      );
     }
     return AutoReplyDraft.written(text);
   } on TimeoutException {

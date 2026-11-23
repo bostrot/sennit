@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
 
 import 'conversation_context.dart' show kAiContextMessages;
+import 'llm_budget.dart';
 import 'llm_request.dart';
 
 /// How many messages of the conversation the title model is shown, the one
@@ -149,7 +150,9 @@ List<String> recentConversationTranscript(
   int maxMessages = kEventTitleContextMessages,
   int maxChars = kEventTitleContextChars,
 }) {
-  assert(maxMessages > 0 && maxMessages <= kAiContextMessages);
+  // Not bound by `kAiContextMessages`: learning from a chat reads hundreds
+  // of messages when the model's window has room for them.
+  assert(maxMessages > 0);
   final byId = <String, WeftMessage>{};
   for (final m in conversation) {
     if (m.threadRootId == null && _wordsOf(m) != null) {
@@ -220,6 +223,7 @@ Future<String?> suggestEventTitle({
   required String model,
   String? apiKey,
   required List<String> transcript,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
 }) async {
@@ -227,11 +231,14 @@ Future<String?> suggestEventTitle({
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return null;
   }
+  final room = (budget ?? LlmBudget.resolve(base)).forFeature(
+    AiFeature.eventTitle,
+  );
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -239,10 +246,9 @@ Future<String?> suggestEventTitle({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
+      body: {
         'model': model,
         'temperature': 0.2,
-        'max_tokens': 60,
         'messages': [
           {
             'role': 'system',
@@ -292,19 +298,18 @@ Future<String?> suggestEventTitle({
             'content': 'Chat:\n${transcript.join('\n')}\n\nJSON:',
           },
         ],
-      }),
+      },
+      maxTokens: room.maxTokens,
+      retryMaxTokens: room.retryMaxTokens,
+      answered: (content) => parseEventTitle(content) != null,
       timeout: timeout ?? llmResponseTimeout(base, LlmTask.eventTitle),
+      what: 'event title',
     );
-    if (response.statusCode != 200) {
-      debugPrint('weft: event title: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: event title: $url answered ${answer.status}');
       return null;
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     if (content == null) {
       debugPrint('weft: event title: no content in the completion');
       return null;

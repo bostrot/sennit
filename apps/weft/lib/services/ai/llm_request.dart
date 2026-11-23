@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -81,8 +84,12 @@ Duration llmResponseTimeout(String baseUrl, LlmTask task) {
   return switch (task) {
     LlmTask.quickMessage ||
     LlmTask.autoReply => hosted ? kHostedReplyTimeout : kSelfHostedReplyTimeout,
-    LlmTask.todo || LlmTask.personFacts =>
+    LlmTask.todo =>
       hosted ? const Duration(seconds: 20) : kSelfHostedReplyTimeout,
+    // Learning reads far more of the chat than anything else — thousands of
+    // tokens on a big window — and a hosted API takes longer for that too.
+    LlmTask.personFacts =>
+      hosted ? const Duration(seconds: 60) : kSelfHostedReplyTimeout,
     // Someone is looking at a spinner on the chip, and a title is not worth
     // ten minutes of it.
     LlmTask.eventTitle =>
@@ -142,4 +149,84 @@ Future<http.Response> postLlm(
     stop();
     rethrow;
   }
+}
+
+/// One chat completion's answer: the HTTP status, the text, and why the model
+/// stopped.
+class LlmAnswer {
+  const LlmAnswer({required this.status, this.content, this.finishReason});
+
+  final int status;
+
+  /// The answer's text, or null when the model gave none — a thinking model
+  /// cut off while still reasoning leaves it empty and its reasoning in
+  /// `reasoning_content`.
+  final String? content;
+
+  /// `stop`, `length`, or whatever the server said; null when it said nothing.
+  final String? finishReason;
+
+  bool get ok => status == 200;
+
+  /// Whether the model stopped at `max_tokens` rather than at its answer's
+  /// end.
+  bool get cutOff => finishReason == 'length';
+}
+
+/// Asks [url] for one chat completion of [body] — everything but
+/// `max_tokens`, which is [maxTokens] — and reads the answer.
+///
+/// When the model is cut off at [maxTokens] before it wrote anything
+/// [answered] accepts, it is asked once more with [retryMaxTokens], if that is
+/// more: a thinking model that spent a short answer's budget on its reasoning
+/// usually finishes with room to. The second answer is returned whatever it
+/// is, and the caller tells the user it was cut off if it was. [timeout] is
+/// per request, so a retry on a slow local model can take as long again.
+///
+/// A timeout throws [TimeoutException] and a cancel
+/// [http.RequestAbortedException], as [postLlm] does; anything else that is
+/// not JSON throws too.
+Future<LlmAnswer> requestCompletion(
+  http.Client client,
+  Uri url, {
+  required Map<String, String> headers,
+  required Map<String, Object?> body,
+  required int maxTokens,
+  int? retryMaxTokens,
+  bool Function(String content)? answered,
+  required Duration timeout,
+  Future<void>? cancel,
+  String what = 'llm',
+}) async {
+  Future<LlmAnswer> ask(int tokens) async {
+    final response = await postLlm(
+      client,
+      url,
+      headers: headers,
+      body: jsonEncode({...body, 'max_tokens': tokens}),
+      timeout: timeout,
+      cancel: cancel,
+    );
+    if (response.statusCode != 200) {
+      return LlmAnswer(status: response.statusCode);
+    }
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    final choice = (decoded is Map ? decoded['choices'] as List? : null)
+        ?.whereType<Map>()
+        .firstOrNull;
+    final message = choice?['message'];
+    return LlmAnswer(
+      status: 200,
+      content: message is Map ? message['content'] as String? : null,
+      finishReason: choice?['finish_reason'] as String?,
+    );
+  }
+
+  final first = await ask(maxTokens);
+  final more = retryMaxTokens ?? maxTokens;
+  if (!first.ok || !first.cutOff || more <= maxTokens) return first;
+  final content = first.content;
+  if (content != null && (answered?.call(content) ?? false)) return first;
+  debugPrint('weft: $what: cut off at $maxTokens tokens, asking with $more');
+  return ask(more);
 }

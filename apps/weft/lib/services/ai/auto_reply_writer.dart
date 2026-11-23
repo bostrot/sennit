@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'llm_budget.dart';
 import 'llm_request.dart';
 import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 import 'smart_replies.dart' show calendarPromptBlock;
@@ -38,6 +39,11 @@ enum AutoReplyOutcome {
   /// The model answered, but with nothing usable — reasoning it never came out
   /// of, an empty string, or anything outside the answer format.
   refused,
+
+  /// The model stopped at the answer length before it wrote an answer, even
+  /// after being asked again with more room — a thinking model still
+  /// thinking.
+  cutOff,
 
   /// The model answered in the format and chose not to reply, because the
   /// user's instruction or the conversation said no message should go out.
@@ -75,14 +81,6 @@ class AutoReplyDraft {
 /// and a short paragraph — past that the words are not a reply any more.
 const int kAutoReplyMaxChars = 600;
 
-/// The completion budget asked for.
-///
-/// Far more than [kAutoReplyMaxChars] needs, because the budget is spent on
-/// reasoning too: a thinking model handed 220 tokens spent all of them inside
-/// `<think>` and never reached the tags, and every such answer was refused.
-/// The cap on what is *sent* is [kAutoReplyMaxChars], not this.
-const int kAutoReplyMaxTokens = 1024;
-
 /// Asks the configured LLM to write one reply, following the user's prompt.
 ///
 /// A sibling of `suggestSmartReplies` rather than a parameter on it, because
@@ -118,6 +116,7 @@ Future<AutoReplyDraft> composeAutoReply({
   required List<String> transcript,
   String? calendar,
   AiMemory? memory,
+  LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
 }) async {
@@ -129,11 +128,16 @@ Future<AutoReplyDraft> composeAutoReply({
     return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
   }
 
+  final limits = budget ?? LlmBudget.resolve(base);
+  // The budget is spent on reasoning too: a thinking model handed 220 tokens
+  // spent all of them inside `<think>` and never reached the tags. The cap on
+  // what is *sent* is [kAutoReplyMaxChars], not this.
+  final room = limits.forFeature(AiFeature.autoReply);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
   final httpClient = client ?? llmHttpClient();
   try {
-    final response = await postLlm(
+    final answer = await requestCompletion(
       httpClient,
       url,
       headers: {
@@ -141,10 +145,9 @@ Future<AutoReplyDraft> composeAutoReply({
         if (apiKey != null && apiKey.isNotEmpty)
           'Authorization': 'Bearer $apiKey',
       },
-      body: jsonEncode({
+      body: {
         'model': model,
         'temperature': 0.6,
-        'max_tokens': kAutoReplyMaxTokens,
         'messages': [
           {
             'role': 'system',
@@ -169,7 +172,7 @@ Future<AutoReplyDraft> composeAutoReply({
                 'without them is never sent.\n\n'
                 "The user's instruction:\n$instruction"
                 '${calendarPromptBlock(calendar)}'
-                '${memoryPromptBlock(memory, baseUrl: base)}',
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits)}',
           },
           {
             'role': 'user',
@@ -179,23 +182,29 @@ Future<AutoReplyDraft> composeAutoReply({
                 'Your answer, in the format above:',
           },
         ],
-      }),
+      },
+      maxTokens: room.maxTokens,
+      retryMaxTokens: room.retryMaxTokens,
+      // Only a closed reply or a decline counts: a message cut off mid-way is
+      // never sent, so it is worth the second try.
+      answered: (content) =>
+          parseAutoReply(content, finished: false).outcome !=
+          AutoReplyOutcome.refused,
       timeout: timeout ?? llmResponseTimeout(base, LlmTask.autoReply),
+      what: 'auto-reply',
     );
 
-    if (response.statusCode != 200) {
-      debugPrint('weft: auto-reply: $url answered ${response.statusCode}');
+    if (!answer.ok) {
+      debugPrint('weft: auto-reply: $url answered ${answer.status}');
       return const AutoReplyDraft.failed(AutoReplyOutcome.unreachable);
     }
 
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final choice = ((decoded as Map)['choices'] as List?)
-        ?.cast<Map>()
-        .firstOrNull;
-    final content = choice?['message']?['content'] as String?;
+    final content = answer.content;
     if (content == null) {
       debugPrint('weft: auto-reply: no content in the completion');
-      return const AutoReplyDraft.failed(AutoReplyOutcome.refused);
+      return AutoReplyDraft.failed(
+        answer.cutOff ? AutoReplyOutcome.cutOff : AutoReplyOutcome.refused,
+      );
     }
 
     // "stop" is the model ending its answer itself, which is what tells an
@@ -204,10 +213,13 @@ Future<AutoReplyDraft> composeAutoReply({
     // cut off.
     final draft = parseAutoReply(
       content,
-      finished: choice?['finish_reason'] == 'stop',
+      finished: answer.finishReason == 'stop',
     );
     if (draft.outcome == AutoReplyOutcome.refused) {
       debugPrint('weft: auto-reply: nothing usable in ${jsonEncode(content)}');
+      if (answer.cutOff) {
+        return const AutoReplyDraft.failed(AutoReplyOutcome.cutOff);
+      }
     }
     return draft;
   } on TimeoutException {

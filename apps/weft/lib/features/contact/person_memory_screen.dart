@@ -12,6 +12,8 @@ import '../../app/localisation.dart';
 import '../../app/person_memory_providers.dart';
 import '../../app/providers.dart';
 import '../../app/quick_message_providers.dart' show quickMessageClientProvider;
+import '../../services/ai/conversation_context.dart' show kAiContextMessages;
+import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/person_memory.dart';
 import '../../services/billing/entitlements.dart';
 import '../settings/person_memory_settings_screen.dart';
@@ -55,8 +57,8 @@ class ChatMemoryScreen extends ConsumerWidget {
     return MemoryEditor.chat(
       chat: chat,
       people: ref.watch(chatMemoryPeopleProvider(chatId)).value ?? const [],
-      loadMessages: () async =>
-          (await repository.timelineFor(chat.id)).view().messages,
+      loadMessages: (wanted) async =>
+          loadHistoryForAi(await repository.timelineFor(chat.id), wanted),
     );
   }
 }
@@ -75,12 +77,13 @@ class PersonMemoryScreen extends StatelessWidget {
 /// which is what lets a test pump it without a repository.
 class MemoryEditor extends ConsumerStatefulWidget {
   /// A chat's memory. [people] are who a fact can be added to instead;
-  /// [loadMessages] is the conversation "Learn from chat" reads.
+  /// [loadMessages] is the conversation "Learn from chat" reads, at least
+  /// the number of messages it is given when there are that many.
   MemoryEditor.chat({
     super.key,
     required Chat this.chat,
     required this.people,
-    required Future<List<WeftMessage>> Function() this.loadMessages,
+    required Future<List<WeftMessage>> Function(int wanted) this.loadMessages,
   }) : person = null,
        keys = chatMemoryKeys(chat);
 
@@ -94,7 +97,7 @@ class MemoryEditor extends ConsumerStatefulWidget {
   final Chat? chat;
   final MemoryPerson? person;
   final List<MemoryPerson> people;
-  final Future<List<WeftMessage>> Function()? loadMessages;
+  final Future<List<WeftMessage>> Function(int wanted)? loadMessages;
 
   /// Where the note is filed.
   final List<String> keys;
@@ -220,14 +223,20 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
     _save();
     setState(() => _busy = true);
     PersonFactsResult result;
+    final endpoint = ref.read(autoReplyEndpointProvider);
     try {
       result = await learnPersonFacts(
         settings: ref.read(personMemorySettingsProvider),
-        endpoint: ref.read(autoReplyEndpointProvider),
+        endpoint: endpoint,
         memory: _memory,
         chat: chat,
         people: widget.people,
-        messages: await widget.loadMessages!(),
+        // As much as the model's window has room for: hundreds of messages
+        // on a big one, which the chat has usually not loaded yet.
+        messages: await widget.loadMessages!(
+          endpoint?.budget.forFeature(AiFeature.learnFacts).maxMessages ??
+              kAiContextMessages,
+        ),
         client: ref.read(quickMessageClientProvider),
       );
     } on Object {
@@ -291,6 +300,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
       apiKey: endpoint.apiKey,
       name: widget.person!.name,
       note: _note.text,
+      budget: endpoint.budget,
       client: ref.read(quickMessageClientProvider),
     );
     if (!mounted) return;
