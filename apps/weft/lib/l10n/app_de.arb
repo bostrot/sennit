@@ -1553,5 +1553,10 @@
   "deleteAccountCancelledAfterBridges": "Dein Konto wurde nicht gelöscht, aber deine Bridges sind abgemeldet. Melde dich unter Bridges wieder an.",
   "deleteAccountUnsupported": "{server} verlangt eine Bestätigung, die Sennit nicht anzeigen kann. Lösche das Konto stattdessen auf der Website von {server}.",
   "deleteAccountFailed": "Das Konto konnte nicht gelöscht werden: {error}",
-  "deleteAccountDone": "Dein Konto wurde gelöscht."
+  "deleteAccountDone": "Dein Konto wurde gelöscht.",
+  "shareTitle": "Teilen mit…",
+  "shareReadingFiles": "{count, plural, =1{1 Datei wird gelesen…} other{{count} Dateien werden gelesen…}}",
+  "shareFileCount": "{count, plural, other{{count} Dateien}}",
+  "shareNothingToSend": "Nichts zu senden",
+  "shareQuotedText": "„{text}“"
 }

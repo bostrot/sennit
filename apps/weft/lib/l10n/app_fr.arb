@@ -1553,5 +1553,10 @@
   "deleteAccountCancelledAfterBridges": "Ton compte n’a pas été supprimé, mais tes ponts sont déconnectés. Reconnecte-les dans Ponts.",
   "deleteAccountUnsupported": "{server} demande une confirmation que Sennit ne sait pas afficher. Supprime plutôt le compte sur le site de {server}.",
   "deleteAccountFailed": "Impossible de supprimer le compte : {error}",
-  "deleteAccountDone": "Ton compte a été supprimé."
+  "deleteAccountDone": "Ton compte a été supprimé.",
+  "shareTitle": "Partager vers…",
+  "shareReadingFiles": "{count, plural, =1{Lecture d’un fichier…} other{Lecture de {count} fichiers…}}",
+  "shareFileCount": "{count, plural, other{{count} fichiers}}",
+  "shareNothingToSend": "Rien à envoyer",
+  "shareQuotedText": "« {text} »"
 }

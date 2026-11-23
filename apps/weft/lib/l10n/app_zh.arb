@@ -1554,5 +1554,10 @@
   "deleteAccountCancelledAfterBridges": "你的账号未被删除，但桥接已退出登录。请在“桥接”中重新登录。",
   "deleteAccountUnsupported": "{server} 要求的确认方式 Sennit 无法显示。请改为在 {server} 的网站上删除账号。",
   "deleteAccountFailed": "无法删除账号：{error}",
-  "deleteAccountDone": "你的账号已删除。"
+  "deleteAccountDone": "你的账号已删除。",
+  "shareTitle": "分享到…",
+  "shareReadingFiles": "{count, plural, other{正在读取 {count} 个文件…}}",
+  "shareFileCount": "{count, plural, other{{count} 个文件}}",
+  "shareNothingToSend": "没有可发送的内容",
+  "shareQuotedText": "“{text}”"
 }
