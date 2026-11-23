@@ -671,7 +671,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             labelText: l10n.endpointsContextField,
-            hintText: '${detected ?? kLlmFallbackContextTokens}',
+            hintText: (detected ?? kLlmFallbackContextTokens).toString(),
             helperText: detected != null
                 ? l10n.endpointsContextDetected(
                     detected,
@@ -690,7 +690,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             labelText: l10n.endpointsAnswerField,
-            hintText: '${defaults.answerTokens}',
+            hintText: defaults.answerTokens.toString(),
             helperText: l10n.endpointsAnswerHelper(defaults.answerTokens),
             helperMaxLines: 3,
           ),
