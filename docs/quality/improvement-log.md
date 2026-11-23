@@ -15,7 +15,7 @@ and what was noticed but not done.
 
 - 2026-11-20 · Bug fix · Older history asked for from inside layout waits for the frame to finish, so reaching the top of a chat no longer rebuilds it mid-frame · https://github.com/bostrot/sennit/pull/9
 
-- 2026-11-23 · Localization · The share sheet's title, summary line ("Reading 3 files…", "2 files", "Nothing to send", the quoted text), "via WhatsApp" and the networks a screen reader hears on each row follow the app's language · PR_LINK
+- 2026-11-23 · Localization · The share sheet's title, summary line ("Reading 3 files…", "2 files", "Nothing to send", the quoted text), "via WhatsApp" and the networks a screen reader hears on each row follow the app's language · https://github.com/bostrot/sennit/pull/29
 
 ## Lessons from reviews
 
