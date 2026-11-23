@@ -1622,6 +1622,8 @@
   "endpointsAnswerHelper": "留空则为 {tokens}。会思考的模型也会把它用于推理。",
   "endpointsThinkingTitle": "思考型模型",
   "endpointsThinkingSubtitle": "让每个 AI 功能在回答前有思考空间。自托管模型默认开启。",
+  "endpointsSuggestionModelField": "回复建议使用的模型",
+  "endpointsSuggestionModelHelper": "可选。同一地址下的小模型或非思考模型能更快写出通知中的回复建议，例如“-nothink”别名。留空则使用上面的模型。",
   "endpointsDetectLimits": "检测",
   "endpointsLimitsDetected": "{source}：窗口 {context}，回答最多 {output}",
   "endpointsLimitsNotDetected": "服务器没有提供。请手动填写数值。",

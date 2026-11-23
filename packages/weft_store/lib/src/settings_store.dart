@@ -245,6 +245,11 @@ abstract final class WeftSettings {
   static const String llmBaseUrl = 'ai.llm_base_url';
   static const String llmModel = 'ai.llm_model';
 
+  /// The model the notification reply chips ask instead of [llmModel], at the
+  /// same endpoint — a small or non-thinking one, so two short answers come
+  /// in a second or two. Empty means [llmModel].
+  static const String llmSuggestionModel = 'ai.llm_suggestion_model';
+
   /// Each model's context window and answer length — what the user typed and
   /// what the server reported — as one JSON object keyed by base URL and
   /// model (`LlmModelSettings.keyFor`), so switching models keeps each one's.

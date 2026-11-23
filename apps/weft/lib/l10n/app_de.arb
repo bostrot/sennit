@@ -1621,6 +1621,8 @@
   "endpointsAnswerHelper": "Leer lassen für {tokens}. Ein nachdenkendes Modell verbraucht das auch fürs Nachdenken.",
   "endpointsThinkingTitle": "Nachdenkendes Modell",
   "endpointsThinkingSubtitle": "Gibt jeder KI-Funktion Platz zum Nachdenken, bevor sie antwortet. Für selbst gehostete Modelle standardmäßig an.",
+  "endpointsSuggestionModelField": "Modell für Antwortvorschläge",
+  "endpointsSuggestionModelHelper": "Optional. Ein kleines Modell ohne Denkphase unter derselben Adresse schreibt die Vorschläge in Benachrichtigungen schneller, z. B. ein „-nothink“-Alias. Leer heißt: das Modell oben.",
   "endpointsDetectLimits": "Erkennen",
   "endpointsLimitsDetected": "{source}: Fenster {context}, Antwort bis {output}",
   "endpointsLimitsNotDetected": "Der Server hat nichts gesagt. Trag die Werte selbst ein.",

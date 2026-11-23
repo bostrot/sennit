@@ -1621,6 +1621,8 @@
   "endpointsAnswerHelper": "Laisse vide pour {tokens}. Un modèle qui réfléchit le dépense aussi pour réfléchir.",
   "endpointsThinkingTitle": "Modèle qui réfléchit",
   "endpointsThinkingSubtitle": "Laisse à chaque fonction d’IA la place de réfléchir avant de répondre. Activé par défaut pour les modèles auto-hébergés.",
+  "endpointsSuggestionModelField": "Modèle pour les suggestions",
+  "endpointsSuggestionModelHelper": "Facultatif. Un petit modèle ou un modèle sans réflexion à la même adresse écrit plus vite les suggestions des notifications, par ex. un alias « -nothink ». Vide : le modèle ci-dessus.",
   "endpointsDetectLimits": "Détecter",
   "endpointsLimitsDetected": "{source} : fenêtre {context}, réponse jusqu’à {output}",
   "endpointsLimitsNotDetected": "Le serveur ne l’a pas indiqué. Saisis les valeurs.",
