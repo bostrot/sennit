@@ -101,11 +101,16 @@ class NamedButton extends StatelessWidget {
 /// A `SnackBar` that a screen reader also hears.
 ///
 /// Both, rather than one or the other: a sighted user needs the bar, and a
-/// reader needs the words to outlive it.
-void showWeftMessage(BuildContext context, String message) {
+/// reader needs the words to outlive it. [action] is the bar's button, for a
+/// message that says where to go to fix what it reports.
+void showWeftMessage(
+  BuildContext context,
+  String message, {
+  SnackBarAction? action,
+}) {
   ScaffoldMessenger.maybeOf(
     context,
-  )?.showSnackBar(SnackBar(content: Text(message)));
+  )?.showSnackBar(SnackBar(content: Text(message), action: action));
   // Assertive on purpose: everything routed through here is the report of
   // something the user asked for having failed or finished. Polite would queue
   // it behind whatever is being read — in practice, behind the bar's own

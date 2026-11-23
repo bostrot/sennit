@@ -7,6 +7,7 @@
 /// never written into a note without the user accepting it.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,17 +53,19 @@ const _anna = Chat(
 );
 
 http.Client _answering(
-  String content, {
+  String? content, {
   void Function(Map<String, Object?> body)? onRequest,
   int status = 200,
+  String finishReason = 'stop',
+  String? reasoning,
 }) => MockClient((request) async {
   onRequest?.call(jsonDecode(request.body) as Map<String, Object?>);
   return http.Response(
     jsonEncode({
       'choices': [
         {
-          'message': {'content': content},
-          'finish_reason': 'stop',
+          'message': {'content': content, 'reasoning_content': ?reasoning},
+          'finish_reason': finishReason,
         },
       ],
     }),
@@ -523,9 +526,48 @@ Mia (5), Ben (3)
       ]);
     });
 
-    test('is nothing for prose or reasoning that never ended', () {
-      expect(parsePersonFacts('She likes jazz, I think.'), isEmpty);
-      expect(parsePersonFacts('<think>She likes'), isEmpty);
+    test('reads through what local models wrap the list in', () {
+      // A fence tagged with something other than json, after a preamble.
+      expect(
+        parsePersonFacts('Here you go:\n```JSON5\n{"facts": ["Runs"]}\n```'),
+        ['Runs'],
+      );
+      // A template that opened <think> itself leaves only the closing tag,
+      // after reasoning that quotes a list of its own.
+      expect(
+        parsePersonFacts(
+          'Maybe ["Likes jazz"]? No, she said blues.\n</think>\n\n'
+          '{"facts": ["Likes blues"]}',
+        ),
+        ['Likes blues'],
+      );
+      // Prose around the object.
+      expect(
+        parsePersonFacts('Sure! {"facts": ["Has a cat"]} Hope this helps.'),
+        ['Has a cat'],
+      );
+    });
+
+    test('reads facts written as objects, with the person named', () {
+      expect(
+        parsePersonFacts(
+          '{"facts": [{"person": "Tom", "fact": "Runs the Berlin marathon"}, '
+          '{"fact": "Calls everyone du"}, {"text": "Tom: likes jazz", '
+          '"name": "Tom"}, 3]}',
+        ),
+        [
+          'Tom: Runs the Berlin marathon',
+          'Calls everyone du',
+          'Tom: likes jazz',
+        ],
+      );
+    });
+
+    test('an empty list is nothing to keep, no list is no answer', () {
+      expect(parsePersonFacts('{"facts": []}'), isEmpty);
+      expect(parsePersonFacts('She likes jazz, I think.'), isNull);
+      expect(parsePersonFacts('<think>She likes'), isNull);
+      expect(parsePersonFacts(''), isNull);
     });
   });
 
@@ -602,7 +644,11 @@ Mia (5), Ben (3)
           onRequest: (b) => sent = b,
         ),
       );
-      expect(result, (outcome: PersonFactsOutcome.proposed, added: 1));
+      expect(result, (
+        outcome: PersonFactsOutcome.proposed,
+        added: 1,
+        status: null,
+      ));
       expect(memory.book.noteFor(keys), 'Planning the Lisbon trip');
       expect(memory.book.suggestionsFor(keys), [
         'Tochter Mia hat morgen Geburtstag',
@@ -617,6 +663,90 @@ Mia (5), Ben (3)
     test('a failed request is a failure, not "nothing new"', () async {
       final result = await learn(client: _answering('', status: 500));
       expect(result.outcome, PersonFactsOutcome.failed);
+      expect(result.status, 500);
+    });
+
+    test('asks for room to think: a reasoning model needs it', () async {
+      late Map<String, Object?> sent;
+      await learn(
+        client: _answering('{"facts": []}', onRequest: (b) => sent = b),
+      );
+      expect(sent['max_tokens'], greaterThanOrEqualTo(2048));
+    });
+
+    // What the owner's Qwen behind litellm answered with 400 tokens: all of
+    // them in reasoning_content, no content, finish_reason "length".
+    test('a model cut off while thinking is not "nothing new"', () async {
+      final result = await learn(
+        client: _answering(
+          null,
+          reasoning: 'We need to produce JSON only with facts…',
+          finishReason: 'length',
+        ),
+      );
+      expect(result.outcome, PersonFactsOutcome.cutOff);
+      expect(memory.book.suggestionsFor(keys), isEmpty);
+
+      final inline = await learn(
+        client: _answering('<think>Tom said', finishReason: 'length'),
+      );
+      expect(inline.outcome, PersonFactsOutcome.cutOff);
+    });
+
+    test('an answer with no list is unreadable, not "nothing new"', () async {
+      final result = await learn(
+        client: _answering('Anna seems to like birthdays.'),
+      );
+      expect(result.outcome, PersonFactsOutcome.unreadable);
+      final empty = await learn(client: _answering(null));
+      expect(empty.outcome, PersonFactsOutcome.unreadable);
+    });
+
+    test('a timeout says so', () async {
+      final result = await learn(
+        client: MockClient((_) async => throw TimeoutException('slow')),
+      );
+      expect(result.outcome, PersonFactsOutcome.timedOut);
+    });
+
+    test('a fenced, thought-through answer is proposed', () async {
+      final result = await learn(
+        client: _answering(
+          '<think>Mia is her daughter.</think>\n```json\n'
+          '{"facts": ["Tochter Mia hat morgen Geburtstag"]}\n```',
+        ),
+      );
+      expect(result.outcome, PersonFactsOutcome.proposed);
+    });
+
+    test('both sides are sent, encrypted messages too when allowed', () async {
+      late Map<String, Object?> sent;
+      final result = await learn(
+        messages: [
+          _message('Ich laufe im September den Berlin-Marathon', minute: 1),
+          _message('Wow, viel Glück!', own: true, minute: 2),
+          _message('Und nenn mich Tommy', encrypted: true, minute: 3),
+        ],
+        settings: on.copyWith(encryptedChats: true),
+        client: _answering('{"facts": []}', onRequest: (b) => sent = b),
+      );
+      expect(result.outcome, PersonFactsOutcome.nothingNew);
+      final last =
+          ((sent['messages'] as List).last as Map)['content'] as String;
+      expect(
+        last,
+        contains('Anna: Ich laufe im September den Berlin-Marathon'),
+      );
+      expect(last, contains('Wow, viel Glück!'));
+      expect(last, contains('Anna: Und nenn mich Tommy'));
+    });
+
+    test('a facts list the notes already hold is "nothing new"', () async {
+      memory.saveNote(keys, '- Tochter Mia hat morgen Geburtstag');
+      final result = await learn(
+        client: _answering('{"facts": ["Tochter Mia hat morgen Geburtstag"]}'),
+      );
+      expect(result.outcome, PersonFactsOutcome.nothingNew);
     });
   });
 }
