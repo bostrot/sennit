@@ -709,6 +709,21 @@ class WeftNotificationService {
     _aiContext.clear();
   }
 
+  /// Completes once every notification decided so far is posted and every
+  /// chip request it started has been answered, added or given up on.
+  ///
+  /// For a process that exists only to post: a headless push engine is
+  /// reaped once its handler returns, and returning before the chips came
+  /// would post the notification without them every time.
+  Future<void> chipsSettled() async {
+    await _queue;
+    while (_chipsPending.isNotEmpty) {
+      await Future.wait(_chipsPending.values);
+      // The update joins the queue once its request is answered.
+      await _queue;
+    }
+  }
+
   /// Posts [notification] as if the pipeline had decided it, past the
   /// pipeline's per-event dedupe — the way a second process or a restarted
   /// pipeline posts a message again.

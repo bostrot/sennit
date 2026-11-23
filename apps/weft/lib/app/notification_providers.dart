@@ -10,10 +10,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
-import '../services/ai/conversation_context.dart';
-import '../services/ai/llm_budget.dart';
 import '../services/billing/entitlements.dart';
-import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
     show NotificationDismisser;
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
@@ -21,8 +18,8 @@ import '../services/notifications/conversation_clearer.dart';
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/open_chats.dart';
 import '../services/notifications/push_registration.dart';
+import '../services/notifications/reply_suggester.dart';
 import 'l10n_labels.dart';
-import 'llm_settings.dart';
 import 'localisation.dart';
 import 'person_memory_providers.dart';
 import 'providers.dart';
@@ -258,72 +255,29 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     conversations: matrixSession.incomingMessages,
   );
 
-  // AI answer chips on message notifications. Settings are read per message
-  // rather than captured, so flipping the toggle needs no restart; every
-  // failure path is an empty list, because the notification must never wait
-  // on an error.
-  service.suggestReplies = (content, thread) async {
-    // A bridge bot's login prompts are not a conversation to be witty in.
-    if (repository.serviceChatIds.contains(content.groupKey)) return const [];
-    final WeftStores stores;
-    try {
-      stores = ref.read(storesProvider);
-    } on Object {
-      return const [];
-    }
-    if (!proUnlockedNow(ref, ProFeature.aiReplies)) return const [];
-    final settings = stores.settings;
-    if (!settings.getBool(WeftSettings.notifySmartReplies, fallback: true)) {
-      debugPrint('weft: smart replies: the setting is off');
-      return const [];
-    }
-    // Android is the one platform that draws them: its reply action takes
-    // them as choices, and no other platform's notification has a place for
-    // them. Anywhere else the completion would be spent on nothing.
-    if (defaultTargetPlatform != TargetPlatform.android) return const [];
-    final baseUrl = settings.getString(WeftSettings.llmBaseUrl) ?? '';
-    final model = smartReplyModel(settings);
-    if (baseUrl.trim().isEmpty || model.isEmpty) {
-      debugPrint('weft: smart replies: no LLM endpoint is configured');
-      return const [];
-    }
-    // Bounded by the service's own buffer — `kAiContextMessages` decides how
-    // many messages leave the device — and then by the share of the model's
-    // window the chips get, which keeps them fast. Projected by the same function the auto-reply
-    // transcript goes through, so the two features send the one endpoint the
-    // same shape of conversation.
-    final budget = LlmBudget.resolve(
-      baseUrl,
-      llmModelSettingsOf(settings, baseUrl: baseUrl, model: model),
-    );
-    final transcript = fitTranscript(
-      transcriptLinesFor(thread),
-      budget.forFeature(AiFeature.smartReplies).transcriptChars,
-    );
-    return suggestSmartReplies(
-      baseUrl: baseUrl,
-      model: model,
-      apiKey: stores.llmApiKey,
-      budget: budget,
-      chatTitle: content.title,
-      transcript: transcript,
-      // The same calendar section, under the same gate, as the auto-reply —
-      // so "Friday works!" is not offered for a Friday that does not. Two
-      // seconds at most: the chips are worth most while the notification is
-      // still being looked at.
-      calendar: await aiCalendarContext(
-        ref,
-        transcript,
-        timeout: const Duration(seconds: 2),
-      ),
-      // What the user noted about this chat and the people writing in it,
-      // under the same switch as every other AI feature's.
-      memory: switch (repository.chatForRoom(content.roomId)) {
-        final Chat chat => ref.read(aiMemoryForPromptProvider)(chat, thread),
-        null => null,
-      },
-    );
-  };
+  // AI answer chips on message notifications.
+  service.suggestReplies = notificationReplySuggester(
+    settings: () => ref.read(storesProvider).settings,
+    apiKey: () => ref.read(storesProvider).llmApiKey,
+    proUnlocked: () => proUnlockedNow(ref, ProFeature.aiReplies),
+    serviceChatIds: () => repository.serviceChatIds,
+    // The same calendar section, under the same gate, as the auto-reply —
+    // so "Friday works!" is not offered for a Friday that does not. Two
+    // seconds at most: the chips are worth most while the notification is
+    // still being looked at.
+    calendar: (transcript) => aiCalendarContext(
+      ref,
+      transcript,
+      timeout: const Duration(seconds: 2),
+    ),
+    // What the user noted about this chat and the people writing in it,
+    // under the same switch as every other AI feature's.
+    memory: (content, thread) =>
+        switch (repository.chatForRoom(content.roomId)) {
+          final Chat chat => ref.read(aiMemoryForPromptProvider)(chat, thread),
+          null => null,
+        },
+  );
 
   ref.onDispose(() {
     unawaited(service.dispose());
@@ -331,15 +285,6 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   });
   return service;
 });
-
-/// The model the reply chips ask: the one set for them, or the AI model.
-String smartReplyModel(SettingsStore settings) {
-  final own = (settings.getString(WeftSettings.llmSuggestionModel) ?? '')
-      .trim();
-  return own.isNotEmpty
-      ? own
-      : (settings.getString(WeftSettings.llmModel) ?? '').trim();
-}
 
 /// Registers this device's pusher, and says why it did not when it did not.
 ///
