@@ -155,6 +155,51 @@ void main() {
     expect(bookOf(tester).noteFor(_person.keys), hasLength(301));
   });
 
+  testWidgets('the writing style stands apart, and edits like a fact', (
+    tester,
+  ) async {
+    final book = MemoryBook.empty
+        .applyLearning(
+          const MemoryUpdate(
+            adds: [MemoryAddition('Lisbon trip in May')],
+            styles: {'me': 'Very short, all lowercase, often 😅'},
+          ),
+          chatKeys: _keys,
+          people: const [_person],
+          numbered: const [],
+          now: DateTime(2026, 11, 24, 9),
+        )
+        .book;
+    await pumpEditor(tester, book: book);
+    expect(find.text(en.personMemoryStyleTitle), findsOneWidget);
+    expect(find.text(en.personMemoryMyStyleHint), findsOneWidget);
+    final style = find.byKey(const ValueKey('memory-style'));
+    expect(
+      find.descendant(
+        of: style,
+        matching: find.text('Very short, all lowercase, often 😅'),
+      ),
+      findsOneWidget,
+    );
+    // Shown once, not again among the facts.
+    expect(find.text('Very short, all lowercase, often 😅'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(of: style, matching: find.byIcon(Icons.edit_outlined)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(en.personMemoryEditStyle), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('memory-fact-edit')),
+      'Short, lowercase',
+    );
+    await tester.tap(find.text(en.commonSave));
+    await tester.pumpAndSettle();
+    final edited = bookOf(tester).styleFor(_keys)!;
+    expect(edited.text, 'Short, lowercase');
+    expect(edited.pinned, isTrue);
+  });
+
   testWidgets('learning asks nothing while the memory is off', (tester) async {
     await pumpEditor(tester);
     await tester.tap(find.byKey(const ValueKey('memory-learn')));

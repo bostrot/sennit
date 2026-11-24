@@ -15,7 +15,9 @@ import '../support/golden_harness.dart';
 ///
 /// The editor frame is the one that matters. A learned fact has to read as
 /// learned — marked, dated, one pinned — and apart from the user's own note
-/// above it, with the last automatic update one tap from undone.
+/// above it, with the last automatic update one tap from undone. The writing
+/// style stands apart from the facts: the user's in the chat's memory,
+/// Anna's in hers, the usual one on the settings screen.
 void main() {
   setUpAll(loadGoldenFonts);
 
@@ -45,6 +47,11 @@ void main() {
                 about: 'Anna',
               ),
             ],
+            styles: {
+              'me': 'Very short, all lowercase, no full stops, often 😅; du',
+              'Anna': 'Full sentences with capitals, an emoji in most',
+              'default': 'Short and casual, few capitals',
+            },
           ),
           chatKeys: keys,
           people: const [anna],

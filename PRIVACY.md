@@ -68,7 +68,11 @@ Sennit talks exclusively to servers **you** configure:
   messages or once a day, only while the app is open, and writes what it
   learns into the memory, marked with when it was learned, for you to edit,
   pin, delete or undo. "Learn now" does the same on request. Both skip
-  end-to-end encrypted chats unless you allow them.
+  end-to-end encrypted chats unless you allow them. What is learned includes
+  a short description of how you write in each chat and how the other person
+  writes; reply suggestions, quick messages and auto-replies send it along
+  with up to ten of your own recent messages in that chat as examples — from
+  an encrypted chat only if you allow learning from those.
 
 ## Auto-reply
 
