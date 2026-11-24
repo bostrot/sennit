@@ -1,0 +1,12 @@
+# Sennit Web relay: `npx wrangler deploy` from this directory.
+name = "sennit-relay"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[[durable_objects.bindings]]
+name = "PHONES"
+class_name = "Phone"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Phone"]

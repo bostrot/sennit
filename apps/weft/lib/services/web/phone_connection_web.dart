@@ -8,8 +8,14 @@ import 'package:web/web.dart' as web;
 import '../../data/remote_chat_repository.dart';
 import 'phone_connection_errors.dart';
 
-const _phoneKey = 'sennit.web.phone';
-const _browserSeed = 'sennit.web.browser';
+// Per path as well as per origin: on a relay every phone shares the origin
+// and has its own path, and each pairing belongs to one phone.
+String get _phoneKey => 'sennit.web.phone${_scope()}';
+String get _browserSeed => 'sennit.web.browser${_scope()}';
+String _scope() {
+  final path = web.window.location.pathname;
+  return path == '/' ? '' : path;
+}
 
 /// Reads the pairing from the address, connects to the phone that served
 /// this page, and hands back its repository.

@@ -1709,5 +1709,16 @@
   "sennitWebPairedNone": "Aún no hay navegadores vinculados.",
   "sennitWebPairedSeen": "Última conexión: {date}",
   "sennitWebRevoke": "Desvincular",
-  "sennitWebServingBanner": "Sennit Web está activado"
+  "sennitWebServingBanner": "Sennit Web está activado",
+  "sennitWebRelayTitle": "Acceso desde cualquier lugar",
+  "sennitWebRelayExplainer": "A través de un relay que tú ejecutas en tu propia cuenta de Cloudflare. El teléfono se conecta hacia fuera, así que nada tiene que entrar. El relay transmite tráfico cifrado y no puede leer tus chats.",
+  "sennitWebRelayUrlLabel": "Dirección del relay",
+  "sennitWebRelayUrlInvalid": "Introduce la dirección https:// del relay.",
+  "sennitWebRelaySwitch": "Servir a través del relay",
+  "sennitWebRelaySubtitle": "Desactivado",
+  "sennitWebRelayConnecting": "Conectando…",
+  "sennitWebRelayConnected": "Conectado. Los navegadores vinculados pueden abrir la dirección de abajo desde cualquier lugar.",
+  "sennitWebRelayRefused": "El relay rechazó este dispositivo. Revisa la dirección.",
+  "sennitWebRelayUnreachable": "No se puede contactar con el relay. Reintentando…",
+  "sennitWebRelayHowTo": "Cómo configurar un relay"
 }

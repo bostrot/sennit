@@ -11,12 +11,14 @@ import 'package:weft/app/stores.dart';
 import 'package:weft/features/components/qr_card.dart';
 import 'package:weft/features/settings/sennit_web_screen.dart';
 import 'package:weft/services/web/pairing_registry.dart';
+import 'package:weft/services/web/relay_connection.dart';
 import 'package:weft/services/web/web_bundle_store.dart';
 
 /// The phone half of Sennit Web as the user sees it: the switch, where to
 /// open it, the pairing code and the browsers that can come back.
 void main() {
   late WeftStores stores;
+  late _FakeServing serving;
 
   setUp(() {
     stores = WeftStores.inMemory();
@@ -33,7 +35,7 @@ void main() {
           storesProvider.overrideWithValue(stores),
           webBundleProvider.overrideWith(_ReadyBundle.new),
           sennitWebServerProvider.overrideWith(
-            () => _FakeServing(running: running),
+            () => serving = _FakeServing(running: running),
           ),
         ],
         child: MaterialApp(
@@ -77,6 +79,36 @@ void main() {
     expect(find.text('Copy link'), findsOneWidget);
   });
 
+  testWidgets('the relay wants an https address', (tester) async {
+    await pump(tester);
+
+    await tester.enterText(find.byType(TextField), 'relay.example');
+    await tester.tap(find.text('Serve through the relay'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter the relay’s https:// address.'), findsOneWidget);
+    expect(find.text('https://relay.example/abc/'), findsNothing);
+  });
+
+  testWidgets('once the relay is connected, it shows where to open it', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    await tester.enterText(
+      find.byType(TextField),
+      'https://relay.example/ignored?x=1',
+    );
+    await tester.tap(find.text('Serve through the relay'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('https://relay.example/abc/'), findsOneWidget);
+    expect(find.textContaining('Connected.'), findsOneWidget);
+    expect(serving.startedWith, Uri.parse('https://relay.example'));
+    // Two pairing buttons now: one per address a browser can use.
+    expect(find.text('Pair a browser'), findsNWidgets(2));
+  });
+
   testWidgets('revoking a browser takes it off the list', (tester) async {
     await pump(tester);
 
@@ -113,6 +145,18 @@ class _FakeServing extends SennitWebController {
       : const SennitWebServing();
 
   @override
-  Uri? pairingUrl() =>
-      Uri.parse('http://192.168.1.20:8787/#p=phone-key&t=one-time-token');
+  Uri? pairingUrl({bool relayed = false}) => relayed
+      ? Uri.parse('https://relay.example/abc/#p=phone-key&t=one-time-token')
+      : Uri.parse('http://192.168.1.20:8787/#p=phone-key&t=one-time-token');
+
+  Uri? startedWith;
+
+  @override
+  Future<void> startRelay(Uri url) async {
+    startedWith = url;
+    state = state.copyWith(
+      relay: RelayStatus.connected,
+      relayAddress: Uri.parse('https://relay.example/abc/'),
+    );
+  }
 }

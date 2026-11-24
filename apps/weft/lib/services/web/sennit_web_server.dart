@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -10,9 +11,12 @@ import 'pairing_registry.dart';
 
 /// One browser connected right now.
 class WebSession {
-  WebSession(this.browser, this.host);
+  WebSession(this.browser, this.host, {this.relayed = false});
   final PairedBrowser browser;
   final RemoteChatHost host;
+
+  /// Came through the relay rather than the LAN listener.
+  final bool relayed;
 }
 
 /// Serves Sennit Web from this device: the verified bundle's files over plain
@@ -67,6 +71,8 @@ class SennitWebServer {
 
   bool get isRunning => _server != null;
 
+  /// Opens the LAN listener. Relayed browsers need no listener; they arrive
+  /// through [serveSocket] and [file].
   Future<void> start() async {
     if (_server != null) return;
     final server = await HttpServer.bind(
@@ -78,6 +84,18 @@ class SennitWebServer {
     _changes.add(null);
   }
 
+  /// Closes the LAN listener and ends the sessions that came through it.
+  Future<void> stopListening() async {
+    final server = _server;
+    _server = null;
+    for (final s in [..._sessions]) {
+      if (!s.relayed) s.host.dispose();
+    }
+    await server?.close(force: true);
+    _changes.add(null);
+  }
+
+  /// Closes everything: the listener and every session, relayed or not.
   Future<void> stop() async {
     final server = _server;
     _server = null;
@@ -113,10 +131,27 @@ class SennitWebServer {
     try {
       if (request.uri.path == '/ws' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
-        await _socket(await WebSocketTransformer.upgrade(request));
+        await serveSocket(
+          _IoSocket(await WebSocketTransformer.upgrade(request)),
+        );
         return;
       }
-      await _file(request);
+      final response = request.response;
+      if (request.method != 'GET' && request.method != 'HEAD') {
+        response.statusCode = HttpStatus.methodNotAllowed;
+        await response.close();
+        return;
+      }
+      final file = await this.file(
+        Uri.decodeComponent(request.uri.path),
+        etag: request.headers.value('if-none-match'),
+      );
+      response.statusCode = file.status;
+      file.headers.forEach(response.headers.set);
+      if (file.body != null && request.method == 'GET') {
+        await response.addStream(file.body!);
+      }
+      await response.close();
     } on Object {
       try {
         request.response.statusCode = HttpStatus.internalServerError;
@@ -145,78 +180,62 @@ class SennitWebServer {
     '.symbols': 'application/octet-stream',
   };
 
-  Future<void> _file(HttpRequest request) async {
-    final response = request.response
-      ..headers.set('X-Content-Type-Options', 'nosniff')
-      ..headers.set('Referrer-Policy', 'no-referrer')
-      ..headers.set('X-Robots-Tag', 'noindex');
-    if (request.method != 'GET' && request.method != 'HEAD') {
-      response.statusCode = HttpStatus.methodNotAllowed;
-      return response.close();
-    }
-    var path = Uri.decodeComponent(request.uri.path);
+  /// One of the bundle's files, for a GET of [path] — over the LAN listener
+  /// or through the relay.
+  ///
+  /// [base] is where the app lives on the host serving it: `/` here, the
+  /// phone's own path on a relay. The page's `<base href>` is set to it, so
+  /// every file the page loads resolves under the same path.
+  Future<WebFile> file(String path, {String? etag, String base = '/'}) async {
+    const common = {
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'X-Robots-Tag': 'noindex',
+    };
     if (path == '/' || path.isEmpty) path = '/index.html';
     final file = File(p.normalize(p.join(bundle.path, path.substring(1))));
     // Nothing outside the bundle, and nothing that is not a plain file.
     if (!p.isWithin(bundle.path, file.path) ||
         p.basename(file.path).startsWith('.') ||
         !file.existsSync()) {
-      response.statusCode = HttpStatus.notFound;
-      return response.close();
+      return const WebFile(HttpStatus.notFound, common);
     }
     // Revalidated on every load, answered with 304 while unchanged: a new
     // bundle — an app update — must never run against a cached old one, and
     // over a relay a 304 is all the second load costs.
     final stat = file.statSync();
-    final etag =
+    final tag =
         '"${stat.size.toRadixString(36)}-'
         '${stat.modified.millisecondsSinceEpoch.toRadixString(36)}"';
-    response.headers
-      ..contentType = ContentType.parse(
-        _types[p.extension(file.path)] ?? 'application/octet-stream',
-      )
-      ..set('Cache-Control', 'no-cache')
-      ..set('ETag', etag);
-    if (request.headers.value('if-none-match') == etag) {
-      response.statusCode = HttpStatus.notModified;
-      return response.close();
+    final headers = {
+      ...common,
+      'Content-Type':
+          _types[p.extension(file.path)] ?? 'application/octet-stream',
+      'Cache-Control': 'no-cache',
+      'ETag': tag,
+    };
+    if (etag == tag) return WebFile(HttpStatus.notModified, headers);
+    if (p.basename(file.path) == 'index.html') {
+      final html = (await file.readAsString()).replaceFirst(
+        RegExp(r'<base href="[^"]*">'),
+        '<base href="$base">',
+      );
+      return WebFile(HttpStatus.ok, headers, Stream.value(utf8.encode(html)));
     }
-    if (request.method == 'HEAD') return response.close();
-    await response.addStream(file.openRead());
-    return response.close();
+    return WebFile(HttpStatus.ok, headers, file.openRead());
   }
 
-  Future<void> _socket(WebSocket socket) async {
-    final rest = StreamController<Object?>();
-    final first = Completer<String>();
-    final sub = socket.listen(
-      (data) {
-        if (!first.isCompleted) {
-          if (data is String) {
-            first.complete(data);
-          } else {
-            first.completeError(
-              const HandshakeException(HandshakeFailure.protocol),
-            );
-          }
-        } else {
-          rest.add(data);
-        }
-      },
-      onDone: () {
-        if (!first.isCompleted) {
-          first.completeError(
-            const HandshakeException(HandshakeFailure.protocol),
-          );
-        }
-        unawaited(rest.close());
-      },
-      cancelOnError: true,
-    );
-
+  /// Runs the handshake on a new browser socket — straight from the LAN
+  /// listener or relayed — and, if the browser is let in, serves it.
+  Future<void> serveSocket(FrameSocket socket, {bool relayed = false}) async {
+    final frames = StreamIterator(socket.incoming);
     String? pairingFor;
     try {
-      final hello = await first.future.timeout(const Duration(seconds: 15));
+      if (!await frames.moveNext().timeout(const Duration(seconds: 15)) ||
+          frames.current is! String) {
+        throw const HandshakeException(HandshakeFailure.protocol);
+      }
+      final hello = frames.current! as String;
       final result = await HandshakeResponder(self: key, name: deviceName)
           .respond(
             hello,
@@ -230,11 +249,14 @@ class SennitWebServer {
             },
           );
       socket.add(result.reply);
-      final link = SecureLink(
-        _IoSocket(socket),
-        result.session,
-        incoming: rest.stream,
-      );
+      final rest = StreamController<Object?>();
+      unawaited(() async {
+        while (await frames.moveNext()) {
+          rest.add(frames.current);
+        }
+        await rest.close();
+      }());
+      final link = SecureLink(socket, result.session, incoming: rest.stream);
       // Paired only once the browser proved its key with a frame that opens.
       unawaited(
         link.authenticated.then((_) {
@@ -257,7 +279,7 @@ class SennitWebServer {
         name: result.session.peerName,
         pairedAt: DateTime.now(),
       );
-      final session = WebSession(browser, host);
+      final session = WebSession(browser, host, relayed: relayed);
       _sessions.add(session);
       _changes.add(null);
       unawaited(
@@ -270,13 +292,21 @@ class SennitWebServer {
       if (e.failure == HandshakeFailure.notPaired) {
         socket.add(HandshakeResponder.notPairedReply());
       }
-      await sub.cancel();
-      await socket.close(WebSocketStatus.policyViolation);
+      await frames.cancel();
+      await socket.close();
     } on TimeoutException {
-      await sub.cancel();
-      await socket.close(WebSocketStatus.policyViolation);
+      await frames.cancel();
+      await socket.close();
     }
   }
+}
+
+/// A file's answer, ready for either transport.
+class WebFile {
+  const WebFile(this.status, this.headers, [this.body]);
+  final int status;
+  final Map<String, String> headers;
+  final Stream<List<int>>? body;
 }
 
 class _IoSocket implements FrameSocket {
@@ -284,7 +314,7 @@ class _IoSocket implements FrameSocket {
   final WebSocket _socket;
 
   @override
-  Stream<Object?> get incoming => throw StateError('read through SecureLink');
+  Stream<Object?> get incoming => _socket;
 
   @override
   void add(Object frame) {

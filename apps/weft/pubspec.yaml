@@ -132,12 +132,13 @@ dependencies:
   in_app_purchase: ^3.3.1
   fc_native_video_thumbnail: ^4.0.0
   flutter_inappwebview: ^6.1.5
+  # The relay's phone id; already in the build through weft_remote.
+  cryptography: ^2.9.0
 dev_dependencies:
-  # For signing and zipping fake Sennit Web releases in tests. Both already in
-  # the lock through the matrix SDK.
+  # For zipping fake Sennit Web releases in tests. Already in the lock through
+  # the matrix SDK.
   archive: ^4.0.9
   build_runner: ^2.15.1
-  cryptography: ^2.9.0
   flutter_launcher_icons: ^0.14.4
   flutter_lints: ^6.0.0
   flutter_test:

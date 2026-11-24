@@ -1709,5 +1709,16 @@
   "sennitWebPairedNone": "لم يُقرن أي متصفح بعد.",
   "sennitWebPairedSeen": "آخر اتصال {date}",
   "sennitWebRevoke": "إلغاء الإقران",
-  "sennitWebServingBanner": "Sennit Web مفعّل"
+  "sennitWebServingBanner": "Sennit Web مفعّل",
+  "sennitWebRelayTitle": "الوصول من أي مكان",
+  "sennitWebRelayExplainer": "عبر مُرحِّل تشغّله على حساب Cloudflare الخاص بك. يتصل الهاتف به نحو الخارج، فلا حاجة لأي اتصال وارد. ينقل المُرحِّل حركة مرور مشفّرة ولا يستطيع قراءة محادثاتك.",
+  "sennitWebRelayUrlLabel": "عنوان المُرحِّل",
+  "sennitWebRelayUrlInvalid": "أدخل عنوان https:// الخاص بالمُرحِّل.",
+  "sennitWebRelaySwitch": "التقديم عبر المُرحِّل",
+  "sennitWebRelaySubtitle": "متوقف",
+  "sennitWebRelayConnecting": "جارٍ الاتصال…",
+  "sennitWebRelayConnected": "متصل. يمكن للمتصفحات المقترنة فتح العنوان أدناه من أي مكان.",
+  "sennitWebRelayRefused": "رفض المُرحِّل هذا الجهاز. تحقّق من العنوان.",
+  "sennitWebRelayUnreachable": "تعذّر الوصول إلى المُرحِّل. جارٍ إعادة المحاولة…",
+  "sennitWebRelayHowTo": "كيفية إعداد مُرحِّل"
 }

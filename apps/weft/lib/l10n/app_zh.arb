@@ -1710,5 +1710,16 @@
   "sennitWebPairedNone": "尚未配对浏览器。",
   "sennitWebPairedSeen": "上次连接：{date}",
   "sennitWebRevoke": "取消配对",
-  "sennitWebServingBanner": "Sennit Web 已开启"
+  "sennitWebServingBanner": "Sennit Web 已开启",
+  "sennitWebRelayTitle": "随时随地访问",
+  "sennitWebRelayExplainer": "通过你在自己的 Cloudflare 账户上运行的中继。手机主动向外连接，无需任何入站连接。中继只转发加密流量，无法读取你的聊天。",
+  "sennitWebRelayUrlLabel": "中继地址",
+  "sennitWebRelayUrlInvalid": "请输入中继的 https:// 地址。",
+  "sennitWebRelaySwitch": "通过中继提供",
+  "sennitWebRelaySubtitle": "关闭",
+  "sennitWebRelayConnecting": "正在连接…",
+  "sennitWebRelayConnected": "已连接。已配对的浏览器可在任何地方打开下方地址。",
+  "sennitWebRelayRefused": "中继拒绝了此设备。请检查地址。",
+  "sennitWebRelayUnreachable": "无法连接中继，正在重试…",
+  "sennitWebRelayHowTo": "如何设置中继"
 }

@@ -107,6 +107,10 @@ class SecretStore {
   /// its public half from the QR code; losing it unpairs every browser.
   static const String sennitWebKey = 'sennit_web_key';
 
+  /// What this device proves to its Sennit Web relay. The relay files the
+  /// device under a hash of it; losing it moves the device's relay address.
+  static const String sennitWebRelaySecret = 'sennit_web_relay_secret';
+
   Future<String?> read(String key) => _storage.read(key: key);
 
   Future<void> write(String key, String? value) async {
