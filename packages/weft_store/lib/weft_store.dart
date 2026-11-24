@@ -12,5 +12,6 @@ export 'src/migrations.dart';
 export 'src/retention_store.dart';
 export 'src/search_store.dart';
 export 'src/settings_store.dart';
+export 'src/sync_state_store.dart';
 export 'src/transcript_store.dart';
 export 'src/weft_database.dart';

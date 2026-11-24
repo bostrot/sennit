@@ -63,6 +63,13 @@ class SettingsStore {
 
   void remove(String key) =>
       _db.raw.execute('DELETE FROM settings WHERE key = ?', [key]);
+
+  /// Every stored preference, for device sync to compare against what it last
+  /// shared.
+  Map<String, String> all() => {
+    for (final row in _db.raw.select('SELECT key, value FROM settings'))
+      row['key'] as String: row['value'] as String,
+  };
 }
 
 /// Credentials, in the platform keychain rather than the database.
@@ -388,6 +395,20 @@ abstract final class WeftSettings {
   /// per conversation, and a global "pause" would be a second place for a
   /// conversation to quietly stop erasing itself.
   static const String retentionPolicies = 'privacy.retention';
+
+  /// Whether this device shares merges and settings with the account's other
+  /// devices through the homeserver, sealed. Off unless set: it is one more
+  /// thing written off the device, even if only as ciphertext. Per device —
+  /// see `SyncPolicy` in weft_sync for what travels and what does not.
+  static const String syncEnabled = 'sync.enabled';
+
+  /// Whether the keychain values — API keys, tokens, the calendar address and
+  /// the person notes — travel too. Off unless set, and itself synced, so
+  /// turning it off anywhere takes them out of the shared copy everywhere.
+  static const String syncSecrets = 'sync.secrets';
+
+  /// This install's id in sync clocks, minted once.
+  static const String syncDeviceId = 'sync.device';
 
   static const String mcpEnabled = 'mcp.enabled';
   static const String mcpPort = 'mcp.port';

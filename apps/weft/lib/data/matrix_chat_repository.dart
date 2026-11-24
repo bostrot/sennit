@@ -67,42 +67,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     final storedHandles = _store?.loadHandles() ?? const <NetworkHandle>[];
-    _graph = IdentityGraph(
-      // The scorer reads its two knobs from settings: the country code that
-      // makes national numbers comparable, and whether same-name pairs merge
-      // on their own. Auto-merge defaults on — its rule is narrow enough to
-      // trust (identical substantial name, different networks, one-to-one)
-      // and it is what makes a fresh login fold a person's three apps into
-      // one conversation without a tour through the merge screen.
-      scorer: MergeScorer(
-        config: MergeScoringConfig(
-          autoMergeOnIdentitySignal:
-              _settings?.getBool(
-                WeftSettings.autoMergeOnIdentitySignal,
-                fallback: true,
-              ) ??
-              true,
-          defaultCountryCode: _settings?.getString(
-            WeftSettings.defaultCountryCode,
-          ),
-        ),
-      ),
-      handles: storedHandles,
-      decisions: [
-        for (final d in _store?.loadDecisions() ?? const <StoredDecision>[])
-          MergeDecision(
-            pair: d.pair,
-            verdict: d.verdict == MergeVerdict.merged.name
-                ? MergeVerdict.merged
-                : MergeVerdict.rejected,
-            source: d.source == MergeDecisionSource.auto.name
-                ? MergeDecisionSource.auto
-                : MergeDecisionSource.user,
-            decidedAt: d.decidedAt,
-          ),
-      ],
-      idFactory: _idFactory(),
-    );
+    _graph = _loadGraph(storedHandles);
     // What the database already says, so the first rebuild does not say it
     // again. `_handleFingerprints` starts empty on every launch while the rows
     // it describes do not, and the refresh below reads an empty map as "none of
@@ -352,6 +317,74 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   /// reuses its sources instead of rebuilding them on every sync.
   final Map<String, MergedTimeline> _timelines = {};
   final Map<String, List<TimelineSource>> _sources = {};
+
+  /// The identity graph as the store has it: stored handles with their
+  /// contact assignment, and every merge verdict.
+  IdentityGraph _loadGraph(List<NetworkHandle> storedHandles) {
+    return IdentityGraph(
+      // The scorer reads its two knobs from settings: the country code that
+      // makes national numbers comparable, and whether same-name pairs merge
+      // on their own. Auto-merge defaults on — its rule is narrow enough to
+      // trust (identical substantial name, different networks, one-to-one)
+      // and it is what makes a fresh login fold a person's three apps into
+      // one conversation without a tour through the merge screen.
+      scorer: MergeScorer(
+        config: MergeScoringConfig(
+          autoMergeOnIdentitySignal:
+              _settings?.getBool(
+                WeftSettings.autoMergeOnIdentitySignal,
+                fallback: true,
+              ) ??
+              true,
+          defaultCountryCode: _settings?.getString(
+            WeftSettings.defaultCountryCode,
+          ),
+        ),
+      ),
+      handles: storedHandles,
+      decisions: [
+        for (final d in _store?.loadDecisions() ?? const <StoredDecision>[])
+          MergeDecision(
+            pair: d.pair,
+            verdict: d.verdict == MergeVerdict.merged.name
+                ? MergeVerdict.merged
+                : MergeVerdict.rejected,
+            source: d.source == MergeDecisionSource.auto.name
+                ? MergeDecisionSource.auto
+                : MergeDecisionSource.user,
+            decidedAt: d.decidedAt,
+          ),
+      ],
+      idFactory: _idFactory(),
+    );
+  }
+
+  /// Re-reads the merge verdicts and send networks another device wrote into
+  /// the store through device sync, and redraws the inbox with them.
+  ///
+  /// The graph is rebuilt rather than patched: a verdict that arrives is a
+  /// verdict about the partition, and rehydrating from every verdict is the one
+  /// path that already turns "merged a–b, rejected b–c" into contacts — the
+  /// same path a restart takes, so a synced merge looks exactly like one made
+  /// here before the last launch.
+  void reloadSyncedPreferences() {
+    final store = _store;
+    if (store == null) return;
+    final current = {for (final h in _graph.handles) h.id: h};
+    for (final stored in store.loadHandles()) {
+      current.putIfAbsent(stored.id, () => stored);
+    }
+    _graph = _loadGraph([
+      for (final h in current.values)
+        h.copyWith(unifiedContactId: _graph.contactIdOf(h.id)),
+    ]);
+    _sendNetworks
+      ..clear()
+      ..addAll(store.loadSendNetworks());
+    _invalidateTimelines();
+    _persistGraph();
+    _rebuild();
+  }
 
   static String Function() _idFactory() {
     // Stamped per run: the old counter restarted at zero every launch and

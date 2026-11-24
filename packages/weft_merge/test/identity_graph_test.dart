@@ -488,4 +488,51 @@ void main() {
       expect(graph.suggestions(), isEmpty);
     });
   });
+
+  group('rehydrating with verdicts from another device', () {
+    test('an unmerge made elsewhere splits the stored contact', () {
+      final a = handle('a', ChatNetwork.whatsapp, displayName: 'Anna');
+      final b = handle('b', ChatNetwork.signal, displayName: 'Anna');
+      final here = IdentityGraph(handles: [a, b], idFactory: counterIds())
+        ..merge('a', 'b');
+      expect(here.contactIdOf('a'), here.contactIdOf('b'));
+
+      // The other device's rejection overrules the merge verdict; the stored
+      // assignment still says "together".
+      final rejected = MergeDecision(
+        pair: pairKey('a', 'b'),
+        verdict: MergeVerdict.rejected,
+        source: MergeDecisionSource.user,
+        decidedAt: DateTime.utc(2026),
+      );
+      final rebuilt = IdentityGraph(
+        handles: [
+          for (final h in here.handles)
+            h.copyWith(unifiedContactId: here.contactIdOf(h.id)),
+        ],
+        decisions: [rejected],
+        idFactory: counterIds(),
+      );
+      expect(rebuilt.contactIdOf('a'), isNot(rebuilt.contactIdOf('b')));
+    });
+
+    test('a merge made elsewhere joins two stored contacts', () {
+      final rebuilt = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Anna'),
+          handle('b', ChatNetwork.signal, displayName: 'Ben'),
+        ],
+        decisions: [
+          MergeDecision(
+            pair: pairKey('a', 'b'),
+            verdict: MergeVerdict.merged,
+            source: MergeDecisionSource.user,
+            decidedAt: DateTime.utc(2026),
+          ),
+        ],
+        idFactory: counterIds(),
+      );
+      expect(rebuilt.contactIdOf('a'), rebuilt.contactIdOf('b'));
+    });
+  });
 }

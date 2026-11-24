@@ -20,6 +20,7 @@ class WeftStores {
     required this.transcripts,
     required this.retention,
     required this.linkPreviews,
+    required this.syncState,
     required this.secrets,
     required this.embeddingApiKey,
     required this.transcriptionApiKey,
@@ -42,6 +43,9 @@ class WeftStores {
   /// Answers the homeserver has already given about links, so a scroll past
   /// the same bubble does not ask it again. See [LinkPreviewStore].
   final LinkPreviewStore linkPreviews;
+
+  /// What device sync last shared — see `StoreSyncLocal`.
+  final SyncStateStore syncState;
 
   final SecretStore secrets;
 
@@ -78,6 +82,7 @@ class WeftStores {
       transcripts: TranscriptStore(db),
       retention: RetentionStore(db, settings),
       linkPreviews: LinkPreviewStore(db),
+      syncState: SyncStateStore(db),
       secrets: SecretStore(),
       embeddingApiKey: null,
       transcriptionApiKey: null,
@@ -143,6 +148,7 @@ class WeftStores {
       transcripts: TranscriptStore(db),
       retention: RetentionStore(db, settings),
       linkPreviews: LinkPreviewStore(db),
+      syncState: SyncStateStore(db),
       secrets: secrets,
       embeddingApiKey: embeddingKey,
       transcriptionApiKey: transcriptionKey,

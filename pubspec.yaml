@@ -27,6 +27,7 @@ workspace:
   - packages/weft_sms
   - packages/weft_snapshot
   - packages/weft_store
+  - packages/weft_sync
   - packages/weft_transcribe
 
 # The workspace root's own dependencies, for the Dart programs under `tooling/`
