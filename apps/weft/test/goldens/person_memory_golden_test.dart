@@ -48,7 +48,7 @@ void main() {
               ),
             ],
             styles: {
-              'me': 'Very short, all lowercase, no full stops, often 😅; du',
+              'me': 'Very short, all lowercase, no full stops, often an emoji; du',
               'Anna': 'Full sentences with capitals, an emoji in most',
               'default': 'Short and casual, few capitals',
             },
