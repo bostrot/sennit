@@ -112,6 +112,15 @@ before you pipe? The scripts live in [`tooling/install/`](tooling/install/).
 <details>
 <summary><b>macOS</b> (Apple silicon, macOS 14 or later)</summary>
 
+With [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask bostrot/tap/sennit
+```
+
+`brew upgrade` keeps it current, and `brew uninstall --cask --zap sennit`
+removes it with its data. Or without Homebrew:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bostrot/sennit/main/tooling/install/install.sh | sh
 ```
