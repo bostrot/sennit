@@ -387,9 +387,15 @@ jobs:
         run: |
           if [ "$HAS_SIGNING" = "true" ]; then
             SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
+            TEAM_PREFIX="$(sed -nE 's/.*\(([A-Z0-9]{10})\)$/\1/p' <<< "$IDENTITY")."
           else
             SIGN=(codesign --force --sign -)
+            TEAM_PREFIX=""
           fi
+          # Xcode would expand $(TeamIdentifierPrefix) in the widget's app
+          # group; signing by hand has to do it itself.
+          sed "s/\$(TeamIdentifierPrefix)/$TEAM_PREFIX/g" "$WIDGET_ENTITLEMENTS" \
+            > "$RUNNER_TEMP/widget.entitlements"
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             if [ -d "$fw/Versions/A" ]; then
               "${SIGN[@]}" "$fw/Versions/A"
@@ -400,7 +406,7 @@ jobs:
           find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.dylib' -print0 \
             | while IFS= read -r -d '' lib; do "${SIGN[@]}" "$lib"; done
           for appex in "$APP/Contents/PlugIns"/*.appex; do
-            [ -e "$appex" ] && "${SIGN[@]}" --entitlements "$WIDGET_ENTITLEMENTS" "$appex"
+            [ -e "$appex" ] && "${SIGN[@]}" --entitlements "$RUNNER_TEMP/widget.entitlements" "$appex"
           done
           "${SIGN[@]}" --entitlements "$APP_ENTITLEMENTS" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
