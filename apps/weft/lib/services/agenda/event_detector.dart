@@ -212,8 +212,9 @@ AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
     // The year is optional and so is a boundary after the second dot —
     // "am 30.06." ends the sentence with that dot, and demanding \b there
     // (between a dot and the end) matches nothing.
-    final de = RegExp(r'\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2,4})\b)?')
-        .firstMatch(text);
+    final de = RegExp(
+      r'\b(\d{1,2})\.(\d{1,2})\.(?:(\d{2,4})\b)?',
+    ).firstMatch(text);
     if (de != null) {
       final day = int.parse(de.group(1)!);
       final month = int.parse(de.group(2)!);
