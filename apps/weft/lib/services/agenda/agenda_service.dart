@@ -147,9 +147,12 @@ class AgendaService {
   Future<AgendaCandidate?> _examine(WeftMessage message) async {
     if (message.kind != MessageKind.text || message.redacted) return null;
 
-    final now = DateTime.now();
-    final candidate = detectAgendaEvent(message.body, now: now);
+    // "am Donnerstag" is counted from the day it was said, not the day the
+    // chat is opened.
+    final candidate = detectAgendaEvent(message.body, now: message.timestamp);
     if (candidate == null) return null;
+
+    final now = DateTime.now();
 
     // A calendar adds what is ahead; "born on 12.05.1990" stays a sentence.
     if (candidate.start.isBefore(now.subtract(const Duration(hours: 1)))) {
