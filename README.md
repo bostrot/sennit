@@ -110,7 +110,7 @@ one-liners below fetch the latest one; set `VERSION=1.0.6` (or
 before you pipe? The scripts live in [`tooling/install/`](tooling/install/).
 
 <details>
-<summary><b>macOS</b> (Apple silicon and Intel)</summary>
+<summary><b>macOS</b> (Apple silicon, macOS 14 or later)</summary>
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bostrot/sennit/main/tooling/install/install.sh | sh

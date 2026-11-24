@@ -10,13 +10,15 @@ git push && git push origin v1.2.0
 ```
 
 The script writes `1.2.0+<commit count>` into `apps/weft/pubspec.yaml`,
-commits, and tags `v1.2.0`. The pushed tag triggers the
+commits, and tags `v1.2.0`. The version bump reaching `main` — or the pushed
+tag, whichever comes first — triggers the
 [Release workflow](../.github/workflows/release.yml), which:
 
-1. verifies the tag matches the pubspec version (and fails the release if
-   someone tags without bumping),
+1. verifies a pushed tag matches the pubspec version (and fails the release if
+   someone tags without bumping), and skips everything when `v1.2.0` is
+   already released, so the second of the two pushes builds nothing,
 2. builds Android (APK + AAB), Linux (tar.gz), Windows (zip), macOS (zip,
-   signed and notarized when secrets are configured) and iOS (IPA — signed
+   Apple silicon, signed and notarized when secrets are configured) and iOS (IPA — signed
    with secrets, sideloadable-unsigned without),
 3. publishes a GitHub release whose body is the [release notes](#release-notes),
    with all six artifacts attached.
@@ -51,7 +53,7 @@ same everywhere and no workflow waits for another:
 
 | Workflow | Writes |
 |---|---|
-| `release.yml` (tag `v*`) | the release body (`--github`); the app asset, into every platform build |
+| `release.yml` (version bump on `main`, or tag `v*`) | the release body (`--github`); the app asset, into every platform build |
 | `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-en-US`, cut to 500 characters at a whole line; the app asset |
 | `deploy_testflight.yml` (version bump on `main`) | the app asset; after the upload, "What to Test" and "What's New" through `tooling/store/build_notes.py` |
 | `promote_to_stores.yml` (nightly, 03:00 Berlin) | nothing new: Play open testing gets the internal release's "What's new"; the App Store version gets "What's New" from the script, run on the build's commit |
@@ -61,9 +63,11 @@ empty, so a local build or a fork shows no sheet; CI overwrites it before
 building and never commits it. The app reads it from the bundle and makes no
 request for it.
 
-Pushing `main` and pushing the tag can happen in either order: the stores get
-their notes from the `main` push, the GitHub release from the tag push, and
-both from the same file in the same commit. `deploy_prebuilt.yml` uploads a
+Pushing `main` and pushing the tag can happen in either order, and forgetting
+the tag costs nothing: the stores and the GitHub release both start from the
+`main` push, and both take their notes from the same file in the same commit.
+A release that never made it to the release page is published by hand with
+`gh workflow run release.yml --ref main -f publish=true`. `deploy_prebuilt.yml` uploads a
 bundle built elsewhere and sets no notes.
 
 ## Signing secrets
@@ -137,18 +141,23 @@ with no manual step.
 ### macOS (signing + notarization)
 
 Needs a paid Apple Developer account. Export your **Developer ID
-Application** certificate + private key from Keychain Access as a `.p12`.
+Application** certificate + private key from Keychain Access as a `.p12` —
+the same one WSL Manager signs with (its `MACOS_SIGNING_CERT_P12`).
 
 | Secret | Value |
 |---|---|
 | `MACOS_CERTIFICATE_BASE64` | the `.p12`, base64 |
 | `MACOS_CERTIFICATE_PASSWORD` | the `.p12` export password |
-| `APPLE_ID` | your Apple ID email |
-| `APPLE_APP_SPECIFIC_PASSWORD` | app-specific password from appleid.apple.com |
-| `APPLE_TEAM_ID` | 10-char team id |
 
-Without these, the app is ad-hoc signed: it runs, but Gatekeeper makes the
-user right-click → Open on first launch.
+Notarization reuses the App Store Connect API key from the TestFlight section
+below (`APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
+`APP_STORE_CONNECT_KEY_P8_BASE64`); no Apple ID or app-specific password.
+The app is signed with `macos/Runner/Release.entitlements`, so the release
+runs in the same sandbox as a debug build.
+
+Without the certificate, the app is ad-hoc signed: it runs, but Gatekeeper
+makes the user right-click → Open on first launch, and the Homebrew cask in
+`bostrot/homebrew-tap` is not bumped to it.
 
 ### iOS
 
