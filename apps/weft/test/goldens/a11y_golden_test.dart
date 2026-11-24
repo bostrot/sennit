@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft/app/localisation.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
@@ -170,7 +171,9 @@ void main() {
       warnIfMissed: false,
     );
     await tester.pumpAndSettle();
-    final reply = find.widgetWithText(ListTile, 'Reply');
+    // The sheet's own label, not 'Reply': the rtl variant runs in Arabic.
+    final label = tester.element(find.byType(ChatView)).l10n.messageActionReply;
+    final reply = find.widgetWithText(ListTile, label);
     await tester.ensureVisible(reply);
     await tester.pumpAndSettle();
     await tester.tap(reply);
