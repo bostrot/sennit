@@ -1709,5 +1709,16 @@
   "sennitWebPairedNone": "अभी तक कोई ब्राउज़र पेयर नहीं हुआ।",
   "sennitWebPairedSeen": "आखिरी बार जुड़ा: {date}",
   "sennitWebRevoke": "अनपेयर करें",
-  "sennitWebServingBanner": "Sennit Web चालू है"
+  "sennitWebServingBanner": "Sennit Web चालू है",
+  "sennitWebRelayTitle": "कहीं से भी पहुँचें",
+  "sennitWebRelayExplainer": "एक रिले के ज़रिए जिसे आप अपने Cloudflare खाते पर चलाते हैं। फ़ोन खुद उससे बाहर की ओर जुड़ता है, इसलिए अंदर किसी को पहुँचने की ज़रूरत नहीं। रिले सिर्फ़ एन्क्रिप्टेड ट्रैफ़िक आगे भेजता है और आपकी चैट नहीं पढ़ सकता।",
+  "sennitWebRelayUrlLabel": "रिले का पता",
+  "sennitWebRelayUrlInvalid": "रिले का https:// पता डालें।",
+  "sennitWebRelaySwitch": "रिले के ज़रिए उपलब्ध कराएँ",
+  "sennitWebRelaySubtitle": "बंद",
+  "sennitWebRelayConnecting": "जुड़ रहा है…",
+  "sennitWebRelayConnected": "जुड़ गया। पेयर किए गए ब्राउज़र नीचे दिया पता कहीं से भी खोल सकते हैं।",
+  "sennitWebRelayRefused": "रिले ने इस डिवाइस को मना कर दिया। पता जाँचें।",
+  "sennitWebRelayUnreachable": "रिले तक नहीं पहुँच सके। फिर कोशिश हो रही है…",
+  "sennitWebRelayHowTo": "रिले कैसे सेट करें"
 }

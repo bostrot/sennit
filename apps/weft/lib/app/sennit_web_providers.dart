@@ -11,6 +11,7 @@ import '../services/backup/backup_service.dart' show kSennitVersion;
 import '../services/background/background_work.dart';
 import '../services/remote/remote_protocol.dart';
 import '../services/web/pairing_registry.dart';
+import '../services/web/relay_connection.dart';
 import '../services/web/sennit_web_server.dart';
 import '../services/web/web_bundle_store.dart';
 import 'localisation.dart';
@@ -68,15 +69,18 @@ class SennitWebServing {
     this.connected = 0,
     this.phoneKey,
     this.failed = false,
+    this.relay = RelayStatus.off,
+    this.relayAddress,
   });
 
+  /// The LAN listener is open.
   final bool running;
   final int? port;
 
   /// This device's LAN addresses, for the address shown and the QR code.
   final List<String> addresses;
 
-  /// Browsers connected right now.
+  /// Browsers connected right now, on either path.
   final int connected;
 
   /// The static public key a pairing URL carries, base64url.
@@ -85,31 +89,70 @@ class SennitWebServing {
   /// The last start failed — the port is taken, usually.
   final bool failed;
 
+  /// The line out to the relay, when one is set up.
+  final RelayStatus relay;
+
+  /// Where a browser opens this device through the relay.
+  final Uri? relayAddress;
+
   /// Where a browser on the same network opens Sennit Web.
   List<Uri> get urls => [
     for (final a in addresses) Uri(scheme: 'http', host: a, port: port),
   ];
+
+  SennitWebServing copyWith({
+    bool? running,
+    int? port,
+    List<String>? addresses,
+    int? connected,
+    String? phoneKey,
+    bool? failed,
+    RelayStatus? relay,
+    Uri? relayAddress,
+  }) => SennitWebServing(
+    running: running ?? this.running,
+    port: port ?? this.port,
+    addresses: addresses ?? this.addresses,
+    connected: connected ?? this.connected,
+    phoneKey: phoneKey ?? this.phoneKey,
+    failed: failed ?? this.failed,
+    relay: relay ?? this.relay,
+    relayAddress: relayAddress ?? this.relayAddress,
+  );
 }
 
 /// The port Sennit Web listens on — fixed rather than random, so a bookmark
 /// keeps working from one session to the next.
 const int kSennitWebPort = 8787;
 
-/// Starts and stops the server, and keeps its hosts current.
+/// The relay this device dials out to, as typed in. Local to the device: a
+/// relay is reached by the device serving, like the pairing it carries.
+const String kSennitWebRelayUrl = 'web.relay_url';
+
+/// Starts and stops the server and the relay line, and keeps their hosts
+/// current.
 ///
 /// Off unless switched on, and off again when the app closes: serving is a
 /// decision made for a moment, not a standing setting.
 class SennitWebController extends Notifier<SennitWebServing> {
   SennitWebServer? _server;
+  RelayConnection? _relay;
   StreamSubscription<void>? _changes;
+  StreamSubscription<RelayStatus>? _relayStatus;
 
   /// The foreground job that keeps an Android phone serving with the app in
   /// the background; its ongoing notification is the system-wide sign that
   /// Sennit Web is on. A no-op on platforms without one.
   BackgroundWorkHandle? _keepAlive;
 
+  PairingRegistry? _registry;
+
   PairingRegistry get registry =>
-      PairingRegistry(ref.read(storesProvider).settings);
+      _registry ?? PairingRegistry(ref.read(storesProvider).settings);
+
+  /// The relay address typed in, if any.
+  String? get relayUrl =>
+      ref.read(storesProvider).settings.getString(kSennitWebRelayUrl);
 
   @override
   SennitWebServing build() {
@@ -122,19 +165,22 @@ class SennitWebController extends Notifier<SennitWebServing> {
     ref.onDispose(() {
       _keepAlive?.end();
       unawaited(_changes?.cancel());
+      unawaited(_relayStatus?.cancel());
+      unawaited(_relay?.stop());
       unawaited(_server?.stop());
     });
     return const SennitWebServing();
   }
 
-  Future<void> start() async {
-    if (_server != null) return;
+  /// The server object both paths share, made on first use.
+  Future<SennitWebServer?> _ensureServer() async {
+    if (_server case final server?) return server;
     final bundle = ref.read(webBundleProvider);
-    if (bundle is! WebBundleReady) return;
+    if (bundle is! WebBundleReady) return null;
     final stores = ref.read(storesProvider);
     final key = await _staticKey(stores);
-    final pairing = registry;
-    final server = SennitWebServer(
+    final pairing = _registry = PairingRegistry(stores.settings);
+    final server = _server = SennitWebServer(
       bundle: bundle.directory,
       key: key,
       registry: pairing,
@@ -144,32 +190,99 @@ class SennitWebController extends Notifier<SennitWebServing> {
       extraHandlers: {RemoteMethods.mediaFetch: _fetchMedia},
       settings: () => _shareableSettings(stores),
     );
+    _changes = server.changes.listen((_) => _publish());
+    state = state.copyWith(phoneKey: key.publicId);
+    return server;
+  }
+
+  /// Opens Sennit Web to browsers on this network.
+  Future<void> start() async {
+    if (state.running) return;
+    final server = await _ensureServer();
+    if (server == null) return;
     try {
       await server.start();
     } on SocketException {
-      state = const SennitWebServing(failed: true);
+      state = state.copyWith(failed: true);
+      await _shutDownIfIdle();
       return;
     }
-    _server = server;
-    _registry = pairing;
-    _changes = server.changes.listen((_) => _publish());
-    state = SennitWebServing(
+    state = state.copyWith(
       running: true,
+      failed: false,
       port: server.boundPort,
       addresses: await SennitWebServer.lanAddresses(),
-      phoneKey: key.publicId,
     );
-    _keepAlive = ref
+    _holdKeepAlive();
+  }
+
+  Future<void> stop() async {
+    await _server?.stopListening();
+    state = SennitWebServing(
+      phoneKey: state.phoneKey,
+      relay: state.relay,
+      relayAddress: state.relayAddress,
+      connected: state.connected,
+    );
+    await _shutDownIfIdle();
+  }
+
+  /// Dials out to the relay at [url], remembering it for next time.
+  Future<void> startRelay(Uri url) async {
+    if (_relay != null) return;
+    final server = await _ensureServer();
+    if (server == null) return;
+    final stores = ref.read(storesProvider);
+    stores.settings.setString(kSennitWebRelayUrl, url.toString());
+    var secret = await stores.secrets.read(SecretStore.sennitWebRelaySecret);
+    if (secret == null) {
+      secret = RelayConnection.newSecret();
+      await stores.secrets.write(SecretStore.sennitWebRelaySecret, secret);
+    }
+    final relay = _relay = RelayConnection(
+      relay: url,
+      secret: secret,
+      server: server,
+    );
+    _relayStatus = relay.statuses.listen(
+      (status) => state = state.copyWith(relay: status),
+    );
+    state = state.copyWith(relayAddress: relay.address);
+    relay.start();
+    _holdKeepAlive();
+  }
+
+  Future<void> stopRelay() async {
+    await _relayStatus?.cancel();
+    _relayStatus = null;
+    await _relay?.stop();
+    _relay = null;
+    for (final s in [...?_server?.sessions]) {
+      if (s.relayed) s.host.dispose();
+    }
+    state = SennitWebServing(
+      running: state.running,
+      port: state.port,
+      addresses: state.addresses,
+      phoneKey: state.phoneKey,
+      connected: state.connected,
+      failed: state.failed,
+    );
+    await _shutDownIfIdle();
+  }
+
+  void _holdKeepAlive() {
+    _keepAlive ??= ref
         .read(backgroundWorkProvider)
         .begin(
           weftPlatformL10n().sennitWebServingBanner,
-          detail: state.urls.firstOrNull?.toString(),
+          detail: (state.urls.firstOrNull ?? state.relayAddress)?.toString(),
         );
   }
 
-  PairingRegistry? _registry;
-
-  Future<void> stop() async {
+  /// Once neither path is open, nothing is served and nothing is kept awake.
+  Future<void> _shutDownIfIdle() async {
+    if (state.running || _relay != null) return;
     _keepAlive?.end();
     _keepAlive = null;
     await _changes?.cancel();
@@ -177,23 +290,32 @@ class SennitWebController extends Notifier<SennitWebServing> {
     await _server?.stop();
     _server = null;
     _registry?.cancelToken();
-    state = const SennitWebServing();
+    _registry = null;
   }
 
-  /// A pairing address with a fresh one-time token, for the QR code.
-  Uri? pairingUrl() {
+  /// A pairing address with a fresh one-time token, for the QR code: through
+  /// the relay when [relayed], on this network otherwise. A browser keeps its
+  /// pairing per address, so each path is paired on its own.
+  Uri? pairingUrl({bool relayed = false}) {
     final s = state;
     final pairing = _registry;
-    if (!s.running || s.urls.isEmpty || pairing == null) return null;
+    if (pairing == null || s.phoneKey == null) return null;
+    final Uri base;
+    if (relayed) {
+      if (s.relay != RelayStatus.connected || s.relayAddress == null) {
+        return null;
+      }
+      base = s.relayAddress!;
+    } else {
+      if (!s.running || s.urls.isEmpty) return null;
+      base = s.urls.first.replace(path: '/');
+    }
     final token = pairing.issueToken();
-    return s.urls.first.replace(
-      path: '/',
-      fragment: 'p=${s.phoneKey}&t=$token',
-    );
+    return base.replace(fragment: 'p=${s.phoneKey}&t=$token');
   }
 
   void revoke(String browserKey) {
-    (_registry ?? registry).revoke(browserKey);
+    registry.revoke(browserKey);
     _server?.disconnect(browserKey);
     _publish();
   }
@@ -201,13 +323,7 @@ class SennitWebController extends Notifier<SennitWebServing> {
   void _publish() {
     final server = _server;
     if (server == null) return;
-    state = SennitWebServing(
-      running: true,
-      port: state.port,
-      addresses: state.addresses,
-      phoneKey: state.phoneKey,
-      connected: server.sessions.length,
-    );
+    state = state.copyWith(connected: server.sessions.length);
   }
 
   Future<StaticKey> _staticKey(WeftStores stores) async {

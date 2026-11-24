@@ -1709,5 +1709,16 @@
   "sennitWebPairedNone": "Aucun navigateur associé pour l’instant.",
   "sennitWebPairedSeen": "Dernière connexion : {date}",
   "sennitWebRevoke": "Dissocier",
-  "sennitWebServingBanner": "Sennit Web est activé"
+  "sennitWebServingBanner": "Sennit Web est activé",
+  "sennitWebRelayTitle": "Accessible de partout",
+  "sennitWebRelayExplainer": "Via un relais que vous hébergez sur votre propre compte Cloudflare. Le téléphone s’y connecte vers l’extérieur, rien n’a besoin d’entrer. Le relais transmet un trafic chiffré et ne peut pas lire vos conversations.",
+  "sennitWebRelayUrlLabel": "Adresse du relais",
+  "sennitWebRelayUrlInvalid": "Saisissez l’adresse https:// du relais.",
+  "sennitWebRelaySwitch": "Servir via le relais",
+  "sennitWebRelaySubtitle": "Désactivé",
+  "sennitWebRelayConnecting": "Connexion…",
+  "sennitWebRelayConnected": "Connecté. Les navigateurs associés peuvent ouvrir l’adresse ci-dessous depuis n’importe où.",
+  "sennitWebRelayRefused": "Le relais a refusé cet appareil. Vérifiez l’adresse.",
+  "sennitWebRelayUnreachable": "Relais injoignable. Nouvelle tentative…",
+  "sennitWebRelayHowTo": "Configurer un relais"
 }

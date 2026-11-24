@@ -9943,5 +9943,49 @@
   "sennitWebServingBanner": "Sennit Web is on",
   "@sennitWebServingBanner": {
     "description": "Banner above the inbox while Sennit Web is being served. Tap opens its settings."
+  },
+  "sennitWebRelayTitle": "Reach from anywhere",
+  "@sennitWebRelayTitle": {
+    "description": "Section title: serving Sennit Web to browsers outside the phone's network through a relay."
+  },
+  "sennitWebRelayExplainer": "Through a relay you run on your own Cloudflare account. The phone connects out to it, so nothing needs to reach in. The relay passes on encrypted traffic and can’t read your chats.",
+  "@sennitWebRelayExplainer": {
+    "description": "Explains the Sennit Web relay."
+  },
+  "sennitWebRelayUrlLabel": "Relay address",
+  "@sennitWebRelayUrlLabel": {
+    "description": "Label of the text field for the relay's web address."
+  },
+  "sennitWebRelayUrlInvalid": "Enter the relay’s https:// address.",
+  "@sennitWebRelayUrlInvalid": {
+    "description": "Error under the relay address field."
+  },
+  "sennitWebRelaySwitch": "Serve through the relay",
+  "@sennitWebRelaySwitch": {
+    "description": "Switch that connects this device to the relay."
+  },
+  "sennitWebRelaySubtitle": "Off",
+  "@sennitWebRelaySubtitle": {
+    "description": "Relay switch subtitle while it is off."
+  },
+  "sennitWebRelayConnecting": "Connecting…",
+  "@sennitWebRelayConnecting": {
+    "description": "Relay switch subtitle while connecting."
+  },
+  "sennitWebRelayConnected": "Connected. Paired browsers can open the address below from anywhere.",
+  "@sennitWebRelayConnected": {
+    "description": "Relay switch subtitle once connected."
+  },
+  "sennitWebRelayRefused": "The relay turned this device away. Check the address.",
+  "@sennitWebRelayRefused": {
+    "description": "Relay switch subtitle when the relay rejected the device."
+  },
+  "sennitWebRelayUnreachable": "Can’t reach the relay. Trying again…",
+  "@sennitWebRelayUnreachable": {
+    "description": "Relay switch subtitle when the relay is unreachable."
+  },
+  "sennitWebRelayHowTo": "How to set up a relay",
+  "@sennitWebRelayHowTo": {
+    "description": "Button that opens the relay setup guide."
   }
 }
