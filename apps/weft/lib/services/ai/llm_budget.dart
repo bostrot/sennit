@@ -406,9 +406,9 @@ class LlmBudget {
   /// model, and the chips are wanted now. A message the user sends gets room
   /// for ten.
   int styleCharsFor(AiFeature feature) => switch (feature) {
-    AiFeature.smartReplies => hosted ? 1200 : 900,
+    AiFeature.smartReplies => hosted ? 1600 : 1300,
     AiFeature.quickMessage ||
-    AiFeature.autoReply => (memoryChars ~/ 2).clamp(hosted ? 1600 : 1200, 2400),
+    AiFeature.autoReply => (memoryChars ~/ 2).clamp(hosted ? 2000 : 1600, 2400),
     _ => 0,
   };
 
