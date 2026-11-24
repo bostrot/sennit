@@ -1,15 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vodozemac;
 import 'package:matrix/encryption.dart' as enc;
 import 'package:matrix/matrix.dart' as sdk;
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'database.dart';
 import 'homeserver.dart';
+import 'login_methods.dart';
 import 'registration.dart';
 
 /// Where the session is in its lifecycle, flattened for the UI.
@@ -87,7 +90,7 @@ class WeftMatrixSession {
 
     final database = await (_databaseOverride?.call() ?? _openDatabase());
 
-    final client = sdk.Client(
+    final client = _WeftClient(
       clientName,
       database: database,
       verificationMethods: {
@@ -104,10 +107,18 @@ class WeftMatrixSession {
       // The most common cause of a soft logout is an expired token, and the
       // SDK can recover from that by itself.
       onSoftLogout: (client) => client.refreshAccessToken(),
+      // The SDK otherwise refuses, in checkHomeserver, any server without a
+      // password login — an SSO-only Synapse among them.
+      supportedLoginTypes: {
+        sdk.AuthenticationTypes.password,
+        sdk.AuthenticationTypes.sso,
+        sdk.AuthenticationTypes.token,
+      },
     );
     _client = client;
 
     client.onLoginStateChanged.stream.listen(_onLoginStateChanged);
+    client.onUiaRequest.stream.listen(_onUiaRequest);
 
     _emit(WeftSessionState.connecting);
     // Not `waitForFirstSync`: with it, init() holds until the homeserver
@@ -205,7 +216,14 @@ class WeftMatrixSession {
     }
 
     final discovery = await discoverHomeserver(parsed);
-    await client.checkHomeserver(discovery.baseUrl);
+    try {
+      await client.checkHomeserver(discovery.baseUrl);
+    } on sdk.BadServerLoginTypesException {
+      // A server whose only ways in are ones Sennit cannot do is still a
+      // server: [loginMethods] says which, rather than this failing on a
+      // name that looks like a typo.
+      client.homeserver = discovery.baseUrl;
+    }
     return discovery;
   }
 
@@ -214,6 +232,35 @@ class WeftMatrixSession {
   Future<List<sdk.LoginFlow>> supportedLoginFlows() async {
     final flows = await client.getLoginFlows();
     return flows ?? const [];
+  }
+
+  /// Every way the current homeserver lets someone sign in.
+  ///
+  /// `GET /login` and the OAuth metadata are asked separately, and a refusal
+  /// of either is an answer rather than a failure: a server that hands
+  /// sign-in to its OAuth server refuses `GET /login` with `M_UNRECOGNIZED`
+  /// — Continuwuity with an identity provider says "User-interactive
+  /// authentication is not available on this server" — and that refusal,
+  /// shown as it was, was the whole login screen.
+  Future<LoginMethods> loginMethods() async {
+    List<sdk.LoginFlow>? flows;
+    try {
+      flows = await client.getLoginFlows();
+    } on sdk.MatrixException {
+      flows = null;
+    }
+    Map<String, Object?>? metadata;
+    try {
+      metadata = await (client as _WeftClient).authMetadataJson();
+    } on Object {
+      metadata = null;
+    }
+    // Neither answered: the server is not refusing a method, it is not
+    // answering. Asking again for the flows surfaces why.
+    if (flows == null && metadata == null) {
+      await client.getLoginFlows();
+    }
+    return loginMethodsFrom(flows: flows, authMetadata: metadata);
   }
 
   Future<void> loginWithPassword({
@@ -349,13 +396,140 @@ class WeftMatrixSession {
   /// The URL to open for SSO. [redirectUrl] must be a scheme the app handles.
   Uri ssoRedirectUrl(String redirectUrl, {String? providerId}) {
     final base = client.homeserver!;
+    final prefix = base.path.endsWith('/')
+        ? base.path.substring(0, base.path.length - 1)
+        : base.path;
     final path = providerId == null
-        ? '/_matrix/client/v3/login/sso/redirect'
-        : '/_matrix/client/v3/login/sso/redirect/$providerId';
+        ? '$prefix/_matrix/client/v3/login/sso/redirect'
+        : '$prefix/_matrix/client/v3/login/sso/redirect/'
+              '${Uri.encodeComponent(providerId)}';
     return base.replace(
       path: path,
       queryParameters: {'redirectUrl': redirectUrl},
     );
+  }
+
+  /// Finishes a legacy SSO sign-in from the address the browser came back
+  /// to.
+  Future<void> completeSsoLogin(Uri callback) =>
+      loginWithToken(ssoLoginTokenFrom(callback));
+
+  /// Starts a next-gen (OAuth 2.0) sign-in: registers Sennit with the
+  /// server's OAuth server and builds the page to open.
+  ///
+  /// Registered afresh on every sign-in rather than once per server: a
+  /// registration is cheap, and a stored one goes stale when the server is
+  /// reset or forgets it, which would fail the sign-in with nothing the
+  /// person could do about it. [create] asks the page to open on its sign-up
+  /// form, for a server whose metadata says it has one.
+  Future<sdk.OidcLoginSession> beginOAuthLogin(
+    Uri redirectUri, {
+    bool create = false,
+  }) async {
+    final loopback = redirectUri.scheme == 'http';
+    final registration = await client.registerOidcClient(
+      redirectUris: [redirectUri],
+      applicationType: sdk.OidcApplicationType.native,
+      clientInformation: sdk.OidcClientInformation(
+        // l10n-ignore: the app's own name, never translated.
+        clientName: 'Sennit',
+        clientUri: kOAuthClientUri,
+        logoUri: null,
+        tosUri: null,
+        policyUri: kOAuthPolicyUri,
+      ),
+    );
+    return client.initOidcLoginSession(
+      oidcClientData: registration,
+      redirectUri: redirectUri,
+      // The loopback server reads the query; a phone's redirect is handed
+      // back whole, so either works there, and the query is what every
+      // server supports.
+      responseMode: loopback ? sdk.OidcResponseMode.query : null,
+      prompt: create ? 'create' : null,
+    );
+  }
+
+  /// Finishes an OAuth sign-in from the address the browser came back to.
+  Future<void> completeOAuthLogin(
+    sdk.OidcLoginSession attempt,
+    Uri callback,
+  ) async {
+    final code = oauthCodeFrom(callback, state: attempt.state);
+    _emit(WeftSessionState.connecting);
+    try {
+      await client.oidcLogin(
+        session: attempt,
+        code: code,
+        state: attempt.state,
+      );
+      // OAuth has no initial device name; without this the device list on
+      // every other client shows a bare device id.
+      final deviceId = client.deviceID;
+      if (deviceId != null) {
+        unawaited(
+          client
+              .updateDevice(deviceId, displayName: deviceDisplayName)
+              .catchError((Object _) {}),
+        );
+      }
+      _emit(_deriveState());
+    } catch (_) {
+      _emit(WeftSessionState.loggedOut);
+      rethrow;
+    }
+  }
+
+  /// The OAuth server this session signed in through, or null for a session
+  /// signed in with a password or a token.
+  ///
+  /// Such a session cannot answer a UIA challenge with a password — it never
+  /// had one here — so device sign-outs and deactivation go to the server's
+  /// account page instead.
+  Future<OAuthServer?> signedInOAuthServer() async {
+    final c = _client;
+    return c == null ? null : oauthServerOf(c);
+  }
+
+  /// Opens a page a UIA challenge sent this session to and resolves once the
+  /// person says they finished there; false when they backed out.
+  ///
+  /// Set by the app. Without it a challenge that needs the browser fails at
+  /// once rather than waiting for an answer nothing is going to give.
+  Future<bool> Function(Uri url)? onBrowserStage;
+
+  final _uiaInFlight = <sdk.UiaRequest<dynamic>>{};
+
+  /// Answers the UIA challenges the SDK raises in the background — today
+  /// only the cross-signing upload while setting up recovery.
+  ///
+  /// Nothing listened before, and an unanswered challenge never completes:
+  /// the setup spun forever. A server that signs in through OAuth sends the
+  /// browser stage, done on its account page; anything else is refused here,
+  /// and the setup reports the refusal.
+  Future<void> _onUiaRequest(sdk.UiaRequest<dynamic> uia) async {
+    if (uia.state != sdk.UiaRequestState.waitForUser) return;
+    if (!_uiaInFlight.add(uia)) return;
+    try {
+      final url = oauthStageUrl(uia.nextStages, uia.params);
+      final open = onBrowserStage;
+      if (url == null || open == null) {
+        uia.cancel();
+        return;
+      }
+      final stage = uia.nextStages.contains(kOAuthStage)
+          ? kOAuthStage
+          : kCrossSigningResetStage;
+      if (!await open(url)) {
+        uia.cancel();
+        return;
+      }
+      await uia.completeStage(
+        sdk.AuthenticationData(type: stage, session: uia.session),
+      );
+    } finally {
+      _uiaInFlight.remove(uia);
+    }
   }
 
   /// True when this device still needs to be verified by another one.
@@ -468,4 +642,78 @@ class WeftMatrixSession {
     _state = next;
     if (!_stateController.isClosed) _stateController.add(next);
   }
+}
+
+/// The OAuth server [client]'s session signed in through, or null for a
+/// session signed in with a password or a token — or one whose server cannot
+/// be asked right now.
+Future<OAuthServer?> oauthServerOf(sdk.Client client) async {
+  if (!client.isLogged()) return null;
+  final stored = await client.database.getClient(client.clientName);
+  if (stored?['oidc_client_id'] == null) return null;
+  try {
+    final json = client is _WeftClient
+        ? await client.authMetadataJson()
+        : (await client.getAuthMetadata()).toJson();
+    return OAuthServer.fromJson(json);
+  } on Object {
+    return null;
+  }
+}
+
+/// The SDK's client, with the OAuth metadata read leniently.
+///
+/// The SDK parses the metadata strictly: an account-page action newer than
+/// it throws a `TypeError`, and a server that only serves the metadata at
+/// MSC2965's unstable path is not found at all. Every OAuth call it makes —
+/// registration, sign-in, token refresh, sign-out — goes through
+/// [getAuthMetadata], so it is overridden here once.
+class _WeftClient extends sdk.Client {
+  _WeftClient(
+    super.clientName, {
+    required super.database,
+    super.verificationMethods,
+    super.importantStateEvents,
+    super.logLevel,
+    super.onSoftLogout,
+    super.supportedLoginTypes,
+  });
+
+  Uri? _metadataFor;
+  Map<String, Object?>? _metadata;
+
+  /// The server's OAuth 2.0 metadata as it sent it, cached per server.
+  Future<Map<String, Object?>> authMetadataJson() async {
+    final base = homeserver;
+    if (base == null) throw StateError('No homeserver');
+    if (_metadataFor == base && _metadata != null) return _metadata!;
+    Future<http.Response> get(String path) =>
+        httpClient.get(base.resolveUri(Uri(path: path)));
+    var response = await get('_matrix/client/v1/auth_metadata');
+    if (response.statusCode == 404 ||
+        (response.statusCode == 400 &&
+            response.body.contains('M_UNRECOGNIZED'))) {
+      final unstable = await get(
+        '_matrix/client/unstable/org.matrix.msc2965/auth_metadata',
+      );
+      if (unstable.statusCode == 200) response = unstable;
+    }
+    if (response.statusCode != 200) {
+      unexpectedResponse(response, response.bodyBytes);
+    }
+    final json = jsonDecode(utf8.decode(response.bodyBytes));
+    if (json is! Map<String, Object?>) {
+      throw const FormatException('OAuth metadata is not an object');
+    }
+    _metadataFor = base;
+    return _metadata = json;
+  }
+
+  @override
+  Future<sdk.GetAuthMetadataResponse> getAuthMetadata({
+    Duration cacheLifetime = const Duration(days: 3),
+    bool throwOnUpdateFailure = false,
+  }) async => sdk.GetAuthMetadataResponse.fromJson(
+    sanitizeAuthMetadata(await authMetadataJson()),
+  );
 }

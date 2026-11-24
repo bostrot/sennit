@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/a11y.dart';
 import '../../app/localisation.dart';
 import '../../app/session_providers.dart';
+import '../../services/account/account_deletion.dart' show ownUserIdProvider;
+import 'delete_account_screen.dart' show serverOfUserId;
 import 'settings_section.dart';
 
 /// The recovery key, and what happens to your history without one.
@@ -150,6 +153,10 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     if (passphrase == null || !mounted) return;
 
     setState(() => _busy = true);
+    // Replacing the keys is the one step a server guards with a challenge, and
+    // a server that signs in through OAuth answers it on its account page.
+    final session = ref.read(matrixSessionProvider);
+    session.onBrowserStage = _completeInBrowser;
     try {
       final key = await ref
           .read(keyBackupProvider)
@@ -170,8 +177,36 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     } catch (error) {
       if (mounted) _say(_sentence(error));
     } finally {
+      session.onBrowserStage = null;
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Opens the server's page for a step it wants confirmed there, and waits
+  /// for the person to say they finished.
+  Future<bool> _completeInBrowser(Uri url) async {
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened || !mounted) return false;
+    final server = serverOfUserId(ref.read(ownUserIdProvider) ?? '');
+    final answer = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.deleteAccountBrowserTitle),
+        content: Text(context.l10n.deleteAccountBrowserBody(server)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.deleteAccountBrowserDone),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
   }
 
   Future<bool> _confirmReplace() async {

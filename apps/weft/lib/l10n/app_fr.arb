@@ -803,7 +803,7 @@
   "loginPasswordField": "Mot de passe",
   "loginWorking": "En cours",
   "loginSignIn": "Se connecter",
-  "loginSso": "Authentification unique (M8)",
+  "loginSso": "Authentification unique",
   "loginFooter": "Sennit se connecte à ton propre serveur Matrix. Il ne fait jamais transiter tes messages par qui que ce soit d’autre.",
   "matrixInfoButton": "C’est quoi, un serveur Matrix ?",
   "matrixInfoBody": "Matrix est un réseau de discussion ouvert et décentralisé. Aucune entreprise ne le contrôle seule : des serveurs indépendants communiquent entre eux, comme les fournisseurs d’e-mail. Ton compte vit sur l’un d’eux, ton serveur d’accueil, et de là tu peux joindre des personnes sur tous les autres.",
@@ -1639,5 +1639,14 @@
   "endpointsDetectLimits": "Détecter",
   "endpointsLimitsDetected": "{source} : fenêtre {context}, réponse jusqu’à {output}",
   "endpointsLimitsNotDetected": "Le serveur ne l’a pas indiqué. Saisis les valeurs.",
-  "autoReplyOutcomeCutOff": "Ton modèle a atteint sa longueur de réponse. Augmente-la dans les points d’accès IA."
+  "autoReplyOutcomeCutOff": "Ton modèle a atteint sa longueur de réponse. Augmente-la dans les points d’accès IA.",
+  "loginContinueWith": "Continuer avec {name}",
+  "loginBrowserHint": "{server} te connecte sur sa propre page. Sennit l’ouvre dans ton navigateur et te ramène ici ensuite.",
+  "loginCreateInBrowser": "{server} crée les comptes sur sa propre page d’inscription. Sennit l’ouvre dans ton navigateur et te connecte ensuite.",
+  "loginBrowserWaiting": "Termine la connexion dans ton navigateur.",
+  "loginBrowserDone": "Tu es connecté·e. Tu peux fermer cet onglet et revenir à Sennit.",
+  "loginBrowserDenied": "La connexion a été annulée sur la page du serveur.",
+  "loginBrowserIncomplete": "La page du serveur n’a pas terminé la connexion. Réessaie.",
+  "loginNoSupportedMethod": "{server} ne propose que des moyens de connexion que Sennit ne prend pas encore en charge.",
+  "devicesSignOutOnAccountPage": "Ton serveur déconnecte les appareils sur sa page de compte. Sennit l’a ouverte dans ton navigateur."
 }

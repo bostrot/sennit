@@ -146,3 +146,32 @@ Future<void> deactivateAccount(
   }
   throw const AccountDeactivationUnsupported();
 }
+
+/// Deactivation for a session signed in through an OAuth server, which keeps
+/// it for its own account page at [page]: the homeserver refuses the request
+/// from a session that never had a password to confirm it with.
+///
+/// The page does the deactivation, so all that is left here is to find out
+/// whether it happened. A token that still works means it did not — the
+/// person closed the page, or changed their mind there — and the account and
+/// this device's copy of it are left alone.
+Future<void> deactivateOnAccountPage(
+  sdk.MatrixApi api, {
+  required Uri page,
+  required AccountReauth reauth,
+}) async {
+  if (!await reauth.completeInBrowser(page)) {
+    throw const AccountDeactivationCancelled();
+  }
+  try {
+    await api.getTokenOwner();
+  } on sdk.MatrixException catch (e) {
+    if (e.error == sdk.MatrixError.M_UNKNOWN_TOKEN ||
+        e.error == sdk.MatrixError.M_USER_DEACTIVATED ||
+        e.response?.statusCode == 401) {
+      return;
+    }
+    rethrow;
+  }
+  throw const AccountDeactivationCancelled();
+}

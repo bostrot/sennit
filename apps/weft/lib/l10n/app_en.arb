@@ -4642,9 +4642,9 @@
     "description": "The sign-in button once the server has been resolved. Keep under ~16 chars.",
     "maxLength": 32
   },
-  "loginSso": "Single sign-on (M8)",
+  "loginSso": "Single sign-on",
   "@loginSso": {
-    "description": "A deliberately disabled button for single sign-on, which needs a deep-link callback that has not shipped. 'M8' is the internal milestone name and stays as-is — surfacing a dead button with no explanation would be worse."
+    "description": "Button that signs in through the server's single sign-on page in the browser, when the server does not name its sign-in providers."
   },
   "loginFooter": "Sennit connects to your own Matrix server. It never proxies your messages through anyone else.",
   "@loginFooter": {
@@ -9599,5 +9599,69 @@
   "autoReplyOutcomeCutOff": "Your model hit its answer length limit. Raise it under Endpoints.",
   "@autoReplyOutcomeCutOff": {
     "description": "Why an AI answer failed: the model reached the answer length limit before writing anything usable, even after a retry with more room. Keep under ~70 chars."
+  },
+  "loginContinueWith": "Continue with {name}",
+  "@loginContinueWith": {
+    "description": "Button that opens the server's own sign-in page in the browser, or one of its sign-in providers. About 30 chars plus the name.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "A server's name, or the name of a sign-in provider the server lists (GitHub, Google, Keycloak…). Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "loginBrowserHint": "{server} signs you in on its own page. Sennit opens it in your browser and brings you back here.",
+  "@loginBrowserHint": {
+    "description": "Under the server field, when the server only signs people in on its own web page (OAuth or single sign-on), not with a password typed into the app.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The server's name. Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "loginCreateInBrowser": "{server} creates accounts on its own sign-up page. Sennit opens it in your browser and signs you in afterwards.",
+  "@loginCreateInBrowser": {
+    "description": "On the create-account form, when the server makes new accounts on its own sign-up page in the browser.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The server's name. Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "loginBrowserWaiting": "Finish signing in in your browser.",
+  "@loginBrowserWaiting": {
+    "description": "Shown under the busy button while the sign-in page is open in the browser. Under ~60 chars."
+  },
+  "loginBrowserDone": "You''re signed in. You can close this tab and go back to Sennit.",
+  "@loginBrowserDone": {
+    "description": "Shown in the browser tab on a computer once the server's sign-in page has handed the sign-in back to the app."
+  },
+  "loginBrowserDenied": "The sign-in was cancelled on the server''s page.",
+  "@loginBrowserDenied": {
+    "description": "Error after the server's sign-in page in the browser was cancelled or refused the sign-in."
+  },
+  "loginBrowserIncomplete": "The server''s page did not finish the sign-in. Try again.",
+  "@loginBrowserIncomplete": {
+    "description": "Error when the server's sign-in page came back without anything the app can sign in with."
+  },
+  "loginNoSupportedMethod": "{server} only offers ways to sign in that Sennit does not support yet.",
+  "@loginNoSupportedMethod": {
+    "description": "Shown after the server was checked, when it offers only ways to sign in the app cannot do.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The server's name. Never translated.",
+        "example": "matrix.example.org"
+      }
+    }
+  },
+  "devicesSignOutOnAccountPage": "Your server signs devices out on its account page. Sennit opened it in your browser.",
+  "@devicesSignOutOnAccountPage": {
+    "description": "After tapping sign out on a device, when the server signs devices out on its own account page, which the app just opened in the browser."
   }
 }
