@@ -5,6 +5,7 @@ import '../../app/localisation.dart';
 import 'auto_reply_screen.dart';
 import 'endpoints_screen.dart';
 import 'models_screen.dart';
+import 'person_memory_settings_screen.dart';
 import 'quick_messages_screen.dart';
 
 /// Every AI setting behind one door.
@@ -66,6 +67,12 @@ class AiSettingsScreen extends StatelessWidget {
               title: l10n.quickMessageSheetTitle,
               subtitle: l10n.quickMessagesSettingsSubtitle,
               screen: const QuickMessagesScreen(),
+            ),
+            tile(
+              icon: Icons.sticky_note_2_outlined,
+              title: l10n.personMemorySettingsTitle,
+              subtitle: l10n.personMemorySettingsSubtitle,
+              screen: const PersonMemorySettingsScreen(),
             ),
           ],
         ),

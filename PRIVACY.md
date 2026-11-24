@@ -56,6 +56,14 @@ Sennit talks exclusively to servers **you** configure:
   draft lands in the composer — nothing is sent to the chat until you do. On-device models never send audio or text anywhere. If
   you point Sennit at a remote endpoint, the content you asked it to process
   is sent to that endpoint — which, again, you chose and control.
+- **Personal memory.** Notes you write about a chat ("This chat") or a
+  person ("About …", on the contact screen) stay on your device, encrypted in
+  the platform keychain, and are not synced to your other devices. They are
+  sent to your AI endpoint only after you turn on "Use personal memory in AI"
+  — then, shortened, with the quick messages, auto-replies and reply
+  suggestions written in that chat. "Learn from chat" sends the last 24
+  messages to the same endpoint and only ever suggests facts for you to
+  accept; it skips end-to-end encrypted chats unless you allow them.
 
 ## Auto-reply
 
@@ -111,6 +119,7 @@ then Sennit cannot read or send text messages at all.
 
 - Message history, search indexes and media caches, stored locally.
 - Encryption keys, held in the platform keystore/keychain.
+- Notes about chats and people (personal memory), held in the same keychain.
 - Contact names, if you enable address-book matching. Matching happens
   entirely on the device; your address book is never uploaded.
 - Notifications are decrypted on the device.
@@ -150,6 +159,12 @@ Your data lives on your homeserver and your device. Deleting the app
 removes its local data; your homeserver's data is managed through your
 homeserver. There is nothing held by the developer to request, export, or
 delete.
+
+**Deleting your account.** Settings → Account → *Delete account* signs
+every bridge out, asks your homeserver to deactivate the account and erase
+what it can, and then deletes everything Sennit stored on the device. How
+that works, and how to ask for deletion without the app, is at
+<https://erictrenkel.com/apps/sennit/delete-account.html>.
 
 ## Changes and contact
 

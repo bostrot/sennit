@@ -146,6 +146,7 @@ extension WeftAutoReplyLabels on AppL10n {
     AutoReplyOutcome.unreachable => autoReplyOutcomeUnreachable,
     AutoReplyOutcome.timedOut => autoReplyOutcomeTimedOut,
     AutoReplyOutcome.refused => autoReplyOutcomeRefused,
+    AutoReplyOutcome.cutOff => autoReplyOutcomeCutOff,
     AutoReplyOutcome.declined => autoReplyOutcomeDeclined,
     AutoReplyOutcome.sendFailed => autoReplyOutcomeSendFailed,
   };

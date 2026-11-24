@@ -29,6 +29,7 @@ import '../../app/intents.dart';
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
+import '../../app/person_memory_providers.dart';
 import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
 import '../../app/search_providers.dart';
@@ -37,6 +38,7 @@ import '../../app/shortcuts.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/ai/event_title.dart' show recentConversationTranscript;
+import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/quick_messages.dart';
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/billing/entitlements.dart';
@@ -53,9 +55,11 @@ import '../settings/quick_messages_screen.dart';
 import 'paperless_picker_sheet.dart';
 import 'quick_message_sheet.dart';
 import '../auth/verification_screen.dart';
+import '../call/call_labels.dart' show formatCallDuration;
 import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../contact/contact_profile.dart';
+import '../contact/person_memory_screen.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
 import '../../services/agenda/device_calendar.dart';
@@ -206,6 +210,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// Bumped per request, so a slow answer to a request the user has since
   /// replaced or dismissed is dropped rather than put into the composer.
   int _quickGeneration = 0;
+
+  /// Completed to abort the quick message request in flight: on Cancel, on a
+  /// regenerate that replaces it, and when the conversation is left. A local
+  /// model is allowed minutes for an answer, and one nobody is waiting for
+  /// any more should not keep it busy for them.
+  Completer<void>? _quickCancel;
 
   /// The composer's focus, held here rather than left to the `TextField` for
   /// one reason: `FocusComposerIntent` is pressed while the user is in the
@@ -588,6 +598,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _peerReceipts.dispose();
     _searchDebounce?.cancel();
     _searchQuery.dispose();
+    _cancelQuickRequest();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -3346,6 +3357,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     }
 
     final generation = ++_quickGeneration;
+    _cancelQuickRequest();
+    final cancel = _quickCancel = Completer<void>();
     final title = l10n.quickMessageTitle(message);
     setState(
       () => _quick = _QuickDraft(
@@ -3356,14 +3369,17 @@ class _ChatViewState extends ConsumerState<ChatView> {
       ),
     );
 
+    final room = endpoint.budget.forFeature(AiFeature.quickMessage);
     final transcript = recentConversationTranscript(
       _view.messages,
-      maxMessages: kQuickMessageContextMessages,
+      maxMessages: room.maxMessages,
+      maxChars: room.transcriptChars,
     );
     final draft = await composeQuickMessage(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
       apiKey: endpoint.apiKey,
+      budget: endpoint.budget,
       instruction: message.effectivePrompt,
       transcript: transcript,
       language: detectChatLanguage(
@@ -3372,8 +3388,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
       ),
       recipient: chat.isGroup ? null : _quickRecipient(chat),
       groupName: chat.isGroup ? chat.title : null,
+      memory: ref.read(aiMemoryForPromptProvider)(chat, _view.messages),
       client: ref.read(quickMessageClientProvider),
+      cancel: cancel.future,
     );
+    if (identical(_quickCancel, cancel)) _quickCancel = null;
     if (!mounted || generation != _quickGeneration) return;
 
     final text = draft.text;
@@ -3405,6 +3424,48 @@ class _ChatViewState extends ConsumerState<ChatView> {
       selection: TextSelection.collapsed(offset: next.length),
     );
     _composerFocus.requestFocus();
+    unawaited(_learnAfterQuickMessage(chat));
+  }
+
+  /// Asks the model what is worth remembering from the chat, after a quick
+  /// message was written in it — only when the user turned that on, and only
+  /// as facts to accept or dismiss on the chat's memory screen.
+  ///
+  /// After the draft rather than with it: the user is waiting on the draft,
+  /// and on nothing here.
+  Future<void> _learnAfterQuickMessage(Chat chat) async {
+    final settings = ref.read(personMemorySettingsProvider);
+    if (!settings.suggestFacts) return;
+    final result = await learnPersonFacts(
+      settings: settings,
+      endpoint: ref.read(autoReplyEndpointProvider),
+      memory: ref.read(personMemoryProvider.notifier),
+      chat: chat,
+      people: memoryPeopleFor(
+        ref.read(chatRepositoryProvider).identityGraph,
+        chat,
+        _view.messages,
+      ),
+      messages: _view.messages,
+      client: ref.read(quickMessageClientProvider),
+    );
+    if (!mounted || result.outcome != PersonFactsOutcome.proposed) return;
+    final l10n = context.l10n;
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l10n.personMemoryLearned(result.added, chat.title)),
+          action: SnackBarAction(
+            label: l10n.personMemoryReview,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ChatMemoryScreen(chatId: chat.id),
+              ),
+            ),
+          ),
+        ),
+      );
   }
 
   /// The first name of whoever a one-to-one chat is with: the chat's own name
@@ -3424,7 +3485,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   void _dismissQuickMessage() {
     _quickGeneration++;
+    _cancelQuickRequest();
     setState(() => _quick = null);
+  }
+
+  void _cancelQuickRequest() {
+    final cancel = _quickCancel;
+    _quickCancel = null;
+    if (cancel != null && !cancel.isCompleted) cancel.complete();
   }
 
   void _showMessage(String message) {
@@ -5672,7 +5740,12 @@ class _QuickDraft {
 /// A live region, so a screen reader hears "Writing…" and then "check it,
 /// then send" without having to go looking — the second is the whole point
 /// of the feature never sending by itself.
-class _QuickMessageBar extends StatelessWidget {
+///
+/// A wait that goes on — a local model can take minutes — shows how long it
+/// has been, so a slow model does not look like a frozen app. The count is
+/// left out of the live region: a screen reader announcing every second of
+/// it would drown out the one change that matters.
+class _QuickMessageBar extends StatefulWidget {
   const _QuickMessageBar({
     required this.draft,
     required this.onRegenerate,
@@ -5684,8 +5757,53 @@ class _QuickMessageBar extends StatelessWidget {
   final VoidCallback onDismiss;
 
   @override
+  State<_QuickMessageBar> createState() => _QuickMessageBarState();
+}
+
+class _QuickMessageBarState extends State<_QuickMessageBar> {
+  /// How long a wait goes before the bar starts counting it.
+  static const _countAfter = Duration(seconds: 5);
+
+  final _waited = Stopwatch();
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _follow();
+  }
+
+  @override
+  void didUpdateWidget(_QuickMessageBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A regenerate is a new wait, even when the bar never stopped being busy.
+    if (!identical(oldWidget.draft, widget.draft)) _follow();
+  }
+
+  void _follow() {
+    _tick?.cancel();
+    _tick = null;
+    _waited
+      ..stop()
+      ..reset();
+    if (!widget.draft.busy) return;
+    _waited.start();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_waited.elapsed >= _countAfter) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final draft = widget.draft;
     final l10n = context.l10n;
+    final waited = _waited.elapsed;
     final label = draft.busy
         ? l10n.quickMessageWriting(draft.title)
         : l10n.quickMessageWritten(draft.title);
@@ -5720,9 +5838,19 @@ class _QuickMessageBar extends StatelessWidget {
               ),
             ),
           ),
+          if (draft.busy && waited >= _countAfter)
+            ExcludeSemantics(
+              child: Text(
+                formatCallDuration(waited)!,
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
           if (!draft.busy)
             TextButton.icon(
-              onPressed: onRegenerate,
+              onPressed: widget.onRegenerate,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(l10n.quickMessageRegenerate),
             ),
@@ -5730,7 +5858,7 @@ class _QuickMessageBar extends StatelessWidget {
             icon: const Icon(Icons.close_rounded, size: 18),
             tooltip: draft.busy ? l10n.commonCancel : l10n.commonClose,
             visualDensity: VisualDensity.compact,
-            onPressed: onDismiss,
+            onPressed: widget.onDismiss,
           ),
         ],
       ),

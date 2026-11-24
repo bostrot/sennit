@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
+
+import 'llm_budget.dart';
+import 'llm_request.dart';
+import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
 /// Asks the configured LLM for one or two short answers to a conversation.
 ///
@@ -9,6 +14,13 @@ import 'package:http/http.dart' as http;
 /// server speaks — Ollama, llama.cpp, LocalAI, vLLM — as well as the hosted
 /// ones. Returns at most two suggestions; an empty list on any failure,
 /// because a notification is not the place for an error message.
+///
+/// A thinking model is asked not to think ([noThinkingOptions]): two
+/// eight-word answers need no reasoning, and a Qwen behind litellm spent five
+/// to twelve seconds on it — past the old eight-second limit half the time.
+///
+/// A timeout is rethrown rather than swallowed, so the notification service
+/// can count it as late; see [smartReplyTimeout] for how long it waits.
 Future<List<String>> suggestSmartReplies({
   required String baseUrl,
   required String model,
@@ -16,75 +28,80 @@ Future<List<String>> suggestSmartReplies({
   required String chatTitle,
   required List<String> transcript,
   String? calendar,
+  AiMemory? memory,
+  LlmBudget? budget,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 8),
+  Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return const [];
   }
+  final limits = budget ?? LlmBudget.resolve(base);
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
+    final answer = await requestCompletion(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: {
+        'model': model,
+        'temperature': 0.7,
+        'messages': [
+          {
+            'role': 'system',
+            'content':
+                'You write short chat replies the user could send. '
+                'Output ONLY a JSON object with a "replies" list of one '
+                'or two strings — no analysis, no commentary, no '
+                'markdown. Each reply is a complete sentence of at most '
+                'eight words, in the same language as the conversation.'
+                '${calendarPromptBlock(calendar)}'
+                '${memoryPromptBlock(memory, baseUrl: base, budget: limits)}',
           },
-          body: jsonEncode({
-            'model': model,
-            'temperature': 0.7,
-            'max_tokens': 120,
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'You write short chat replies the user could send. '
-                    'Output ONLY a JSON object with a "replies" list of one '
-                    'or two strings — no analysis, no commentary, no '
-                    'markdown. Each reply is a complete sentence of at most '
-                    'eight words, in the same language as the conversation.'
-                    '${calendarPromptBlock(calendar)}',
-              },
-              // One worked example pins the format better than any amount
-              // of instruction — and gives the template no placeholder text
-              // to parrot back, which is how "…" became a chip.
-              {
-                'role': 'user',
-                'content':
-                    'Conversation (newest message last):\n'
-                    'Anna: Kommst du morgen mit?\n\nJSON:',
-              },
-              {
-                'role': 'assistant',
-                'content':
-                    '{"replies": ["Ja, gerne!", "Ich sage dir heute Abend '
-                    'Bescheid."]}',
-              },
-              {
-                'role': 'user',
-                'content':
-                    'Conversation (newest message last):\n'
-                    '${transcript.join('\n')}\n\nJSON:',
-              },
-            ],
-          }),
-        )
-        .timeout(timeout);
-    if (response.statusCode != 200) {
-      debugPrint('weft: smart replies: $url answered ${response.statusCode}');
+          // One worked example pins the format better than any amount
+          // of instruction — and gives the template no placeholder text
+          // to parrot back, which is how "…" became a chip.
+          {
+            'role': 'user',
+            'content':
+                'Conversation (newest message last):\n'
+                'Anna: Kommst du morgen mit?\n\nJSON:',
+          },
+          {
+            'role': 'assistant',
+            'content':
+                '{"replies": ["Ja, gerne!", "Ich sage dir heute Abend '
+                'Bescheid."]}',
+          },
+          {
+            'role': 'user',
+            'content':
+                'Conversation (newest message last):\n'
+                '${transcript.join('\n')}\n\nJSON:',
+          },
+        ],
+      },
+      // No retry after a cut-off answer: the time is better spent on the
+      // next message's chips. The token budget stays a thinking model's in
+      // case the server ignores the switch; one that heeds it stops at the
+      // twenty-odd tokens of the answer.
+      maxTokens: limits.forFeature(AiFeature.smartReplies).maxTokens,
+      optional: limits.thinking ? noThinkingOptions(base) : const {},
+      timeout: timeout ?? smartReplyTimeout(base),
+      what: 'smart replies',
+    );
+    if (!answer.ok) {
+      debugPrint('weft: smart replies: $url answered ${answer.status}');
       return const [];
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     if (content == null) {
       debugPrint('weft: smart replies: no content in the completion');
       return const [];
@@ -96,6 +113,9 @@ Future<List<String>> suggestSmartReplies({
       );
     }
     return replies;
+  } on TimeoutException {
+    debugPrint('weft: smart replies: $url took longer than allowed');
+    rethrow;
   } on Object catch (error) {
     debugPrint('weft: smart replies against $url failed: $error');
     return const [];
@@ -103,6 +123,17 @@ Future<List<String>> suggestSmartReplies({
     if (owned) httpClient.close();
   }
 }
+
+/// How long the chips for one message may take at [baseUrl].
+///
+/// The notification no longer waits for them — it is posted at once and
+/// updated when they come — so this is only how long they are still worth
+/// adding. A hosted API that has not answered two short lines in ten seconds
+/// is not going to; a self-hosted model gets the time a cold start or a busy
+/// GPU takes, while the notification is likely still being read.
+Duration smartReplyTimeout(String baseUrl) => isHostedLlm(baseUrl)
+    ? const Duration(seconds: 10)
+    : const Duration(seconds: 25);
 
 /// The calendar paragraph both AI prompts end their system message with, or
 /// nothing when there is no calendar to tell.
@@ -206,25 +237,25 @@ Future<String?> probeLlm({
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty) return 'No base URL';
   if (model.trim().isEmpty) return 'No model name';
-  final client = http.Client();
+  final client = llmHttpClient();
   try {
-    final response = await client
-        .post(
-          Uri.parse('$base/chat/completions'),
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
-          },
-          body: jsonEncode({
-            'model': model,
-            'max_tokens': 8,
-            'messages': [
-              {'role': 'user', 'content': 'Reply with the word OK.'},
-            ],
-          }),
-        )
-        .timeout(const Duration(seconds: 12));
+    final response = await postLlm(
+      client,
+      Uri.parse('$base/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        'model': model,
+        'max_tokens': 8,
+        'messages': [
+          {'role': 'user', 'content': 'Reply with the word OK.'},
+        ],
+      }),
+      timeout: llmResponseTimeout(base, LlmTask.probe),
+    );
     if (response.statusCode != 200) {
       return 'The server answered ${response.statusCode}';
     }

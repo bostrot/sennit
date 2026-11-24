@@ -5302,6 +5302,34 @@
       }
     }
   },
+  "bridgeBrowserExternalIntro": "Sign in to {network} in your browser, with your company’s sign-in. Sennit never sees your password: your browser hands back the signed-in session, and Sennit passes it straight to your server.",
+  "@bridgeBrowserExternalIntro": {
+    "description": "Explains, before the person picks a sign-in, that the messenger's sign-in (usually a company single sign-on such as GitLab, Google or Entra ID) happens in the device's web browser and what the app does with the result. {network} is the messenger.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated."
+      }
+    }
+  },
+  "bridgeBrowserExternal": "Sign in with {provider} in your browser",
+  "@bridgeBrowserExternal": {
+    "description": "Button that opens the device's web browser to sign in to a messenger through one single sign-on provider. {provider} is the provider's name as the server labels it.",
+    "placeholders": {
+      "provider": {
+        "type": "String",
+        "description": "A sign-in provider's name, such as GitLab, Google, Entra ID or a company name; never translated."
+      }
+    }
+  },
+  "bridgeBrowserInApp": "Open the sign-in page in Sennit",
+  "@bridgeBrowserInApp": {
+    "description": "Secondary button, under the browser sign-in buttons, that opens the messenger's whole sign-in page inside the app instead, where a password works too."
+  },
+  "bridgeBrowserExternalFailed": "Signing in through your browser didn’t work. Try again, or open the sign-in page in Sennit.",
+  "@bridgeBrowserExternalFailed": {
+    "description": "Short message shown when a sign-in in the device's web browser came back without a usable session."
+  },
   "bridgeMethodBotTitle": "Connect a bot account",
   "@bridgeMethodBotTitle": {
     "description": "Title of a developer sign-in method that connects a bot account instead of a person. Under ~30 chars."
@@ -8916,5 +8944,585 @@
   "quickMessageFieldPromptHelper": "Your AI is told the chat partner's first name and the chat's language for you.",
   "@quickMessageFieldPromptHelper": {
     "description": "Helper text under the prompt field: the chat partner's first name and the chat's language are added automatically. About 90 chars."
+  },
+  "settingsSectionAccount": "Account",
+  "@settingsSectionAccount": {
+    "description": "Section heading on the settings screen above the row that deletes the account. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsDeleteAccountTitle": "Delete account",
+  "@settingsDeleteAccountTitle": {
+    "description": "Title of the settings row that opens the account deletion screen. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsDeleteAccountSubtitle": "Permanently delete your account on {server}",
+  "@settingsDeleteAccountSubtitle": {
+    "description": "One-line subtitle under 'Delete account', naming the homeserver the account lives on. Keep under ~50 chars.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountTitle": "Delete account",
+  "@deleteAccountTitle": {
+    "description": "App bar title of the account deletion screen. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountLead": "Deleting {userId} can’t be undone. This is what happens:",
+  "@deleteAccountLead": {
+    "description": "First sentence of the deletion screen, above the list of consequences.",
+    "placeholders": {
+      "userId": {
+        "type": "String",
+        "description": "The full Matrix ID. Never translated.",
+        "example": "@alice:matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointDeactivated": "Your account on {server} is deactivated for good. Nobody can sign in to it again, and its user ID can’t be registered again.",
+  "@deleteAccountPointDeactivated": {
+    "description": "Consequence in the deletion list: the account is deactivated permanently and the user ID cannot be reused.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointErased": "Sennit asks {server} to erase what it can: your profile, your account data, and your messages for anyone who didn’t already receive them.",
+  "@deleteAccountPointErased": {
+    "description": "Consequence in the deletion list: the server is asked to erase data (Matrix 'erase' flag).",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountPointBridges": "Every bridge you’re signed in to — WhatsApp, Signal, Telegram, Meta and the rest — is signed out first, so those sessions end on the server too.",
+  "@deleteAccountPointBridges": {
+    "description": "Consequence in the deletion list: connected bridges are logged out before the account is deleted. Network names are never translated."
+  },
+  "deleteAccountPointCopies": "People you talked to keep their copies of the messages you sent them.",
+  "@deleteAccountPointCopies": {
+    "description": "Consequence in the deletion list: recipients keep the messages they already received."
+  },
+  "deleteAccountPointDevice": "Everything Sennit stored on this device is deleted, and the app goes back to the welcome screen.",
+  "@deleteAccountPointDevice": {
+    "description": "Consequence in the deletion list: local data is wiped and the app returns to its first screen."
+  },
+  "deleteAccountPointPro": "Sennit Pro belongs to your app store account or licence key, not to this account. Deleting doesn’t cancel or refund it, and you can restore it after signing in again.",
+  "@deleteAccountPointPro": {
+    "description": "Consequence in the deletion list, shown only in builds that sell Sennit Pro: the purchase is not refunded."
+  },
+  "deleteAccountConfirmField": "Type {localpart} to confirm",
+  "@deleteAccountConfirmField": {
+    "description": "Label of the text field the user must type their username into before the delete button unlocks.",
+    "placeholders": {
+      "localpart": {
+        "type": "String",
+        "description": "The username part of the Matrix ID, without @ or server. Never translated.",
+        "example": "alice"
+      }
+    }
+  },
+  "deleteAccountButton": "Delete account",
+  "@deleteAccountButton": {
+    "description": "The destructive button that starts the deletion. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountStepBridges": "Signing out of bridges…",
+  "@deleteAccountStepBridges": {
+    "description": "Progress line while bridges are being logged out."
+  },
+  "deleteAccountStepAccount": "Deleting your account…",
+  "@deleteAccountStepAccount": {
+    "description": "Progress line while the homeserver deactivates the account."
+  },
+  "deleteAccountBridgesFailedTitle": "Some bridges didn’t sign out",
+  "@deleteAccountBridgesFailedTitle": {
+    "description": "Title of the dialog shown when one or more bridges could not be logged out. Keep under ~32 chars."
+  },
+  "deleteAccountBridgesFailedBody": "{networks} didn’t answer. Their sessions may stay on the server until its admin removes them. Delete the account anyway?",
+  "@deleteAccountBridgesFailedBody": {
+    "description": "Body of the bridge-failure dialog.",
+    "placeholders": {
+      "networks": {
+        "type": "String",
+        "description": "Comma-separated network names. Never translated.",
+        "example": "WhatsApp, Signal"
+      }
+    }
+  },
+  "deleteAccountAnyway": "Delete anyway",
+  "@deleteAccountAnyway": {
+    "description": "Destructive button in the bridge-failure dialog. Keep under ~20 chars.",
+    "maxLength": 32
+  },
+  "deleteAccountPasswordTitle": "Confirm it’s you",
+  "@deleteAccountPasswordTitle": {
+    "description": "Title of the password prompt before the account is deleted. Keep under ~26 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountPasswordMessage": "Enter the password for {userId} to delete the account.",
+  "@deleteAccountPasswordMessage": {
+    "description": "Body of the password prompt before deletion.",
+    "placeholders": {
+      "userId": {
+        "type": "String",
+        "description": "The full Matrix ID. Never translated.",
+        "example": "@alice:matrix.org"
+      }
+    }
+  },
+  "deleteAccountPasswordRetry": "That password wasn’t right. Try again.",
+  "@deleteAccountPasswordRetry": {
+    "description": "Shown in the password prompt after the homeserver refused the password."
+  },
+  "deleteAccountPasswordField": "Password",
+  "@deleteAccountPasswordField": {
+    "description": "Label of the password field in the prompt before deletion. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "deleteAccountBrowserTitle": "Finish in your browser",
+  "@deleteAccountBrowserTitle": {
+    "description": "Title of the dialog shown while the homeserver's own sign-in page (single sign-on) is open in the browser. Keep under ~28 chars.",
+    "maxLength": 48
+  },
+  "deleteAccountBrowserBody": "{server} opened a page to confirm it’s you. Come back here once it says you’re done.",
+  "@deleteAccountBrowserBody": {
+    "description": "Body of the browser dialog.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountBrowserDone": "I’m done",
+  "@deleteAccountBrowserDone": {
+    "description": "Button in the browser dialog confirming the web page step is finished. Keep under ~16 chars.",
+    "maxLength": 32
+  },
+  "deleteAccountCancelled": "Your account wasn’t deleted.",
+  "@deleteAccountCancelled": {
+    "description": "Message after the user backed out of re-authentication and no bridge had been signed out."
+  },
+  "deleteAccountCancelledAfterBridges": "Your account wasn’t deleted, but your bridges are signed out. Sign in to them again under Bridges.",
+  "@deleteAccountCancelledAfterBridges": {
+    "description": "Message after the user backed out of re-authentication when bridges had already been signed out."
+  },
+  "deleteAccountUnsupported": "{server} asks for a kind of confirmation Sennit can’t show. Delete the account on {server}’s own website instead.",
+  "@deleteAccountUnsupported": {
+    "description": "Error when the homeserver demands an authentication stage the app cannot complete.",
+    "placeholders": {
+      "server": {
+        "type": "String",
+        "description": "The homeserver's name, from the user ID. Never translated.",
+        "example": "matrix.org"
+      }
+    }
+  },
+  "deleteAccountFailed": "Couldn’t delete the account: {error}",
+  "@deleteAccountFailed": {
+    "description": "Error after the deletion request failed. Nothing was deleted.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "description": "The error as the server or network reported it. Never translated.",
+        "example": "M_FORBIDDEN"
+      }
+    }
+  },
+  "deleteAccountDone": "Your account was deleted.",
+  "@deleteAccountDone": {
+    "description": "Message on the welcome screen after the account was deleted and the device cleared."
+  },
+  "personMemoryTitle": "About this person",
+  "@personMemoryTitle": {
+    "description": "Heading of the person's note on the contact screen, and the label of the note field. Keep under ~24 chars."
+  },
+  "personMemoryScreenTitle": "About {name}",
+  "@personMemoryScreenTitle": {
+    "description": "App bar title of the screen where the user edits their note about a person. Keep under ~28 chars.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "The chat's name for the person.",
+        "example": "Anna"
+      }
+    }
+  },
+  "personMemoryEmpty": "Nothing noted yet. Tap to add what you want to remember.",
+  "@personMemoryEmpty": {
+    "description": "Row on the contact screen when nothing is noted about the person yet. About 60 chars."
+  },
+  "personMemoryHint": "## Name or nickname\n## Relationship\n## Birthday\n## Language, formal or casual\n## Key facts",
+  "@personMemoryHint": {
+    "description": "Placeholder of the person note field: short suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "personMemoryUseTemplate": "Start from headings",
+  "@personMemoryUseTemplate": {
+    "description": "Button that fills an empty note with the suggested headings. Keep under ~24 chars."
+  },
+  "personMemoryOnNotice": "Stored only on this device. Quick messages, auto-replies and reply suggestions send it to your AI model.",
+  "@personMemoryOnNotice": {
+    "description": "Notice above the note when personal memory is on. About 140 chars."
+  },
+  "personMemoryOffNotice": "Stored only on this device, and never sent anywhere until you turn on personal memory for AI.",
+  "@personMemoryOffNotice": {
+    "description": "Notice above the note when personal memory is off. About 120 chars."
+  },
+  "personMemoryLearn": "Learn from chat",
+  "@personMemoryLearn": {
+    "description": "Button that asks the AI model to suggest facts about the person from the recent conversation. Keep under ~22 chars."
+  },
+  "personMemorySuggestionsTitle": "Suggested by AI",
+  "@personMemorySuggestionsTitle": {
+    "description": "Heading over the facts the AI suggested adding to the note. Keep under ~24 chars."
+  },
+  "personMemorySuggestionsHint": "From your recent conversation. Nothing is added until you accept it, to this chat or to a person’s profile.",
+  "@personMemorySuggestionsHint": {
+    "description": "Line under the suggestions heading. About 80 chars."
+  },
+  "personMemoryAccept": "Add to note",
+  "@personMemoryAccept": {
+    "description": "Tooltip of the button that adds a suggested fact to the note. Keep under ~20 chars."
+  },
+  "personMemoryDismiss": "Dismiss",
+  "@personMemoryDismiss": {
+    "description": "Tooltip of the button that throws a suggested fact away. Keep under ~16 chars."
+  },
+  "personMemoryLearned": "{count, plural, =1{1 new fact from {name} to review} other{{count} new facts from {name} to review}}",
+  "@personMemoryLearned": {
+    "description": "Toast after the AI suggested new facts from a chat. {name} is the chat's name. About 60 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      },
+      "name": {
+        "type": "String",
+        "description": "The chat's name for the person.",
+        "example": "Anna"
+      }
+    }
+  },
+  "personMemoryReview": "Review",
+  "@personMemoryReview": {
+    "description": "Action on the toast that opens the person's note to review suggestions. Keep under ~12 chars."
+  },
+  "personMemorySuggestionCount": "{count, plural, =1{1 suggestion to review} other{{count} suggestions to review}}",
+  "@personMemorySuggestionCount": {
+    "description": "Line on the contact screen's note row when AI suggestions are waiting. About 30 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryNothingNew": "Nothing new to remember.",
+  "@personMemoryNothingNew": {
+    "description": "Toast when the AI found nothing new to remember. About 40 chars."
+  },
+  "personMemoryLearnOff": "Turn on personal memory for AI in its settings first.",
+  "@personMemoryLearnOff": {
+    "description": "Toast when Learn from chat is tapped while personal memory is off. About 80 chars."
+  },
+  "personMemoryLearnEncrypted": "This chat is end-to-end encrypted. Allow learning from encrypted chats in the personal memory settings first.",
+  "@personMemoryLearnEncrypted": {
+    "description": "Toast when Learn from chat is tapped in an end-to-end encrypted chat while learning from encrypted chats is off. About 110 chars."
+  },
+  "personMemoryLearnNothing": "There is nothing in this chat to learn from yet.",
+  "@personMemoryLearnNothing": {
+    "description": "Toast when there are no messages to learn from. About 50 chars."
+  },
+  "personMemoryLearnFailed": "Your AI model did not answer. Try again later.",
+  "@personMemoryLearnFailed": {
+    "description": "Toast when the AI model could not be reached or failed while suggesting facts. About 50 chars."
+  },
+  "personMemoryLearnHttpError": "Your AI model answered with error {status}. Check the endpoint in its settings.",
+  "@personMemoryLearnHttpError": {
+    "description": "Toast when the AI endpoint answered Learn from chat with an HTTP error. {status} is the number, such as 401 or 500. About 80 chars.",
+    "placeholders": {
+      "status": {"type": "int"}
+    }
+  },
+  "personMemoryLearnTimedOut": "Your AI model took too long to answer. Try again later.",
+  "@personMemoryLearnTimedOut": {
+    "description": "Toast when the AI model did not answer Learn from chat in time. About 60 chars."
+  },
+  "personMemoryLearnCutOff": "Your AI model was still thinking when it hit its answer length limit, even with more room. Raise Max answer length under Endpoints, or use a model that thinks less.",
+  "@personMemoryLearnCutOff": {
+    "description": "Toast when a reasoning AI model spent its whole answer budget thinking and gave no answer to Learn from chat, even after a retry with more room. About 170 chars."
+  },
+  "personMemoryLearnUnreadable": "Your AI model answered, but not with a list of facts. Try again, or use another model.",
+  "@personMemoryLearnUnreadable": {
+    "description": "Toast when the AI model answered Learn from chat with text that is not the JSON list it was asked for. About 90 chars."
+  },
+  "personMemorySettingsTitle": "Personal memory",
+  "@personMemorySettingsTitle": {
+    "description": "Title of the personal memory settings screen, its row in AI settings, and a button leading there. Keep under ~24 chars."
+  },
+  "personMemorySettingsSubtitle": "Notes about people that make AI messages personal",
+  "@personMemorySettingsSubtitle": {
+    "description": "Subtitle of the personal memory row in AI settings. About 60 chars."
+  },
+  "personMemoryExplainer": "Sennit keeps two kinds of notes. Each chat, groups included, has its own: what is going on, plans, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual, the key facts. Both are stored only on this device, encrypted in the system keychain, and are not synced to your other devices. When personal memory is on, quick messages, auto-replies and reply suggestions send the chat’s note and the notes of the people in it, shortened (more so for a model on your own computer), to your AI model, along with the messages those features already send. Learn from chat sends up to the last {count} messages, as many as your model''s context window has room for, to the same model and only ever suggests facts. Nothing is added until you accept it. Notes are included in backups and deleted with your account.",
+  "@personMemoryExplainer": {
+    "description": "Privacy notice at the top of the personal memory settings screen: the two kinds of notes, what is stored where and what is sent where. {count} is the most recent messages Learn from chat sends, which depends on the AI model's context window. About 850 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryUseInAi": "Use personal memory in AI",
+  "@personMemoryUseInAi": {
+    "description": "Master switch: whether notes about people are ever sent to the AI model. Keep under ~36 chars."
+  },
+  "personMemoryUseInAiSubtitle": "Quick messages, auto-replies and reply suggestions include what you noted about the chat and its people",
+  "@personMemoryUseInAiSubtitle": {
+    "description": "Subtitle of the master switch. About 90 chars."
+  },
+  "personMemorySuggestTitle": "Suggest facts after quick messages",
+  "@personMemorySuggestTitle": {
+    "description": "Switch: whether the AI suggests facts after writing a quick message. Keep under ~40 chars."
+  },
+  "personMemorySuggestSubtitle": "Your AI model proposes what to remember; you accept or dismiss each one",
+  "@personMemorySuggestSubtitle": {
+    "description": "Subtitle of the suggest switch. About 90 chars."
+  },
+  "personMemoryEncryptedTitle": "Learn from encrypted chats",
+  "@personMemoryEncryptedTitle": {
+    "description": "Switch: whether facts may be learned from end-to-end encrypted chats. Keep under ~36 chars."
+  },
+  "personMemoryEncryptedSubtitle": "Off by default, like link previews: learning sends an encrypted conversation to your AI model",
+  "@personMemoryEncryptedSubtitle": {
+    "description": "Subtitle of the encrypted-chats switch. About 110 chars."
+  },
+  "personMemoryStoredTitle": "Only on this device",
+  "@personMemoryStoredTitle": {
+    "description": "Row title saying where the notes are kept. Keep under ~30 chars."
+  },
+  "personMemoryStoredBody": "{count, plural, =0{No notes yet. Notes are not synced to other devices.} =1{1 note. Notes are not synced to other devices.} other{{count} notes. Notes are not synced to other devices.}}",
+  "@personMemoryStoredBody": {
+    "description": "Row subtitle: how many notes are kept, and that notes are not synced. About 80 chars.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "3"
+      }
+    }
+  },
+  "personMemoryForgetAllTitle": "Delete all notes",
+  "@personMemoryForgetAllTitle": {
+    "description": "Destructive row and dialog title: delete every note about every person. Keep under ~30 chars."
+  },
+  "personMemoryForgetAllBody": "Every note about every person, and every waiting suggestion, is removed from this device.",
+  "@personMemoryForgetAllBody": {
+    "description": "Body of the dialog confirming deletion of every note. About 90 chars."
+  },
+  "personMemoryForgotAll": "All notes deleted.",
+  "@personMemoryForgotAll": {
+    "description": "Toast after all notes were deleted. About 30 chars."
+  },
+  "memoryThisChat": "This chat",
+  "@memoryThisChat": {
+    "description": "Section header on the contact screen over the memory of this chat. Keep under ~20 chars."
+  },
+  "chatMemoryScreenTitle": "Memory: {name}",
+  "@chatMemoryScreenTitle": {
+    "description": "App bar title of the screen editing a chat's memory. Keep under ~28 chars.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "The chat's or the person's name.",
+        "example": "Anna"
+      }
+    }
+  },
+  "chatMemoryLabel": "About this chat",
+  "@chatMemoryLabel": {
+    "description": "Label of the chat memory field. Keep under ~24 chars."
+  },
+  "chatMemoryHint": "## Ongoing topics\n## Plans\n## Tone in this chat\n## Inside jokes",
+  "@chatMemoryHint": {
+    "description": "Placeholder of the chat memory field: suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "chatMemoryEmpty": "Nothing noted for this chat yet. Tap to add topics, plans or the tone you use here.",
+  "@chatMemoryEmpty": {
+    "description": "Row on the contact screen when nothing is noted for the chat yet. About 60 chars."
+  },
+  "personMemorySharedHint": "Used in every chat with this person. Keep it to a few lines.",
+  "@personMemorySharedHint": {
+    "description": "Helper text under the person note field. About 70 chars."
+  },
+  "personMemoryPromote": "Add to profile",
+  "@personMemoryPromote": {
+    "description": "Tooltip of the button that adds a suggested fact to a person's profile note instead of the chat's. Keep under ~24 chars."
+  },
+  "personMemoryPromoteTo": "Add to whose profile?",
+  "@personMemoryPromoteTo": {
+    "description": "Title of the sheet asking which person's profile a fact goes to, in a group. Keep under ~30 chars."
+  },
+  "personMemoryCondense": "Condense with AI",
+  "@personMemoryCondense": {
+    "description": "Button asking the AI to suggest a shorter version of a person's note. Keep under ~22 chars."
+  },
+  "personMemoryCondensed": "Suggested short version",
+  "@personMemoryCondensed": {
+    "description": "Heading over the AI's suggested short version of a person's note. Keep under ~30 chars."
+  },
+  "personMemoryReplace": "Replace note",
+  "@personMemoryReplace": {
+    "description": "Button replacing the person's note with the AI's short version. Keep under ~16 chars."
+  },
+  "shareTitle": "Share to…",
+  "@shareTitle": {
+    "description": "Title of the share sheet while the user picks which conversations get what another app shared. Keep under ~20 chars.",
+    "maxLength": 36
+  },
+  "shareReadingFiles": "{count, plural, =1{Reading 1 file…} other{Reading {count} files…}}",
+  "@shareReadingFiles": {
+    "description": "Line under the share sheet's title while the files another app shared are still being read, before their names and sizes are known.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files were shared.",
+        "example": "3"
+      }
+    }
+  },
+  "shareFileCount": "{count, plural, other{{count} files}}",
+  "@shareFileCount": {
+    "description": "Part of the share sheet's summary line when several files are shared, followed by ' · ' and their total size (e.g. '3 files · 2.4 MB').",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many files are shared, always 2 or more.",
+        "example": "3"
+      }
+    }
+  },
+  "shareNothingToSend": "Nothing to send",
+  "@shareNothingToSend": {
+    "description": "Line under the share sheet's title when every shared file failed to load and there was no text."
+  },
+  "shareQuotedText": "\"{text}\"",
+  "@shareQuotedText": {
+    "description": "The shared text quoted in the share sheet's summary line. Use your language's own quotation marks.",
+    "placeholders": {
+      "text": {
+        "type": "String",
+        "description": "The start of the text another app shared. Never translated.",
+        "example": "look at this"
+      }
+    }
+  },
+  "endpointsLimitsTitle": "Context and answer length",
+  "@endpointsLimitsTitle": {
+    "description": "Heading above the AI model's context window and answer length fields on the endpoints screen. Keep under ~40 chars."
+  },
+  "endpointsLimitsSubtitle": "How much of a chat your model can read at once, and how long it may answer. A bigger window lets \"Learn from chat\" read hundreds of messages.",
+  "@endpointsLimitsSubtitle": {
+    "description": "Explains the two fields under endpointsLimitsTitle. About 160 chars."
+  },
+  "endpointsContextField": "Context window (tokens)",
+  "@endpointsContextField": {
+    "description": "Label of the number field for the AI model's context window, in tokens. Keep under ~32 chars."
+  },
+  "endpointsContextDetected": "Detected: {tokens} tokens ({source}). Leave empty to use it.",
+  "@endpointsContextDetected": {
+    "description": "Helper under the context window field when the server reported it. {tokens} is a number such as 172032, {source} the kind of server such as litellm or ollama. About 90 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      },
+      "source": {
+        "type": "String",
+        "example": "litellm"
+      }
+    }
+  },
+  "endpointsContextFallback": "Not detected, so {tokens} tokens are assumed. Type your model''s window to let it read more.",
+  "@endpointsContextFallback": {
+    "description": "Helper under the context window field when the server did not report it. {tokens} is the number assumed, such as 8192. About 110 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      }
+    }
+  },
+  "endpointsAnswerField": "Max answer length (tokens)",
+  "@endpointsAnswerField": {
+    "description": "Label of the number field for the longest answer the AI model may write, in tokens. Keep under ~32 chars."
+  },
+  "endpointsAnswerHelper": "Leave empty for {tokens}. A thinking model spends this on its reasoning too.",
+  "@endpointsAnswerHelper": {
+    "description": "Helper under the answer length field. {tokens} is the default, such as 8192. About 110 chars.",
+    "placeholders": {
+      "tokens": {
+        "type": "int"
+      }
+    }
+  },
+  "endpointsThinkingTitle": "Thinking model",
+  "@endpointsThinkingTitle": {
+    "description": "Switch title: the AI model reasons before it answers. Keep under ~24 chars."
+  },
+  "endpointsThinkingSubtitle": "Gives every AI feature room to reason before it answers. On by default for self-hosted models.",
+  "@endpointsThinkingSubtitle": {
+    "description": "Subtitle of the thinking model switch. About 110 chars."
+  },
+  "endpointsSuggestionModelField": "Model for reply suggestions",
+  "@endpointsSuggestionModelField": {
+    "description": "Text field label: an optional second AI model used only for the reply suggestions on notifications. Keep under ~30 chars."
+  },
+  "endpointsSuggestionModelHelper": "Optional. A small or non-thinking model at the same address writes the notification chips faster, e.g. a \"-nothink\" alias. Empty uses the model above.",
+  "@endpointsSuggestionModelHelper": {
+    "description": "Helper under the reply-suggestion model field. About 160 chars."
+  },
+  "endpointsDetectLimits": "Detect",
+  "@endpointsDetectLimits": {
+    "description": "Button that asks the AI server for the model's context window and answer length. Keep under ~20 chars."
+  },
+  "endpointsLimitsDetected": "{source}: window {context}, answer up to {output}",
+  "@endpointsLimitsDetected": {
+    "description": "Shown beside the Detect button after the server answered. {context} and {output} are token counts; either may be shown as a dash. {source} is the server kind, such as litellm. About 70 chars.",
+    "placeholders": {
+      "source": {
+        "type": "String",
+        "example": "litellm"
+      },
+      "context": {
+        "type": "String",
+        "example": "172032"
+      },
+      "output": {
+        "type": "String",
+        "example": "32768"
+      }
+    }
+  },
+  "endpointsLimitsNotDetected": "The server did not say. Type the numbers in.",
+  "@endpointsLimitsNotDetected": {
+    "description": "Shown beside the Detect button when the server did not report the model's limits. About 60 chars."
+  },
+  "autoReplyOutcomeCutOff": "Your model hit its answer length limit. Raise it under Endpoints.",
+  "@autoReplyOutcomeCutOff": {
+    "description": "Why an AI answer failed: the model reached the answer length limit before writing anything usable, even after a retry with more room. Keep under ~70 chars."
   }
 }

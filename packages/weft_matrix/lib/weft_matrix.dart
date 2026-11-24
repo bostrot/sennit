@@ -11,6 +11,7 @@ export 'package:matrix/encryption.dart'
     show Bootstrap, BootstrapState, KeyVerification, KeyVerificationState;
 export 'package:matrix/matrix.dart' show LoginFlow;
 
+export 'src/account_deactivation.dart';
 export 'src/api_session.dart';
 export 'src/bridge_discovery.dart';
 export 'src/call_signalling.dart';

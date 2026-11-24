@@ -209,6 +209,37 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts"/>
         </activity>
+        <!-- Sign-in in the person's own browser (BrowserAuth.kt). The
+             invisible activity that opens the page and waits for it.
+             `singleTask` with MainActivity's (empty) affinity: the redirect
+             arrives in the browser's task, and starting this from there must
+             come back to the one copy in Sennit's task, closing the tab. -->
+        <activity
+            android:name=".BrowserAuthActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"/>
+        <!-- Where a browser without Auth Tabs sends Mattermost's mobile SSO
+             redirect. Disabled here and enabled only while a sign-in waits:
+             `mmauth` is also the official Mattermost app's scheme, and Sennit
+             must not offer to open sign-ins it did not start. -->
+        <activity
+            android:name=".BrowserAuthCallbackActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="mmauth" android:host="callback"/>
+            </intent-filter>
+        </activity>
         <!-- SMS delivery. `SMS_DELIVER` is broadcast to exactly one app on the
              device — the default one — and it is the *only* way that app is
              told about a message. `SMS_RECEIVED`, the one every tutorial shows,
@@ -502,6 +533,12 @@
         <intent>
             <action android:name="android.intent.action.INSERT"/>
             <data android:mimeType="vnd.android.cursor.dir/event"/>
+        </intent>
+        <!-- Sign-in in the person's own browser (BrowserAuth.kt): which
+             browser can open a Custom Tab, and whether it can open an Auth
+             Tab, are both asked of its Custom Tabs service. -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
         </intent>
     </queries>
 </manifest>

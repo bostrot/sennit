@@ -40,11 +40,12 @@ else
 fi
 
 # Release assets are named <App>-<version>-<platform>.<ext>; matching on the
-# suffix keeps this working across renames of the app.
+# suffix keeps this working across renames of the app. The patterns start with
+# "-", so they go in through -e or grep reads them as options.
 url=$(curl -fsSL "$api" \
   | grep -o '"browser_download_url": *"[^"]*"' \
   | sed 's/.*"\(https[^"]*\)"/\1/' \
-  | grep -E "$pattern" | head -n 1) || true
+  | grep -E -e "$pattern" | head -n 1) || true
 [ -n "$url" ] || die "no $os${arch:+ $arch} build in ${VERSION:-the latest} release of $REPO"
 
 file=$(basename "$url")

@@ -9,8 +9,12 @@ import 'package:weft_store/weft_store.dart';
 import 'package:weft_transcribe/weft_transcribe.dart';
 
 import '../../app/a11y.dart';
+import '../../app/llm_settings.dart';
 import '../../app/localisation.dart';
 import '../../app/stores.dart';
+import '../../services/ai/llm_budget.dart';
+import '../../services/ai/llm_limits.dart';
+import '../../services/ai/llm_request.dart' show isHostedLlm;
 import '../../services/ai/smart_replies.dart' show probeLlm;
 import '../../services/transcription/transcription_languages.dart';
 import 'models_screen.dart';
@@ -79,6 +83,45 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     text: _settings.getString(WeftSettings.llmModel) ?? '',
   );
   final _llmKey = TextEditingController();
+  late final _llmSuggestionModel = TextEditingController(
+    text: _settings.getString(WeftSettings.llmSuggestionModel) ?? '',
+  );
+
+  /// What is stored for the model as it was when the screen opened; the
+  /// detected numbers in it are replaced by [_detect].
+  late LlmModelSettings _llmLimits = llmModelSettingsOf(
+    _settings,
+    baseUrl: _llmUrl.text,
+    model: _llmModel.text,
+  );
+  late final _llmContext = TextEditingController(
+    text: _llmLimits.contextTokens?.toString() ?? '',
+  );
+  late final _llmAnswer = TextEditingController(
+    text: _llmLimits.answerTokens?.toString() ?? '',
+  );
+  late bool? _llmThinking = _llmLimits.thinking;
+
+  /// The address and model [_llmLimits] was detected for, so a detection is
+  /// not carried over to a model it was not about.
+  late String _limitsFor = LlmModelSettings.keyFor(
+    _llmUrl.text,
+    _llmModel.text,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // Nothing detected for the configured model yet: ask now, so the numbers
+    // shown are the server's and not the fallback.
+    if (_llmLimits.detectedFrom == null &&
+        _llmUrl.text.trim().isNotEmpty &&
+        _llmModel.text.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _runTest(_limitsTestKey, _detect);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -93,6 +136,9 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       _llmUrl,
       _llmModel,
       _llmKey,
+      _llmSuggestionModel,
+      _llmContext,
+      _llmAnswer,
     ]) {
       c.dispose();
     }
@@ -218,6 +264,42 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
         ? _llmKey.text
         : ref.read(storesProvider).llmApiKey,
   );
+
+  static const String _limitsTestKey = 'llm-limits';
+
+  /// The stored settings for the model typed in now — what the screen opened
+  /// with when it is the same one, and that model's own otherwise.
+  LlmModelSettings _limitsForTyped() {
+    final key = LlmModelSettings.keyFor(_llmUrl.text, _llmModel.text);
+    if (key == _limitsFor) return _llmLimits;
+    return llmModelSettingsOf(
+      _settings,
+      baseUrl: _llmUrl.text,
+      model: _llmModel.text,
+    );
+  }
+
+  /// Asks the server typed in for the model's limits. Its result line is the
+  /// one beside the Detect button: what was found, or that nothing was.
+  Future<String?> _detect() async {
+    final url = _llmUrl.text.trim();
+    final model = _llmModel.text.trim();
+    if (url.isEmpty || model.isEmpty) return null;
+    final limits = await detectLlmLimits(
+      baseUrl: url,
+      model: model,
+      apiKey: _llmKey.text.isNotEmpty
+          ? _llmKey.text
+          : ref.read(storesProvider).llmApiKey,
+    );
+    if (!mounted) return null;
+    setState(() {
+      _llmLimits = withDetected(_limitsForTyped(), limits);
+      _limitsFor = LlmModelSettings.keyFor(url, model);
+    });
+    // Not an error: the fields below say what is assumed instead.
+    return null;
+  }
 
   Future<String?> _probeWhisper() async {
     final provider = buildTranscriptionProvider(
@@ -361,6 +443,27 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     }
     _settings.setString(WeftSettings.llmBaseUrl, _llmUrl.text.trim());
     _settings.setString(WeftSettings.llmModel, _llmModel.text.trim());
+    _settings.setString(
+      WeftSettings.llmSuggestionModel,
+      _llmSuggestionModel.text.trim(),
+    );
+    if (_llmUrl.text.trim().isNotEmpty && _llmModel.text.trim().isNotEmpty) {
+      int? tokens(TextEditingController c) {
+        final n = int.tryParse(c.text.replaceAll(RegExp(r'[^0-9]'), ''));
+        return n != null && n > 0 ? n : null;
+      }
+
+      storeLlmModelSettings(
+        _settings,
+        baseUrl: _llmUrl.text,
+        model: _llmModel.text,
+        value: _limitsForTyped().copyWith(
+          contextTokens: () => tokens(_llmContext),
+          answerTokens: () => tokens(_llmAnswer),
+          thinking: () => _llmThinking,
+        ),
+      );
+    }
 
     final keyFailures = <String>[];
     Future<void> writeKey(
@@ -541,10 +644,122 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
             ),
             _copyRow(_Endpoint.llm),
             _testRow(_Endpoint.llm.testKey, _probeLlmEndpoint),
+            ..._limitsSection(),
           ],
         ),
       ),
     );
+  }
+
+  /// The model's context window, answer length and whether it thinks: the
+  /// numbers every AI feature sizes what it sends and asks for by.
+  List<Widget> _limitsSection() {
+    final l10n = context.l10n;
+    final limits = _limitsForTyped();
+    final hosted = isHostedLlm(_llmUrl.text);
+    final defaults = LlmBudget.resolve(
+      _llmUrl.text,
+      limits.copyWith(answerTokens: () => null, thinking: () => null),
+    );
+    final detected = limits.detectedContextTokens;
+    final busy = _testing.contains(_limitsTestKey);
+    final tried = _testResult.containsKey(_limitsTestKey);
+    String count(int? n) => n == null ? '–' : '$n';
+    return [
+      const SizedBox(height: WeftSpace.md),
+      SettingsSectionHeader(
+        title: l10n.endpointsLimitsTitle,
+        subtitle: l10n.endpointsLimitsSubtitle,
+      ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.md),
+        child: TextField(
+          key: const ValueKey('llm-context'),
+          controller: _llmContext,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: l10n.endpointsContextField,
+            hintText: (detected ?? kLlmFallbackContextTokens).toString(),
+            helperText: detected != null
+                ? l10n.endpointsContextDetected(
+                    detected,
+                    limits.detectedFrom ?? '',
+                  )
+                : l10n.endpointsContextFallback(kLlmFallbackContextTokens),
+            helperMaxLines: 3,
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.md),
+        child: TextField(
+          key: const ValueKey('llm-answer'),
+          controller: _llmAnswer,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: l10n.endpointsAnswerField,
+            hintText: defaults.answerTokens.toString(),
+            helperText: l10n.endpointsAnswerHelper(defaults.answerTokens),
+            helperMaxLines: 3,
+          ),
+        ),
+      ),
+      SwitchListTile(
+        key: const ValueKey('llm-thinking'),
+        title: Text(l10n.endpointsThinkingTitle),
+        subtitle: Text(l10n.endpointsThinkingSubtitle),
+        value: _llmThinking ?? !hosted,
+        onChanged: (v) => setState(() => _llmThinking = v),
+        contentPadding: EdgeInsets.zero,
+      ),
+      Padding(
+        padding: const EdgeInsets.only(bottom: WeftSpace.md),
+        child: TextField(
+          key: const ValueKey('llm-suggestion-model'),
+          controller: _llmSuggestionModel,
+          autocorrect: false,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: l10n.endpointsSuggestionModelField,
+            hintText: _llmModel.text.trim(),
+            helperText: l10n.endpointsSuggestionModelHelper,
+            helperMaxLines: 4,
+          ),
+        ),
+      ),
+      Row(
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey('llm-detect'),
+            onPressed: busy ? null : () => _runTest(_limitsTestKey, _detect),
+            icon: busy
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.travel_explore_rounded, size: 16),
+            label: Text(l10n.endpointsDetectLimits),
+          ),
+          const SizedBox(width: WeftSpace.md),
+          if (tried && !busy)
+            Expanded(
+              child: Text(
+                limits.detectedFrom == null
+                    ? l10n.endpointsLimitsNotDetected
+                    : l10n.endpointsLimitsDetected(
+                        limits.detectedFrom!,
+                        count(limits.detectedContextTokens),
+                        count(limits.detectedOutputTokens),
+                      ),
+                style: context.text.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
+    ];
   }
 
   /// The spoken language sent with every voice message.

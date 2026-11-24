@@ -10,9 +10,7 @@ import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
-import '../services/ai/conversation_context.dart';
 import '../services/billing/entitlements.dart';
-import '../services/ai/smart_replies.dart';
 import '../services/notifications/notification_actions.dart'
     show NotificationDismisser;
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
@@ -20,8 +18,10 @@ import '../services/notifications/conversation_clearer.dart';
 import '../services/notifications/notification_service.dart';
 import '../services/notifications/open_chats.dart';
 import '../services/notifications/push_registration.dart';
+import '../services/notifications/reply_suggester.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';
+import 'person_memory_providers.dart';
 import 'providers.dart';
 import 'snapshot_providers.dart';
 import 'session_providers.dart';
@@ -255,54 +255,28 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
     conversations: matrixSession.incomingMessages,
   );
 
-  // AI answer chips on message notifications. Settings are read per message
-  // rather than captured, so flipping the toggle needs no restart; every
-  // failure path is an empty list, because the notification must never wait
-  // on an error.
-  service.suggestReplies = (content, thread) async {
-    // A bridge bot's login prompts are not a conversation to be witty in.
-    if (repository.serviceChatIds.contains(content.groupKey)) return const [];
-    final WeftStores stores;
-    try {
-      stores = ref.read(storesProvider);
-    } on Object {
-      return const [];
-    }
-    if (!proUnlockedNow(ref, ProFeature.aiReplies)) return const [];
-    final settings = stores.settings;
-    if (!settings.getBool(WeftSettings.notifySmartReplies, fallback: true)) {
-      debugPrint('weft: smart replies: the setting is off');
-      return const [];
-    }
-    final baseUrl = settings.getString(WeftSettings.llmBaseUrl) ?? '';
-    final model = settings.getString(WeftSettings.llmModel) ?? '';
-    if (baseUrl.trim().isEmpty || model.trim().isEmpty) {
-      debugPrint('weft: smart replies: no LLM endpoint is configured');
-      return const [];
-    }
-    // Bounded by the service's own buffer, not trimmed again here: one place
-    // decides how much conversation leaves the device, and that place is
-    // `kAiContextMessages`. Projected by the same function the auto-reply
-    // transcript goes through, so the two features send the one endpoint the
-    // same shape of conversation.
-    final transcript = transcriptLinesFor(thread);
-    return suggestSmartReplies(
-      baseUrl: baseUrl,
-      model: model,
-      apiKey: stores.llmApiKey,
-      chatTitle: content.title,
-      transcript: transcript,
-      // The same calendar section, under the same gate, as the auto-reply —
-      // so "Friday works!" is not offered for a Friday that does not. Two
-      // seconds at most: the notification waits for these chips, under a ten
-      // second cap that the model's own eight already mostly spends.
-      calendar: await aiCalendarContext(
-        ref,
-        transcript,
-        timeout: const Duration(seconds: 2),
-      ),
-    );
-  };
+  // AI answer chips on message notifications.
+  service.suggestReplies = notificationReplySuggester(
+    settings: () => ref.read(storesProvider).settings,
+    apiKey: () => ref.read(storesProvider).llmApiKey,
+    proUnlocked: () => proUnlockedNow(ref, ProFeature.aiReplies),
+    serviceChatIds: () => repository.serviceChatIds,
+    // The same calendar section, under the same gate, as the auto-reply —
+    // so "Friday works!" is not offered for a Friday that does not. Two
+    // seconds at most: the chips are worth most while the notification is
+    // still being looked at.
+    calendar: (transcript) {
+      const wait = Duration(seconds: 2);
+      return aiCalendarContext(ref, transcript, timeout: wait);
+    },
+    // What the user noted about this chat and the people writing in it,
+    // under the same switch as every other AI feature's.
+    memory: (content, thread) {
+      final chat = repository.chatForRoom(content.roomId);
+      if (chat == null) return null;
+      return ref.read(aiMemoryForPromptProvider)(chat, thread);
+    },
+  );
 
   ref.onDispose(() {
     unawaited(service.dispose());

@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:weft_domain/weft_domain.dart';
 
 import 'conversation_context.dart' show kAiContextMessages;
+import 'llm_budget.dart';
+import 'llm_request.dart';
 
 /// How many messages of the conversation the title model is shown, the one
 /// with the date included.
@@ -148,7 +150,9 @@ List<String> recentConversationTranscript(
   int maxMessages = kEventTitleContextMessages,
   int maxChars = kEventTitleContextChars,
 }) {
-  assert(maxMessages > 0 && maxMessages <= kAiContextMessages);
+  // Not bound by `kAiContextMessages`: learning from a chat reads hundreds
+  // of messages when the model's window has room for them.
+  assert(maxMessages > 0);
   final byId = <String, WeftMessage>{};
   for (final m in conversation) {
     if (m.threadRootId == null && _wordsOf(m) != null) {
@@ -219,91 +223,93 @@ Future<String?> suggestEventTitle({
   required String model,
   String? apiKey,
   required List<String> transcript,
+  LlmBudget? budget,
   http.Client? client,
-  Duration timeout = const Duration(seconds: 8),
+  Duration? timeout,
 }) async {
   final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
   if (base.isEmpty || model.trim().isEmpty || transcript.isEmpty) {
     return null;
   }
+  final room = (budget ?? LlmBudget.resolve(base)).forFeature(
+    AiFeature.eventTitle,
+  );
   final url = Uri.parse('$base/chat/completions');
   final owned = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? llmHttpClient();
   try {
-    final response = await httpClient
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            if (apiKey != null && apiKey.isNotEmpty)
-              'Authorization': 'Bearer $apiKey',
+    final answer = await requestCompletion(
+      httpClient,
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+      body: {
+        'model': model,
+        'temperature': 0.2,
+        'messages': [
+          {
+            'role': 'system',
+            'content':
+                'You name calendar events. You are given a chat, oldest '
+                'message first. "You" is the user; every other name is '
+                'someone they are talking to. The line marked '
+                '"$kEventTitleMarker" is the message that set the date; '
+                'the lines around it say what the plan is. Output ONLY a '
+                'JSON object with a "title" string — no analysis, no '
+                'commentary, no markdown. The title says what the event '
+                'is, and with whom and where when the chat says so: '
+                '"Dinner with Sam at Luigi\'s", not "Meeting". At most '
+                'eight words, in the same language as the chat, without '
+                'the date or time, never "You" and never a copied '
+                'message.',
           },
-          body: jsonEncode({
-            'model': model,
-            'temperature': 0.2,
-            'max_tokens': 60,
-            'messages': [
-              {
-                'role': 'system',
-                'content':
-                    'You name calendar events. You are given a chat, oldest '
-                    'message first. "You" is the user; every other name is '
-                    'someone they are talking to. The line marked '
-                    '"$kEventTitleMarker" is the message that set the date; '
-                    'the lines around it say what the plan is. Output ONLY a '
-                    'JSON object with a "title" string — no analysis, no '
-                    'commentary, no markdown. The title says what the event '
-                    'is, and with whom and where when the chat says so: '
-                    '"Dinner with Sam at Luigi\'s", not "Meeting". At most '
-                    'eight words, in the same language as the chat, without '
-                    'the date or time, never "You" and never a copied '
-                    'message.',
-              },
-              // Worked examples, as in the reply prompt: they pin the format
-              // and leave no placeholder to parrot back. The second has
-              // nothing in the marked line but the time — the title is in
-              // the lines around it, which is what the examples must teach.
-              {
-                'role': 'user',
-                'content':
-                    'Chat:\nLea: Hast du nächste Woche Zeit?\n'
-                    'You: Dienstag geht, warum?\n'
-                    '$kEventTitleMarker Lea: Dann lass uns um 14:30 zusammen '
-                    'zum Zahnarzt gehen, ich hab Angst 😅\n'
-                    'You: Klar, ich komm mit\n\nJSON:',
-              },
-              {'role': 'assistant', 'content': '{"title": "Zahnarzt mit Lea"}'},
-              {
-                'role': 'user',
-                'content':
-                    'Chat:\nSam: we should finally try that new italian '
-                    'place\n'
-                    'You: Luigi\'s? heard it\'s great\n'
-                    '$kEventTitleMarker Sam: yes! friday at 7?\n'
-                    'You: perfect, I\'ll book a table\n\nJSON:',
-              },
-              {
-                'role': 'assistant',
-                'content': '{"title": "Dinner with Sam at Luigi\'s"}',
-              },
-              {
-                'role': 'user',
-                'content': 'Chat:\n${transcript.join('\n')}\n\nJSON:',
-              },
-            ],
-          }),
-        )
-        .timeout(timeout);
-    if (response.statusCode != 200) {
-      debugPrint('weft: event title: $url answered ${response.statusCode}');
+          // Worked examples, as in the reply prompt: they pin the format
+          // and leave no placeholder to parrot back. The second has
+          // nothing in the marked line but the time — the title is in
+          // the lines around it, which is what the examples must teach.
+          {
+            'role': 'user',
+            'content':
+                'Chat:\nLea: Hast du nächste Woche Zeit?\n'
+                'You: Dienstag geht, warum?\n'
+                '$kEventTitleMarker Lea: Dann lass uns um 14:30 zusammen '
+                'zum Zahnarzt gehen, ich hab Angst 😅\n'
+                'You: Klar, ich komm mit\n\nJSON:',
+          },
+          {'role': 'assistant', 'content': '{"title": "Zahnarzt mit Lea"}'},
+          {
+            'role': 'user',
+            'content':
+                'Chat:\nSam: we should finally try that new italian '
+                'place\n'
+                'You: Luigi\'s? heard it\'s great\n'
+                '$kEventTitleMarker Sam: yes! friday at 7?\n'
+                'You: perfect, I\'ll book a table\n\nJSON:',
+          },
+          {
+            'role': 'assistant',
+            'content': '{"title": "Dinner with Sam at Luigi\'s"}',
+          },
+          {
+            'role': 'user',
+            'content': 'Chat:\n${transcript.join('\n')}\n\nJSON:',
+          },
+        ],
+      },
+      maxTokens: room.maxTokens,
+      retryMaxTokens: room.retryMaxTokens,
+      answered: (content) => parseEventTitle(content) != null,
+      timeout: timeout ?? llmResponseTimeout(base, LlmTask.eventTitle),
+      what: 'event title',
+    );
+    if (!answer.ok) {
+      debugPrint('weft: event title: $url answered ${answer.status}');
       return null;
     }
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-    final content =
-        ((decoded as Map)['choices'] as List?)
-                ?.cast<Map>()
-                .firstOrNull?['message']?['content']
-            as String?;
+    final content = answer.content;
     if (content == null) {
       debugPrint('weft: event title: no content in the completion');
       return null;

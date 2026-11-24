@@ -13,6 +13,8 @@ import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import 'billing_providers.dart';
 import 'calendar_providers.dart';
 import 'labels.dart';
+import 'llm_settings.dart';
+import 'person_memory_providers.dart';
 import 'providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
@@ -130,10 +132,30 @@ final autoReplyEndpointProvider = Provider<AutoReplyEndpoint?>((ref) {
   } on Object {
     return null;
   }
+  final baseUrl = (stores.settings.getString(WeftSettings.llmBaseUrl) ?? '')
+      .trim();
+  final model = (stores.settings.getString(WeftSettings.llmModel) ?? '').trim();
+  if (baseUrl.isEmpty || model.isEmpty) return null;
+  final limits = llmModelSettingsOf(
+    stores.settings,
+    baseUrl: baseUrl,
+    model: model,
+  );
+  // A model configured before the window could be detected, or whose server
+  // was down when it was saved, is asked once per run.
+  if (limits.detectedFrom == null && limits.contextTokens == null) {
+    detectLlmLimitsInBackground(
+      ref,
+      baseUrl: baseUrl,
+      model: model,
+      apiKey: stores.llmApiKey,
+    );
+  }
   return AutoReplyEndpoint.resolve(
-    baseUrl: stores.settings.getString(WeftSettings.llmBaseUrl),
-    model: stores.settings.getString(WeftSettings.llmModel),
+    baseUrl: baseUrl,
+    model: model,
     apiKey: stores.llmApiKey,
+    limits: limits,
   );
 });
 
@@ -179,6 +201,9 @@ final autoReplyServiceProvider = Provider<AutoReplyService?>((ref) {
     // Busy times, when the conversation is about meeting up — "are you free
     // on Friday?" answered from the calendar rather than guessed.
     calendar: (transcript) => aiCalendarContext(ref, transcript),
+    // What the user noted about the chat and its people, when they let it be
+    // sent.
+    memory: (chat, recent) => ref.read(aiMemoryForPromptProvider)(chat, recent),
   );
 
   ref.onDispose(() => unawaited(service.dispose()));

@@ -96,6 +96,17 @@ class ConversationContext<T> {
   int get length => _entries.length;
 }
 
+/// [lines] without the oldest ones, until what is left fits in [maxChars] —
+/// the newest line always stays, since it is what is being answered.
+List<String> fitTranscript(List<String> lines, int maxChars) {
+  var length = lines.fold(0, (n, l) => n + l.length + 1);
+  var start = 0;
+  while (length > maxChars && start < lines.length - 1) {
+    length -= lines[start++].length + 1;
+  }
+  return start == 0 ? lines : lines.sublist(start);
+}
+
 /// One `Name: what they said` line per message, oldest first — the shape every
 /// prompt in `services/ai` is written against.
 ///

@@ -7,6 +7,8 @@ import 'package:weft_domain/weft_domain.dart';
 import '../../data/auto_reply_transport.dart';
 import 'auto_reply_writer.dart';
 import 'conversation_context.dart';
+import 'llm_budget.dart';
+import 'person_memory.dart' show AiMemory;
 
 /// One attempt, kept so the user can see what happened.
 ///
@@ -109,6 +111,7 @@ class AutoReplyService {
     AutoReplyLedger? ledger,
     DateTime Function()? now,
     Future<String?> Function(List<String> transcript)? calendar,
+    AiMemory? Function(Chat chat, List<WeftMessage> recent)? memory,
   }) : _incoming = incoming,
        _transport = transport,
        _chatForRoom = chatForRoom,
@@ -122,7 +125,8 @@ class AutoReplyService {
        _composer = composer ?? composeAutoReply,
        _ledger = ledger ?? AutoReplyLedger(),
        _now = now ?? DateTime.now,
-       _calendar = calendar;
+       _calendar = calendar,
+       _memory = memory;
 
   final Stream<WeftMessage> _incoming;
   final AutoReplyTransport _transport;
@@ -142,6 +146,11 @@ class AutoReplyService {
   /// `aiCalendarContext`. Asked once per attempt, before the first request, so
   /// a format retry is the same question asked again.
   final Future<String?> Function(List<String> transcript)? _calendar;
+
+  /// What the user noted about [Chat] and the people in [recent], or null —
+  /// null for everyone while the memory switch is off. Read per reply, like
+  /// the rules, so the switch takes effect on the next message.
+  final AiMemory? Function(Chat chat, List<WeftMessage> recent)? _memory;
 
   StreamSubscription<WeftMessage>? _sub;
 
@@ -317,8 +326,12 @@ class AutoReplyService {
     if (endpoint == null) {
       return const AutoReplyDraft.failed(AutoReplyOutcome.notConfigured);
     }
-    final transcript = transcriptFor(chat.id);
+    final transcript = fitTranscript(
+      transcriptFor(chat.id),
+      endpoint.budget.forFeature(AiFeature.autoReply).transcriptChars,
+    );
     final calendar = await _calendarFor(transcript);
+    final memory = _memory?.call(chat, _context.of(chat.id));
     Future<AutoReplyDraft> ask() => _composer(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
@@ -327,6 +340,8 @@ class AutoReplyService {
       chatTitle: chat.title,
       transcript: transcript,
       calendar: calendar,
+      memory: memory,
+      budget: endpoint.budget,
     );
 
     var draft = await ask();
@@ -418,11 +433,17 @@ class AutoReplyEndpoint {
     required this.baseUrl,
     required this.model,
     this.apiKey,
-  });
+    LlmBudget? budget,
+  }) : _budget = budget;
 
   final String baseUrl;
   final String model;
   final String? apiKey;
+  final LlmBudget? _budget;
+
+  /// The model's context window and answer length, and what each feature
+  /// gets of them — the defaults for [baseUrl] when none was given.
+  LlmBudget get budget => _budget ?? LlmBudget.resolve(baseUrl);
 
   /// The endpoint, or null when nothing is configured — the same test
   /// `notifications_screen.dart` applies before offering reply chips, so the
@@ -431,11 +452,17 @@ class AutoReplyEndpoint {
     required String? baseUrl,
     required String? model,
     String? apiKey,
+    LlmModelSettings limits = LlmModelSettings.none,
   }) {
     final url = (baseUrl ?? '').trim();
     final name = (model ?? '').trim();
     if (url.isEmpty || name.isEmpty) return null;
-    return AutoReplyEndpoint(baseUrl: url, model: name, apiKey: apiKey);
+    return AutoReplyEndpoint(
+      baseUrl: url,
+      model: name,
+      apiKey: apiKey,
+      budget: LlmBudget.resolve(url, limits),
+    );
   }
 }
 
@@ -450,4 +477,6 @@ typedef AutoReplyComposer =
       required String chatTitle,
       required List<String> transcript,
       String? calendar,
+      AiMemory? memory,
+      LlmBudget? budget,
     });

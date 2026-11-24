@@ -17,6 +17,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/share_fixtures.dart';
+
 import 'package:weft/app/localisation.dart';
 
 /// The share sheet as a *picker*, which is what Phase 04 task 7 turned it into.
@@ -62,6 +63,7 @@ void main() {
     required SharedPayload payload,
     ResolvedShare resolved = const ResolvedShare(),
     ShareShortcutService? shortcuts,
+    Locale? locale,
   }) async {
     final repository = _RecordingRepository();
 
@@ -81,6 +83,8 @@ void main() {
         ],
         child: MaterialApp(
           localizationsDelegates: weftLocalizationsDelegates,
+          supportedLocales: weftSupportedLocales,
+          locale: locale,
           theme: WeftTheme.build(),
           home: Builder(
             builder: (context) => Scaffold(
@@ -870,6 +874,82 @@ void main() {
           ['Recent Contact'],
           reason: 'one file refused is not the whole share refused',
         );
+      });
+    });
+  });
+
+  group('in the app\'s language', () {
+    // The title, the summary line, the "via" under a picked target and the
+    // networks a reader hears on each row were built in English inside the
+    // sheet, out of the l10n audit's sight because none of them is a literal
+    // passed straight to a `Text`.
+    testWidgets('the header and the rows speak German', (tester) async {
+      await withClock(Clock.fixed(shareNow), () async {
+        final semantics = tester.ensureSemantics();
+        await pumpSheet(
+          tester,
+          locale: const Locale('de'),
+          chats: [
+            shareChat(
+              id: 'merged:grace',
+              title: 'Grace Hopper',
+              networks: const [ChatNetwork.whatsapp, ChatNetwork.signal],
+              preferredSendNetwork: ChatNetwork.signal,
+              lastMessageAt: shareAgo(const Duration(minutes: 5)),
+            ),
+          ],
+          payload: const SharedPayload(
+            text: 'schau mal',
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1', 'content://media/2'],
+          ),
+          resolved: ResolvedShare(
+            sources: [
+              photo(name: 'one.jpg', size: 100000),
+              photo(name: 'two.jpg', size: 100000),
+            ],
+          ),
+        );
+
+        expect(find.text('Teilen mit…'), findsOneWidget);
+        expect(
+          find.textContaining('„schau mal“ · 2 Dateien · '),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(RegExp('Grace Hopper, WhatsApp und Signal')),
+          findsOneWidget,
+        );
+
+        await tapRow(tester, find.widgetWithText(ListTile, 'Grace Hopper'));
+        expect(find.text('An Grace Hopper senden'), findsWidgets);
+        expect(find.text('über Signal'), findsOneWidget);
+        semantics.dispose();
+      });
+    });
+
+    testWidgets('a share with nothing left says so in German', (tester) async {
+      await withClock(Clock.fixed(shareNow), () async {
+        await pumpSheet(
+          tester,
+          locale: const Locale('de'),
+          chats: [
+            shareChat(
+              id: 'recent',
+              title: 'Recent Contact',
+              lastMessageAt: shareAgo(const Duration(minutes: 5)),
+            ),
+          ],
+          payload: const SharedPayload(
+            mimeType: 'image/jpeg',
+            uris: ['content://media/1'],
+          ),
+          resolved: const ResolvedShare(
+            problems: ['huge.mov is larger than 100 MB.'],
+          ),
+        );
+
+        expect(find.text('Nichts zu senden'), findsOneWidget);
       });
     });
   });

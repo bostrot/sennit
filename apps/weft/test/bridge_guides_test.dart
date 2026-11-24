@@ -133,6 +133,58 @@ void main() {
     ]);
   });
 
+  // The bridge's own order, as mautrix-mattermost lists its flows.
+  const mmFlows = ['mm-login-pat', 'mm-login-password', 'mm-login-cookie'];
+
+  test('Mattermost with a browser: its own page leads, tokens folded', () {
+    expect(
+      methods(ChatNetwork.mattermost, [
+        ...mmFlows,
+        'mm-login-webview',
+      ], browser: true),
+      [
+        ('mm-login-webview', LoginMethodKind.browser, true, false),
+        ('mm-login-password', LoginMethodKind.password, false, false),
+        ('mm-login-pat', LoginMethodKind.other, false, true),
+        ('mm-login-cookie', LoginMethodKind.other, false, true),
+      ],
+    );
+  });
+
+  test('Mattermost without a browser: the password, the page folded', () {
+    expect(methods(ChatNetwork.mattermost, [...mmFlows, 'mm-login-webview']), [
+      ('mm-login-webview', LoginMethodKind.browser, false, true),
+      ('mm-login-password', LoginMethodKind.password, false, false),
+      ('mm-login-pat', LoginMethodKind.other, false, true),
+      ('mm-login-cookie', LoginMethodKind.other, false, true),
+    ]);
+  });
+
+  test('Mattermost: the pasted cookie is not a second browser sign-in', () {
+    final offered = loginMethodsFor(ChatNetwork.mattermost, const [
+      BridgeLoginFlow(
+        id: 'mm-login-pat',
+        name: 'Login with Personal Access Token',
+      ),
+      BridgeLoginFlow(
+        id: 'mm-login-cookie',
+        name: 'Login with Browser Cookie (SSO)',
+      ),
+      BridgeLoginFlow(id: 'mm-login-webview', name: 'Browser Window (SSO)'),
+    ], browser: true);
+    expect(
+      [for (final m in offered) methodTitle(l10n, ChatNetwork.mattermost, m)],
+      [
+        'Sign in on the Mattermost website',
+        'Login with Personal Access Token',
+        'Login with Browser Cookie (SSO)',
+      ],
+    );
+    expect(offered.where((m) => m.inAppBrowser).map((m) => m.flow.id), [
+      'mm-login-webview',
+    ]);
+  });
+
   test('a network with only browser sign-ins still shows them', () {
     expect(methods(ChatNetwork.linkedin, ['cookies']), [
       ('cookies', LoginMethodKind.browser, false, true),

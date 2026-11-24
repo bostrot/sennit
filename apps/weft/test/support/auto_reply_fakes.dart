@@ -6,6 +6,8 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft/data/auto_reply_transport.dart';
 import 'package:weft/services/ai/auto_reply_service.dart';
 import 'package:weft/services/ai/auto_reply_writer.dart';
+import 'package:weft/services/ai/llm_budget.dart' show LlmBudget;
+import 'package:weft/services/ai/person_memory.dart' show AiMemory;
 
 /// A transport that remembers what it was asked to send — and, crucially, what
 /// it was *not*.
@@ -67,6 +69,9 @@ class FakeComposer {
   /// The calendar section each call was given, in call order.
   final List<String?> calendars = [];
 
+  /// The person's note each call was given, in call order.
+  final List<AiMemory?> memories = [];
+
   Future<AutoReplyDraft> call({
     required String baseUrl,
     required String model,
@@ -75,9 +80,12 @@ class FakeComposer {
     required String chatTitle,
     required List<String> transcript,
     String? calendar,
+    AiMemory? memory,
+    LlmBudget? budget,
   }) async {
     calls.add((instruction: instruction, transcript: transcript));
     calendars.add(calendar);
+    memories.add(memory);
     final failure = _script.isNotEmpty ? _script.removeAt(0) : failWith;
     if (failure != null) return AutoReplyDraft.failed(failure);
     return AutoReplyDraft.written(reply);
@@ -108,6 +116,7 @@ buildAutoReplyService({
   AutoReplyLedger? ledger,
   DateTime? now,
   Future<String?> Function(List<String> transcript)? calendar,
+  AiMemory? Function(Chat chat, List<WeftMessage> recent)? memory,
 }) {
   // Closed by the caller through the returned record — every test that takes
   // one registers an `addTearDown`. Not closed here, because the service is
@@ -134,6 +143,7 @@ buildAutoReplyService({
     ledger: ledger,
     now: now == null ? null : () => now,
     calendar: calendar,
+    memory: memory,
   );
 
   return (

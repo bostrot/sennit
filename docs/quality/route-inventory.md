@@ -168,6 +168,10 @@ macOS. Every row below is a push from it unless said otherwise.
 | Encryption | `features/settings/security_screen.dart:21` | screen | Settings ▸ *Encryption* | both | yes |
 | Set a passphrase | `features/settings/security_screen.dart:137` | dialog | Encryption ▸ *Set up backup* | both | yes |
 | Replace the backup | `features/settings/security_screen.dart:178` | dialog | Encryption ▸ *Set up backup* with one already there | both | yes |
+| Delete account | `features/settings/delete_account_screen.dart:38` | screen | Settings ▸ *Delete account* | both | no — every step past the form ends an account; covered by `delete_account_test.dart` and the `delete_account_*` goldens |
+| Bridges did not sign out | `features/settings/delete_account_screen.dart:132` | dialog | Delete account ▸ *Delete account*, when a bridge does not answer | both | no — covered by `delete_account_test.dart` |
+| Confirm it's you | `features/settings/delete_account_screen.dart:159` | dialog | Delete account ▸ *Delete account*, when the homeserver asks for a password | both | no — covered by `delete_account_test.dart` |
+| Finish in your browser | `features/settings/delete_account_screen.dart:176` | dialog | Delete account ▸ *Delete account*, when the homeserver asks for single sign-on | both | no — covered by `delete_account_test.dart` |
 | Backup & restore | `features/settings/backup_screen.dart:77` | screen | Settings ▸ *Backup* | both | yes |
 | Choose a passphrase | `features/settings/backup_screen.dart:471` | dialog | Backup ▸ *Create backup* | both | yes |
 | Creating backup / Restoring | `features/settings/backup_screen.dart:421` | dialog | Backup ▸ *Create backup* ▸ *Create*; Backup ▸ a restore ▸ *Restore* | both | yes |

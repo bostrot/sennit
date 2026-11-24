@@ -205,6 +205,47 @@ void main() {
     expect(find.text(l10n.quickMessageRegenerate), findsNothing);
   });
 
+  testWidgets('a slow model counts the wait, and Cancel aborts it', (
+    tester,
+  ) async {
+    var aborted = false;
+    // A model that never answers on its own, as a local one on a laptop can
+    // seem to: only the abort ends the request.
+    final client = MockClient.streaming((request, body) async {
+      await body.drain<void>();
+      await (request as http.Abortable).abortTrigger;
+      aborted = true;
+      throw http.RequestAbortedException(request.url);
+    });
+    await pump(tester, client: client);
+    final l10n = tester.element(find.byType(ChatView)).l10n;
+
+    await openQuickMessages(tester);
+    await tester.tap(find.text(l10n.quickMessagePresetBirthday));
+    // Not settled: the spinner turns for as long as the model takes.
+    await tester.pump();
+    expect(find.byTooltip(l10n.commonCancel), findsOneWidget);
+    expect(find.text('0:01'), findsNothing);
+
+    // Real time, not fake: the bar reads a stopwatch.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 6)),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining(RegExp(r'^0:0[5-9]$')), findsOneWidget);
+    expect(aborted, isFalse);
+
+    await tester.tap(find.byTooltip(l10n.commonCancel));
+    await tester.pumpAndSettle();
+
+    expect(aborted, isTrue);
+    expect(find.byTooltip(l10n.commonCancel), findsNothing);
+    expect(composerText(tester), isEmpty);
+    // Cancelled is not failed: no error for a stop the user asked for.
+    expect(find.textContaining(l10n.quickMessageFailed('')), findsNothing);
+    expect(sends(), isEmpty);
+  });
+
   testWidgets('"Edit quick messages" opens the list', (tester) async {
     await pump(tester, client: answering(['x']));
     final l10n = tester.element(find.byType(ChatView)).l10n;

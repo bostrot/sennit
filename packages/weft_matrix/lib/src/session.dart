@@ -411,6 +411,33 @@ class WeftMatrixSession {
     }
   }
 
+  /// Forgets everything this device holds for the account: the SDK's
+  /// database with its rooms, events and encryption keys, and the attachment
+  /// cache beside it.
+  ///
+  /// [logout] asks the server first and is no use once the account is gone —
+  /// after a deactivation every token is already dead, and the request would
+  /// only fail on its way to the same local clear-out.
+  Future<void> clearLocalData() async {
+    try {
+      await _client?.clear();
+    } finally {
+      if (_databaseOverride == null) await _deleteAttachmentCache();
+      _emit(WeftSessionState.loggedOut);
+    }
+  }
+
+  Future<void> _deleteAttachmentCache() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final files = Directory(p.join(support.path, 'matrix', 'files'));
+      if (files.existsSync()) await files.delete(recursive: true);
+    } on Object {
+      // A file held open by the platform is not a reason to leave the app
+      // signed in to an account that no longer exists.
+    }
+  }
+
   Future<void> dispose() async {
     await _stateController.close();
     await _client?.dispose();
