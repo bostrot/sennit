@@ -1,0 +1,23 @@
+name: weft_sync
+description: >-
+  Device sync: merge verdicts and settings shared between a user's devices,
+  last-writer-wins by a hybrid logical clock, sealed before they leave the
+  device. Pure Dart so convergence is testable without a homeserver.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  # Both already in the lock as transitive dependencies of the matrix SDK, so
+  # declaring them changes no resolution. Both run on the web too, which the
+  # browser client will need.
+  archive: ^4.0.9
+  cryptography: ^2.9.0
+  meta: ^1.17.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.0

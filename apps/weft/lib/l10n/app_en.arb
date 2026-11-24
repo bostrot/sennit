@@ -9687,5 +9687,91 @@
   "devicesSignOutOnAccountPage": "Your server signs devices out on its account page. Sennit opened it in your browser.",
   "@devicesSignOutOnAccountPage": {
     "description": "After tapping sign out on a device, when the server signs devices out on its own account page, which the app just opened in the browser."
+  },
+  "settingsDeviceSyncTitle": "Sync between devices",
+  "@settingsDeviceSyncTitle": {
+    "description": "Settings row opening device sync. About 30 chars."
+  },
+  "settingsDeviceSyncSubtitle": "Merged chats and settings on all your devices",
+  "@settingsDeviceSyncSubtitle": {
+    "description": "Subtitle of the device sync settings row. About 60 chars."
+  },
+  "deviceSyncNotice": "Merged chats and your settings are shared with your other Sennit devices through your homeserver, encrypted with your key backup. Your homeserver only ever sees ciphertext.",
+  "@deviceSyncNotice": {
+    "description": "Notice at the top of the device sync screen: what it does and who can read it. The homeserver is the user's Matrix server."
+  },
+  "deviceSyncEnableTitle": "Sync this device",
+  "@deviceSyncEnableTitle": {
+    "description": "Switch that turns device sync on for this device. About 30 chars."
+  },
+  "deviceSyncEnableSubtitle": "Turn this on on every device that should share",
+  "@deviceSyncEnableSubtitle": {
+    "description": "Under the device sync switch: it has to be turned on on each device. About 70 chars."
+  },
+  "deviceSyncSecretsTitle": "Include API keys and person notes",
+  "@deviceSyncSecretsTitle": {
+    "description": "Switch that adds API keys, tokens and person notes to device sync. About 40 chars."
+  },
+  "deviceSyncSecretsWarning": "Your API keys, tokens, calendar address and what you noted about people are shared too — still encrypted.",
+  "@deviceSyncSecretsWarning": {
+    "description": "Warning next to the secrets switch, saying what it discloses. About 120 chars."
+  },
+  "deviceSyncSecretsSubtitle": "Changing this changes it on all your devices",
+  "@deviceSyncSecretsSubtitle": {
+    "description": "Under the secrets switch: changing it changes it on every device. About 60 chars."
+  },
+  "deviceSyncSharedTitle": "What is shared",
+  "@deviceSyncSharedTitle": {
+    "description": "Section header: what device sync shares."
+  },
+  "deviceSyncSharedBody": "Merged and unmerged chats, which network a chat sends on, and your appearance, AI, notification, privacy, search and transcription settings.",
+  "@deviceSyncSharedBody": {
+    "description": "List of what device sync shares."
+  },
+  "deviceSyncLocalBody": "Stays on this device: downloaded models, the notification permission and push registration, widgets and watch, and the MCP server.",
+  "@deviceSyncLocalBody": {
+    "description": "What device sync never shares."
+  },
+  "deviceSyncStatusNever": "Not synced yet",
+  "@deviceSyncStatusNever": {
+    "description": "Device sync status before the first round."
+  },
+  "deviceSyncStatusSynced": "Synced at {time}",
+  "@deviceSyncStatusSynced": {
+    "description": "Device sync status after a successful round. {time} is a clock time such as 14:05.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "14:05"
+      }
+    }
+  },
+  "deviceSyncStatusNoKey": "Unlock key backup on this device first, under Encryption.",
+  "@deviceSyncStatusNoKey": {
+    "description": "Device sync status: this device cannot read the key backup, which is what the sync key is made from. Points to the encryption screen."
+  },
+  "deviceSyncStatusOtherKey": "Another device shared with a different key backup.",
+  "@deviceSyncStatusOtherKey": {
+    "description": "Device sync status: the shared copy was written with another key backup."
+  },
+  "deviceSyncStatusCorrupt": "The shared copy could not be read.",
+  "@deviceSyncStatusCorrupt": {
+    "description": "Device sync status: the shared copy could not be decrypted or read."
+  },
+  "deviceSyncStatusWaiting": "Waiting for the rest of the shared copy…",
+  "@deviceSyncStatusWaiting": {
+    "description": "Device sync status: part of the shared copy has not arrived yet."
+  },
+  "deviceSyncStatusFailed": "Could not reach your homeserver. Trying again shortly.",
+  "@deviceSyncStatusFailed": {
+    "description": "Device sync status: the homeserver could not be reached; it retries on its own."
+  },
+  "deviceSyncNow": "Sync now",
+  "@deviceSyncNow": {
+    "description": "Button that runs a sync round now. About 20 chars."
+  },
+  "deviceSyncReplace": "Replace with this device’s",
+  "@deviceSyncReplace": {
+    "description": "Button that overwrites a shared copy this device cannot read with this device's settings. About 30 chars."
   }
 }

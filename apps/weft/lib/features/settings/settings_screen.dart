@@ -26,6 +26,7 @@ import 'appearance_sheet.dart';
 import 'ai_screen.dart';
 import 'backup_screen.dart';
 import 'delete_account_screen.dart';
+import 'device_sync_screen.dart';
 import 'integrations_screen.dart';
 import 'devices_screen.dart';
 import 'link_previews_screen.dart';
@@ -176,6 +177,13 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: l10n.settingsLinkPreviewsSubtitle,
               onTap: () => push(const LinkPreviewsScreen()),
             ),
+            if (!kDemoMode)
+              tile(
+                icon: Icons.sync_rounded,
+                title: l10n.settingsDeviceSyncTitle,
+                subtitle: l10n.settingsDeviceSyncSubtitle,
+                onTap: () => push(const DeviceSyncScreen()),
+              ),
             tile(
               icon: Icons.devices_rounded,
               title: l10n.settingsDevicesTitle,

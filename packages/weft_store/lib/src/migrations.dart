@@ -245,6 +245,22 @@ const List<String> weftMigrations = [
   );
   CREATE INDEX idx_purged_room ON purged_event(room_id);
   ''',
+
+  // ---------------------------------------------------------------- v7
+  '''
+  -- What this device last shared with its other devices, per sync key — see
+  -- `reconcile` in weft_sync. `observed` is the local value as last seen,
+  -- which is how an edit is found by comparison rather than by a hook in every
+  -- place that writes a setting. Not in a backup: it describes this device's
+  -- conversation with the others, and a restored device starts that afresh.
+  CREATE TABLE sync_state (
+    key      TEXT PRIMARY KEY,
+    value    TEXT,
+    hlc      TEXT NOT NULL,
+    observed TEXT,
+    tracked  INTEGER NOT NULL
+  );
+  ''',
 ];
 
 /// Applies any migrations the database has not seen yet.

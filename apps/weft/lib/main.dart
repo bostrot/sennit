@@ -27,6 +27,7 @@ import 'app/share_providers.dart';
 import 'app/shortcuts.dart';
 import 'app/snapshot_providers.dart';
 import 'app/stores.dart';
+import 'app/sync_providers.dart';
 import 'app/todo_providers.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
@@ -145,6 +146,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
 
   /// Keeps the search backfill running for as long as there is a session.
   ProviderSubscription<EmbeddingBackfill?>? _embeddingBackfill;
+
+  /// Keeps device sync running — and rebuilt when it is switched on or off —
+  /// for as long as a session is ready. Held for the same reason as
+  /// [_embeddingBackfill].
+  ProviderSubscription<DeviceSyncRunner?>? _deviceSync;
 
   /// Clears a conversation the user read somewhere else.
   ///
@@ -602,6 +608,12 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
             embeddingBackfillProvider,
             (_, _) {},
           );
+          if (!kDemoMode) {
+            _deviceSync ??= ref.listenManual(
+              deviceSyncRunnerProvider,
+              (_, _) {},
+            );
+          }
           // Every launch, so a purchase that finished while the app was
           // closed is acknowledged and a live subscription re-confirmed.
           unawaited(ref.read(proControllerProvider.notifier).start());
@@ -616,6 +628,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           _stopInboxSurfaces();
           _embeddingBackfill?.close();
           _embeddingBackfill = null;
+          _deviceSync?.close();
+          _deviceSync = null;
         case _:
           break;
       }

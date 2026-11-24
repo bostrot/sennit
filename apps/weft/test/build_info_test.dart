@@ -77,6 +77,10 @@ void main() {
     );
     final about = find.text('About Sennit');
     await tester.scrollUntilVisible(about, 200);
+    // scrollUntilVisible stops once any of the row is in the viewport, which
+    // can leave its centre — where tap() aims — below the window's edge.
+    await tester.ensureVisible(about);
+    await tester.pumpAndSettle();
     await tester.tap(about);
     await tester.pumpAndSettle();
 
