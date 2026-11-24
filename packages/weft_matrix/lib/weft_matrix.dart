@@ -9,7 +9,7 @@ library;
 // Encryption types live in a separate library from the main SDK barrel.
 export 'package:matrix/encryption.dart'
     show Bootstrap, BootstrapState, KeyVerification, KeyVerificationState;
-export 'package:matrix/matrix.dart' show LoginFlow;
+export 'package:matrix/matrix.dart' show LoginFlow, OidcLoginSession;
 
 export 'src/account_deactivation.dart';
 export 'src/api_session.dart';
@@ -20,6 +20,7 @@ export 'src/devices.dart';
 export 'src/homeserver.dart';
 export 'src/key_backup.dart';
 export 'src/link_preview.dart';
+export 'src/login_methods.dart';
 export 'src/mapping.dart';
 export 'src/media.dart';
 export 'src/matrix_timeline_source.dart';

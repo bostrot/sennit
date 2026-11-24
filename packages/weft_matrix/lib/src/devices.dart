@@ -1,5 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:matrix/matrix.dart' as sdk;
+
+import 'login_methods.dart';
+import 'session.dart' show oauthServerOf;
 import 'package:meta/meta.dart';
 
 /// How much this account trusts one of its own devices.
@@ -271,6 +274,18 @@ class DeviceActionException implements Exception {
   String toString() => message;
 }
 
+/// This session signed in through an OAuth server, which keeps device
+/// sign-outs for its own account page: the homeserver refuses them here.
+class DeviceSignOutOnAccountPage implements Exception {
+  const DeviceSignOutOnAccountPage(this.url);
+
+  /// The account page, opened on the device when there is just one.
+  final Uri url;
+
+  @override
+  String toString() => 'DeviceSignOutOnAccountPage($url)';
+}
+
 /// Reading and changing this account's other logins.
 ///
 /// An interface rather than one class so the devices screen can be built and
@@ -338,6 +353,19 @@ class MatrixDeviceManager implements DeviceManager {
     required ReauthPrompt reauth,
   }) async {
     if (deviceIds.isEmpty) return;
+
+    // Asked before trying: such a server answers a session with no password
+    // by refusing outright, with no challenge to complete.
+    final oauth = await oauthServerOf(_client);
+    if (oauth != null) {
+      final url = deviceIds.length == 1
+          ? oauth.accountManagementUrl(
+              AccountManagementAction.deviceDelete,
+              deviceId: deviceIds.single,
+            )
+          : oauth.accountManagementUrl(AccountManagementAction.devicesList);
+      if (url != null) throw DeviceSignOutOnAccountPage(url);
+    }
 
     try {
       await _client.deleteDevices(deviceIds);
