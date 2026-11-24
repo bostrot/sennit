@@ -45,3 +45,14 @@ cd apps/weft && flutter test test/l10n_test.dart test/l10n_overflow_test.dart
 [docs/TRANSLATING.md](docs/TRANSLATING.md) has the conventions per language,
 and [docs/architecture/l10n-pipeline.md](docs/architecture/l10n-pipeline.md)
 how the catalogues are built.
+
+## Every release needs a short Play text
+
+Google Play's "What's new" shows at most 500 characters; longer notes show
+the first bullet and "…". So besides `docs/release-notes/<version>.md`, every
+release needs `docs/release-notes/<version>.play.md` (en-US) and
+`<version>.play.de-DE.md`: all highlights, one short line each, at most 500
+characters per file. Play gets these, on every track; the full notes stay
+for GitHub, TestFlight and the app. Check with
+`python3 tooling/scripts/release_notes.py --check` (CI runs it).
+[docs/RELEASING.md](docs/RELEASING.md#plays-short-text) has the details.
