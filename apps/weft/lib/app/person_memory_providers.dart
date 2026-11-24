@@ -15,6 +15,7 @@ import '../services/ai/event_title.dart' show recentConversationTranscript;
 import '../services/ai/llm_budget.dart' show AiFeature;
 import '../services/ai/memory_learner.dart';
 import '../services/ai/person_memory.dart';
+import '../services/ai/writing_style.dart';
 import '../services/status/status_feed.dart' show isStatusBroadcastChat;
 import 'auto_reply_providers.dart' show autoReplyEndpointProvider;
 import 'providers.dart';
@@ -257,18 +258,45 @@ List<MemoryPerson> memoryPeopleFor(
 }
 
 /// What the prompts for [chat] are told, from [book]: the chat's memory and
-/// the memory of [people], notes and learned facts. Null when there is none.
-AiMemory? aiMemoryFrom(MemoryBook book, Chat chat, List<MemoryPerson> people) {
+/// the memory of [people], notes and learned facts, and how everyone writes —
+/// the style profiles, and the user's habits and [ownMessages] here. Null when
+/// there is none.
+AiMemory? aiMemoryFrom(
+  MemoryBook book,
+  Chat chat,
+  List<MemoryPerson> people, {
+  Iterable<WeftMessage> ownMessages = const [],
+}) {
+  final chatKeys = chatMemoryKeys(chat);
+  final examples = ownStyleExamples(ownMessages);
   final memory = AiMemory(
-    chat: book.memoryFor(chatMemoryKeys(chat)),
+    chat: book.memoryFor(chatKeys),
     people: [
       for (final person in people)
         if (book.memoryFor(person.keys) case final note when note.isNotEmpty)
           (name: person.name, note: note),
     ],
+    style: AiStyle(
+      mine: book.styleFor(chatKeys)?.text ?? '',
+      usual: book.styleFor(const [kOwnStyleKey])?.text ?? '',
+      habits: measureWritingHabits(examples)?.describe() ?? '',
+      examples: examples,
+      theirs: [
+        for (final person in people)
+          if (book.styleFor(person.keys) case final style?)
+            (name: person.name, style: style.text),
+      ],
+    ),
   );
   return memory.isEmpty ? null : memory;
 }
+
+/// The user's messages seen per chat this run, for the reply chips on a
+/// notification, which arrive with little of the conversation. See
+/// [OwnMessageCache].
+final ownMessageCacheProvider = Provider<OwnMessageCache>(
+  (ref) => OwnMessageCache(),
+);
 
 /// What to send with a prompt written for [chat], given the [recent]
 /// messages the prompt is written from, or null.
@@ -276,17 +304,26 @@ AiMemory? aiMemoryFrom(MemoryBook book, Chat chat, List<MemoryPerson> people) {
 /// The one gate every AI feature goes through: null while the master switch
 /// is off, and null when nothing is noted. Untrimmed — the composers trim to
 /// their endpoint's budget, in `memoryPromptBlock`.
+///
+/// The user's own messages in [recent], with those seen earlier this run, are
+/// the examples of how they write — minus an encrypted chat's while learning
+/// from those is off: older messages are more than the feature itself sends.
 final aiMemoryForPromptProvider =
     Provider<AiMemory? Function(Chat chat, Iterable<WeftMessage> recent)>((
       ref,
     ) {
       return (chat, recent) {
-        if (!ref.read(personMemorySettingsProvider).useInAi) return null;
+        final settings = ref.read(personMemorySettingsProvider);
+        if (!settings.useInAi) return null;
         final graph = ref.read(chatRepositoryProvider).identityGraph;
         return aiMemoryFrom(
           ref.read(personMemoryProvider),
           chat,
           memoryPeopleFor(graph, chat, recent),
+          ownMessages: ref.read(ownMessageCacheProvider).remember(chat.id, [
+            for (final m in recent)
+              if (settings.mayLearnFrom(encrypted: m.encrypted)) m,
+          ]),
         );
       };
     });
@@ -421,6 +458,7 @@ Future<PersonFactsResult> learnPersonFacts({
   final book = memory.book;
   final memoryChars = endpoint.budget.memoryChars;
   final numbered = book.numberedFacts(keys, people, maxChars: memoryChars);
+  final style = styleLearningFor(book, chat, people, recent);
   Object? failure;
   final update = await requestMemoryUpdate(
     baseUrl: endpoint.baseUrl,
@@ -431,6 +469,7 @@ Future<PersonFactsResult> learnPersonFacts({
     people: [for (final p in people) p.name],
     fixed: fixedMemoryText(book, keys, people, maxChars: memoryChars),
     numbered: numbered,
+    style: style,
     budget: endpoint.budget,
     client: client,
     cancel: cancel,
@@ -458,7 +497,8 @@ Future<PersonFactsResult> learnPersonFacts({
     };
   }
   final changed = memory.learn(
-    update,
+    // A profile only for someone who wrote enough here to have one.
+    update.withStyles(style.mayLearn),
     chatKeys: keys,
     people: people,
     // Numbered against the book as it was sent; an edit made meanwhile is
@@ -473,6 +513,44 @@ Future<PersonFactsResult> learnPersonFacts({
   return changed > 0
       ? done(PersonFactsOutcome.learned, changed: changed)
       : done(PersonFactsOutcome.nothingNew);
+}
+
+/// What the learning prompt is told about how everyone in [chat] writes: the
+/// style profiles in [book] so far, and the habits measured in [messages] —
+/// the user's own, and each of [people]'s.
+///
+/// In a direct chat the person is whoever is not the user; in a group, the
+/// sender of that name.
+StyleLearning styleLearningFor(
+  MemoryBook book,
+  Chat chat,
+  List<MemoryPerson> people,
+  Iterable<WeftMessage> messages,
+) {
+  final list = messages.toList();
+  String habitsOf(bool Function(WeftMessage m) whose) =>
+      measureWritingHabits(wordsOf(list.where(whose)))?.describe() ?? '';
+  final theirHabits = <String, String>{};
+  for (final person in people) {
+    final habits = habitsOf(
+      (m) =>
+          !m.isOwn &&
+          !m.isBridgeNotice &&
+          (!chat.isGroup || m.senderName == person.name),
+    );
+    if (habits.isNotEmpty) theirHabits[person.name] = habits;
+  }
+  return StyleLearning(
+    mine: book.styleFor(chatMemoryKeys(chat))?.text ?? '',
+    usual: book.styleFor(const [kOwnStyleKey])?.text ?? '',
+    theirs: {
+      for (final person in people)
+        if (book.styleFor(person.keys) case final style?)
+          person.name: style.text,
+    },
+    myHabits: habitsOf((m) => m.isOwn),
+    theirHabits: theirHabits,
+  );
 }
 
 /// What the user wrote and pinned about the chat under [chatKeys] and its
@@ -579,8 +657,15 @@ Future<bool> learnInBackground(
     await repository.timelineFor(chat.id),
     wanted,
   );
+  final settings = ref.read(personMemorySettingsProvider);
+  // What the chips on this chat's next notification can show as the user's
+  // voice, under the same gate as learning from it.
+  ref.read(ownMessageCacheProvider).remember(chat.id, [
+    for (final m in messages)
+      if (settings.mayLearnFrom(encrypted: m.encrypted)) m,
+  ]);
   final result = await learnPersonFacts(
-    settings: ref.read(personMemorySettingsProvider),
+    settings: settings,
     endpoint: endpoint,
     memory: ref.read(personMemoryProvider.notifier),
     chat: chat,

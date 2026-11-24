@@ -60,8 +60,9 @@ Future<List<String>> suggestSmartReplies({
                 'You write short chat replies the user could send. '
                 'Output ONLY a JSON object with a "replies" list of one '
                 'or two strings — no analysis, no commentary, no '
-                'markdown. Each reply is a complete sentence of at most '
-                'eight words, in the same language as the conversation.'
+                'markdown. Each reply is at most eight words, makes sense '
+                'on its own, and is in the same language as the '
+                'conversation.'
                 '${calendarPromptBlock(calendar)}'
                 '${memoryPromptBlock(memory, baseUrl: base, budget: limits, feature: AiFeature.smartReplies)}',
           },

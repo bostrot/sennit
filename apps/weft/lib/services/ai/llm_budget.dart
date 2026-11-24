@@ -30,6 +30,15 @@ enum AiFeature {
   condense,
 }
 
+/// Whether [feature] writes a message the user sends — in their name, so in
+/// their style.
+bool writesAsUser(AiFeature feature) => switch (feature) {
+  AiFeature.smartReplies ||
+  AiFeature.quickMessage ||
+  AiFeature.autoReply => true,
+  _ => false,
+};
+
 /// The context window assumed for a model nothing could be detected for.
 ///
 /// Small on purpose: every model people run today has at least this, and a
@@ -339,7 +348,10 @@ class LlmBudget {
     }
     final room = math.max(
       0,
-      contextTokens - retry - kLlmPromptOverheadTokens - memoryChars ~/ 3,
+      contextTokens -
+          retry -
+          kLlmPromptOverheadTokens -
+          (memoryChars + styleCharsFor(feature)) ~/ kLlmCharsPerToken,
     );
     final share = _inputShare(feature);
     final tokens = math.min(
@@ -382,6 +394,22 @@ class LlmBudget {
     AiFeature.eventTitle => math.max(hosted ? 600 : 240, memoryChars ~/ 2),
     AiFeature.todo => math.max(hosted ? 800 : 300, (memoryChars * 2) ~/ 3),
     _ => memoryChars,
+  };
+
+  /// The most characters [feature]'s prompt spends on how the user writes —
+  /// the style profiles and a few of their own messages, see
+  /// `stylePromptBlock` — and none for a feature that does not write as the
+  /// user.
+  ///
+  /// The chips get enough for the profiles and five to ten short examples,
+  /// and no more: every character is read before the first word on a local
+  /// model, and the chips are wanted now. A message the user sends gets room
+  /// for ten.
+  int styleCharsFor(AiFeature feature) => switch (feature) {
+    AiFeature.smartReplies => hosted ? 1200 : 900,
+    AiFeature.quickMessage ||
+    AiFeature.autoReply => (memoryChars ~/ 2).clamp(hosted ? 1600 : 1200, 2400),
+    _ => 0,
   };
 
   /// The most of one person's note a prompt carries: a third of
