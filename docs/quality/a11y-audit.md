@@ -733,6 +733,7 @@ composer had no reachable second line.
 | Send | `Enter` | the composer |
 | New line | `Shift+Enter` | the composer |
 | Cancel reply or edit | `Escape` | the conversation |
+| Empty the search field, then leave it | `Escape` | the Mac toolbar's search field; left to the input method while it is composing |
 
 ### Five things later tasks must not get wrong
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../surface.dart';
 import '../tap_target.dart';
@@ -139,6 +140,9 @@ class MacToolbarGroup extends StatelessWidget {
 /// Short, quiet, and 24pt tall — it is a control in a bar, not the page's
 /// headline. Expands on focus the way the system's does, which is what tells
 /// the user their typing is going somewhere.
+///
+/// Escape behaves as the system's search fields do: it empties a field that
+/// has text in it, and leaves one that is already empty.
 class MacSearchField extends StatefulWidget {
   const MacSearchField({
     super.key,
@@ -181,14 +185,51 @@ class _MacSearchFieldState extends State<MacSearchField> {
     super.initState();
     _owned = widget.focusNode == null;
     _focus.addListener(_onFocus);
+    widget.controller.addListener(_onText);
+  }
+
+  @override
+  void didUpdateWidget(MacSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onText);
+      widget.controller.addListener(_onText);
+      _hasText = widget.controller.text.isNotEmpty;
+    }
   }
 
   void _onFocus() {
     if (_focus.hasFocus != _focused) setState(() => _focused = _focus.hasFocus);
   }
 
+  /// Whether the clear button is showing.
+  ///
+  /// Tracked from the controller rather than read at build time: the toolbar
+  /// that owns the field does not rebuild as the user types, so the button
+  /// used to stay hidden until the field next lost or gained focus.
+  late bool _hasText = widget.controller.text.isNotEmpty;
+
+  void _onText() {
+    final hasText = widget.controller.text.isNotEmpty;
+    if (hasText != _hasText) setState(() => _hasText = hasText);
+  }
+
+  void _clear() {
+    widget.controller.clear();
+    widget.onChanged?.call('');
+  }
+
+  void _escape() {
+    if (widget.controller.text.isNotEmpty) {
+      _clear();
+    } else {
+      _focus.unfocus();
+    }
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_onText);
     _focus.removeListener(_onFocus);
     if (_owned) _focus.dispose();
     super.dispose();
@@ -228,41 +269,77 @@ class _MacSearchFieldState extends State<MacSearchField> {
           Icon(Icons.search_rounded, size: 13, color: colors.onSurfaceVariant),
           const SizedBox(width: 4),
           Expanded(
-            child: TextField(
-              controller: widget.controller,
-              focusNode: _focus,
-              autofocus: widget.autofocus,
-              onChanged: widget.onChanged,
-              onSubmitted: widget.onSubmitted,
-              cursorHeight: 13,
-              cursorWidth: 1,
-              style: context.text.bodyMedium,
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                hintText: widget.hintText,
-                hintStyle: context.text.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+            child: Shortcuts(
+              shortcuts: const {
+                SingleActivator(LogicalKeyboardKey.escape): _EscapeIntent(),
+              },
+              child: Actions(
+                actions: {
+                  _EscapeIntent: _EscapeAction(
+                    onInvoke: _escape,
+                    // Mid-composition the key belongs to the input method,
+                    // which uses it to drop the half-typed pinyin or kana;
+                    // clearing here would take the rest of the query too.
+                    enabled: () => !widget.controller.value.composing.isValid,
+                  ),
+                },
+                child: _textField(context),
               ),
             ),
           ),
-          if (widget.controller.text.isNotEmpty)
-            _ClearButton(
-              label: widget.clearLabel,
-              onPressed: () {
-                widget.controller.clear();
-                widget.onChanged?.call('');
-                setState(() {});
-              },
-            ),
+          if (_hasText)
+            _ClearButton(label: widget.clearLabel, onPressed: _clear),
         ],
       ),
     );
+  }
+
+  Widget _textField(BuildContext context) {
+    final colors = context.colors;
+    return TextField(
+      controller: widget.controller,
+      focusNode: _focus,
+      autofocus: widget.autofocus,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
+      cursorHeight: 13,
+      cursorWidth: 1,
+      style: context.text.bodyMedium,
+      decoration: InputDecoration(
+        isDense: true,
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+        hintText: widget.hintText,
+        hintStyle: context.text.bodyMedium?.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _EscapeIntent extends Intent {
+  const _EscapeIntent();
+}
+
+/// Disabled rather than absent while the input method is composing, so
+/// [Shortcuts] reports the key as unhandled and it reaches the input method.
+class _EscapeAction extends Action<_EscapeIntent> {
+  _EscapeAction({required this.onInvoke, required this.enabled});
+
+  final VoidCallback onInvoke;
+  final bool Function() enabled;
+
+  @override
+  bool isEnabled(_EscapeIntent intent) => enabled();
+
+  @override
+  Object? invoke(_EscapeIntent intent) {
+    onInvoke();
+    return null;
   }
 }
 

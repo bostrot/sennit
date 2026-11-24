@@ -1,5 +1,10 @@
 ## Unreleased
 
+* `MacSearchField`: Escape empties a field with text in it and leaves an
+  empty one, as the system's search fields do; mid-composition it is left to
+  the input method. The clear button now appears as soon as something is typed,
+  rather than on the next focus change, because the field listens to its
+  controller instead of relying on its parent to rebuild.
 * `MacSearchField` takes a `clearLabel` for its clear button's tooltip and
   accessibility label, which was fixed English. The button now answers across
   the field's full 24pt height instead of only on its 13pt glyph, and the focus

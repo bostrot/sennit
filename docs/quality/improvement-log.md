@@ -17,6 +17,8 @@ and what was noticed but not done.
 
 - 2026-11-23 · Localization · The share sheet's title, summary line ("Reading 3 files…", "2 files", "Nothing to send", the quoted text), "via WhatsApp" and the networks a screen reader hears on each row follow the app's language · https://github.com/bostrot/sennit/pull/29
 
+- 2026-11-24 · User experience · Escape empties the Mac toolbar's search field (and leaves it once empty), and the field's clear button shows up while you type instead of only after a focus change · https://github.com/bostrot/sennit/pull/35
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -50,6 +52,12 @@ and what was noticed but not done.
   rather than passed straight to a `Text` are as invisible to the l10n audit
   as the ones passed through a parameter: grep a screen for `'[A-Z]` and
   `' and '` before trusting the audit's silence.
+
+- 2026-11-24 · #29 merged with no review comments; nothing closed
+  unmerged, no issues open. A widget that reads a controller's text in
+  `build` without listening to it works in a test that pumps it fresh and
+  fails in the app, whose parent never rebuilds: test the typing path
+  (`enterText`, then `pump`), not only a controller created with text.
 
 ## Ideas backlog
 
@@ -96,9 +104,11 @@ and what was noticed but not done.
   over the field rather than inset, the `TextField` can take the full
   `MacMetrics.fieldHeight`. "Attach" and "Record voice message" (UI-04c/d) are
   in `chat_view.dart`'s composer; #3 has merged, so that file is free now.
-- **Escape empties the Mac search field.** The system's search fields do it;
-  `MacSearchField` does not. Check first what Escape is already bound to in
-  `shortcuts.dart` so it does not also close the pane.
+- ~~**Escape empties the Mac search field.**~~ Done 2026-11-24, together with
+  the clear button that never appeared while typing. Left out: Escape on the
+  phone/tablet search screen (`features/search/`) and the in-conversation
+  search bar still close rather than clear first; worth checking whether that
+  is what people expect there before changing it.
 - **A window per conversation on the Mac.** Element X for iOS added multiple
   windows on Mac and iPad in 26.04.1
   (https://newreleases.io/project/github/element-hq/element-x-ios/release/release%2F26.04.1).
