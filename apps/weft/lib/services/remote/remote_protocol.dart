@@ -15,6 +15,10 @@ abstract final class RemoteMethods {
   static const String timelineClose = 'timeline.close';
   static const String attachmentBytes = 'attachment.bytes';
 
+  /// A picture the phone fetches with its own homeserver credentials — an
+  /// avatar, a link preview. Only homeserver media; see `SennitWebServer`.
+  static const String mediaFetch = 'media.fetch';
+
   /// Every [ChatRepository] call that takes plain values and returns nothing,
   /// forwarded by name.
   static const String send = 'send';

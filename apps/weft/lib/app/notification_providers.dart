@@ -200,7 +200,7 @@ class SettingsPushKeyStore implements PushKeyStore {
 /// device is notified from sync while Sennit is running", which is the whole of
 /// what desktop Weft has ever done.
 final pushTransportProvider = FutureProvider<PushTransport?>((ref) async {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
   return FirebasePushTransport.initialize();
 });
 
@@ -211,7 +211,7 @@ final pushTransportProvider = FutureProvider<PushTransport?>((ref) async {
 final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   ref,
 ) async {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
 
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;
@@ -293,7 +293,7 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
 final pushRegistrationProvider = FutureProvider<PushRegistrationOutcome>((
   ref,
 ) async {
-  if (kDemoMode) {
+  if (kNoMatrix) {
     return const PushRegistrationOutcome(
       PushRegistrationStatus.unsupportedPlatform,
     );
@@ -335,7 +335,7 @@ Future<List<PushRuleChange>> reconcilePushRules({
   required List<Chat> chats,
   DateTime? now,
 }) async {
-  if (kDemoMode || !session.isInitialized || chats.isEmpty) return const [];
+  if (kNoMatrix || !session.isInitialized || chats.isEmpty) return const [];
 
   return MatrixPushRuleSync(
     MatrixPushRuleTarget.forClient(session.client),

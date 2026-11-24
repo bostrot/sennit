@@ -16,8 +16,13 @@ import 'remote_protocol.dart';
 /// pushes a snapshot of those after every change, and only the parts that
 /// changed since the last push. Everything that does something is a call.
 class RemoteChatHost {
-  RemoteChatHost(this._repo, RemoteLink link) {
-    _peer = RpcPeer(link, handlers: _handlers());
+  RemoteChatHost(
+    this._repo,
+    RemoteLink link, {
+    Map<String, RpcHandler> extraHandlers = const {},
+    Map<String, String> Function()? settings,
+  }) : _settings = settings {
+    _peer = RpcPeer(link, handlers: {..._handlers(), ...extraHandlers});
     _chats = _repo.watchChats().listen((chats) {
       _lastChats = chats;
       _schedulePush();
@@ -26,6 +31,8 @@ class RemoteChatHost {
   }
 
   final ChatRepository _repo;
+  final Map<String, String> Function()? _settings;
+  final Map<String, String> _sentSettings = {};
   late final RpcPeer _peer;
   late final StreamSubscription<List<Chat>> _chats;
 
@@ -41,6 +48,9 @@ class RemoteChatHost {
   bool _disposed = false;
 
   Future<void> get done => _peer.done;
+
+  /// Pushes whatever changed outside the chat stream — a setting, a pairing.
+  void refresh() => _schedulePush();
 
   void dispose() {
     if (_disposed) return;
@@ -126,6 +136,24 @@ class RemoteChatHost {
     }
     if (timelines.isNotEmpty) frame['timelines'] = timelines;
 
+    // The phone's preferences, so the browser behaves the way the phone was
+    // set up — which network sends, what Return does, how statuses show.
+    if (_settings case final read?) {
+      final now = read();
+      final changed = <String, Object?>{
+        for (final MapEntry(:key, :value) in now.entries)
+          if (_sentSettings[key] != value) key: value,
+        for (final key in _sentSettings.keys)
+          if (!now.containsKey(key)) key: null,
+      };
+      if (changed.isNotEmpty) {
+        frame['settings'] = changed;
+        _sentSettings
+          ..clear()
+          ..addAll(now);
+      }
+    }
+
     if (frame.isNotEmpty) _peer.emit(RemoteMethods.stateEvent, frame);
   }
 
@@ -200,6 +228,7 @@ class RemoteChatHost {
         _sentOrder = const [];
         _sentNetworks = _sentService = _sentIdentity = null;
         _sentEpoch = null;
+        _sentSettings.clear();
         _schedulePush();
         return {'protocol': kRemoteProtocolVersion};
       },

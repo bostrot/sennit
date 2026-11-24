@@ -9,6 +9,8 @@ import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../inbox/inbox_shell.dart';
 import '../whats_new/whats_new.dart';
+import '../../services/web/phone_connection_errors.dart';
+import 'connect_phone_screen.dart';
 import 'login_screen.dart';
 import 'setup_screen.dart';
 import 'verification_screen.dart';
@@ -38,7 +40,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   bool get _setupDone {
-    if (kDemoMode) return true;
+    if (kNoMatrix) return true;
     final settings = _settings;
     // Stores not up yet: claim done rather than flashing setup on the way
     // to the splash — the gate rebuilds when they open.
@@ -52,7 +54,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   bool get _walkthroughPending {
-    if (kDemoMode) return false;
+    if (kNoMatrix) return false;
     return _settings?.getBool(WeftSettings.walkthroughPending) ?? false;
   }
 
@@ -95,6 +97,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       switchInCurve: WeftMotion.enter,
       child: switch (state) {
         AsyncLoading() => const _Splash(key: ValueKey('splash')),
+        AsyncError(:final PhoneConnectionException error) => ConnectPhoneScreen(
+          key: const ValueKey('connect'),
+          problem: error.problem,
+          onRetry: () => ref.invalidate(remoteRepositoryProvider),
+        ),
         AsyncError(:final error) => _StartupError(
           key: const ValueKey('error'),
           error: error,

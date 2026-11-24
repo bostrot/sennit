@@ -32,6 +32,7 @@ import '../../app/notification_providers.dart';
 import '../../app/person_memory_providers.dart';
 import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
+import '../../app/session_providers.dart' show kRemoteClient;
 import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
@@ -3746,7 +3747,11 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             builder: (context, ref, _) {
               final availability = ref.watch(callAvailabilityProvider(chat.id));
               final target = availability.target;
+              // Sennit Web places no calls of its own; only the hand-off to
+              // the network's app or the dialler below works from a browser.
+              const none = SizedBox.shrink();
               if (target != null) {
+                if (kRemoteClient) return none;
                 return _action(
                   tooltip: context.l10n.callAvailability(availability),
                   icon: Icons.call_rounded,
@@ -3761,6 +3766,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               // its members are on.
               if (availability is! CallBlocked ||
                   availability.reason != CallBlocker.bridged) {
+                if (kRemoteClient) return none;
                 return _action(
                   tooltip: context.l10n.callAvailability(availability),
                   icon: Icons.call_rounded,
@@ -3781,6 +3787,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 contact,
               );
               if (external == null) {
+                if (kRemoteClient) return none;
                 return _action(
                   tooltip: context.l10n.callAvailability(availability),
                   icon: Icons.call_rounded,

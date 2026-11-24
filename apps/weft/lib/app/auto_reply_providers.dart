@@ -168,7 +168,7 @@ final autoReplyEndpointProvider = Provider<AutoReplyEndpoint?>((ref) {
 /// `send` would break the one promise it exists to keep. Falling back would be
 /// worse than being dormant.
 final autoReplyServiceProvider = Provider<AutoReplyService?>((ref) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
 
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;

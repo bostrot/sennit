@@ -94,6 +94,9 @@ dependencies:
   # is a declaration rather than a new package.
   url_launcher: ^6.3.2
   video_player: ^2.11.1
+  # The browser build's WebSocket and local storage, for Sennit Web. Already
+  # in the lock through Flutter itself.
+  web: ^1.1.1
 
   whisper_ggml: ^2.6.0
   # ONNX Runtime bindings for every platform Weft builds on. Runs the local

@@ -9833,5 +9833,115 @@
   "sennitWebRemove": "Remove",
   "@sennitWebRemove": {
     "description": "Button: delete the downloaded browser files."
+  },
+  "settingsSectionThisBrowser": "This browser",
+  "@settingsSectionThisBrowser": {
+    "description": "Settings section header in Sennit Web: settings that belong to this browser."
+  },
+  "sennitWebUnpairTitle": "Unpair this browser",
+  "@sennitWebUnpairTitle": {
+    "description": "Sennit Web settings row: forget the phone this browser is paired with."
+  },
+  "sennitWebUnpairSubtitle": "You will need the QR code from your phone to connect again",
+  "@sennitWebUnpairSubtitle": {
+    "description": "Subtitle: after unpairing, the phone's QR code is needed to connect again."
+  },
+  "sennitWebSettingsOnPhone": "Everything else is set on your phone, and this browser follows it.",
+  "@sennitWebSettingsOnPhone": {
+    "description": "Note in Sennit Web's settings: the other settings are changed on the phone."
+  },
+  "sennitWebConnectTitle": "Connect to your phone",
+  "@sennitWebConnectTitle": {
+    "description": "Title of Sennit Web's screen shown until the browser reaches its phone."
+  },
+  "sennitWebConnectNotPaired": "Open Sennit on your phone, go to Settings → Sennit Web, turn it on and scan the QR code to pair this browser.",
+  "@sennitWebConnectNotPaired": {
+    "description": "Sennit Web connect screen: this browser is not paired yet; how to pair it."
+  },
+  "sennitWebConnectUnreachable": "Your phone did not answer. Check that Sennit Web is on there and that the phone is awake and reachable.",
+  "@sennitWebConnectUnreachable": {
+    "description": "Sennit Web connect screen: the phone did not answer."
+  },
+  "sennitWebConnectVersion": "Your phone runs a different Sennit version. Reload this page to get the one it serves now.",
+  "@sennitWebConnectVersion": {
+    "description": "Sennit Web connect screen: the phone runs a different Sennit version than this page."
+  },
+  "sennitWebServeTitle": "Serve on this network",
+  "@sennitWebServeTitle": {
+    "description": "Switch: serve Sennit Web to browsers on this network."
+  },
+  "sennitWebServeSubtitle": "Paired browsers on the same network can open Sennit while this is on and the app is running",
+  "@sennitWebServeSubtitle": {
+    "description": "Under the serve switch: who can reach it and for how long."
+  },
+  "sennitWebServeFailed": "Could not start. Another app may be using port {port}.",
+  "@sennitWebServeFailed": {
+    "description": "Under the serve switch after a failed start. {port} is the network port number.",
+    "placeholders": {
+      "port": {
+        "type": "int",
+        "example": "8787"
+      }
+    }
+  },
+  "sennitWebAddressTitle": "Open in a browser",
+  "@sennitWebAddressTitle": {
+    "description": "Section header: the address to open in a browser."
+  },
+  "sennitWebConnected": "{count, plural, =0{No browser connected} =1{1 browser connected} other{{count} browsers connected}}",
+  "@sennitWebConnected": {
+    "description": "How many browsers are connected right now.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "sennitWebPair": "Pair a browser",
+  "@sennitWebPair": {
+    "description": "Button: show the pairing code for a new browser."
+  },
+  "sennitWebPairTitle": "Pair a browser",
+  "@sennitWebPairTitle": {
+    "description": "Title of the pairing dialog with the QR code."
+  },
+  "sennitWebPairBody": "Open this address in the browser: scan the code with that computer’s camera, or copy or share the link to it. It pairs one browser, once, within 5 minutes — anyone who has it can pair, so keep it to yourself.",
+  "@sennitWebPairBody": {
+    "description": "Pairing dialog: how to use the code and why to keep it private."
+  },
+  "sennitWebCopyLink": "Copy link",
+  "@sennitWebCopyLink": {
+    "description": "Button in the pairing dialog: copy the pairing link."
+  },
+  "sennitWebShareLink": "Share link",
+  "@sennitWebShareLink": {
+    "description": "Button in the pairing dialog: share the pairing link."
+  },
+  "sennitWebPairedTitle": "Paired browsers",
+  "@sennitWebPairedTitle": {
+    "description": "Section header: browsers paired with this device."
+  },
+  "sennitWebPairedNone": "No browser paired yet.",
+  "@sennitWebPairedNone": {
+    "description": "Shown when no browser is paired."
+  },
+  "sennitWebPairedSeen": "Last connected {date}",
+  "@sennitWebPairedSeen": {
+    "description": "Under a paired browser: when it last connected. {date} is a formatted date.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "24 Nov 2026"
+      }
+    }
+  },
+  "sennitWebRevoke": "Unpair",
+  "@sennitWebRevoke": {
+    "description": "Tooltip: unpair this browser; it is disconnected at once."
+  },
+  "sennitWebServingBanner": "Sennit Web is on",
+  "@sennitWebServingBanner": {
+    "description": "Banner above the inbox while Sennit Web is being served. Tap opens its settings."
   }
 }

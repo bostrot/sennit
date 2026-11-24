@@ -322,7 +322,7 @@ final linkPreviewSettingsProvider = Provider<LinkPreviewSettings>((ref) {
 
 /// Where previews come from, or null when there is nowhere to ask.
 final linkPreviewFetchProvider = Provider<LinkPreviewFetch?>((ref) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;
   return homeserverLinkPreviews(session.client);
@@ -398,7 +398,7 @@ final linkPreviewProvider =
 /// rather than breaking, but it degrades for the wrong reason and the reader
 /// cannot tell.
 final authenticatedMediaProvider = FutureProvider<bool>((ref) async {
-  if (kDemoMode) return true;
+  if (kNoMatrix) return true;
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return true;
   try {
@@ -419,7 +419,7 @@ final linkPreviewImageProvider = Provider.family<ImageProvider?, String>((
   ref,
   mxc,
 ) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;
 
