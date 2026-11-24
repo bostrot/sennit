@@ -110,6 +110,8 @@ dependencies:
   weft_matrix: ^0.1.0
   weft_mcp: ^0.1.0
   weft_merge: ^0.1.0
+  # Sennit Web's wire: the phone serves, the browser mirrors.
+  weft_remote: ^0.1.0
   weft_notify: ^0.1.0
   weft_richtext: ^0.1.0
   weft_search: ^0.1.0

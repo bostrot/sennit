@@ -133,6 +133,10 @@ class Chat {
 
   final ChatNetwork? _preferredSendNetwork;
 
+  /// The network the user picked for this chat, as given — [sendNetwork]
+  /// is what it resolves to. For carrying a chat across a wire unchanged.
+  ChatNetwork? get preferredSendNetwork => _preferredSendNetwork;
+
   bool get isMerged => sources.length > 1;
 
   /// Networks feeding this chat, in stable enum order.
