@@ -196,10 +196,17 @@ Future<void> _deleteDirectories() async {
 final accountDeletionProvider = Provider<AccountDeletion>((ref) {
   return AccountDeletion(
     bridges: () => bridgeSignOutTargets(ref),
-    deactivate: (reauth) {
-      final client = ref.read(matrixSessionProvider).client;
+    deactivate: (reauth) async {
+      final session = ref.read(matrixSessionProvider);
+      final client = session.client;
       final userId = client.userID;
       if (userId == null) throw StateError('No account is signed in');
+      final page = (await session.signedInOAuthServer())?.accountManagementUrl(
+        AccountManagementAction.accountDeactivate,
+      );
+      if (page != null) {
+        return deactivateOnAccountPage(client, page: page, reauth: reauth);
+      }
       return deactivateAccount(client, userId: userId, reauth: reauth);
     },
     wipe: () => wipeLocalData(ref),

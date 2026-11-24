@@ -6,6 +6,8 @@ import 'package:weft_matrix/weft_matrix.dart';
 import '../../app/localisation.dart';
 
 import '../../app/session_providers.dart';
+import '../bridges/bridge_external_sign_in.dart' show ExternalSignInException;
+import 'browser_login.dart';
 import 'matrix_server_sheet.dart';
 
 /// Where someone new lands unless they name a server of their own.
@@ -32,7 +34,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _inviteCode = TextEditingController();
 
   HomeserverDiscovery? _discovery;
-  List<LoginFlow> _flows = const [];
+
+  /// How the server lets people in; null until it has been asked.
+  LoginMethods? _methods;
 
   /// What the server wants from a new account; null when it could not be
   /// asked, in which case the form is offered and the server answers on
@@ -42,6 +46,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Creating an account rather than signing in to one.
   bool _creating = false;
   bool _busy = false;
+
+  /// A sign-in is open in the browser; the screen waits for it to come back.
+  bool _inBrowser = false;
   String? _error;
 
   @override
@@ -56,15 +63,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _serverResolved => _discovery != null;
 
-  bool get _supportsPassword =>
-      _flows.isEmpty || _flows.any((f) => f.type == 'm.login.password');
+  /// A server that named no way in at all is offered the password form, as
+  /// it always was: most of those take one and only forgot to say so.
+  bool get _supportsPassword {
+    final methods = _methods;
+    if (methods == null) return true;
+    return methods.password || (!methods.any && !methods.unsupported);
+  }
 
-  bool get _supportsSso => _flows.any((f) => f.type == 'm.login.sso');
+  bool get _supportsSso => _methods?.sso ?? false;
+
+  OAuthServer? get _oauth => _methods?.oauth;
+
+  /// The server named its ways in and Sennit can do none of them.
+  bool get _unsupported => _methods?.unsupported ?? false;
+
+  /// New accounts are made on the OAuth server's own page, when it has one.
+  bool get _createsInBrowser => _oauth?.canRegister ?? false;
 
   /// Whether the create form has anything to submit to.
   bool get _canCreate =>
-      _offer != RegistrationOffer.closed &&
-      _offer != RegistrationOffer.unsupported;
+      _createsInBrowser ||
+      (_oauth == null &&
+          _offer != RegistrationOffer.closed &&
+          _offer != RegistrationOffer.unsupported);
 
   /// The server as the user knows it, for sentences about it.
   String get _serverName =>
@@ -82,7 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final session = ref.read(matrixSessionProvider);
       final discovery = await session.checkHomeserver(_homeserver.text);
-      final flows = await session.supportedLoginFlows();
+      final methods = await session.loginMethods();
       // Asked now rather than on the way into the create form, so that form
       // opens already knowing whether it has an invite-code field.
       RegistrationOffer? offer;
@@ -94,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       setState(() {
         _discovery = discovery;
-        _flows = flows;
+        _methods = methods;
         _offer = offer;
       });
     } on Exception catch (e) {
@@ -111,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _homeserver.text = kDefaultHomeserver;
       _discovery = null;
-      _flows = const [];
+      _methods = null;
       _offer = null;
     });
     _resolveServer();
@@ -141,7 +163,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// Signs in — or, with [create], signs up — on the server's own page in
+  /// the browser: next-gen OAuth when the server has it, the legacy SSO
+  /// redirect otherwise, with [ssoProvider] picking one of its buttons.
+  Future<void> _signInInBrowser({
+    bool create = false,
+    String? ssoProvider,
+  }) async {
+    final l10n = context.l10n;
+    final session = ref.read(matrixSessionProvider);
+    final browser = ref.read(browserLoginProvider);
+    setState(() {
+      _busy = true;
+      _inBrowser = true;
+      _error = null;
+    });
+    try {
+      if (_oauth != null) {
+        OidcLoginSession? attempt;
+        final callback = await browser.run((redirect) async {
+          attempt = await session.beginOAuthLogin(redirect, create: create);
+          return attempt!.authenticationUri;
+        }, doneText: l10n.loginBrowserDone);
+        if (callback == null || attempt == null) return;
+        if (mounted) setState(() => _inBrowser = false);
+        await session.completeOAuthLogin(attempt!, callback);
+      } else {
+        final callback = await browser.run(
+          (redirect) async => session.ssoRedirectUrl(
+            redirect.toString(),
+            providerId: ssoProvider,
+          ),
+          doneText: l10n.loginBrowserDone,
+        );
+        if (callback == null) return;
+        if (mounted) setState(() => _inBrowser = false);
+        await session.completeSsoLogin(callback);
+      }
+      // The auth gate reacts to the session state change; nothing to do here.
+    } on BrowserLoginException catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _error = switch (e.reason) {
+          BrowserLoginFailure.denied => l10n.loginBrowserDenied,
+          BrowserLoginFailure.mismatch ||
+          BrowserLoginFailure.incomplete => l10n.loginBrowserIncomplete,
+        },
+      );
+    } on ExternalSignInException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _error = _humanize(e));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _inBrowser = false;
+        });
+      }
+    }
+  }
+
   Future<void> _createAccount() async {
+    if (_createsInBrowser) return _signInInBrowser(create: true);
     final l10n = context.l10n;
     final username = _newLocalpart;
     final String? problem;
@@ -238,15 +324,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ? context.l10n.commonContinue
       : _creating
       ? context.l10n.loginCreateAccount
-      : context.l10n.loginSignIn;
+      : _supportsPassword || _unsupported
+      ? context.l10n.loginSignIn
+      : _oauth != null
+      ? context.l10n.loginContinueWith(_serverName)
+      : context.l10n.loginSso;
 
   VoidCallback? get _primaryAction => !_serverResolved
       ? _resolveServer
-      : !_creating
+      : _creating
+      ? (_canCreate ? _createAccount : null)
+      : _supportsPassword
       ? _signIn
-      : _canCreate
-      ? _createAccount
+      : _oauth != null ||
+            (_supportsSso && (_methods?.ssoProviders.isEmpty ?? true))
+      ? _signInInBrowser
       : null;
+
+  /// The server's named SSO buttons are the only way in; a main button would
+  /// have nothing of its own to do.
+  bool get _ssoButtonsOnly =>
+      _serverResolved &&
+      !_creating &&
+      !_supportsPassword &&
+      _oauth == null &&
+      _supportsSso &&
+      _methods!.ssoProviders.isNotEmpty;
+
+  /// Whether the browser sign-in has a button of its own under the form, as
+  /// the way in besides the password.
+  bool get _browserAlongside =>
+      _serverResolved && !_creating && _supportsPassword && _oauth != null;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +396,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               onPressed: () => setState(() {
                                 _discovery = null;
-                                _flows = const [];
+                                _methods = null;
                                 _offer = null;
                               }),
                             )
@@ -360,10 +468,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
 
+                if (_serverResolved && !_creating && _unsupported) ...[
+                  const SizedBox(height: WeftSpace.lg),
+                  Text(
+                    context.l10n.loginNoSupportedMethod(_serverName),
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+
+                if (_serverResolved &&
+                    !_supportsPassword &&
+                    (_oauth != null || _supportsSso) &&
+                    (!_creating || _createsInBrowser)) ...[
+                  const SizedBox(height: WeftSpace.lg),
+                  Text(
+                    _creating
+                        ? context.l10n.loginCreateInBrowser(_serverName)
+                        : context.l10n.loginBrowserHint(_serverName),
+                    style: context.text.bodyMedium?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+
                 if (_serverResolved && _creating && !_canCreate) ...[
                   const SizedBox(height: WeftSpace.lg),
                   Text(
-                    _offer == RegistrationOffer.closed
+                    _offer == RegistrationOffer.closed || _oauth != null
                         ? context.l10n.loginCreateClosed(_serverName)
                         : context.l10n.loginCreateUnsupported(_serverName),
                     style: context.text.bodyMedium?.copyWith(
@@ -373,7 +508,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
 
-                if (_serverResolved && _creating && _canCreate) ...[
+                if (_serverResolved &&
+                    _creating &&
+                    _canCreate &&
+                    !_createsInBrowser) ...[
                   const SizedBox(height: WeftSpace.lg),
                   // The `new…` hints are what tell a password manager this is
                   // a sign-up: it offers to generate a password instead of
@@ -497,21 +635,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // flight, so for the seconds that matter most the button had no
                 // name at all — a reader who came back to it was told only
                 // "button". The label outlives the text it is made of.
-                Semantics(
-                  label: _busy ? context.l10n.loginWorking : _primaryLabel,
-                  excludeSemantics: true,
-                  button: true,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _primaryAction,
-                    child: _busy
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_primaryLabel),
+                if (!_ssoButtonsOnly)
+                  Semantics(
+                    label: _busy ? context.l10n.loginWorking : _primaryLabel,
+                    excludeSemantics: true,
+                    button: true,
+                    child: FilledButton(
+                      onPressed: _busy ? null : _primaryAction,
+                      child: _busy
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_primaryLabel),
+                    ),
                   ),
-                ),
 
                 // The way between the two forms sits under the button of the
                 // one that is showing: someone who arrived to sign up and
@@ -528,13 +667,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
 
-                if (_serverResolved && !_creating && _supportsSso) ...[
+                if (_inBrowser) ...[
+                  const SizedBox(height: WeftSpace.sm),
+                  Text(
+                    context.l10n.loginBrowserWaiting,
+                    textAlign: TextAlign.center,
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: ref.read(browserLoginProvider).cancel,
+                    child: Text(context.l10n.commonCancel),
+                  ),
+                ],
+
+                if (_browserAlongside) ...[
                   const SizedBox(height: WeftSpace.sm),
                   OutlinedButton.icon(
-                    // Completing SSO needs the deep-link callback, which lands
-                    // with App Links in M8; surfacing a dead button now would
-                    // be worse than saying so.
-                    onPressed: null,
+                    onPressed: _busy ? null : _signInInBrowser,
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: Text(context.l10n.loginContinueWith(_serverName)),
+                  ),
+                ],
+
+                // One button per identity provider the server names, or — on a
+                // server with a password form beside it — one generic one.
+                if (_serverResolved && !_creating && _supportsSso)
+                  for (final provider in _methods!.ssoProviders) ...[
+                    const SizedBox(height: WeftSpace.sm),
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _signInInBrowser(ssoProvider: provider.id),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: Text(
+                        context.l10n.loginContinueWith(provider.name),
+                      ),
+                    ),
+                  ],
+                if (_serverResolved &&
+                    !_creating &&
+                    _supportsSso &&
+                    _supportsPassword &&
+                    _methods!.ssoProviders.isEmpty) ...[
+                  const SizedBox(height: WeftSpace.sm),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _signInInBrowser,
                     icon: const Icon(Icons.open_in_new_rounded, size: 18),
                     label: Text(context.l10n.loginSso),
                   ),

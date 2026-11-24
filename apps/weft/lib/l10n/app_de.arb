@@ -803,7 +803,7 @@
   "loginPasswordField": "Passwort",
   "loginWorking": "Läuft",
   "loginSignIn": "Anmelden",
-  "loginSso": "Single Sign-on (M8)",
+  "loginSso": "Single Sign-on",
   "loginFooter": "Sennit verbindet sich mit deinem eigenen Matrix-Server. Es leitet deine Nachrichten nie über jemand anderen.",
   "matrixInfoButton": "Was ist ein Matrix-Server?",
   "matrixInfoBody": "Matrix ist ein offenes, dezentrales Chat-Netzwerk. Kein einzelnes Unternehmen betreibt es: Unabhängige Server sprechen miteinander, so wie E-Mail-Anbieter. Dein Konto liegt auf einem davon, deinem Homeserver, und von dort erreichst du Menschen auf jedem anderen.",
@@ -1639,5 +1639,14 @@
   "endpointsDetectLimits": "Erkennen",
   "endpointsLimitsDetected": "{source}: Fenster {context}, Antwort bis {output}",
   "endpointsLimitsNotDetected": "Der Server hat nichts gesagt. Trag die Werte selbst ein.",
-  "autoReplyOutcomeCutOff": "Dein Modell kam an seine Antwortlänge. Erhöhe sie unter Endpunkte."
+  "autoReplyOutcomeCutOff": "Dein Modell kam an seine Antwortlänge. Erhöhe sie unter Endpunkte.",
+  "loginContinueWith": "Weiter mit {name}",
+  "loginBrowserHint": "{server} meldet dich auf seiner eigenen Seite an. Sennit öffnet sie in deinem Browser und bringt dich danach hierher zurück.",
+  "loginCreateInBrowser": "{server} legt Konten auf seiner eigenen Registrierungsseite an. Sennit öffnet sie in deinem Browser und meldet dich danach an.",
+  "loginBrowserWaiting": "Schließ die Anmeldung in deinem Browser ab.",
+  "loginBrowserDone": "Du bist angemeldet. Du kannst diesen Tab schließen und zu Sennit zurückkehren.",
+  "loginBrowserDenied": "Die Anmeldung wurde auf der Seite des Servers abgebrochen.",
+  "loginBrowserIncomplete": "Die Seite des Servers hat die Anmeldung nicht abgeschlossen. Versuch es noch einmal.",
+  "loginNoSupportedMethod": "{server} bietet nur Anmeldewege an, die Sennit noch nicht unterstützt.",
+  "devicesSignOutOnAccountPage": "Dein Server meldet Geräte auf seiner Kontoseite ab. Sennit hat sie in deinem Browser geöffnet."
 }

@@ -223,9 +223,10 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"/>
         <!-- Where a browser without Auth Tabs sends Mattermost's mobile SSO
-             redirect. Disabled here and enabled only while a sign-in waits:
-             `mmauth` is also the official Mattermost app's scheme, and Sennit
-             must not offer to open sign-ins it did not start. -->
+             redirect, and a Matrix server's OAuth or SSO sign-in. Disabled
+             here and enabled only while a sign-in waits: `mmauth` is also the
+             official Mattermost app's scheme, and Sennit must not offer to
+             open sign-ins it did not start. -->
         <activity
             android:name=".BrowserAuthCallbackActivity"
             android:exported="true"
@@ -238,6 +239,14 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="mmauth" android:host="callback"/>
+            </intent-filter>
+            <!-- Matrix sign-in (`kOAuthRedirectUri`): no host, because an
+                 OAuth server refuses a private-use redirect that has one. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.erictrenkel.sennit"/>
             </intent-filter>
         </activity>
         <!-- SMS delivery. `SMS_DELIVER` is broadcast to exactly one app on the

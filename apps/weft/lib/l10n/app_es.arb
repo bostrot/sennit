@@ -803,7 +803,7 @@
   "loginPasswordField": "Contraseña",
   "loginWorking": "Trabajando",
   "loginSignIn": "Iniciar sesión",
-  "loginSso": "Inicio de sesión único (M8)",
+  "loginSso": "Inicio de sesión único",
   "loginFooter": "Sennit se conecta a tu propio servidor Matrix. Nunca hace pasar tus mensajes por nadie más.",
   "matrixInfoButton": "¿Qué es un servidor Matrix?",
   "matrixInfoBody": "Matrix es una red de chat abierta y descentralizada. Ninguna empresa la controla: servidores independientes se comunican entre sí, como los proveedores de correo. Tu cuenta vive en uno de ellos, tu servidor de origen, y desde allí puedes hablar con gente de cualquier otro.",
@@ -1639,5 +1639,14 @@
   "endpointsDetectLimits": "Detectar",
   "endpointsLimitsDetected": "{source}: ventana {context}, respuesta hasta {output}",
   "endpointsLimitsNotDetected": "El servidor no lo ha dicho. Escribe los valores.",
-  "autoReplyOutcomeCutOff": "Tu modelo llegó a su límite de respuesta. Súbelo en los endpoints de IA."
+  "autoReplyOutcomeCutOff": "Tu modelo llegó a su límite de respuesta. Súbelo en los endpoints de IA.",
+  "loginContinueWith": "Continuar con {name}",
+  "loginBrowserHint": "{server} inicia tu sesión en su propia página. Sennit la abre en tu navegador y te trae de vuelta aquí.",
+  "loginCreateInBrowser": "{server} crea las cuentas en su propia página de registro. Sennit la abre en tu navegador e inicia tu sesión después.",
+  "loginBrowserWaiting": "Termina de iniciar sesión en tu navegador.",
+  "loginBrowserDone": "Has iniciado sesión. Puedes cerrar esta pestaña y volver a Sennit.",
+  "loginBrowserDenied": "El inicio de sesión se canceló en la página del servidor.",
+  "loginBrowserIncomplete": "La página del servidor no terminó el inicio de sesión. Inténtalo de nuevo.",
+  "loginNoSupportedMethod": "{server} solo ofrece formas de iniciar sesión que Sennit aún no admite.",
+  "devicesSignOutOnAccountPage": "Tu servidor cierra la sesión de los dispositivos en su página de cuenta. Sennit la abrió en tu navegador."
 }

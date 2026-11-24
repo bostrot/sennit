@@ -804,7 +804,7 @@
   "loginPasswordField": "密码",
   "loginWorking": "处理中",
   "loginSignIn": "登录",
-  "loginSso": "单点登录（M8）",
+  "loginSso": "单点登录",
   "loginFooter": "Sennit 连接到你自己的 Matrix 服务器，绝不会通过任何第三方中转你的消息。",
   "matrixInfoButton": "什么是 Matrix 服务器？",
   "matrixInfoBody": "Matrix 是一个开放、去中心化的聊天网络，不归任何一家公司所有：各自独立的服务器彼此互通，就像电子邮件服务商一样。你的账号存放在其中一台服务器上，即你的主服务器，并可从那里联系任何其他服务器上的人。",
@@ -1640,5 +1640,14 @@
   "endpointsDetectLimits": "检测",
   "endpointsLimitsDetected": "{source}：窗口 {context}，回答最多 {output}",
   "endpointsLimitsNotDetected": "服务器没有提供。请手动填写数值。",
-  "autoReplyOutcomeCutOff": "你的模型达到了回答长度上限。请在 AI 端点中调高。"
+  "autoReplyOutcomeCutOff": "你的模型达到了回答长度上限。请在 AI 端点中调高。",
+  "loginContinueWith": "使用 {name} 继续",
+  "loginBrowserHint": "{server} 会在自己的页面上让你登录。Sennit 会在浏览器中打开该页面，完成后带你回到这里。",
+  "loginCreateInBrowser": "{server} 在自己的注册页面上创建账号。Sennit 会在浏览器中打开该页面，并在之后为你登录。",
+  "loginBrowserWaiting": "请在浏览器中完成登录。",
+  "loginBrowserDone": "你已登录。可以关闭此标签页并返回 Sennit。",
+  "loginBrowserDenied": "登录已在服务器页面上取消。",
+  "loginBrowserIncomplete": "服务器页面未完成登录，请重试。",
+  "loginNoSupportedMethod": "{server} 只提供 Sennit 暂不支持的登录方式。",
+  "devicesSignOutOnAccountPage": "你的服务器在其账号页面上注销设备。Sennit 已在浏览器中打开该页面。"
 }

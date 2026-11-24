@@ -2,6 +2,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
@@ -72,6 +73,19 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     } on ReauthCancelled {
       // The user backed out of the password prompt. Nothing happened, and
       // saying so would be noise about their own decision.
+    } on DeviceSignOutOnAccountPage catch (redirect) {
+      // Nothing was signed out here; the server's own page does it.
+      final opened = await launchUrl(
+        redirect.url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (mounted) {
+        _say(
+          opened
+              ? context.l10n.devicesSignOutOnAccountPage
+              : redirect.url.toString(),
+        );
+      }
     } catch (error) {
       if (mounted) _say(_sentence(error));
     } finally {

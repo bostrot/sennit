@@ -804,7 +804,7 @@
   "loginPasswordField": "Senha",
   "loginWorking": "Trabalhando",
   "loginSignIn": "Entrar",
-  "loginSso": "Login único (M8)",
+  "loginSso": "Login único",
   "loginFooter": "O Sennit se conecta ao seu próprio servidor Matrix. Ele nunca faz suas mensagens passarem por mais ninguém.",
   "matrixInfoButton": "O que é um servidor Matrix?",
   "matrixInfoBody": "Matrix é uma rede de chat aberta e descentralizada. Nenhuma empresa sozinha a controla: servidores independentes conversam entre si, como os provedores de e-mail. Sua conta fica em um deles, o seu servidor de origem, e de lá você fala com pessoas em qualquer outro.",
@@ -1640,5 +1640,14 @@
   "endpointsDetectLimits": "Detectar",
   "endpointsLimitsDetected": "{source}: janela {context}, resposta até {output}",
   "endpointsLimitsNotDetected": "O servidor não indicou. Escreva os valores.",
-  "autoReplyOutcomeCutOff": "O seu modelo atingiu o limite da resposta. Aumente-o nos endpoints de IA."
+  "autoReplyOutcomeCutOff": "O seu modelo atingiu o limite da resposta. Aumente-o nos endpoints de IA.",
+  "loginContinueWith": "Continuar com {name}",
+  "loginBrowserHint": "{server} faz seu login na própria página dele. O Sennit a abre no seu navegador e traz você de volta para cá.",
+  "loginCreateInBrowser": "{server} cria contas na própria página de cadastro dele. O Sennit a abre no seu navegador e faz seu login depois.",
+  "loginBrowserWaiting": "Termine o login no seu navegador.",
+  "loginBrowserDone": "Login feito. Você pode fechar esta aba e voltar ao Sennit.",
+  "loginBrowserDenied": "O login foi cancelado na página do servidor.",
+  "loginBrowserIncomplete": "A página do servidor não concluiu o login. Tente de novo.",
+  "loginNoSupportedMethod": "{server} só oferece formas de login que o Sennit ainda não suporta.",
+  "devicesSignOutOnAccountPage": "Seu servidor desconecta aparelhos na página da conta dele. O Sennit a abriu no seu navegador."
 }
