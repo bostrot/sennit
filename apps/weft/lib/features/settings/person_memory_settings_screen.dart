@@ -8,6 +8,8 @@ import '../../app/localisation.dart';
 import '../../app/person_memory_providers.dart';
 import '../../services/ai/conversation_context.dart' show kAiContextMessages;
 import '../../services/ai/llm_budget.dart' show AiFeature;
+import '../../services/ai/writing_style.dart' show kOwnStyleKey;
+import '../contact/person_memory_screen.dart' show LearnedFactTile;
 
 /// The full explanation of personal memory: the two layers, when learning
 /// runs and what it sends, where it is all kept.
@@ -52,7 +54,9 @@ class PersonMemorySettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final settings = ref.watch(personMemorySettingsProvider);
-    final people = ref.watch(personMemoryProvider).notes.values.toSet().length;
+    final book = ref.watch(personMemoryProvider);
+    final people = book.notes.values.toSet().length;
+    final usualStyle = book.styleFor(const [kOwnStyleKey]);
 
     void save(PersonMemorySettings next) => savePersonMemorySettings(ref, next);
 
@@ -139,6 +143,23 @@ class PersonMemorySettingsScreen extends ConsumerWidget {
                   ? (on) => save(settings.copyWith(encryptedChats: on))
                   : null,
             ),
+            if (usualStyle != null) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.edit_note_rounded),
+                title: Text(l10n.personMemoryUsualStyleTitle),
+                subtitle: Text(l10n.personMemoryUsualStyleHint),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: WeftSpace.lg),
+                child: LearnedFactTile(
+                  key: const ValueKey('person-memory-usual-style'),
+                  memory: ref.read(personMemoryProvider.notifier),
+                  keys: const [kOwnStyleKey],
+                  fact: usualStyle,
+                ),
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.phone_android_rounded),

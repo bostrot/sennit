@@ -8,6 +8,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import 'llm_budget.dart';
 import 'llm_request.dart';
+import 'writing_style.dart';
 
 /// What the user has noted for the AI features, and what Sennit learned on its
 /// own, in two layers.
@@ -97,19 +98,28 @@ class MemoryBook {
   }
 
   /// Everything known about [keys], as a prompt is told it: the user's note,
-  /// then the learned facts it does not already say, as a list.
-  String memoryFor(Iterable<String> keys) {
+  /// then the learned facts it does not already say, as a list. The style
+  /// profile is not among them — the reply prompts are told it on its own,
+  /// see [styleFor] — unless [withStyle].
+  String memoryFor(Iterable<String> keys, {bool withStyle = false}) {
     final keyList = keys.toList();
     final note = noteFor(keyList);
     final facts = [
       for (final fact in learnedFor(keyList))
-        if (!_noteSays(note, fact.text)) '- ${fact.text}',
+        if ((withStyle || !fact.style) && !_noteSays(note, fact.text))
+          '- ${fact.text}',
     ];
     return [
       if (note.isNotEmpty) note,
       if (facts.isNotEmpty) facts.join('\n'),
     ].join('\n\n');
   }
+
+  /// The style profile learned for [keys]: under a chat's, how the user
+  /// writes there; under a person's, how they write; under [kOwnStyleKey],
+  /// how the user usually writes. Null when there is none.
+  LearnedFact? styleFor(Iterable<String> keys) =>
+      learnedFor(keys).where((f) => f.style).firstOrNull;
 
   /// Whether the last automatic update touched any of [keys].
   bool undoTouches(Iterable<String> keys) =>
@@ -232,10 +242,14 @@ class MemoryBook {
   /// The note for every key, learned facts included — what a backup carries.
   /// Restored, the facts come back as part of the note: the user's from then
   /// on.
+  /// The user's usual style is left out: a note under [kOwnStyleKey] would be
+  /// nobody's, and the style is learned again.
   Map<String, String> get notesWithLearned => {
     for (final key in {...notes.keys, ...learned.keys})
-      if (memoryFor([key]) case final memory when memory.isNotEmpty)
-        key: memory,
+      if (key != kOwnStyleKey)
+        if (memoryFor([key], withStyle: true) case final memory
+            when memory.isNotEmpty)
+          key: memory,
   };
 
   bool get isEmpty =>
@@ -260,7 +274,13 @@ class MemoryBook {
       learned: _setAllFacts(learned, keyList, [
         for (final f in learnedFor(keyList))
           if (_same(f, fact))
-            LearnedFact(words, at: now, pinned: true, edited: true)
+            LearnedFact(
+              words,
+              at: now,
+              pinned: true,
+              edited: true,
+              style: f.style,
+            )
           else
             f,
       ]),
@@ -308,6 +328,12 @@ class MemoryBook {
   /// than a learned one, it takes that one's place. Each layer then keeps its
   /// newest [kChatLearnedLimit] or [kPersonLearnedLimit] facts, pinned ones
   /// always.
+  ///
+  /// A style in [MemoryUpdate.styles] replaces the layer's style profile —
+  /// "me" the chat's, "default" the user's usual one under [kOwnStyleKey], a
+  /// name that person's — unless it is pinned, or the user once deleted that
+  /// very text. A style profile is never numbered, dropped or cut by the
+  /// limits: there is one per layer.
   ({MemoryBook book, int added, int updated, int dropped}) applyLearning(
     MemoryUpdate update, {
     required List<String> chatKeys,
@@ -334,7 +360,7 @@ class MemoryBook {
       final target = numbered[change.id - 1];
       final facts = layer(target.keys).facts;
       final i = facts.indexWhere(
-        (f) => factKey(f.text) == factKey(target.text),
+        (f) => !f.style && factKey(f.text) == factKey(target.text),
       );
       if (i < 0 || facts[i].pinned) continue;
       final text = _cleanFact(change.fact);
@@ -350,7 +376,7 @@ class MemoryBook {
       final facts = layer(target.keys).facts;
       final before = facts.length;
       facts.removeWhere(
-        (f) => !f.pinned && factKey(f.text) == factKey(target.text),
+        (f) => !f.pinned && !f.style && factKey(f.text) == factKey(target.text),
       );
       dropped += before - facts.length;
     }
@@ -366,16 +392,41 @@ class MemoryBook {
       // Said in the chat's memory already counts for a person's fact too.
       if (person != null && _noteSays(noteFor(chatKeys), text)) continue;
       final facts = layer(keys).facts;
-      if (facts.any((f) => factKey(f.text).contains(key))) continue;
+      if (facts.any((f) => !f.style && factKey(f.text).contains(key))) {
+        continue;
+      }
       // More than an unpinned fact said: it takes that one's place.
       final i = facts.indexWhere(
-        (f) => !f.pinned && key.contains(factKey(f.text)),
+        (f) => !f.pinned && !f.style && key.contains(factKey(f.text)),
       );
       if (i >= 0) {
         facts[i] = LearnedFact(text, at: now);
         updated++;
       } else {
         facts.add(LearnedFact(text, at: now));
+        added++;
+      }
+      remember(keys, text);
+    }
+    for (final MapEntry(key: who, value: raw) in update.styles.entries) {
+      final text = cleanStyle(raw);
+      if (text == null) continue;
+      final List<String> keys = switch (who.trim().toLowerCase()) {
+        'me' => chatKeys,
+        'default' => const [kOwnStyleKey],
+        _ => _personNamed(people, who)?.keys ?? const [],
+      };
+      if (keys.isEmpty) continue;
+      final key = factKey(text);
+      if (_dismissedFor(keys).any((d) => factKey(d) == key)) continue;
+      final facts = layer(keys).facts;
+      final i = facts.indexWhere((f) => f.style);
+      if (i >= 0) {
+        if (facts[i].pinned || factKey(facts[i].text) == key) continue;
+        facts[i] = LearnedFact(text, at: now, style: true);
+        updated++;
+      } else {
+        facts.add(LearnedFact(text, at: now, style: true));
         added++;
       }
       remember(keys, text);
@@ -457,7 +508,7 @@ class MemoryBook {
       for (final p in people) (p.keys, p.name),
     ]) {
       for (final fact in learnedFor(keys)) {
-        if (fact.pinned) continue;
+        if (fact.pinned || fact.style) continue;
         used += fact.text.length + 12;
         if (used > maxChars) return result;
         result.add((keys: keys, about: about, text: fact.text));
@@ -496,19 +547,19 @@ class MemoryBook {
     return text;
   }
 
-  /// [facts] cut to the newest [limit], every pinned one kept, in the order
-  /// they were.
+  /// [facts] cut to the newest [limit], every pinned one and the style
+  /// profile kept, in the order they were.
   static List<LearnedFact> _keepNewest(List<LearnedFact> facts, int limit) {
     if (facts.length <= limit) return facts;
     final unpinned = [
       for (final f in facts)
-        if (!f.pinned) f,
+        if (!f.pinned && !f.style) f,
     ]..sort((a, b) => b.at.compareTo(a.at));
     final room = math.max(0, limit - (facts.length - unpinned.length));
     final keep = unpinned.take(room).toSet();
     return [
       for (final f in facts)
-        if (f.pinned || keep.contains(f)) f,
+        if (f.pinned || f.style || keep.contains(f)) f,
     ];
   }
 
@@ -639,6 +690,7 @@ class LearnedFact {
     required this.at,
     this.pinned = false,
     this.edited = false,
+    this.style = false,
   });
 
   /// One short sentence.
@@ -653,14 +705,24 @@ class LearnedFact {
   /// The user wrote this version of it.
   final bool edited;
 
-  LearnedFact copyWith({bool? pinned}) =>
-      LearnedFact(text, at: at, pinned: pinned ?? this.pinned, edited: edited);
+  /// A style profile — how someone writes — rather than a fact; see
+  /// [MemoryBook.styleFor]. Up to [kStyleMaxChars] long.
+  final bool style;
+
+  LearnedFact copyWith({bool? pinned}) => LearnedFact(
+    text,
+    at: at,
+    pinned: pinned ?? this.pinned,
+    edited: edited,
+    style: style,
+  );
 
   Map<String, Object?> toJson() => {
     't': text,
     'at': at.millisecondsSinceEpoch,
     if (pinned) 'pin': true,
     if (edited) 'edit': true,
+    if (style) 'style': true,
   };
 
   static LearnedFact? fromJson(Object? json) {
@@ -673,6 +735,7 @@ class LearnedFact {
       at: DateTime.fromMillisecondsSinceEpoch(at),
       pinned: json['pin'] == true,
       edited: json['edit'] == true,
+      style: json['style'] == true,
     );
   }
 
@@ -682,10 +745,11 @@ class LearnedFact {
       other.text == text &&
       other.at == at &&
       other.pinned == pinned &&
-      other.edited == edited;
+      other.edited == edited &&
+      other.style == style;
 
   @override
-  int get hashCode => Object.hash(text, at, pinned, edited);
+  int get hashCode => Object.hash(text, at, pinned, edited, style);
 
   @override
   String toString() => 'LearnedFact(${text.length} chars, $at)';
@@ -807,7 +871,11 @@ typedef MemoryPerson = ({String name, List<String> keys});
 /// and the short notes of the people in it, most relevant first.
 @immutable
 class AiMemory {
-  const AiMemory({this.chat = '', this.people = const []});
+  const AiMemory({
+    this.chat = '',
+    this.people = const [],
+    this.style = AiStyle.none,
+  });
 
   /// The chat memory, untrimmed.
   final String chat;
@@ -816,12 +884,18 @@ class AiMemory {
   /// group, the most recent speaker first.
   final List<({String name, String note})> people;
 
+  /// How the user writes here, and how the people do: for the features that
+  /// write a message the user sends, see [stylePromptBlock].
+  final AiStyle style;
+
   bool get isEmpty =>
-      chat.trim().isEmpty && people.every((p) => p.note.trim().isEmpty);
+      chat.trim().isEmpty &&
+      people.every((p) => p.note.trim().isEmpty) &&
+      style.isEmpty;
 
   @override
   String toString() =>
-      'AiMemory(chat: ${chat.length} chars, ${people.length} people)';
+      'AiMemory(chat: ${chat.length} chars, ${people.length} people, $style)';
 }
 
 /// The most of one person's note a prompt carries, for a hosted model.
@@ -965,6 +1039,10 @@ int aiMemoryBudget(String baseUrl) =>
 /// "Never quote" is there because a model handed a list of facts likes to
 /// show it read them — "Happy birthday, and say hi to Mia and Ben, your two
 /// kids!" — and a note is there to set the tone, not to be recited.
+///
+/// A [feature] that writes a message the user sends — the chips, a quick
+/// message, an auto-reply — also gets [AiMemory.style] through
+/// [stylePromptBlock], in a budget of its own ([LlmBudget.styleCharsFor]).
 String memoryPromptBlock(
   AiMemory? memory, {
   required String baseUrl,
@@ -972,6 +1050,24 @@ String memoryPromptBlock(
   AiFeature? feature,
 }) {
   if (memory == null || memory.isEmpty) return '';
+  final style = feature != null && writesAsUser(feature)
+      ? stylePromptBlock(
+          memory.style,
+          maxChars:
+              budget?.styleCharsFor(feature) ??
+              LlmBudget.resolve(baseUrl).styleCharsFor(feature),
+        )
+      : '';
+  return '${_notesBlock(memory, baseUrl: baseUrl, budget: budget, feature: feature)}'
+      '$style';
+}
+
+String _notesBlock(
+  AiMemory memory, {
+  required String baseUrl,
+  LlmBudget? budget,
+  AiFeature? feature,
+}) {
   final hosted = isHostedLlm(baseUrl);
   final chars = budget == null
       ? aiMemoryBudget(baseUrl)
@@ -1048,25 +1144,40 @@ class MemoryAddition {
 }
 
 /// What the model wants changed in what is remembered about a chat: facts to
-/// add, numbered facts to rewrite, numbered facts to drop. The numbers are
-/// [MemoryBook.numberedFacts]'s, from 1.
+/// add, numbered facts to rewrite, numbered facts to drop, and style profiles
+/// to write. The numbers are [MemoryBook.numberedFacts]'s, from 1.
 @immutable
 class MemoryUpdate {
   const MemoryUpdate({
     this.adds = const [],
     this.updates = const [],
     this.drops = const [],
+    this.styles = const {},
   });
 
   final List<MemoryAddition> adds;
   final List<({int id, String fact})> updates;
   final List<int> drops;
 
-  bool get isEmpty => adds.isEmpty && updates.isEmpty && drops.isEmpty;
+  /// How someone writes, by who: "me" for the user in this chat, "default"
+  /// for the user in general, or a person's name.
+  final Map<String, String> styles;
+
+  bool get isEmpty =>
+      adds.isEmpty && updates.isEmpty && drops.isEmpty && styles.isEmpty;
+
+  /// This update with only the [styles] [keep] allows.
+  MemoryUpdate withStyles(bool Function(String who) keep) => MemoryUpdate(
+    adds: adds,
+    updates: updates,
+    drops: drops,
+    styles: {...styles}..removeWhere((who, _) => !keep(who)),
+  );
 
   @override
   String toString() =>
-      'MemoryUpdate(+${adds.length} ~${updates.length} -${drops.length})';
+      'MemoryUpdate(+${adds.length} ~${updates.length} -${drops.length}, '
+      '${styles.length} styles)';
 }
 
 /// The chat completion messages that ask what to change in what is remembered
@@ -1077,12 +1188,14 @@ class MemoryUpdate {
 /// so it does not repeat it, and is given no way to change it. [numbered] is
 /// what was learned before, which it may rewrite or drop by number. [people]
 /// are the names a fact may be filed under; anything else is the chat's.
+/// [style] is how everyone writes, so far and as measured in [transcript].
 List<Map<String, String>> memoryUpdateRequest({
   required List<String> transcript,
   required String chatTitle,
   required List<String> people,
   String fixed = '',
   List<NumberedFact> numbered = const [],
+  StyleLearning style = StyleLearning.none,
 }) => [
   {
     'role': 'system',
@@ -1101,25 +1214,52 @@ List<Map<String, String>> memoryUpdateRequest({
         'of the conversation. "about" is a person\'s name for what matters in '
         'every chat with them — name, relationship, birthday, family, job, du '
         'or Sie, language — and "chat" for plans, topics, the tone here and '
-        'everything else. Output ONLY a JSON object {"add": [{"fact": ..., '
-        '"about": ...}], "update": [{"id": number, "fact": ...}], "drop": '
-        '[numbers]} — empty lists when nothing changes.',
+        'everything else.\n\n'
+        'Also keep a profile of how each one writes, in "style": "me" for '
+        'how the user ("You") writes in this chat, a name for how that '
+        'person writes, and "default" for how the user writes in general — '
+        'the default so far, adjusted by this chat. A profile says: language '
+        'or mix of languages, du or Sie, length, greetings and sign-offs, '
+        'capitalisation, punctuation, emojis, typical words or phrases, '
+        'tone (jokey, terse, warm…). At most two short sentences, in the '
+        'language of the conversation, no names of anyone. Use what was '
+        'measured; write a profile only for someone measured, and only when '
+        'it is new or the conversation shows it changed — otherwise leave it '
+        'out.\n\n'
+        'Output ONLY a JSON object {"add": [{"fact": ..., "about": ...}], '
+        '"update": [{"id": number, "fact": ...}], "drop": [numbers], '
+        '"style": {"me": ..., "default": ..., name: ...}} — empty lists and '
+        'an empty style when nothing changes.',
   },
   {
     'role': 'user',
     'content': memoryUpdatePrompt(
       transcript: const [
         'Lea: Mia hat am 12. März Geburtstag, sie wird 5!',
-        'You: Wie schnell die Zeit vergeht',
+        'You: krass wie schnell die zeit vergeht',
         'Lea: Ja 🙈 Hab bei der Post gekündigt, ab Montag bin ich bei der Bahn',
+        'You: oh nice 👍',
+        'Lea: Hoffentlich wird die Pendelei nicht zu schlimm 😅',
+        'You: wird schon passen',
       ],
       chatTitle: 'Lea',
       people: const ['Lea'],
       fixed: 'About Lea:\n- Meine Schwester',
       numbered: const [
         (keys: [], about: 'Lea', text: 'Arbeitet bei der Post'),
-        (keys: [], about: null, text: 'Schreibt locker, mit Emojis'),
+        (keys: [], about: null, text: 'Telefonieren meist sonntags'),
       ],
+      style: const StyleLearning(
+        usual: 'Schreibt kurz und locker',
+        myHabits:
+            'very short (about 3 words); starts lowercase; no full stop at '
+            'the end; emojis sometimes (👍)',
+        theirHabits: {
+          'Lea':
+              'short (about 9 words); starts with a capital; emojis in most '
+              'messages (🙈 😅)',
+        },
+      ),
     ),
   },
   {
@@ -1127,7 +1267,9 @@ List<Map<String, String>> memoryUpdateRequest({
     'content':
         '{"add": [{"fact": "Tochter Mia, Geburtstag am 12. März", '
         '"about": "Lea"}], "update": [{"id": 1, "fact": "Arbeitet ab '
-        'Montag bei der Bahn"}], "drop": []}',
+        'Montag bei der Bahn"}], "drop": [], "style": {"me": "Sehr kurz, '
+        'alles klein, ohne Punkt, ab und zu 👍; duzt, locker", "Lea": '
+        '"Ganze Sätze mit Großschreibung, fast immer ein Emoji 🙈😅"}}',
   },
   {
     'role': 'user',
@@ -1137,6 +1279,7 @@ List<Map<String, String>> memoryUpdateRequest({
       people: people,
       fixed: fixed,
       numbered: numbered,
+      style: style,
     ),
   },
 ];
@@ -1148,6 +1291,7 @@ String memoryUpdatePrompt({
   required List<String> people,
   String fixed = '',
   List<NumberedFact> numbered = const [],
+  StyleLearning style = StyleLearning.none,
 }) {
   final buffer = StringBuffer()
     ..writeln('Conversation "$chatTitle" (newest message last):')
@@ -1166,6 +1310,10 @@ String memoryUpdatePrompt({
     buffer.writeln(
       '${i + 1}. [${numbered[i].about ?? 'chat'}] ${numbered[i].text}',
     );
+  }
+  buffer.writeln();
+  for (final line in style.promptLines()) {
+    buffer.writeln(line);
   }
   buffer
     ..writeln()
@@ -1190,6 +1338,7 @@ Future<MemoryUpdate?> requestMemoryUpdate({
   List<String> people = const [],
   String fixed = '',
   List<NumberedFact> numbered = const [],
+  StyleLearning style = StyleLearning.none,
   LlmBudget? budget,
   http.Client? client,
   Duration? timeout,
@@ -1215,6 +1364,7 @@ Future<MemoryUpdate?> requestMemoryUpdate({
       people: people,
       fixed: fixed,
       numbered: numbered,
+      style: style,
     ),
     timeout: timeout ?? llmResponseTimeout(base, LlmTask.personFacts),
     client: client,
@@ -1258,7 +1408,8 @@ MemoryUpdate? parseMemoryUpdate(String content) {
       if (parsed is Map &&
           (parsed['add'] is List ||
               parsed['update'] is List ||
-              parsed['drop'] is List)) {
+              parsed['drop'] is List ||
+              parsed['style'] is Map)) {
         return _memoryUpdateFrom(parsed);
       }
     } on FormatException {
@@ -1308,7 +1459,18 @@ MemoryUpdate _memoryUpdateFrom(Map<Object?, Object?> json) {
     for (final entry in json['drop'] is List ? json['drop']! as List : const [])
       ?number(entry is Map ? entry['id'] : entry),
   ];
-  return MemoryUpdate(adds: adds, updates: updates, drops: drops);
+  final styles = <String, String>{
+    if (json['style'] case final Map raw)
+      for (final MapEntry(:key, :value) in raw.entries)
+        if (key is String && value is String && value.trim().isNotEmpty)
+          key.trim(): value.trim(),
+  };
+  return MemoryUpdate(
+    adds: adds,
+    updates: updates,
+    drops: drops,
+    styles: styles,
+  );
 }
 
 /// What a model said with its reasoning and a code fence taken off, or null

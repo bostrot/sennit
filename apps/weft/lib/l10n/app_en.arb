@@ -9381,7 +9381,7 @@
   "@personMemoryDetailsTitle": {
     "description": "Title of the dialog with the full explanation of personal memory."
   },
-  "personMemoryDetails": "Each chat, groups included, has a memory of its own: plans, topics, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual.\n\nWith automatic learning on, Sennit reads an active chat again after about 30 new messages, or once a day, while the app is open. It sends up to the last {count} messages to your AI model and updates the memory itself: it adds new facts, rewrites changed ones and drops stale ones. Each learned fact shows when it was learned. Edit, pin or delete it, or undo the last update; AI never changes a fact you edited or pinned.\n\nWith personal memory on, every AI feature (reply suggestions, quick messages, auto-replies, to-dos and calendar titles) sends a shortened memory of the chat and its people with its request.\n\nMemory is stored only on this device, encrypted in the system keychain, not synced, included in backups and deleted with your account. Turn personal memory off and nothing is sent.",
+  "personMemoryDetails": "Each chat, groups included, has a memory of its own: plans, topics, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual.\n\nWith automatic learning on, Sennit reads an active chat again after about 30 new messages, or once a day, while the app is open. It sends up to the last {count} messages to your AI model and updates the memory itself: it adds new facts, rewrites changed ones and drops stale ones. Each learned fact shows when it was learned. Edit, pin or delete it, or undo the last update; AI never changes a fact you edited or pinned.\n\nIt also learns how you write in each chat (language, length, emojis) and how the other person writes. Reply suggestions, quick messages and auto-replies are then written in your style, with a few of your recent messages in that chat as examples.\n\nWith personal memory on, every AI feature (reply suggestions, quick messages, auto-replies, to-dos and calendar titles) sends a shortened memory of the chat and its people with its request.\n\nMemory is stored only on this device, encrypted in the system keychain, not synced, included in backups and deleted with your account. Turn personal memory off and nothing is sent.",
   "@personMemoryDetails": {
     "description": "The full explanation of personal memory, in a dialog behind Learn more: the two kinds of memory, how and when automatic learning runs, what is sent where, what is stored where. {count} is the most recent messages a learning pass sends, which depends on the AI model's context window.",
     "placeholders": {
@@ -9407,6 +9407,30 @@
   "personMemoryLearnedHint": "AI never changes a fact you edit or pin.",
   "@personMemoryLearnedHint": {
     "description": "Line under that heading. About 45 chars."
+  },
+  "personMemoryStyleTitle": "Writing style",
+  "@personMemoryStyleTitle": {
+    "description": "Heading over the learned writing-style profile on a chat or person memory screen."
+  },
+  "personMemoryMyStyleHint": "How you write here. Suggestions follow it.",
+  "@personMemoryMyStyleHint": {
+    "description": "Line under that heading on a chat memory screen: the profile is how the user writes there. About 45 chars."
+  },
+  "personMemoryTheirStyleHint": "How they write. Only used to understand them.",
+  "@personMemoryTheirStyleHint": {
+    "description": "Line under that heading on a person memory screen: the profile is how that person writes, never imitated. About 45 chars."
+  },
+  "personMemoryEditStyle": "Edit style",
+  "@personMemoryEditStyle": {
+    "description": "Title of the dialog that edits a style profile."
+  },
+  "personMemoryUsualStyleTitle": "Your usual style",
+  "@personMemoryUsualStyleTitle": {
+    "description": "Memory settings: title over the style the user writes in across chats."
+  },
+  "personMemoryUsualStyleHint": "For chats with little history",
+  "@personMemoryUsualStyleHint": {
+    "description": "Subtitle of that title: when the usual style is used. About 35 chars."
   },
   "personMemoryLearnedAt": "Learned {date}",
   "@personMemoryLearnedAt": {

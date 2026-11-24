@@ -69,7 +69,7 @@ List<String> eventTitleTranscript(
   final byId = <String, WeftMessage>{};
   for (final m in conversation) {
     if (m.eventId == trigger.eventId) continue;
-    if (sameConversation(m) && _wordsOf(m) != null) {
+    if (sameConversation(m) && messageWords(m) != null) {
       byId.putIfAbsent(m.eventId, () => m);
     }
   }
@@ -92,7 +92,7 @@ List<String> eventTitleTranscript(
   final targetId = trigger.replyToEventId?.trim();
   if (targetId != null && !preceding.any((m) => m.eventId == targetId)) {
     final target = conversation
-        .where((m) => m.eventId == targetId && _wordsOf(m) != null)
+        .where((m) => m.eventId == targetId && messageWords(m) != null)
         .firstOrNull;
     final preview = trigger.replyPreview;
     if (target != null) {
@@ -156,7 +156,7 @@ List<String> recentConversationTranscript(
   assert(maxMessages > 0);
   final byId = <String, WeftMessage>{};
   for (final m in conversation) {
-    if (m.threadRootId == null && _wordsOf(m) != null) {
+    if (m.threadRootId == null && messageWords(m) != null) {
       byId.putIfAbsent(m.eventId, () => m);
     }
   }
@@ -179,8 +179,9 @@ int _chronological(WeftMessage a, WeftMessage b) {
   return byTime != 0 ? byTime : a.eventId.compareTo(b.eventId);
 }
 
-/// What [m] says in words, or null when it is nothing a person said.
-String? _wordsOf(WeftMessage m) {
+/// What [m] says in words, or null when it is nothing a person said — a
+/// redaction, a bridge notice, an auto-reply, a photo without a caption.
+String? messageWords(WeftMessage m) {
   if (m.redacted || m.isBridgeNotice || m.isAutoReply) return null;
   final String raw;
   switch (m.kind) {
@@ -201,7 +202,7 @@ String? _wordsOf(WeftMessage m) {
 }
 
 String _line(WeftMessage m, int limit) =>
-    _format(m.senderName, _wordsOf(m) ?? m.body, limit, own: m.isOwn);
+    _format(m.senderName, messageWords(m) ?? m.body, limit, own: m.isOwn);
 
 String _format(String sender, String text, int limit, {required bool own}) {
   final name = own

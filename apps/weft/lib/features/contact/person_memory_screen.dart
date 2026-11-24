@@ -16,6 +16,7 @@ import '../../app/quick_message_providers.dart' show quickMessageClientProvider;
 import '../../services/ai/conversation_context.dart' show kAiContextMessages;
 import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/person_memory.dart';
+import '../../services/ai/writing_style.dart' show kStyleMaxChars;
 import '../../services/billing/entitlements.dart';
 import '../settings/person_memory_settings_screen.dart';
 import '../settings/pro_screen.dart';
@@ -317,42 +318,6 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
     showWeftMessage(context, context.l10n.personMemoryUndone);
   }
 
-  Future<void> _editFact(LearnedFact fact) async {
-    final l10n = context.l10n;
-    final controller = TextEditingController(text: fact.text);
-    final text = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.personMemoryEditFact),
-        content: TextField(
-          key: const ValueKey('memory-fact-edit'),
-          controller: controller,
-          autofocus: true,
-          maxLines: null,
-          maxLength: kPersonFactMaxChars,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(l10n.commonSave),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (text == null || !mounted) return;
-    _memory.editLearned(widget.keys, fact, text);
-  }
-
-  /// A short date as the app's locale writes it: "24 Nov", "24. Nov.".
-  static String _date(BuildContext context, DateTime at) =>
-      DateFormat.MMMd(Localizations.localeOf(context).toString()).format(at);
-
   void _openSettings() => Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => const PersonMemorySettingsScreen()),
   );
@@ -365,7 +330,11 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
     final suggestions = _isChat
         ? book.suggestionsFor(widget.keys)
         : const <String>[];
-    final learned = book.learnedFor(widget.keys);
+    final learned = [
+      for (final f in book.learnedFor(widget.keys))
+        if (!f.style) f,
+    ];
+    final style = book.styleFor(widget.keys);
     final undo = book.undoTouches(widget.keys) ? book.undo : null;
     final hint = _isChat ? l10n.chatMemoryHint : l10n.personMemoryHint;
     final length = _note.text.trim().length;
@@ -413,7 +382,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
               _Notice(
                 key: const ValueKey('memory-undo'),
                 icon: Icons.history_rounded,
-                text: l10n.personMemoryUpdatedAt(_date(context, undo.at)),
+                text: l10n.personMemoryUpdatedAt(memoryDate(context, undo.at)),
                 action: TextButton(
                   onPressed: _undo,
                   child: Text(l10n.personMemoryUndo),
@@ -476,6 +445,21 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                   ),
               ],
             ),
+            if (style != null) ...[
+              const SizedBox(height: WeftSpace.xl),
+              _Heading(
+                title: l10n.personMemoryStyleTitle,
+                hint: _isChat
+                    ? l10n.personMemoryMyStyleHint
+                    : l10n.personMemoryTheirStyleHint,
+              ),
+              LearnedFactTile(
+                key: const ValueKey('memory-style'),
+                memory: _memory,
+                keys: widget.keys,
+                fact: style,
+              ),
+            ],
             if (learned.isNotEmpty) ...[
               const SizedBox(height: WeftSpace.xl),
               _Heading(
@@ -483,17 +467,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                 hint: l10n.personMemoryLearnedHint,
               ),
               for (final fact in learned)
-                _LearnedFactTile(
-                  fact: fact,
-                  date: _date(context, fact.at),
-                  onPin: () => _memory.pinLearned(
-                    widget.keys,
-                    fact,
-                    pinned: !fact.pinned,
-                  ),
-                  onEdit: () => _editFact(fact),
-                  onDelete: () => _memory.deleteLearned(widget.keys, fact),
-                ),
+                LearnedFactTile(memory: _memory, keys: widget.keys, fact: fact),
             ],
             if (_condensed case final short?) ...[
               const SizedBox(height: WeftSpace.xl),
@@ -640,27 +614,102 @@ class _Notice extends StatelessWidget {
   }
 }
 
-/// One fact the model learned: what it says, that it was learned and when —
-/// or that the user edited it — and pin, edit and delete.
-class _LearnedFactTile extends StatelessWidget {
-  const _LearnedFactTile({
-    required this.fact,
-    required this.date,
-    required this.onPin,
-    required this.onEdit,
-    required this.onDelete,
-  });
+/// A short date as the app's locale writes it: "24 Nov", "24. Nov.".
+String memoryDate(BuildContext context, DateTime at) =>
+    DateFormat.MMMd(Localizations.localeOf(context).toString()).format(at);
+
+/// Asks for a new wording of [fact], filed under [keys], and saves it —
+/// pinned from then on. A style profile may be longer than a fact.
+Future<void> editLearnedFact(
+  BuildContext context,
+  PersonMemoryNotifier memory,
+  List<String> keys,
+  LearnedFact fact,
+) async {
+  final text = await showDialog<String>(
+    context: context,
+    builder: (context) => _EditFactDialog(fact: fact),
+  );
+  if (text == null || !context.mounted) return;
+  memory.editLearned(keys, fact, text);
+}
+
+/// The dialog [editLearnedFact] shows. Its own widget so the field's
+/// controller lives until the dialog has finished closing, not only until
+/// it has answered.
+class _EditFactDialog extends StatefulWidget {
+  const _EditFactDialog({required this.fact});
 
   final LearnedFact fact;
-  final String date;
-  final VoidCallback onPin;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+
+  @override
+  State<_EditFactDialog> createState() => _EditFactDialogState();
+}
+
+class _EditFactDialogState extends State<_EditFactDialog> {
+  late final TextEditingController _text = TextEditingController(
+    text: widget.fact.text,
+  );
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final style = widget.fact.style;
+    return AlertDialog(
+      title: Text(
+        style ? l10n.personMemoryEditStyle : l10n.personMemoryEditFact,
+      ),
+      content: TextField(
+        key: const ValueKey('memory-fact-edit'),
+        controller: _text,
+        autofocus: true,
+        maxLines: null,
+        maxLength: style ? kStyleMaxChars : kPersonFactMaxChars,
+        textCapitalization: TextCapitalization.sentences,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.commonCancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_text.text),
+          child: Text(l10n.commonSave),
+        ),
+      ],
+    );
+  }
+}
+
+/// One fact or style profile the model learned, filed under [keys]: what it
+/// says, that it was learned and when — or that the user edited it — and
+/// pin, edit and delete.
+class LearnedFactTile extends StatelessWidget {
+  const LearnedFactTile({
+    super.key,
+    required this.memory,
+    required this.keys,
+    required this.fact,
+  });
+
+  final PersonMemoryNotifier memory;
+  final List<String> keys;
+  final LearnedFact fact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final colors = context.colors;
+    final date = memoryDate(context, fact.at);
+    void onPin() => memory.pinLearned(keys, fact, pinned: !fact.pinned);
+    void onEdit() => unawaited(editLearnedFact(context, memory, keys, fact));
+    void onDelete() => memory.deleteLearned(keys, fact);
     return Card(
       margin: const EdgeInsets.only(bottom: WeftSpace.sm),
       child: Padding(

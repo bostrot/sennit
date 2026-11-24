@@ -604,7 +604,8 @@ List<Map<String, String>> quickMessageRequest({
           'their own phone. You do not reply to the chat: you write the '
           'message the task asks for, to the person it is for, in the '
           'language given. Very short, warm and natural, like a text from a '
-          'friend: one or two sentences, an emoji at most. Use the first '
+          'friend: one or two sentences, an emoji at most — unless the '
+          "user's style below says otherwise. Use the first "
           'name given once; never invent a name. Output only the message '
           'itself — no quotation marks, no preamble, no explanation, no '
           'signature, no placeholders like [name].'
