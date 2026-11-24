@@ -58,8 +58,8 @@ a `ProFeature` gate in its provider. See `docs/decisions/adr-004-sennit-pro.md`.
 
 ## Translating
 
-Sennit ships six languages, five of them machine-seeded and waiting to be read
-by someone who speaks them. You need no Dart and no checkout: Weblate is set up
+Sennit ships eight languages, seven of them machine-seeded and waiting to be
+read by someone who speaks them. You need no Dart and no checkout: Weblate is set up
 against this repository, and a pull request works too.
 
 **[docs/TRANSLATING.md](docs/TRANSLATING.md)** has how to claim a language, the

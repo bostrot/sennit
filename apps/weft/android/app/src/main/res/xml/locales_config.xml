@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages Android 13+ offers for Sennit alone, under Settings → Apps →
+     Sennit → Language. One per ARB catalogue in `lib/l10n/`, spelled the way
+     `weftSupportedLocales` declares it; `l10n_test.dart` keeps the two in step.
+     Hebrew is declared in the app for right-to-left layout but has no
+     translation, so it is not offered here. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="de" />
+    <locale android:name="zh-Hans" />
+    <locale android:name="hi" />
+    <locale android:name="es" />
+    <locale android:name="ar" />
+    <locale android:name="fr" />
+    <locale android:name="pt-BR" />
+</locale-config>

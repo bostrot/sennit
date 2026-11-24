@@ -1,0 +1,19 @@
+/* Hindi, machine-seeded 2026-11-24. TRANSLATOR REVIEW PENDING.
+
+   The permission prompts iOS and macOS draw before Sennit has run a line of
+   Dart. They cannot come from `lib/l10n/*.arb`: the system reads them straight
+   out of the bundle, keyed by the `Info.plist` key each one overrides.
+
+   Keep them keyed against the English in `Info.plist` — a key here that is not
+   there is dead, and a key there that is missing here falls back to English,
+   which is a permission prompt in the wrong language on a screen the user
+   cannot get past. `l10n_test.dart` checks both directions. */
+
+"NSPhotoLibraryUsageDescription" = "बातचीत में फ़ोटो और वीडियो भेजने के लिए Sennit को आपकी फ़ोटो लाइब्रेरी चाहिए।";
+"NSCameraUsageDescription" = "फ़ोटो लेकर बातचीत में भेजने के लिए Sennit को कैमरा चाहिए।";
+"NSLocationWhenInUseUsageDescription" = "Sennit आपकी लोकेशन सिर्फ़ तब शेयर करता है जब आप किसी चैट में “लोकेशन शेयर करें” पर टैप करते हैं।";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit आपकी लोकेशन सिर्फ़ तब शेयर करता है जब आप किसी चैट में “लोकेशन शेयर करें” पर टैप करते हैं। बैकग्राउंड में Sennit इसे कभी ट्रैक नहीं करता।";
+"NSCalendarsUsageDescription" = "Sennit आपके कैलेंडर में इवेंट तभी जोड़ता है जब आप चैट की किसी तारीख के लिए कहें।";
+"NSContactsUsageDescription" = "Sennit मैसेजिंग नेटवर्क के दिए नामों की जगह आपकी एड्रेस बुक के नाम दिखाता है। मिलान इसी डिवाइस पर होता है और कभी अपलोड नहीं होता।";
+"NSMicrophoneUsageDescription" = "वॉइस या वीडियो कॉल में बोलने के लिए Sennit को माइक्रोफ़ोन चाहिए।";
+"NSSiriUsageDescription" = "Siri आपके नए मैसेज पढ़कर सुना सकता है और आपके बोले जवाब भेज सकता है, iPhone और CarPlay पर। मैसेज प्रीव्यू बंद हों तो Siri सिर्फ़ बताता है कि किसने लिखा।";

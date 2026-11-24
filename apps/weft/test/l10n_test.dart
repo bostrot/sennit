@@ -67,8 +67,8 @@ void main() {
 
     test('the app delegate accepts every declared locale', () {
       // Including the two with a script or country subtag, and — the reason
-      // this test exists — including `ar` and `he`, which have no ARB file. A
-      // locale the delegate refuses is a locale with no `AppL10n` in
+      // this test exists — including `he`, which has no ARB file. A locale
+      // the delegate refuses is a locale with no `AppL10n` in
       // `Localizations` at all, so `context.l10n` throws a null check on the
       // first widget that draws rather than falling back to English.
       final delegate = weftLocalizationsDelegates.firstWhere(
@@ -289,6 +289,8 @@ void main() {
         'fr': 'fr',
         'pt': 'pt-rBR',
         'zh': 'zh-rCN',
+        'hi': 'hi',
+        'ar': 'ar',
       };
 
       for (final (root, translations) in catalogues()) {
@@ -299,8 +301,8 @@ void main() {
             .toSet();
         for (final locale in weftSupportedLocales) {
           final code = androidFor[locale.languageCode];
-          // `ar` and `he` are declared for layout and have no translations —
-          // on Android as in the ARB catalogue.
+          // `he` is declared for layout and has no translations — on Android
+          // as in the ARB catalogue.
           if (code == null) continue;
           expect(
             present,
@@ -310,6 +312,23 @@ void main() {
         }
       }
     });
+  });
+
+  test('Android offers every translated locale in its per-app picker', () {
+    // Android 13+ lists `res/xml/locales_config.xml` under Settings → Apps →
+    // Sennit → Language. A catalogue missing from it is a language a person
+    // can only reach by switching their whole phone.
+    final config = File(
+      'android/app/src/main/res/xml/locales_config.xml',
+    ).readAsStringSync();
+    final offered = RegExp(
+      r'<locale android:name="([^"]+)"',
+    ).allMatches(config).map((m) => m.group(1)!).toSet();
+    final translated = {
+      for (final locale in weftSupportedLocales)
+        if (AppL10n.delegate.isSupported(locale)) locale.toLanguageTag(),
+    };
+    expect(offered, translated);
   });
 
   group('Apple usage descriptions', () {
@@ -405,18 +424,26 @@ void main() {
       );
     });
 
-    testWidgets('the RTL locales fall back to English, not to keys', (
+    testWidgets('Arabic and Hindi resolve to their own catalogues', (
       tester,
     ) async {
-      // The half-state `ar` and `he` are declared for: right-to-left layout,
-      // English words. If this ever returns a key, the fallback is broken.
-      for (final locale in [const Locale('ar'), const Locale('he')]) {
-        expect(
-          await stringIn(tester, locale, (l) => l.settingsTitle),
-          'Settings',
-          reason: '$locale should fall back to English',
-        );
-      }
+      expect(
+        await stringIn(tester, const Locale('ar'), (l) => l.settingsTitle),
+        'الإعدادات',
+      );
+      expect(
+        await stringIn(tester, const Locale('hi'), (l) => l.settingsTitle),
+        'सेटिंग्स',
+      );
+    });
+
+    testWidgets('Hebrew falls back to English, not to keys', (tester) async {
+      // The half-state `he` is declared for: right-to-left layout, English
+      // words. If this ever returns a key, the fallback is broken.
+      expect(
+        await stringIn(tester, const Locale('he'), (l) => l.settingsTitle),
+        'Settings',
+      );
     });
 
     testWidgets('script and country subtags resolve to their base file', (

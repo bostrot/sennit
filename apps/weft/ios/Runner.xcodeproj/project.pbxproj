@@ -265,6 +265,8 @@
 		A1171000000000000000000C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "fr"; path = "fr.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A1171000000000000000000D /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A1171000000000000000000E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A1171000000000000000000F /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "hi"; path = "hi.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A11710000000000000000010 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ar"; path = "ar.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A11810000000000000000010 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Base"; path = "Base.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 		A11810000000000000000011 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "en"; path = "en.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 		A11810000000000000000012 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "de"; path = "de.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
@@ -272,6 +274,8 @@
 		A11810000000000000000014 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "fr"; path = "fr.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 		A11810000000000000000015 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "pt-BR"; path = "pt-BR.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 		A11810000000000000000016 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "zh-Hans"; path = "zh-Hans.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000017 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "hi"; path = "hi.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
+		A11810000000000000000018 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "ar"; path = "ar.lproj/AppIntentVocabulary.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -744,6 +748,8 @@
 				"fr",
 				"pt-BR",
 				"zh-Hans",
+				"hi",
+				"ar",
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
@@ -1208,6 +1214,8 @@
 				A1171000000000000000000C /* fr */,
 				A1171000000000000000000D /* pt-BR */,
 				A1171000000000000000000E /* zh-Hans */,
+				A1171000000000000000000F /* hi */,
+				A11710000000000000000010 /* ar */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";
@@ -1222,6 +1230,8 @@
 				A11810000000000000000014 /* fr */,
 				A11810000000000000000015 /* pt-BR */,
 				A11810000000000000000016 /* zh-Hans */,
+				A11810000000000000000017 /* hi */,
+				A11810000000000000000018 /* ar */,
 			);
 			name = AppIntentVocabulary.plist;
 			sourceTree = "<group>";

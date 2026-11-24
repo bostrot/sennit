@@ -288,8 +288,9 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
       builder: (context) => AlertDialog(
         title: Text(context.l10n.smsRcsDialogTitle),
         content: Text(
-          // l10n-ignore: an interpolation of strings already translated above.
-          '${context.l10n.smsRcsDialogBody(bridged ? context.l10n.smsRcsDialogBridgeClause : '')}.',
+          context.l10n.smsRcsDialogBody(
+            bridged ? context.l10n.smsRcsDialogBridgeClause : '',
+          ),
         ),
         actions: [
           TextButton(

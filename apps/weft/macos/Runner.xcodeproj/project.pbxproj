@@ -166,6 +166,8 @@
 		A2171000000000000000000C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "fr"; path = "fr.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A2171000000000000000000D /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A2171000000000000000000E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A2171000000000000000000F /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "hi"; path = "hi.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A21710000000000000000010 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "ar"; path = "ar.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -497,6 +499,8 @@
 				"fr",
 				"pt-BR",
 				"zh-Hans",
+				"hi",
+				"ar",
 			);
 			mainGroup = 33CC10E42044A3C60003C045;
 			packageReferences = (
@@ -817,6 +821,8 @@
 				A2171000000000000000000C /* fr */,
 				A2171000000000000000000D /* pt-BR */,
 				A2171000000000000000000E /* zh-Hans */,
+				A2171000000000000000000F /* hi */,
+				A21710000000000000000010 /* ar */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Siri example phrases, one set per intent in INIntentsSupported. App
+     Store Connect rejects the Siri support (ITMS-90626) for every language
+     the bundle has a .lproj for that lacks them. siri_vocabulary_test.dart
+     holds every localization to all three. -->
+<dict>
+	<key>IntentPhrases</key>
+	<array>
+		<dict>
+			<key>IntentName</key>
+			<string>INSendMessageIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>Sennit से मैसेज भेजो</string>
+				<string>Sennit में अनीता को जवाब दो</string>
+				<string>Sennit से रवि को लिखो</string>
+			</array>
+		</dict>
+		<dict>
+			<key>IntentName</key>
+			<string>INSearchForMessagesIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>मेरे Sennit मैसेज पढ़कर सुनाओ</string>
+				<string>Sennit में मेरे नए मैसेज दिखाओ</string>
+				<string>क्या Sennit में मेरे नए मैसेज हैं</string>
+			</array>
+		</dict>
+		<dict>
+			<key>IntentName</key>
+			<string>INSetMessageAttributeIntent</string>
+			<key>IntentExamples</key>
+			<array>
+				<string>मेरे Sennit मैसेज पढ़े हुए मार्क करो</string>
+				<string>Sennit में मेरे मैसेज पढ़े हुए मार्क करो</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

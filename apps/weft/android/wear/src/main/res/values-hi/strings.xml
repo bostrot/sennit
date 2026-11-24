@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hindi, machine-seeded 2026-11-24. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml`, which carries the reasoning behind
+     each string; this one only the words. `app_name`, `tile_name` and
+     `complication_name` are the product's own name and stay as they are. -->
+<resources>
+    <string name="app_name">Weft</string>
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">आपके अनपढ़े मैसेज और हाल की बातचीत।</string>
+    <string name="complication_name">Weft unread</string>
+    <string name="inbox_heading">हाल की</string>
+    <string name="signed_out_title">Weft में साइन इन करें</string>
+    <string name="signed_out_body">अपने फ़ोन पर Weft खोलें और साइन इन करें।</string>
+    <string name="disabled_title">वॉच बंद है</string>
+    <string name="disabled_body">अपने फ़ोन पर Weft खोलें और विजेट और वॉच में वॉच चालू करें।</string>
+    <string name="stale_title">अपने फ़ोन पर Weft खोलें</string>
+    <string name="stale_body">यह पुराना है। ताज़ा करने के लिए Weft खोलें।</string>
+    <string name="empty_title">कोई बातचीत नहीं</string>
+    <string name="empty_body">अभी दिखाने को कुछ नहीं। बाहर रखे नेटवर्क की बातचीत यहाँ कभी नहीं दिखती।</string>
+    <string name="merged">जोड़ी गई बातचीत</string>
+    <string name="unread_label">अनपढ़े</string>
+    <string name="reply_heading">जवाब दें</string>
+    <string name="reply_dictate">बोलकर लिखें</string>
+    <string name="reply_dictate_hint">%1$s को जवाब दें</string>
+    <string name="reply_sending">भेजा जा रहा है…</string>
+    <string name="reply_sent">भेजा गया</string>
+    <string name="reply_sent_via">%1$s से भेजा गया</string>
+    <string name="reply_failed">नहीं भेजा गया</string>
+    <string name="reply_failed_unknown_chat">यह बातचीत अब Weft में नहीं है।</string>
+    <string name="reply_failed_not_signed_in">नहीं भेजा गया। आपके फ़ोन पर कोई साइन इन नहीं है।</string>
+    <string name="reply_failed_send_failed">नहीं भेजा गया। अपने फ़ोन पर Weft खोलकर फिर कोशिश करें।</string>
+    <string name="reply_failed_timed_out">नहीं भेजा गया। आपके फ़ोन ने जवाब नहीं दिया।</string>
+    <string name="reply_failed_overflowed">नहीं भेजा गया। एक साथ बहुत सारे जवाब।</string>
+    <string name="reply_failed_app_not_running">नहीं भेजा गया। अपने फ़ोन पर Weft खोलें।</string>
+    <string name="canned_yes">हाँ</string>
+    <string name="canned_no">नहीं</string>
+    <string name="canned_on_my_way">रास्ते में हूँ</string>
+    <string name="canned_thanks">धन्यवाद!</string>
+    <string name="canned_call_later">क्या मैं बाद में कॉल करूँ?</string>
+    <string name="canned_cant_talk">अभी बात नहीं कर सकता</string>
+
+    <plurals name="unread_count">
+        <item quantity="one">%1$d अनपढ़ा मैसेज</item>
+        <item quantity="other">%1$d अनपढ़े मैसेज</item>
+    </plurals>
+</resources>

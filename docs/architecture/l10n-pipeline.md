@@ -21,7 +21,7 @@ Dart literal; [[l10n-inventory]] is the machine-generated list of the ones that
 still are.
 
 This is the how-to. The *why* — what declaring a locale turns on beyond
-translation, and why Arabic and Hebrew are declared with no ARB file — is in the
+translation, and why Hebrew is declared with no ARB file — is in the
 library comment at the top of `apps/weft/lib/app/localisation.dart`, which is
 where someone changing that list will be standing.
 
@@ -71,8 +71,11 @@ Where a key needs a title and a subtitle, spell both out — `xTitle`, `xSubtitl
 2. Add an `@key` block next to it with a `description`. This is **required** —
    `required-resource-attributes: true` in `l10n.yaml` makes a missing one a
    build failure, and `l10n_test.dart` checks it too.
-3. Add the same key to every other `app_*.arb`. Descriptions do not go in the
-   translated files; only `@@locale` and `@@x-review` do.
+3. Add the same key to every other `app_*.arb`, translated — never the English
+   copied across. Descriptions do not go in the translated files; only
+   `@@locale` and `@@x-review` do. The same goes for a changed English string:
+   every locale is updated in the same pull request. `AGENTS.md` states the
+   rule; the lint below enforces it.
 4. Replace the literal at the call site with `context.l10n.yourKey`.
 5. `flutter gen-l10n`, then `flutter test`.
 
@@ -338,7 +341,9 @@ what reached it is *usable in the language it landed in* — and every one of it
 findings is invisible to a reviewer who does not read that language, which is
 what makes it a CI step rather than a review note.
 
-Eight rules: key parity, placeholder-set drift, an ICU message that does not
+Nine rules: a required locale with no catalogue at all (`en`, `de`, `zh`,
+`hi`, `es` and `ar` — the list is `_requiredLocales` in the script), key parity,
+placeholder-set drift, an ICU message that does not
 parse, a translation byte-identical to the English, a translation wider than
 its key's budget, a breaking space before French punctuation, a Traditional
 character in the Simplified Chinese catalogue, and a plural category Chinese

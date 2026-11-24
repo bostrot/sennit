@@ -13,8 +13,11 @@
 /// the widget has. None of those is visible in a diff, and all of them are
 /// invisible in English.
 ///
-/// Eight checks, and each catches something a human reviewer reliably misses:
+/// Nine checks, and each catches something a human reviewer reliably misses:
 ///
+/// * **`missing-locale`** — a locale in [_requiredLocales] has no catalogue.
+///   Key parity below only covers the files that exist; this is what stops a
+///   language from leaving by deletion.
 /// * **`missing-key` / `extra-key`** — key parity with the template.
 ///   `l10n_test.dart` checks this too; repeating it here costs a set
 ///   comparison and means the lint is worth running on its own.
@@ -53,6 +56,13 @@ import 'dart:io';
 /// Where the catalogues live, relative to the workspace root.
 const String _arbDir = 'apps/weft/lib/l10n';
 const String _templateLocale = 'en';
+
+/// The languages Sennit promises to ship in full: English, the five most
+/// spoken languages after it, and German. A pull request that adds or changes
+/// a user-facing string updates every one of them, and this list is what makes
+/// a missing catalogue a CI failure rather than a quiet English fallback. See
+/// `AGENTS.md`.
+const Set<String> _requiredLocales = {'en', 'de', 'zh', 'hi', 'es', 'ar'};
 
 /// Per-locale exceptions to the `untranslated` rule, each with its reason.
 const String _allowFile = '$_arbDir/lint_allow.json';
@@ -146,6 +156,15 @@ void main(List<String> args) {
         templateKeys,
         allowed is Map ? allowed.keys.cast<String>().toSet() : const <String>{},
       ),
+    );
+  }
+
+  for (final locale in _requiredLocales.difference({
+    _templateLocale,
+    ...locales,
+  }).toList()..sort()) {
+    findings.add(
+      Finding(locale, '*', 'missing-locale', 'no $_arbDir/app_$locale.arb'),
     );
   }
 
