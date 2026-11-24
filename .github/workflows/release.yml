@@ -325,11 +325,6 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: Bundle the release notes
-        uses: actions/download-artifact@v4
-        with:
-          name: release-notes
-          path: apps/weft/assets
       - name: Restore the CocoaPods and Cargo caches
         # download.onnxruntime.ai, where the onnxruntime-c pod downloads
         # from, serves a certificate for *.azureedge.net and fails every
@@ -344,6 +339,11 @@ jobs:
             ~/.cargo/git
           key: ios-downloads-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
           restore-keys: ios-downloads-${{ runner.arch }}-
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - name: Build (signing deferred)
@@ -469,11 +469,6 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: Bundle the release notes
-        uses: actions/download-artifact@v4
-        with:
-          name: release-notes
-          path: apps/weft/assets
       - name: Restore the CocoaPods and Cargo caches
         # download.onnxruntime.ai, where the onnxruntime-c pod downloads
         # from, serves a certificate for *.azureedge.net and fails every
@@ -488,6 +483,11 @@ jobs:
             ~/.cargo/git
           key: ios-downloads-${{ runner.arch }}-${{ hashFiles('apps/weft/ios/Podfile.lock', 'pubspec.lock') }}
           restore-keys: ios-downloads-${{ runner.arch }}-
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
       - run: flutter pub get
         working-directory: apps/weft
       - name: Import the distribution certificate and profile
