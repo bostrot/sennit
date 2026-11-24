@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 
@@ -132,4 +133,82 @@ void main() {
       expect(clearButton('Suche löschen'), findsOneWidget);
     });
   }
+
+  testWidgets('the clear button appears as soon as something is typed', (
+    tester,
+  ) async {
+    // The app's toolbar passes no `onChanged` and does not rebuild on its own,
+    // so the field has to notice the text itself.
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(field(controller));
+
+    await tester.enterText(find.byType(TextField), 'anna');
+    await tester.pump();
+
+    expect(find.byIcon(Icons.cancel_rounded), findsOneWidget);
+  });
+
+  group('Escape', () {
+    testWidgets('empties a field that has text, and keeps it focused', (
+      tester,
+    ) async {
+      final changes = <String>[];
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(field(controller, changes: changes));
+      await tester.enterText(find.byType(TextField), 'anna');
+      await tester.pump();
+      changes.clear();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(controller.text, isEmpty);
+      expect(changes, ['']);
+      expect(find.byIcon(Icons.cancel_rounded), findsNothing);
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.focusNode.hasFocus, isTrue);
+    });
+
+    testWidgets('leaves an empty field', (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(field(controller));
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      final focus = tester
+          .widget<EditableText>(find.byType(EditableText))
+          .focusNode;
+      expect(focus.hasFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(focus.hasFocus, isFalse);
+    });
+
+    testWidgets('is left to the input method while it is composing', (
+      tester,
+    ) async {
+      // Escape mid-composition (pinyin, kana) cancels the composition; taking
+      // it for the field would throw away everything typed before it too.
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(field(controller));
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      controller.value = const TextEditingValue(
+        text: 'anna ni',
+        selection: TextSelection.collapsed(offset: 7),
+        composing: TextRange(start: 5, end: 7),
+      );
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(controller.text, 'anna ni');
+    });
+  });
 }
