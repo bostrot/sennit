@@ -34,6 +34,22 @@ class RemoteChatRepository implements ChatRepository {
   final Map<String, Future<MergedTimeline>> _timelineByChat = {};
   final Map<int, _RemoteTimeline> _timelines = {};
   final _firstState = Completer<void>();
+  final _settingsController =
+      StreamController<Map<String, String?>>.broadcast();
+  Map<String, String?> _pendingSettings = {};
+
+  /// The phone's preferences as they change; null removes. The first event
+  /// after [connect] carries all of them.
+  Stream<Map<String, String?>> get settingsChanges =>
+      _settingsController.stream;
+
+  /// Settings received before anyone listened — the first snapshot arrives
+  /// with [connect], before the app has a listener.
+  Map<String, String?> takePendingSettings() {
+    final out = _pendingSettings;
+    _pendingSettings = {};
+    return out;
+  }
 
   /// Completes when the link to the phone closes.
   Future<void> get done => _peer.done;
@@ -51,6 +67,13 @@ class RemoteChatRepository implements ChatRepository {
   Future<void> dispose() async {
     await _peer.close();
     await _chatsController.close();
+    await _settingsController.close();
+  }
+
+  /// A picture the phone fetches with its homeserver credentials.
+  Future<Uint8List?> fetchMedia(String url) async {
+    final data = await _call(RemoteMethods.mediaFetch, {'url': url});
+    return data is String ? base64.decode(data) : null;
   }
 
   void _onEvent(String name, Object? data) {
@@ -100,6 +123,18 @@ class RemoteChatRepository implements ChatRepository {
         _timelines[int.parse(key! as String)]?.apply(
           (value! as Map).cast<String, Object?>(),
         );
+      }
+    }
+
+    if (frame['settings'] case final Map<Object?, Object?> settings) {
+      final changes = {
+        for (final MapEntry(:key, :value) in settings.entries)
+          key! as String: value as String?,
+      };
+      if (_settingsController.hasListener) {
+        _settingsController.add(changes);
+      } else {
+        _pendingSettings.addAll(changes);
       }
     }
 

@@ -24,6 +24,7 @@ import '../settings/settings_screen.dart';
 import 'inbox_shell.dart';
 import 'requests_screen.dart';
 import 'new_chat_sheet.dart';
+import '../settings/sennit_web_screen.dart' show SennitWebIndicator;
 
 /// The sidebar and list widths to actually draw in a window [available] wide.
 ///
@@ -474,6 +475,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
       ),
     ),
     actions: [
+      const SennitWebIndicator(),
       MacSearchField(
         controller: _searchController,
         hintText: context.l10n.macSearchHint,

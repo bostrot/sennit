@@ -119,7 +119,7 @@ class WeftStores {
     // subscribes to all seven at once: a keychain that refuses then fails the
     // bootstrap exactly as it does today, instead of failing it once and
     // leaving six unhandled errors behind it.
-    final secretValues = kDemoMode
+    final secretValues = kNoMatrix
         ? const <String?>[null, null, null, null, null, null, null]
         : await Future.wait<String?>([
             secrets.read(SecretStore.embeddingApiKey),
@@ -207,7 +207,7 @@ final storesBootstrapProvider = FutureProvider<WeftStores>((ref) async {
   ref.onDispose(stores.dispose);
   // Before anything is drawn, so a fresh install has recorded its version
   // by the time it reaches the inbox; see [recordLaunchVersion].
-  if (!kDemoMode) recordLaunchVersion(stores.settings, kSennitVersion);
+  if (!kNoMatrix) recordLaunchVersion(stores.settings, kSennitVersion);
   return stores;
 });
 

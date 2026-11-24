@@ -51,6 +51,9 @@ import 'stores.dart';
 /// graph and every open timeline for a token that changed. This resolves once.
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   if (kDemoMode) return DemoChatRepository();
+  // Sennit Web: the phone's repository, through the encrypted link. The auth
+  // gate holds the inbox back until the connection exists.
+  if (kRemoteClient) return ref.watch(remoteRepositoryProvider).requireValue;
 
   // First, and before anything that can throw: a dependency only counts once
   // `ref.watch` has run, and a build that threw before reaching this line
@@ -82,7 +85,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 /// phone where the user declined the default-app role, the SMS network is
 /// simply absent from the inbox and nothing else changes.
 final smsRepositoryProvider = Provider<SmsChatRepository?>((ref) {
-  if (kDemoMode || defaultTargetPlatform != TargetPlatform.android) return null;
+  if (kNoMatrix || defaultTargetPlatform != TargetPlatform.android) return null;
 
   final platform = SmsPlatform();
   final repository = SmsChatRepository(
@@ -135,7 +138,7 @@ String? _defaultCountryCode(Ref ref) {
 /// headers exactly when the token is actually usable — and again if it
 /// changes later.
 final mediaHeadersProvider = Provider<Map<String, String>?>((ref) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
   final state = ref.watch(sessionStateProvider).value;
   switch (state) {
     case null:
@@ -253,7 +256,7 @@ final chatTrustProvider = FutureProvider.family<RoomTrust, String>((
   ref,
   chatId,
 ) async {
-  if (kDemoMode) return RoomTrust.none;
+  if (kNoMatrix) return RoomTrust.none;
 
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized || !session.encryptionEnabled) {

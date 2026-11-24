@@ -25,6 +25,7 @@ import 'new_chat_sheet.dart';
 import 'requests_screen.dart';
 import '../search/search_screen.dart';
 import '../settings/appearance_sheet.dart';
+import '../settings/sennit_web_screen.dart' show SennitWebIndicator;
 import '../settings/settings_screen.dart';
 
 /// The conversation's verbs, at the cursor.
@@ -869,6 +870,7 @@ class _InboxHeader extends ConsumerWidget {
                     ),
                   ),
                 ),
+              const SennitWebIndicator(),
               IconButton(
                 tooltip: context.l10n.commonAppearance,
                 icon: const Icon(Icons.palette_outlined),

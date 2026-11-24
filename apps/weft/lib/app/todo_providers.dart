@@ -239,7 +239,7 @@ final todoListProvider = NotifierProvider<TodoList, List<TodoItem>>(
 /// one — demo mode, or before the session is up. Whether it *acts* is
 /// [TodoPreferences.aiEnabled], read per message.
 final todoAgentProvider = Provider<TodoAgent?>((ref) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
 
   final session = ref.watch(matrixSessionProvider);
   if (!session.isInitialized) return null;

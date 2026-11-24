@@ -5,6 +5,13 @@ import '../semantics.dart';
 import '../theme.dart';
 import 'network_glyph.dart';
 
+/// Where avatar pictures come from when not straight from the network.
+///
+/// Sennit Web sets this: the browser has no homeserver credentials, so it asks
+/// the phone for each picture over the encrypted link instead. Null — the
+/// default everywhere else — means a [NetworkImage] with the given headers.
+ImageProvider Function(String url)? weftAvatarImageOverride;
+
 /// Avatar for a contact or chat.
 ///
 /// Three states matter, and each is visually distinct at a glance:
@@ -72,10 +79,12 @@ class WeftAvatar extends StatelessWidget {
 
     // Initials are always painted; the picture covers them once it loads.
     //
-    // `Image.network` rather than a `DecorationImage`/`NetworkImage`, because
-    // only the former takes [headers]. Matrix media is authenticated, so
+    // A `NetworkImage` with [headers]: Matrix media is authenticated, so
     // without the access token every avatar request 401s and silently falls
-    // back to initials — which is exactly what it looked like.
+    // back to initials — which is exactly what it looked like. The decode is
+    // bounded too, not just the layout: a 1024px avatar decoded at full size
+    // for a 48dp circle is wasted work the scroll thread pays for, once per
+    // tile, on every rebuild after eviction.
     Widget avatar = Container(
       width: inner,
       height: inner,
@@ -110,17 +119,16 @@ class WeftAvatar extends StatelessWidget {
           ),
           if (imageUrl != null)
             ClipOval(
-              child: Image.network(
-                imageUrl!,
-                headers: imageHeaders,
+              child: Image(
+                image: ResizeImage.resizeIfNeeded(
+                  (inner * 3).round(),
+                  null,
+                  weftAvatarImageOverride?.call(imageUrl!) ??
+                      NetworkImage(imageUrl!, headers: imageHeaders),
+                ),
                 width: inner,
                 height: inner,
                 fit: BoxFit.cover,
-                // Bounds the *decode*, not just the layout: a 1024px avatar
-                // decoded at full size for a 48dp circle is wasted work the
-                // scroll thread pays for, once per tile, on every rebuild
-                // after eviction.
-                cacheWidth: (inner * 3).round(),
                 errorBuilder: (context, error, stack) {
                   debugPrint('weft: avatar failed for $imageUrl — $error');
                   return const SizedBox.shrink();

@@ -56,7 +56,7 @@ final retentionSweeperProvider = Provider<RetentionSweeper?>((ref) {
   final stores = storesOrNull(ref);
   if (stores == null) return null;
 
-  final session = kDemoMode ? null : ref.watch(matrixSessionProvider);
+  final session = kNoMatrix ? null : ref.watch(matrixSessionProvider);
 
   final sweeper = RetentionSweeper(
     retention: stores.retention,

@@ -1,7 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weft_design/weft_design.dart' show weftAvatarImageOverride;
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../data/demo_account.dart';
+import '../data/remote_chat_repository.dart';
+import '../services/web/phone_connection.dart';
+import '../services/web/phone_connection_errors.dart';
+import '../services/web/remote_media_image.dart';
+import 'stores.dart';
 
 /// Runs the app on in-memory fixtures instead of a homeserver.
 ///
@@ -9,6 +18,56 @@ import '../data/demo_account.dart';
 ///
 /// Useful for UI work, screenshots and golden tests without credentials.
 const bool kDemoMode = bool.fromEnvironment('WEFT_DEMO');
+
+/// Sennit Web: this build runs in a browser and gets everything from a phone.
+/// It has no Matrix session, no keychain and no database of its own.
+const bool kRemoteClient = kIsWeb && !kDemoMode;
+
+/// Whether there is no Matrix session in this process — demo mode or Sennit
+/// Web. The guards that keep platform services from touching a session that
+/// does not exist read this.
+const bool kNoMatrix = kDemoMode || kRemoteClient;
+
+/// The browser's connection to its phone, made once. Fails with a
+/// `PhoneConnectionException` the connect screen explains.
+/// A browser that is not paired, or whose phone is off, is told so on the
+/// connect screen at once; retrying behind the splash would only hide that.
+Duration? _retryUnlessPhone(int count, Object error) =>
+    error is PhoneConnectionException
+    ? null
+    : ProviderContainer.defaultRetry(count, error);
+
+final remoteRepositoryProvider = FutureProvider<RemoteChatRepository>(
+  retry: _retryUnlessPhone,
+  (ref) async {
+    final repository = await connectToPhone();
+    ref.onDispose(() => unawaited(repository.dispose()));
+    // Pictures come through the phone, which holds the homeserver credentials.
+    weftAvatarImageOverride = (url) =>
+        RemoteMediaImage(url, repository.fetchMedia);
+    // The phone's preferences land in this tab's in-memory settings, so the
+    // screens read them exactly as they would on the phone.
+    final stores = await ref.read(storesBootstrapProvider.future);
+    void apply(Map<String, String?> changes) {
+      for (final MapEntry(:key, :value) in changes.entries) {
+        if (value == null) {
+          stores.settings.remove(key);
+        } else {
+          stores.settings.setString(key, value);
+        }
+      }
+      ref.read(settingsRevisionProvider.notifier).bump();
+    }
+
+    apply(repository.takePendingSettings());
+    final settingsSub = repository.settingsChanges.listen(apply);
+    ref.onDispose(() => unawaited(settingsSub.cancel()));
+    // When the phone goes away — the app closed, the network changed — start
+    // over: the connect screen shows while this retries.
+    unawaited(repository.done.then((_) => ref.invalidateSelf()));
+    return repository;
+  },
+);
 
 final matrixSessionProvider = Provider<WeftMatrixSession>((ref) {
   // The clientName stays 'Weft' — it keys the session database, and a
@@ -20,10 +79,17 @@ final matrixSessionProvider = Provider<WeftMatrixSession>((ref) {
 
 /// Creates the client and restores a stored session. The app waits on this once
 /// at startup; everything downstream reads [sessionStateProvider].
-final sessionBootstrapProvider = FutureProvider<WeftSessionState>((ref) async {
-  if (kDemoMode) return WeftSessionState.ready;
-  return ref.watch(matrixSessionProvider).initialize();
-});
+final sessionBootstrapProvider = FutureProvider<WeftSessionState>(
+  retry: _retryUnlessPhone,
+  (ref) async {
+    if (kDemoMode) return WeftSessionState.ready;
+    if (kRemoteClient) {
+      await ref.watch(remoteRepositoryProvider.future);
+      return WeftSessionState.ready;
+    }
+    return ref.watch(matrixSessionProvider).initialize();
+  },
+);
 
 /// True while this run's first sync is still on its way.
 ///
@@ -37,7 +103,7 @@ final sessionBootstrapProvider = FutureProvider<WeftSessionState>((ref) async {
 /// Yields nothing until the bootstrap resolves, so a build with no session —
 /// tests, demo mode — settles on false without ever showing the label.
 final catchingUpProvider = StreamProvider<bool>((ref) async* {
-  if (!kDemoMode) {
+  if (!kNoMatrix) {
     try {
       await ref.watch(sessionBootstrapProvider.future);
       final client = ref.read(matrixSessionProvider).client;
@@ -92,16 +158,23 @@ final keyBackupProvider = Provider<KeyBackup>((ref) {
 
 /// Live session state. Seeded from the bootstrap result so there is no gap
 /// between "restored" and "first state event".
-final sessionStateProvider = StreamProvider<WeftSessionState>((ref) async* {
-  if (kDemoMode) {
-    yield WeftSessionState.ready;
-    return;
-  }
+final sessionStateProvider = StreamProvider<WeftSessionState>(
+  retry: _retryUnlessPhone,
+  (ref) async* {
+    if (kDemoMode) {
+      yield WeftSessionState.ready;
+      return;
+    }
+    if (kRemoteClient) {
+      yield await ref.watch(sessionBootstrapProvider.future);
+      return;
+    }
 
-  final session = ref.watch(matrixSessionProvider);
-  yield await ref.watch(sessionBootstrapProvider.future);
-  yield* session.states;
-});
+    final session = ref.watch(matrixSessionProvider);
+    yield await ref.watch(sessionBootstrapProvider.future);
+    yield* session.states;
+  },
+);
 
 /// Whether the client holds a usable login right now.
 ///

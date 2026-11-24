@@ -27,7 +27,7 @@ import 'session_providers.dart';
 /// is what keeps [CallService] testable against a `StreamController` and a
 /// list.
 final callServiceProvider = Provider<CallService?>((ref) {
-  if (kDemoMode) return null;
+  if (kNoMatrix) return null;
 
   // Watched, so the service is built the moment the login is usable. Reading
   // `session.isInitialized` here instead computed once during startup, before

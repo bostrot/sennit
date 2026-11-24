@@ -103,6 +103,10 @@ class SecretStore {
   /// birthday, a partner's name, what someone is going through.
   static const String personMemory = 'person_memory';
 
+  /// Sennit Web's static X25519 key, as a base64 seed. Paired browsers know
+  /// its public half from the QR code; losing it unpairs every browser.
+  static const String sennitWebKey = 'sennit_web_key';
+
   Future<String?> read(String key) => _storage.read(key: key);
 
   Future<void> write(String key, String? value) async {
