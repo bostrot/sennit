@@ -1,0 +1,16 @@
+{
+  "name": "Sennit",
+  "short_name": "Sennit",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAF8FF",
+  "theme_color": "#3D6FD8",
+  "description": "Sennit in the browser, served by your phone.",
+  "prefer_related_applications": false,
+  "icons": [
+    {"src": "icons/Icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/Icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/Icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "icons/Icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

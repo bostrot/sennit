@@ -99,6 +99,24 @@ jobs:
       - name: Lint the translations
         run: dart run tooling/scripts/l10n_lint.dart
 
+  web:
+    name: Build for the web
+    # Never a fork's pull request: see the note above `jobs:`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-flutter
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      # The browser build is the same app compiled to JavaScript, so a native
+      # import that slips past the conditional ones only shows up here.
+      - name: Build
+        run: cd apps/weft && flutter build web --release --no-pub
+      - name: Add SQLite's WebAssembly build
+        run: tooling/scripts/fetch_sqlite_wasm.sh apps/weft/build/web
+
   unit:
     name: Unit tests (pure Dart)
     # Never a fork's pull request: see the note above `jobs:`.

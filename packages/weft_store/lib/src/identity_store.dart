@@ -1,4 +1,4 @@
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'weft_database.dart';
@@ -25,7 +25,7 @@ class IdentityStore {
 
   final WeftDatabase _db;
 
-  Database get _raw => _db.raw;
+  CommonDatabase get _raw => _db.raw;
 
   // ------------------------------------------------------------------ handles
 

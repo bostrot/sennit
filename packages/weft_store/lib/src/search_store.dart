@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 import 'package:weft_search/weft_search.dart';
@@ -14,7 +14,7 @@ class SearchStore implements SearchBackend {
 
   final WeftDatabase _db;
 
-  Database get _raw => _db.raw;
+  CommonDatabase get _raw => _db.raw;
 
   final _queued = StreamController<void>.broadcast();
 
@@ -407,7 +407,7 @@ String? toFtsMatchQuery(String input, {bool prefixLastToken = true}) {
 /// only in what it is filed under, it is re-filed and keeps its embedding;
 /// only new or reworded text is embedded again.
 class _IndexWriter {
-  _IndexWriter(Database db)
+  _IndexWriter(CommonDatabase db)
     : _existing = db.prepare(
         'SELECT rowid, chat_id, kind, body, has_media, sender_name, chat_title '
         'FROM search_message WHERE event_id = ? AND room_id = ?',
@@ -443,11 +443,11 @@ class _IndexWriter {
         ON CONFLICT(message_rowid) DO NOTHING
       ''');
 
-  final PreparedStatement _existing;
-  final PreparedStatement _upsert;
-  final PreparedStatement _dropEmbedding;
-  final PreparedStatement _enqueue;
-  final PreparedStatement _enqueueIfMissing;
+  final CommonPreparedStatement _existing;
+  final CommonPreparedStatement _upsert;
+  final CommonPreparedStatement _dropEmbedding;
+  final CommonPreparedStatement _enqueue;
+  final CommonPreparedStatement _enqueueIfMissing;
 
   int write(
     WeftMessage message, {

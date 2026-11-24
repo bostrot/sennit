@@ -1,5 +1,5 @@
 import 'package:meta/meta.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'settings_store.dart';
@@ -35,7 +35,7 @@ class RetentionStore {
   final WeftDatabase _db;
   final SettingsStore _settings;
 
-  Database get _raw => _db.raw;
+  CommonDatabase get _raw => _db.raw;
 
   // ----------------------------------------------------------------- policies
 

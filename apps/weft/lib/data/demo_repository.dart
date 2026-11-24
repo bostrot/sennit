@@ -841,19 +841,21 @@ class DemoChatRepository implements ChatRepository {
     // Michael appears twice with the identical name — the exact signal a
     // suggestion needs since resemblance alone stopped opening one. The demo
     // scorer runs without auto-merge, so it stays a suggestion to exercise.
+    // The hashes stay under 2^53, which is all the browser build's integers
+    // can hold exactly; one bit apart either way.
     _handle(
       'michael_wa',
       ChatNetwork.whatsapp,
       'Michael Johnson',
       null,
-      dHash: 0x0F0F0F0F0F0F0F0F,
+      dHash: 0x000F0F0F0F0F0F0F,
     ),
     _handle(
       'michael_dc',
       ChatNetwork.discord,
       'Michael Johnson',
       null,
-      dHash: 0x0F0F0F0F0F0F0F0E,
+      dHash: 0x000F0F0F0F0F0F0E,
     ),
     _handle('alex_sl', ChatNetwork.slack, 'Alexandra Thompson', null),
     _handle('emma_sg', ChatNetwork.signal, 'Emma Robinson', null),

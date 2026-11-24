@@ -1,4 +1,4 @@
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 
 /// Ordered schema migrations.
 ///
@@ -251,7 +251,7 @@ const List<String> weftMigrations = [
 ///
 /// Returns the version it ended on. Idempotent: running it against an
 /// up-to-date database does nothing.
-int migrate(Database db, {List<String> migrations = weftMigrations}) {
+int migrate(CommonDatabase db, {List<String> migrations = weftMigrations}) {
   db.execute('PRAGMA foreign_keys = ON');
 
   final current = db.select('PRAGMA user_version').first.values.first! as int;

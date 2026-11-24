@@ -90,6 +90,7 @@ class WeftStores {
     String? directoryOverride,
     SecretStore? secretStore,
   }) async {
+    await WeftDatabase.loadEngine();
     final db = directoryOverride != null
         ? WeftDatabase.openAt(directoryOverride)
         : await WeftDatabase.open();
