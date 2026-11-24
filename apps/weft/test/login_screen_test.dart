@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matrix/matrix.dart'
+    show OidcClientData, OidcClientInformation, OidcLoginSession;
 import 'package:weft/app/localisation.dart';
 import 'package:weft/app/session_providers.dart';
+import 'package:weft/features/auth/browser_login.dart';
 import 'package:weft/features/auth/login_screen.dart';
 import 'package:weft/features/auth/matrix_server_sheet.dart';
 import 'package:weft_design/weft_design.dart';
@@ -20,11 +23,16 @@ void main() {
   Future<_FakeSession> pumpResolved(
     WidgetTester tester, {
     RegistrationOffer? offer = RegistrationOffer.open,
+    LoginMethods methods = const LoginMethods(password: true),
+    _FakeBrowser? browser,
   }) async {
-    final session = _FakeSession(offer: offer);
+    final session = _FakeSession(offer: offer, methods: methods);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [matrixSessionProvider.overrideWithValue(session)],
+        overrides: [
+          matrixSessionProvider.overrideWithValue(session),
+          if (browser != null) browserLoginProvider.overrideWithValue(browser),
+        ],
         child: MaterialApp(
           localizationsDelegates: weftLocalizationsDelegates,
           supportedLocales: weftSupportedLocales,
@@ -252,12 +260,185 @@ void main() {
 
     expect(find.text('That username is taken. Try another.'), findsOneWidget);
   });
+
+  group('a server that signs people in on its own page', () {
+    final oauth = LoginMethods(
+      oauth: OAuthServer(
+        issuer: Uri.parse('https://matrix.aachen.dev/'),
+        promptValues: const {'create'},
+      ),
+    );
+
+    testWidgets('OAuth only: no password form, one button to the browser', (
+      tester,
+    ) async {
+      final browser = _FakeBrowser(
+        (redirect) => redirect.replace(
+          queryParameters: {'code': 'the-code', 'state': 'the-state'},
+        ),
+      );
+      final session = await pumpResolved(
+        tester,
+        methods: oauth,
+        browser: browser,
+      );
+
+      // Only the server field: no username or password to type.
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.textContaining('signs you in on its own page'), findsOne);
+
+      await tester.tap(find.text('Continue with matrix.aachen.dev'));
+      await tester.pumpAndSettle();
+
+      expect(session.oauthStarts, [(redirect: _redirect, create: false)]);
+      expect(browser.opened, [_page]);
+      expect(session.oauthCallbacks.single.queryParameters['code'], 'the-code');
+    });
+
+    testWidgets('a new account is made on the server page too', (tester) async {
+      final browser = _FakeBrowser(
+        (redirect) => redirect.replace(queryParameters: {'state': 'the-state'}),
+      );
+      final session = await pumpResolved(
+        tester,
+        methods: oauth,
+        browser: browser,
+      );
+      await openCreateForm(tester);
+
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.textContaining('own sign-up page'), findsOne);
+      await submit(tester);
+
+      expect(session.oauthStarts.single.create, isTrue);
+    });
+
+    testWidgets('closing the browser is not an error', (tester) async {
+      final browser = _FakeBrowser((_) => null);
+      final session = await pumpResolved(
+        tester,
+        methods: oauth,
+        browser: browser,
+      );
+      await tester.tap(find.text('Continue with matrix.aachen.dev'));
+      await tester.pumpAndSettle();
+
+      expect(session.oauthCallbacks, isEmpty);
+      expect(find.byType(FilledButton), findsOneWidget);
+      expect(find.textContaining('Sign-in failed'), findsNothing);
+    });
+
+    testWidgets('a refusal on the server page is said in words', (
+      tester,
+    ) async {
+      final browser = _FakeBrowser((redirect) => redirect);
+      final session = await pumpResolved(
+        tester,
+        methods: oauth,
+        browser: browser,
+      );
+      session.oauthFailure = const BrowserLoginException(
+        BrowserLoginFailure.denied,
+        'access_denied',
+      );
+      await tester.tap(find.text('Continue with matrix.aachen.dev'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text("The sign-in was cancelled on the server's page."),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('beside a password, the browser is the second way in', (
+      tester,
+    ) async {
+      await pumpResolved(
+        tester,
+        methods: LoginMethods(password: true, oauth: oauth.oauth),
+        browser: _FakeBrowser((_) => null),
+      );
+      expect(find.byType(TextField), findsNWidgets(3));
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.text('Continue with matrix.aachen.dev'), findsOneWidget);
+    });
+
+    testWidgets('legacy SSO: one button per named provider', (tester) async {
+      final browser = _FakeBrowser(
+        (redirect) => redirect.replace(queryParameters: {'loginToken': 't'}),
+      );
+      final session = await pumpResolved(
+        tester,
+        methods: const LoginMethods(
+          sso: true,
+          ssoProviders: [SsoProvider(id: 'oidc-keycloak', name: 'Keycloak')],
+        ),
+        browser: browser,
+      );
+
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.ensureVisible(find.text('Continue with Keycloak'));
+      await tester.tap(find.text('Continue with Keycloak'));
+      await tester.pumpAndSettle();
+
+      expect(browser.opened.single.path, endsWith('/redirect/oidc-keycloak'));
+      expect(session.ssoCallbacks.single.queryParameters['loginToken'], 't');
+    });
+
+    testWidgets('a server with no way in Sennit knows says so', (tester) async {
+      await pumpResolved(
+        tester,
+        methods: const LoginMethods(unsupported: true),
+      );
+      expect(find.byType(TextField), findsOneWidget);
+      expect(
+        find.text(
+          'matrix.aachen.dev only offers ways to sign in that Sennit does not '
+          'support yet.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+}
+
+final _redirect = Uri.parse('com.erictrenkel.sennit:/oauth');
+final _page = Uri.parse('https://matrix.aachen.dev/oauth2/authorize');
+
+/// Hands back whatever [answer] makes of the redirect address, as if the
+/// person had finished — or, for null, closed — the page.
+class _FakeBrowser implements BrowserLogin {
+  _FakeBrowser(this.answer);
+
+  final Uri? Function(Uri redirect) answer;
+  final opened = <Uri>[];
+
+  @override
+  Future<Uri?> run(
+    Future<Uri> Function(Uri redirectUri) pageFor, {
+    required String doneText,
+  }) async {
+    opened.add(await pageFor(_redirect));
+    return answer(_redirect);
+  }
+
+  @override
+  void cancel() {}
 }
 
 class _FakeSession implements WeftMatrixSession {
-  _FakeSession({required this.offer});
+  _FakeSession({
+    required this.offer,
+    this.methods = const LoginMethods(password: true),
+  });
 
   final RegistrationOffer? offer;
+  final LoginMethods methods;
+
+  final oauthStarts = <({Uri redirect, bool create})>[];
+  final oauthCallbacks = <Uri>[];
+  final ssoCallbacks = <Uri>[];
+  Exception? oauthFailure;
 
   /// Thrown by the next [register] instead of creating anything.
   Exception? failure;
@@ -276,7 +457,53 @@ class _FakeSession implements WeftMatrixSession {
   }
 
   @override
-  Future<List<LoginFlow>> supportedLoginFlows() async => const [];
+  Future<LoginMethods> loginMethods() async => methods;
+
+  @override
+  Future<OidcLoginSession> beginOAuthLogin(
+    Uri redirectUri, {
+    bool create = false,
+  }) async {
+    oauthStarts.add((redirect: redirectUri, create: create));
+    return OidcLoginSession(
+      oidcClientData: OidcClientData(
+        clientId: 'client',
+        clientIdIssuedAt: null,
+        clientInformation: OidcClientInformation(
+          clientName: 'Sennit',
+          clientUri: Uri.parse('https://erictrenkel.com/apps/sennit/'),
+          logoUri: null,
+          tosUri: null,
+          policyUri: null,
+        ),
+        additionalProperties: const {},
+      ),
+      authenticationUri: _page,
+      redirectUri: redirectUri,
+      codeVerifier: 'verifier',
+      state: 'the-state',
+    );
+  }
+
+  @override
+  Future<void> completeOAuthLogin(
+    OidcLoginSession attempt,
+    Uri callback,
+  ) async {
+    if (oauthFailure case final error?) throw error;
+    oauthCallbacks.add(callback);
+  }
+
+  @override
+  Uri ssoRedirectUrl(String redirectUrl, {String? providerId}) => Uri.parse(
+    'https://matrix.aachen.dev/_matrix/client/v3/login/sso/redirect/'
+    '$providerId',
+  ).replace(queryParameters: {'redirectUrl': redirectUrl});
+
+  @override
+  Future<void> completeSsoLogin(Uri callback) async {
+    ssoCallbacks.add(callback);
+  }
 
   @override
   Future<RegistrationOffer> registrationOffer() async {
