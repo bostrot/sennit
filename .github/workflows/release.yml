@@ -117,6 +117,49 @@ jobs:
           name: release-notes
           path: notes/*
 
+  web:
+    # Sennit Web: the app compiled for the browser, which phones download on
+    # demand and serve to a paired browser. Not shipped inside any app. The
+    # archive's manifest is signed with SENNIT_WEB_SIGNING_KEY, whose public
+    # half is in packages/weft_remote/lib/src/web_bundle.dart; without the
+    # secret the job builds and stops, and the release has no web bundle —
+    # every app then says the bundle is not available for its version.
+    needs: verify
+    if: needs.verify.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      SENNIT_WEB_SIGNING_KEY: ${{ secrets.SENNIT_WEB_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-flutter
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Bundle the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: apps/weft/assets
+      - run: flutter pub get
+      # --no-web-resources-cdn: CanvasKit comes from the phone, not from a
+      # Google CDN — the browser talks to nobody but the phone.
+      - run: flutter build web --release --no-web-resources-cdn ${{ env.DIRECT_DEFINES }}
+        working-directory: apps/weft
+      - run: tooling/scripts/fetch_sqlite_wasm.sh apps/weft/build/web
+      - name: Pack and sign
+        if: env.SENNIT_WEB_SIGNING_KEY != ''
+        run: dart run tooling/scripts/package_web_bundle.dart apps/weft/build/web "$VERSION" dist
+      - name: No signing key
+        if: env.SENNIT_WEB_SIGNING_KEY == ''
+        run: |
+          echo "::warning::SENNIT_WEB_SIGNING_KEY is not set; this release has no Sennit Web bundle."
+          mkdir -p dist && touch dist/.keep
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: dist/*
+          if-no-files-found: ignore
+
   android:
     needs: verify
     if: needs.verify.outputs.build == 'true'
@@ -542,7 +585,7 @@ jobs:
           path: dist/*
 
   publish:
-    needs: [verify, android, linux, windows, macos, ios]
+    needs: [verify, android, linux, windows, macos, ios, web]
     runs-on: ubuntu-latest
     permissions:
       contents: write

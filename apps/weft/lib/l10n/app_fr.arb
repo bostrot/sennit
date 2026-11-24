@@ -1674,5 +1674,17 @@
   "deviceSyncStatusWaiting": "En attente du reste de la copie partagée…",
   "deviceSyncStatusFailed": "Serveur injoignable. Nouvel essai sous peu.",
   "deviceSyncNow": "Synchroniser",
-  "deviceSyncReplace": "Remplacer par cet appareil"
+  "deviceSyncReplace": "Remplacer par cet appareil",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "Utiliser Sennit dans un navigateur, servi par cet appareil",
+  "sennitWebNotice": "Sennit Web fonctionne dans un navigateur et reçoit tout de cet appareil, chiffré de bout en bout. Ses fichiers ne font pas partie de l’app : téléchargez-les une fois depuis la page des versions de Sennit, qui vérifie leur signature avant de les utiliser.",
+  "sennitWebBundleTitle": "Fichiers du navigateur",
+  "sennitWebBundleAbsent": "Non téléchargés",
+  "sennitWebBundleDownloading": "Téléchargement… {percent} %",
+  "sennitWebBundleReady": "Téléchargés et vérifiés · {megabytes} Mo",
+  "sennitWebBundleUnavailable": "Pas encore disponible pour cette version.",
+  "sennitWebBundleNetwork": "Échec du téléchargement. Vérifiez votre connexion et réessayez.",
+  "sennitWebBundleRejected": "Le téléchargement n’a pas passé la vérification de signature et a été supprimé.",
+  "sennitWebDownload": "Télécharger",
+  "sennitWebRemove": "Supprimer"
 }

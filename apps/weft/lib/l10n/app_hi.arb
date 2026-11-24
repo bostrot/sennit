@@ -1674,5 +1674,17 @@
   "deviceSyncStatusWaiting": "शेयर की गई कॉपी के बाकी हिस्से का इंतज़ार…",
   "deviceSyncStatusFailed": "आपके होमसर्वर तक नहीं पहुँच सके। थोड़ी देर में फिर कोशिश होगी।",
   "deviceSyncNow": "अभी सिंक करें",
-  "deviceSyncReplace": "इस डिवाइस वाली से बदलें"
+  "deviceSyncReplace": "इस डिवाइस वाली से बदलें",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "ब्राउज़र में Sennit इस्तेमाल करें, यह डिवाइस उसे चलाता है",
+  "sennitWebNotice": "Sennit Web ब्राउज़र में चलता है और सब कुछ इसी डिवाइस से लेता है, एंड-टू-एंड एन्क्रिप्टेड। इसकी फ़ाइलें ऐप का हिस्सा नहीं हैं: इन्हें एक बार Sennit के रिलीज़ पेज से डाउनलोड करें, और इस्तेमाल से पहले Sennit इनका सिग्नेचर जाँचता है।",
+  "sennitWebBundleTitle": "ब्राउज़र फ़ाइलें",
+  "sennitWebBundleAbsent": "डाउनलोड नहीं हुई",
+  "sennitWebBundleDownloading": "डाउनलोड हो रहा है… {percent}%",
+  "sennitWebBundleReady": "डाउनलोड और जाँच पूरी · {megabytes} MB",
+  "sennitWebBundleUnavailable": "इस वर्शन के लिए अभी उपलब्ध नहीं है।",
+  "sennitWebBundleNetwork": "डाउनलोड नहीं हो सका। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+  "sennitWebBundleRejected": "डाउनलोड सिग्नेचर की जाँच में फ़ेल हुआ और हटा दिया गया।",
+  "sennitWebDownload": "डाउनलोड करें",
+  "sennitWebRemove": "हटाएँ"
 }

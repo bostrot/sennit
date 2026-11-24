@@ -1675,5 +1675,17 @@
   "deviceSyncStatusWaiting": "正在等待共享副本的其余部分…",
   "deviceSyncStatusFailed": "无法连接你的服务器，稍后将重试。",
   "deviceSyncNow": "立即同步",
-  "deviceSyncReplace": "用此设备的内容替换"
+  "deviceSyncReplace": "用此设备的内容替换",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "在浏览器中使用 Sennit，由此设备提供",
+  "sennitWebNotice": "Sennit Web 在浏览器中运行，所有内容都由此设备端到端加密提供。它的文件不包含在应用中：请从 Sennit 的发布页面下载一次，Sennit 会在使用前验证签名。",
+  "sennitWebBundleTitle": "浏览器文件",
+  "sennitWebBundleAbsent": "未下载",
+  "sennitWebBundleDownloading": "正在下载… {percent}%",
+  "sennitWebBundleReady": "已下载并验证 · {megabytes} MB",
+  "sennitWebBundleUnavailable": "此版本暂不可用。",
+  "sennitWebBundleNetwork": "下载失败。请检查网络连接后重试。",
+  "sennitWebBundleRejected": "下载未通过签名验证，已删除。",
+  "sennitWebDownload": "下载",
+  "sennitWebRemove": "删除"
 }

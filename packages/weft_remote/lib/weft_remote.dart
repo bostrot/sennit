@@ -3,3 +3,4 @@ library;
 
 export 'src/domain_codec.dart';
 export 'src/rpc.dart';
+export 'src/web_bundle.dart';

@@ -34,6 +34,7 @@ import 'mcp_screen.dart';
 import 'notifications_screen.dart';
 import 'pro_screen.dart';
 import 'security_screen.dart';
+import 'sennit_web_screen.dart';
 import 'shortcuts_sheet.dart';
 import 'sms_screen.dart';
 import 'surfaces_screen.dart';
@@ -217,6 +218,14 @@ class SettingsScreen extends ConsumerWidget {
               feature: ProFeature.integrations,
               onTap: () => push(const IntegrationsScreen()),
             ),
+            // The browser build is the client; it does not serve itself.
+            if (!kDemoMode && !kIsWeb)
+              tile(
+                icon: Icons.language_rounded,
+                title: l10n.settingsSennitWebTitle,
+                subtitle: l10n.settingsSennitWebSubtitle,
+                onTap: () => push(const SennitWebScreen()),
+              ),
             tile(
               icon: Icons.terminal_rounded,
               title: l10n.settingsMcpTitle,

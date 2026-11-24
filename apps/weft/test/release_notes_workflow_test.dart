@@ -53,7 +53,8 @@ void main() {
   });
 
   test('every release build bundles the notes before it builds', () {
-    // One download per platform job, each ahead of its `flutter pub get`.
+    // One download per platform job — the browser bundle's included — each
+    // ahead of its `flutter pub get`.
     final downloads = RegExp(
       r'- name: Bundle the release notes\n'
       r'        uses: actions/download-artifact@v4\n'
@@ -62,7 +63,7 @@ void main() {
       r'          path: apps/weft/assets\n'
       r'      - run: flutter pub get\n',
     ).allMatches(release);
-    expect(downloads, hasLength(5));
+    expect(downloads, hasLength(6));
     expect(
       release,
       contains('--github notes/github.md --app-asset notes/release_notes.json'),

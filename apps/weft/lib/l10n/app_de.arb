@@ -1674,5 +1674,17 @@
   "deviceSyncStatusWaiting": "Warte auf den Rest der geteilten Kopie …",
   "deviceSyncStatusFailed": "Homeserver nicht erreichbar. Neuer Versuch in Kürze.",
   "deviceSyncNow": "Jetzt abgleichen",
-  "deviceSyncReplace": "Durch dieses Gerät ersetzen"
+  "deviceSyncReplace": "Durch dieses Gerät ersetzen",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "Sennit im Browser nutzen, bereitgestellt von diesem Gerät",
+  "sennitWebNotice": "Sennit Web läuft im Browser und bekommt alles von diesem Gerät, Ende-zu-Ende-verschlüsselt. Seine Dateien gehören nicht zur App: Lade sie einmal von Sennits Release-Seite herunter, Sennit prüft vor der Nutzung ihre Signatur.",
+  "sennitWebBundleTitle": "Browser-Dateien",
+  "sennitWebBundleAbsent": "Nicht heruntergeladen",
+  "sennitWebBundleDownloading": "Wird heruntergeladen … {percent} %",
+  "sennitWebBundleReady": "Heruntergeladen und geprüft · {megabytes} MB",
+  "sennitWebBundleUnavailable": "Für diese Version noch nicht verfügbar.",
+  "sennitWebBundleNetwork": "Download fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.",
+  "sennitWebBundleRejected": "Der Download hat die Signaturprüfung nicht bestanden und wurde gelöscht.",
+  "sennitWebDownload": "Herunterladen",
+  "sennitWebRemove": "Entfernen"
 }
