@@ -30,6 +30,17 @@ fi
 [ -f "$REPO/docs/release-notes/$VERSION.md" ] ||
   echo "warning: no docs/release-notes/$VERSION.md — the release notes will list commit titles" >&2
 
+# Play shows 500 characters, so it gets its own short text, and CI fails
+# without it: docs/release-notes/$VERSION.play.md and .play.de-DE.md.
+missing=0
+for name in "$VERSION.play.md" "$VERSION.play.de-DE.md"; do
+  [ -f "$REPO/docs/release-notes/$name" ] || {
+    echo "no docs/release-notes/$name — Play's short \"What's new\" text (see docs/release-notes/README.md)" >&2
+    missing=1
+  }
+done
+[ "$missing" = 0 ] || exit 1
+
 # +1 for the release commit this script is about to make.
 BUILD=$(( $(git -C "$REPO" rev-list --count HEAD) + 1 ))
 

@@ -1,0 +1,41 @@
+name: Play release notes
+
+# Rewrites the "What's new" text of a release already on a Play track from
+# docs/release-notes/<version>.play*.md on main: for a release that went out
+# with a wrong or cut text. Only the notes change — see
+# tooling/store/play_notes.py. Promoting an internal release copies its
+# notes, so fixing internal before 03:00 fixes the next beta too.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The release, e.g. 1.0.25
+        required: true
+      track:
+        description: The Play track
+        type: choice
+        options: [internal, beta, production]
+        default: internal
+      dry_run:
+        description: Print and validate only, change nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  notes:
+    name: Set the Play release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set the notes
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          VERSION: ${{ inputs.version }}
+          TRACK: ${{ inputs.track }}
+          APPLY: ${{ !inputs.dry_run && '--apply' || '' }}
+        run: python3 tooling/store/play_notes.py "$VERSION" --track "$TRACK" $APPLY

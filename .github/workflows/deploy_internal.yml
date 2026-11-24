@@ -186,7 +186,8 @@ jobs:
         if: steps.check_version.outputs.changed == 'true'
         # The same text the GitHub release and App Store Connect get, from
         # the same commit — see tooling/scripts/release_notes.py. Play's
-        # "What's new" takes 500 characters; the app bundles the rest.
+        # "What's new" takes 500 characters, so it gets the short
+        # docs/release-notes/<version>.play*.md, one file per language.
         run: |
           version=$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)\+.*/\1/p' apps/weft/pubspec.yaml)
           python3 tooling/scripts/release_notes.py "$version" \

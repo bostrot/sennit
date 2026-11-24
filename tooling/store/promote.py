@@ -320,11 +320,24 @@ def release_notes(sha, version, flag):
             subprocess.run([sys.executable, os.path.join(tree, 'tooling', 'scripts',
                                                          'release_notes.py'),
                             version, flag, out], check=True, capture_output=True)
-            path = os.path.join(out, 'whatsnew-en-US') if flag == '--play-dir' else out
-            with open(path, encoding='utf-8') as f:
+            if flag == '--play-dir':
+                return play_notes_from(out)
+            with open(out, encoding='utf-8') as f:
                 return f.read().strip()
         finally:
             git('worktree', 'remove', '--force', tree)
+
+
+def play_notes_from(directory):
+    """Play's releaseNotes from release_notes.py's `whatsnew-<language>`
+    files."""
+    notes = []
+    for name in sorted(os.listdir(directory)):
+        if name.startswith('whatsnew-'):
+            with open(os.path.join(directory, name), encoding='utf-8') as f:
+                notes.append({'language': name[len('whatsnew-'):],
+                              'text': f.read().strip()[:PLAY_LIMIT]})
+    return notes
 
 
 # --- Google Play --------------------------------------------------------------
@@ -364,8 +377,8 @@ def play(apply, audit, now, max_age_hours, rollout, track):
 
         if decision.promote:
             if not release.get('releaseNotes') and candidate.sha:
-                notes = release_notes(candidate.sha, candidate.version, '--play-dir')
-                release['releaseNotes'] = [{'language': 'en-US', 'text': notes[:PLAY_LIMIT]}]
+                release['releaseNotes'] = release_notes(candidate.sha, candidate.version,
+                                                        '--play-dir')
             releases = play_track_releases(release, target, rollout)
             body = {'track': track, 'releases': releases}
             log('play', f'{track} track would become:')
