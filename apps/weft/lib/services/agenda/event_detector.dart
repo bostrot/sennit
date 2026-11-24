@@ -93,36 +93,115 @@ const _monthsDe = [
   'dezember',
 ];
 
+/// Counts people write out in "in zwei Wochen" / "in three days".
+const _numberWords = {
+  'a': 1,
+  'an': 1,
+  'one': 1,
+  'ein': 1,
+  'eine': 1,
+  'einem': 1,
+  'einer': 1,
+  'two': 2,
+  'zwei': 2,
+  'three': 3,
+  'drei': 3,
+  'four': 4,
+  'vier': 4,
+  'five': 5,
+  'fünf': 5,
+  'six': 6,
+  'sechs': 6,
+  'seven': 7,
+  'sieben': 7,
+  'eight': 8,
+  'acht': 8,
+  'nine': 9,
+  'neun': 9,
+  'ten': 10,
+  'zehn': 10,
+};
+
+/// "morgen" meaning tomorrow, not the noun "Morgen" (morning): "Guten
+/// Morgen!", "am Morgen", "heute Morgen" and "jeden Morgen" name no day.
+/// Reading the greeting as tomorrow put Thursday's appointment on Wednesday.
+const _tomorrowDe =
+    r'(?<!(?:guten|gutem|schönen|einen|am|jeden|heute|gestern|vorgestern|'
+    r'den|dem|diesen|diesem|ganzen|vom|zum|frühen|nächsten)\s+)'
+    r'(?<![\p{L}\p{N}])morgen(?![\p{L}\p{N}])';
+
+/// Parts of the day German glues onto a weekday: "Donnerstagabend",
+/// "donnerstags".
+const _weekdaySuffix = '(?:s|morgen|vormittag|mittag|nachmittag|abend|nacht)?';
+
 /// Scans [text] for a date/time worth putting in a calendar.
 ///
-/// [now] is injected rather than read so "tomorrow" is testable.
+/// [now] is when the message was *sent*, injected rather than read: "am
+/// Donnerstag" in a Tuesday message is that week's Thursday however many
+/// days later it is looked at, and "tomorrow" is testable. Days are counted
+/// on the local calendar — `DateTime(y, m, d + n)`, never `Duration(days:)`,
+/// which is 23 or 25 hours across a DST change.
+///
+/// Relative words, resolved against [now]'s local date:
+/// - heute/today/tonight, morgen/tomorrow, übermorgen/day after tomorrow;
+/// - in N Tagen/Wochen, in N days/weeks (digits or words up to ten);
+/// - a weekday name ("am Donnerstag", "nächsten Donnerstag", "friday") is
+///   its next occurrence after today. The weekday it is today means the one
+///   a week ahead — on a Monday, "Montag" is next Monday, because today
+///   would be "heute" — unless "diesen"/"this" asks for today.
 AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
   if (text.trim().length < 4) return null;
   final lower = text.toLowerCase();
+  now = now.toLocal();
+  DateTime daysAhead(int n) => DateTime(now.year, now.month, now.day + n);
 
   DateTime? date;
   var explicitDate = false;
 
   // --- relative days -------------------------------------------------------
-  if (RegExp(r'\b(day after tomorrow|übermorgen)\b').hasMatch(lower)) {
-    date = DateTime(now.year, now.month, now.day + 2);
-  } else if (RegExp(r'\b(tomorrow|morgen)\b').hasMatch(lower)) {
-    date = DateTime(now.year, now.month, now.day + 1);
-  } else if (RegExp(r'\b(today|tonight|heute)\b').hasMatch(lower)) {
-    date = DateTime(now.year, now.month, now.day);
+  final inSpan = RegExp(
+    '$_edgeBefore(?:in|within|innerhalb von)\\s+'
+    '(\\d{1,2}|${_numberWords.keys.join('|')})\\s+'
+    '(tag|tage|tagen|days?|wochen?|weeks?)$_edgeAfter',
+    unicode: true,
+  ).firstMatch(lower);
+  if (RegExp(
+    '$_edgeBefore(?:day after tomorrow|übermorgen)$_edgeAfter',
+    unicode: true,
+  ).hasMatch(lower)) {
+    date = daysAhead(2);
+  } else if (RegExp(
+    '$_edgeBefore(?:tomorrow)$_edgeAfter|$_tomorrowDe',
+    unicode: true,
+  ).hasMatch(lower)) {
+    date = daysAhead(1);
+  } else if (RegExp(
+    '$_edgeBefore(?:today|tonight|heute)$_edgeAfter',
+    unicode: true,
+  ).hasMatch(lower)) {
+    date = daysAhead(0);
+  } else if (inSpan != null) {
+    final count =
+        int.tryParse(inSpan.group(1)!) ?? _numberWords[inSpan.group(1)!]!;
+    final weeks = inSpan.group(2)!.startsWith('w');
+    date = daysAhead(count * (weeks ? 7 : 1));
   }
 
   // --- weekday names -------------------------------------------------------
   if (date == null) {
     for (final names in [_weekdaysEn, _weekdaysDe]) {
       for (var day = 0; day < names.length; day++) {
-        if (RegExp('\\b${names[day]}\\b').hasMatch(lower)) {
-          // Both lists are Monday-first; DateTime.weekday is Monday=1.
-          var ahead = (day + 1 - now.weekday) % 7;
-          if (ahead == 0) ahead = 7; // "Montag" on a Monday means next week.
-          date = DateTime(now.year, now.month, now.day + ahead);
-          break;
-        }
+        final match = RegExp(
+          '$_edgeBefore(?:(this|diesen|dieser|diese)\\s+)?'
+          '${names[day]}$_weekdaySuffix$_edgeAfter',
+          unicode: true,
+        ).firstMatch(lower);
+        if (match == null) continue;
+        // Both lists are Monday-first; DateTime.weekday is Monday=1.
+        var ahead = (day + 1 - now.weekday) % 7;
+        if (ahead == 0 && match.group(1) == null) ahead = 7;
+        date = daysAhead(ahead);
+        break;
       }
       if (date != null) break;
     }
@@ -143,7 +222,7 @@ AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
       if (year < 100) year += 2000;
       if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
         date = DateTime(year, month, day);
-        if (de.group(3) == null && date.isBefore(now)) {
+        if (de.group(3) == null && date.isBefore(daysAhead(0))) {
           date = DateTime(year + 1, month, day);
         }
         explicitDate = true;
@@ -157,13 +236,14 @@ AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
       for (var m = 0; m < months.length; m++) {
         final name = months[m];
         final match = RegExp(
-          '\\b(?:(\\d{1,2})\\.?\\s+$name|$name\\s+(\\d{1,2}))\\b',
+          '\\b(?:(\\d{1,2})(?:st|nd|rd|th)?\\.?\\s+(?:of\\s+)?$name|'
+          '$name\\s+(\\d{1,2})(?:st|nd|rd|th)?)\\b',
         ).firstMatch(lower);
         if (match != null) {
           final day = int.parse(match.group(1) ?? match.group(2)!);
           if (day >= 1 && day <= 31) {
             date = DateTime(now.year, m + 1, day);
-            if (date.isBefore(DateTime(now.year, now.month, now.day))) {
+            if (date.isBefore(daysAhead(0))) {
               date = DateTime(now.year + 1, m + 1, day);
             }
             explicitDate = true;
@@ -213,8 +293,7 @@ AgendaCandidate? detectAgendaEvent(String text, {required DateTime now}) {
   // A bare time with intent still means something — "meeting at 15:00" is
   // today's meeting.
   if (date == null && hour != null && keyword) {
-    date = DateTime(now.year, now.month, now.day);
-    if (hour < now.hour) date = date.add(const Duration(days: 1));
+    date = daysAhead(hour < now.hour ? 1 : 0);
   }
   if (date == null) return null;
 
@@ -255,8 +334,9 @@ final _whenPatterns =
             '(?:${months.join('|')})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?',
           ],
           // tomorrow, heute Abend, next friday morning
-          '(?:day after tomorrow|übermorgen|tomorrow|morgen|today|tonight|heute|'
-              '${_weekdaysEn.join('|')}|${_weekdaysDe.join('|')})'
+          '(?:day after tomorrow|übermorgen|tomorrow|$_tomorrowDe|today|tonight|'
+              'heute|(?:${_weekdaysEn.join('|')}|${_weekdaysDe.join('|')})'
+              '$_weekdaySuffix)'
               '(?:\\s+(?:morning|afternoon|evening|night|früh|vormittag|nachmittag|'
               'abend|nacht))?',
         ]

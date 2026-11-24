@@ -153,6 +153,11 @@ void main() {
         await tester.pumpAndSettle(const Duration(milliseconds: 50));
       }
 
+      // One more frame first. The bubbles join the selection area on the frame
+      // after they are laid out, and a settled thread schedules none — a drag
+      // into it finds nothing to select. A real mouse gets that frame from its
+      // own hover; this test used to get it from an agenda chip resolving.
+      await tester.pump();
       await setClipboard('nothing yet');
       await drag(from, to);
       await copy();
