@@ -401,15 +401,14 @@ jobs:
         run: |
           if [ "$HAS_SIGNING" = "true" ]; then
             SIGN=(codesign --force --options runtime --timestamp --sign "$IDENTITY")
-            TEAM_PREFIX="$(sed -nE 's/.*\(([A-Z0-9]{10})\)$/\1/p' <<< "$IDENTITY")."
           else
             SIGN=(codesign --force --sign -)
-            TEAM_PREFIX=""
           fi
-          # Xcode would expand $(TeamIdentifierPrefix) in the widget's app
-          # group; signing by hand has to do it itself.
-          sed "s/\$(TeamIdentifierPrefix)/$TEAM_PREFIX/g" "$WIDGET_ENTITLEMENTS" \
-            > "$RUNNER_TEMP/widget.entitlements"
+          # The entitlements files explain themselves in comments with `--`
+          # in them, which codesign's parser rejects. Xcode would hand it a
+          # normalised copy; signing by hand has to make one.
+          plutil -convert xml1 -o "$RUNNER_TEMP/app.entitlements" "$APP_ENTITLEMENTS"
+          plutil -convert xml1 -o "$RUNNER_TEMP/widget.entitlements" "$WIDGET_ENTITLEMENTS"
           for fw in "$APP/Contents/Frameworks"/*.framework; do
             if [ -d "$fw/Versions/A" ]; then
               "${SIGN[@]}" "$fw/Versions/A"
@@ -422,7 +421,7 @@ jobs:
           for appex in "$APP/Contents/PlugIns"/*.appex; do
             [ -e "$appex" ] && "${SIGN[@]}" --entitlements "$RUNNER_TEMP/widget.entitlements" "$appex"
           done
-          "${SIGN[@]}" --entitlements "$APP_ENTITLEMENTS" "$APP"
+          "${SIGN[@]}" --entitlements "$RUNNER_TEMP/app.entitlements" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -d --entitlements - "$APP" 2>/dev/null | grep -q com.apple.security.app-sandbox
           codesign -d --entitlements - "$APP" 2>/dev/null | grep -q com.apple.security.device.audio-input

@@ -69,7 +69,14 @@ void main() {
       macos,
       contains('APP_ENTITLEMENTS: apps/weft/macos/Runner/Release.entitlements'),
     );
-    expect(macos, contains(r'--entitlements "$APP_ENTITLEMENTS" "$APP"'));
+    expect(
+      macos,
+      contains(r'-o "$RUNNER_TEMP/app.entitlements" "$APP_ENTITLEMENTS"'),
+    );
+    expect(
+      macos,
+      contains(r'--entitlements "$RUNNER_TEMP/app.entitlements" "$APP"'),
+    );
     expect(macos, contains('--options runtime --timestamp'));
     expect(macos, isNot(contains('codesign --deep --force')));
   });
