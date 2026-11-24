@@ -17,7 +17,7 @@ and what was noticed but not done.
 
 - 2026-11-23 · Localization · The share sheet's title, summary line ("Reading 3 files…", "2 files", "Nothing to send", the quoted text), "via WhatsApp" and the networks a screen reader hears on each row follow the app's language · https://github.com/bostrot/sennit/pull/29
 
-- 2026-11-24 · User experience · Escape empties the Mac toolbar's search field (and leaves it once empty), and the field's clear button shows up while you type instead of only after a focus change · PRLINK
+- 2026-11-24 · User experience · Escape empties the Mac toolbar's search field (and leaves it once empty), and the field's clear button shows up while you type instead of only after a focus change · https://github.com/bostrot/sennit/pull/35
 
 ## Lessons from reviews
 
