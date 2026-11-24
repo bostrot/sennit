@@ -1,10 +1,7 @@
-import 'dart:io';
-
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 
 import 'migrations.dart';
+import 'sqlite_native.dart' if (dart.library.js_interop) 'sqlite_web.dart';
 
 /// Weft's own database, separate from the Matrix SDK's.
 ///
@@ -15,25 +12,29 @@ import 'migrations.dart';
 class WeftDatabase {
   WeftDatabase._(this.raw, this.path);
 
-  final Database raw;
+  final CommonDatabase raw;
 
   /// File path, or `:memory:`.
   final String path;
 
   /// Opens the app's database in the platform's support directory.
   static Future<WeftDatabase> open({String? directoryOverride}) async {
-    final directory =
-        directoryOverride ??
-        p.join((await getApplicationSupportDirectory()).path, 'weft');
-    final dir = Directory(directory);
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-
-    return WeftDatabase.openAt(p.join(directory, 'weft.db'));
+    await loadSqlite();
+    return WeftDatabase.openAt(
+      directoryOverride != null
+          ? databasePathIn(directoryOverride)
+          : await defaultDatabasePath(),
+    );
   }
+
+  /// Loads the SQLite engine where it is not linked in — the browser build,
+  /// which fetches it as WebAssembly. A no-op everywhere else. [openAt] needs
+  /// it to have finished.
+  static Future<void> loadEngine() => loadSqlite();
 
   /// Opens (or creates) a database at [path]. Pass `:memory:` for tests.
   factory WeftDatabase.openAt(String path) {
-    final db = sqlite3.open(path);
+    final db = openSqlite(path);
 
     // WAL lets the UI read while a backfill writes. Meaningless in memory, and
     // sqlite refuses it there, so it is skipped.

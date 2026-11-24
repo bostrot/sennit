@@ -12,7 +12,7 @@ import '../features/settings/models_screen.dart';
 import '../services/billing/entitlements.dart';
 import '../services/models/model_catalog.dart';
 import '../services/search/local_embedding_provider.dart';
-import '../services/transcription/local_whisper_provider.dart';
+import '../services/transcription/local_whisper.dart';
 import 'billing_providers.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';

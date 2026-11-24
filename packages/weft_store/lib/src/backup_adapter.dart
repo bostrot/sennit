@@ -44,7 +44,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 import 'package:weft_backup/weft_backup.dart';
 
 import 'weft_database.dart';
@@ -84,7 +84,7 @@ class StoreBackupSource implements BackupSource {
   final WeftDatabase _db;
   final Directory? _media;
 
-  Database get _raw => _db.raw;
+  CommonDatabase get _raw => _db.raw;
 
   @override
   Future<BackupSummary> summarise({required bool includeMedia}) async {
@@ -357,7 +357,7 @@ class StoreBackupSink implements BackupSink {
   final WeftDatabase _db;
   final Directory? _media;
 
-  Database get _raw => _db.raw;
+  CommonDatabase get _raw => _db.raw;
 
   /// Content hash to the folder-and-name it was written under, so a
   /// [MediaRefRecord] arriving after its bytes knows where they went.

@@ -27,6 +27,10 @@ dependencies:
   # which self-bundles its natives via Dart build hooks, so one code path
   # covers Android, iOS, macOS, Linux and Windows.
   sqflite_common_ffi: ^2.4.2
+  # Only for the `Database` type the browser build names in place of the ffi
+  # backend — see `database_web.dart`. Already in the lock through the line
+  # above.
+  sqflite_common: ^2.5.11
   weft_attachments: ^0.1.0
   # The call *decisions* — glare, candidate ordering, invite expiry — stay pure
   # Dart in weft_call. This package only maps them to and from `m.call.*`
