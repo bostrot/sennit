@@ -372,6 +372,18 @@ class LlmBudget {
     return ((room * kLlmCharsPerToken) ~/ 10).clamp(hosted ? 1200 : 400, 6000);
   }
 
+  /// The share of [memoryChars] [feature]'s prompt carries.
+  ///
+  /// The chips and a calendar title are short answers wanted at once, and
+  /// need little more than the names and the tone; a to-do review needs who
+  /// is who; a message the user sends gets everything.
+  int memoryCharsFor(AiFeature feature) => switch (feature) {
+    AiFeature.smartReplies ||
+    AiFeature.eventTitle => math.max(hosted ? 600 : 240, memoryChars ~/ 2),
+    AiFeature.todo => math.max(hosted ? 800 : 300, (memoryChars * 2) ~/ 3),
+    _ => memoryChars,
+  };
+
   /// The most of one person's note a prompt carries: a third of
   /// [memoryChars], so a group's few speakers and the chat itself all fit.
   int get personMemoryChars => (memoryChars ~/ 3).clamp(160, 2000);

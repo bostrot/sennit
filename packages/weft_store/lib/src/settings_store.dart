@@ -286,11 +286,12 @@ abstract final class WeftSettings {
   /// a note nobody sends is still a note.
   static const String personMemoryInAi = 'ai.person_memory';
 
-  /// Whether the model is asked, after it wrote a quick message, what it
-  /// learned about the person from the conversation. What it answers is only
-  /// ever offered for the user to accept; nothing is written to a note on its
-  /// own. Off unless set.
-  static const String personMemorySuggest = 'ai.person_memory_suggest';
+  /// Whether Sennit keeps the memory up to date by itself: every so often it
+  /// sends an active chat to the model and writes what it learned straight
+  /// into the chat's and its people's memory, marked as learned, for the user
+  /// to edit, pin or undo. On unless set — the owner's call — but only ever
+  /// acted on while [personMemoryInAi] is on too.
+  static const String personMemoryAutoLearn = 'ai.person_memory_auto';
 
   /// Whether facts may be learned from end-to-end encrypted chats too.
   ///

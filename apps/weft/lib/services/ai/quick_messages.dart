@@ -709,7 +709,12 @@ Future<AutoReplyDraft> composeQuickMessage({
           language: language,
           recipient: recipient,
           groupName: groupName,
-          memory: memoryPromptBlock(memory, baseUrl: base, budget: limits),
+          memory: memoryPromptBlock(
+            memory,
+            baseUrl: base,
+            budget: limits,
+            feature: AiFeature.quickMessage,
+          ),
         ),
       },
       maxTokens: room.maxTokens,

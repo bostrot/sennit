@@ -451,7 +451,9 @@ final backupServiceProvider = Provider<BackupService>((ref) {
     picker: ref.watch(archivePickerProvider),
     appVersion: kSennitVersion,
     background: ref.watch(backgroundWorkProvider),
-    personNotes: () => ref.read(personMemoryProvider).notes,
+    // Learned facts ride along as part of each note: an archive has one note
+    // per key, and a restored fact is the user's from then on.
+    personNotes: () => ref.read(personMemoryProvider).notesWithLearned,
     restorePersonNotes: (notes, {required replace}) => ref
         .read(personMemoryProvider.notifier)
         .restore(MemoryBook(notes: notes), replace: replace),

@@ -9,11 +9,42 @@ import '../../app/person_memory_providers.dart';
 import '../../services/ai/conversation_context.dart' show kAiContextMessages;
 import '../../services/ai/llm_budget.dart' show AiFeature;
 
+/// The full explanation of personal memory: the two layers, when learning
+/// runs and what it sends, where it is all kept.
+Future<void> showMemoryDetails(BuildContext context, WidgetRef ref) {
+  final l10n = context.l10n;
+  final messages =
+      ref
+          .read(autoReplyEndpointProvider)
+          ?.budget
+          .forFeature(AiFeature.learnFacts)
+          .maxMessages ??
+      kAiContextMessages;
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.personMemoryDetailsTitle),
+      content: SingleChildScrollView(
+        child: Text(l10n.personMemoryDetails(messages)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).okButtonLabel),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Personal memory's switches, and the one place that says what leaves the
 /// device because of it.
 ///
-/// The notes are written on each person's contact screen; this is where the
-/// user decides whether any of them is ever sent.
+/// The notes are written, and what was learned is checked, on each chat's and
+/// person's memory screen; this is where the user decides whether any of it is
+/// ever sent, and whether it keeps itself up to date. The screen opens with
+/// one or two lines; the whole story is behind "Learn more", in
+/// [showMemoryDetails].
 class PersonMemorySettingsScreen extends ConsumerWidget {
   const PersonMemorySettingsScreen({super.key});
 
@@ -59,19 +90,25 @@ class PersonMemorySettingsScreen extends ConsumerWidget {
                 WeftSpace.lg,
                 WeftSpace.md,
                 WeftSpace.lg,
-                WeftSpace.sm,
+                0,
               ),
               child: Text(
-                l10n.personMemoryExplainer(
-                  ref
-                          .watch(autoReplyEndpointProvider)
-                          ?.budget
-                          .forFeature(AiFeature.learnFacts)
-                          .maxMessages ??
-                      kAiContextMessages,
-                ),
+                l10n.personMemoryExplainer,
+                key: const ValueKey('person-memory-explainer'),
                 style: context.text.bodyMedium?.copyWith(
                   color: context.colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(start: WeftSpace.sm),
+                child: TextButton.icon(
+                  key: const ValueKey('person-memory-learn-more'),
+                  onPressed: () => showMemoryDetails(context, ref),
+                  icon: const Icon(Icons.info_outline_rounded, size: 18),
+                  label: Text(l10n.personMemoryLearnMore),
                 ),
               ),
             ),
@@ -84,12 +121,13 @@ class PersonMemorySettingsScreen extends ConsumerWidget {
               onChanged: (on) => save(settings.copyWith(useInAi: on)),
             ),
             SwitchListTile(
-              secondary: const Icon(Icons.lightbulb_outline_rounded),
-              title: Text(l10n.personMemorySuggestTitle),
-              subtitle: Text(l10n.personMemorySuggestSubtitle),
-              value: settings.useInAi && settings.suggestFacts,
+              key: const ValueKey('person-memory-auto-learn'),
+              secondary: const Icon(Icons.update_rounded),
+              title: Text(l10n.personMemoryAutoTitle),
+              subtitle: Text(l10n.personMemoryAutoSubtitle),
+              value: settings.learnsAutomatically,
               onChanged: settings.useInAi
-                  ? (on) => save(settings.copyWith(suggestFacts: on))
+                  ? (on) => save(settings.copyWith(autoLearn: on))
                   : null,
             ),
             SwitchListTile(

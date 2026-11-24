@@ -59,7 +59,6 @@ import '../call/call_labels.dart' show formatCallDuration;
 import '../call/external_call.dart';
 import '../call/start_call.dart';
 import '../contact/contact_profile.dart';
-import '../contact/person_memory_screen.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
 import '../../services/agenda/device_calendar.dart';
@@ -3424,48 +3423,6 @@ class _ChatViewState extends ConsumerState<ChatView> {
       selection: TextSelection.collapsed(offset: next.length),
     );
     _composerFocus.requestFocus();
-    unawaited(_learnAfterQuickMessage(chat));
-  }
-
-  /// Asks the model what is worth remembering from the chat, after a quick
-  /// message was written in it — only when the user turned that on, and only
-  /// as facts to accept or dismiss on the chat's memory screen.
-  ///
-  /// After the draft rather than with it: the user is waiting on the draft,
-  /// and on nothing here.
-  Future<void> _learnAfterQuickMessage(Chat chat) async {
-    final settings = ref.read(personMemorySettingsProvider);
-    if (!settings.suggestFacts) return;
-    final result = await learnPersonFacts(
-      settings: settings,
-      endpoint: ref.read(autoReplyEndpointProvider),
-      memory: ref.read(personMemoryProvider.notifier),
-      chat: chat,
-      people: memoryPeopleFor(
-        ref.read(chatRepositoryProvider).identityGraph,
-        chat,
-        _view.messages,
-      ),
-      messages: _view.messages,
-      client: ref.read(quickMessageClientProvider),
-    );
-    if (!mounted || result.outcome != PersonFactsOutcome.proposed) return;
-    final l10n = context.l10n;
-    ScaffoldMessenger.maybeOf(context)
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(l10n.personMemoryLearned(result.added, chat.title)),
-          action: SnackBarAction(
-            label: l10n.personMemoryReview,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => ChatMemoryScreen(chatId: chat.id),
-              ),
-            ),
-          ),
-        ),
-      );
   }
 
   /// The first name of whoever a one-to-one chat is with: the chat's own name

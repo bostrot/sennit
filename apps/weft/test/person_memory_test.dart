@@ -633,31 +633,82 @@ Mia (5), Ben (3)
       expect((await learn(via: null)).outcome, PersonFactsOutcome.noEndpoint);
     });
 
-    test('proposes into the chat, and leaves every note alone', () async {
+    test('writes into the chat and the person, never into a note', () async {
+      const annaKeys = ['dm:!dm:example.org'];
       memory
         ..saveNote(keys, 'Planning the Lisbon trip')
-        ..saveNote(const ['dm:!dm:example.org'], 'Calls me Ricky');
+        ..saveNote(annaKeys, 'Calls me Ricky');
       late Map<String, Object?> sent;
       final result = await learn(
         client: _answering(
-          '{"facts": ["Tochter Mia hat morgen Geburtstag"]}',
+          '{"add": [{"fact": "Tochter Mia hat morgen Geburtstag", '
+          '"about": "Anna"}, {"fact": "Schreibt mit vielen Emojis", '
+          '"about": "chat"}], "update": [], "drop": []}',
           onRequest: (b) => sent = b,
         ),
       );
       expect(result, (
-        outcome: PersonFactsOutcome.proposed,
-        added: 1,
+        outcome: PersonFactsOutcome.learned,
+        changed: 2,
         status: null,
       ));
       expect(memory.book.noteFor(keys), 'Planning the Lisbon trip');
-      expect(memory.book.suggestionsFor(keys), [
-        'Tochter Mia hat morgen Geburtstag',
-      ]);
-      // The notes go along, so the model can leave out what is known.
+      expect(memory.book.noteFor(annaKeys), 'Calls me Ricky');
+      expect(
+        [for (final f in memory.book.learnedFor(annaKeys)) f.text],
+        ['Tochter Mia hat morgen Geburtstag'],
+      );
+      expect(
+        [for (final f in memory.book.learnedFor(keys)) f.text],
+        ['Schreibt mit vielen Emojis'],
+      );
+      expect(memory.book.suggestionsFor(keys), isEmpty);
+      expect(memory.book.undoTouches(keys), isTrue);
+      // The notes go along as fixed, so the model can leave out what is
+      // known and cannot change it.
       final last = (sent['messages'] as List).last as Map;
       expect(last['content'], contains('Calls me Ricky'));
       expect(last['content'], contains('Planning the Lisbon trip'));
       expect(last['content'], contains('Anna: Mia hat morgen Geburtstag!'));
+      expect(last['content'], contains('People: Anna'));
+    });
+
+    test('rewrites and drops what it learned before, by number', () async {
+      final at = DateTime(2026, 11, 1);
+      memory.learn(
+        const MemoryUpdate(
+          adds: [
+            MemoryAddition('Arbeitet bei der Post', about: 'Anna'),
+            MemoryAddition('Plant ein Treffen am Samstag'),
+          ],
+        ),
+        chatKeys: keys,
+        people: const [
+          (name: 'Anna', keys: ['dm:!dm:example.org']),
+        ],
+        numbered: const [],
+        now: at,
+      );
+      late Map<String, Object?> sent;
+      final result = await learn(
+        client: _answering(
+          '{"add": [], "update": [{"id": 2, "fact": "Arbeitet jetzt bei '
+          'der Bahn"}], "drop": [1]}',
+          onRequest: (b) => sent = b,
+        ),
+      );
+      final last = ((sent['messages'] as List).last as Map)['content'];
+      expect(last, contains('1. [chat] Plant ein Treffen am Samstag'));
+      expect(last, contains('2. [Anna] Arbeitet bei der Post'));
+      expect(result.outcome, PersonFactsOutcome.learned);
+      expect(memory.book.learnedFor(keys), isEmpty);
+      expect(
+        [
+          for (final f in memory.book.learnedFor(['dm:!dm:example.org']))
+            f.text,
+        ],
+        ['Arbeitet jetzt bei der Bahn'],
+      );
     });
 
     test('a failed request is a failure, not "nothing new"', () async {
@@ -701,7 +752,7 @@ Mia (5), Ben (3)
       );
       expect(asked, hasLength(2));
       expect(asked.last, greaterThan(asked.first));
-      expect(result.outcome, PersonFactsOutcome.proposed);
+      expect(result.outcome, PersonFactsOutcome.learned);
     });
 
     // What the owner's Qwen behind litellm answered with 400 tokens: all of
@@ -715,7 +766,7 @@ Mia (5), Ben (3)
         ),
       );
       expect(result.outcome, PersonFactsOutcome.cutOff);
-      expect(memory.book.suggestionsFor(keys), isEmpty);
+      expect(memory.book.learnedFor(keys), isEmpty);
 
       final inline = await learn(
         client: _answering('<think>Tom said', finishReason: 'length'),
@@ -739,14 +790,14 @@ Mia (5), Ben (3)
       expect(result.outcome, PersonFactsOutcome.timedOut);
     });
 
-    test('a fenced, thought-through answer is proposed', () async {
+    test('a fenced, thought-through answer is learned', () async {
       final result = await learn(
         client: _answering(
           '<think>Mia is her daughter.</think>\n```json\n'
           '{"facts": ["Tochter Mia hat morgen Geburtstag"]}\n```',
         ),
       );
-      expect(result.outcome, PersonFactsOutcome.proposed);
+      expect(result.outcome, PersonFactsOutcome.learned);
     });
 
     test('both sides are sent, encrypted messages too when allowed', () async {

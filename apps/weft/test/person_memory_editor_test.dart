@@ -8,6 +8,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/app/localisation.dart';
@@ -173,24 +174,70 @@ void main() {
         size: size,
         stores: stores,
       );
-      expect(find.text(en.personMemoryExplainer(24)), findsOneWidget);
+      expect(find.text(en.personMemoryExplainer), findsOneWidget);
 
       SwitchListTile tile(String title) => tester.widget<SwitchListTile>(
         find.widgetWithText(SwitchListTile, title),
       );
       expect(tile(en.personMemoryUseInAi).value, isFalse);
-      expect(tile(en.personMemorySuggestTitle).onChanged, isNull);
+      expect(tile(en.personMemoryAutoTitle).onChanged, isNull);
+      expect(tile(en.personMemoryAutoTitle).value, isFalse);
       expect(tile(en.personMemoryEncryptedTitle).onChanged, isNull);
 
       await tester.tap(find.text(en.personMemoryUseInAi));
       await tester.pumpAndSettle();
       expect(stores.settings.getBool(WeftSettings.personMemoryInAi), isTrue);
-      expect(tile(en.personMemorySuggestTitle).onChanged, isNotNull);
+      // Automatic learning is on as soon as the memory is.
+      expect(tile(en.personMemoryAutoTitle).onChanged, isNotNull);
+      expect(tile(en.personMemoryAutoTitle).value, isTrue);
       expect(tile(en.personMemoryEncryptedTitle).value, isFalse);
       expect(
         stores.settings.getBool(WeftSettings.personMemoryEncryptedChats),
         isFalse,
       );
+    });
+
+    // The explainer once took half a phone screen. One or two lines in every
+    // language, at phone width, in the real font; the whole story is behind
+    // "Learn more".
+    group('text length', () {
+      setUpAll(loadGoldenFonts);
+      for (final locale in const ['en', 'de', 'es', 'fr', 'pt', 'zh']) {
+        testWidgets('the explainer is two lines at most, in $locale', (
+          tester,
+        ) async {
+          await pumpWeft(
+            tester,
+            const PersonMemorySettingsScreen(),
+            size: const Size(390, 844),
+            stores: WeftStores.inMemory(),
+            variant: WeftGoldenVariant(name: locale, locale: Locale(locale)),
+          );
+          final l10n = lookupAppL10n(Locale(locale));
+          final explainer = find.byKey(
+            const ValueKey('person-memory-explainer'),
+          );
+          final lineHeight = tester
+              .renderObject<RenderParagraph>(explainer)
+              .getFullHeightForCaret(const TextPosition(offset: 0));
+          expect(
+            tester.getSize(explainer).height,
+            lessThanOrEqualTo(lineHeight * 2 + 1),
+          );
+          expect(find.text(l10n.personMemoryLearnMore), findsOneWidget);
+          for (final subtitle in [
+            l10n.personMemoryUseInAiSubtitle,
+            l10n.personMemoryAutoSubtitle,
+            l10n.personMemoryEncryptedSubtitle,
+          ]) {
+            expect(subtitle.length, lessThanOrEqualTo(70), reason: subtitle);
+          }
+
+          await tester.tap(find.text(l10n.personMemoryLearnMore));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.personMemoryDetailsTitle), findsOneWidget);
+        });
+      }
     });
   });
 }

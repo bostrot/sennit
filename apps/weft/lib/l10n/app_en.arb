@@ -434,7 +434,7 @@
   "@todoAiTitle": {
     "description": "Switch title: lets the AI assistant read chats and keep the to-do list. Keep under ~30 chars."
   },
-  "todoAiSubtitle": "When someone asks you for something, you promise something, or a chat shows a to-do is done, the list is updated. Only messages that sound like that are sent to your AI endpoint, with the recent conversation around them.",
+  "todoAiSubtitle": "Updates the list when someone asks, you promise, or a to-do gets done. Only such messages go to your AI endpoint, with recent context.",
   "@todoAiSubtitle": {
     "description": "Subtitle under the AI switch, saying what it does and what gets sent where."
   },
@@ -3736,9 +3736,9 @@
   "@endpointsLlmTitle": {
     "description": "Section heading on the endpoints screen for the chat model. 'LLM' is the usual abbreviation for a large language model and normally stays as-is. Keep under ~26 chars."
   },
-  "endpointsLlmSubtitle": "Any OpenAI-compatible chat endpoint. Point it at an Ollama or llama.cpp server on your own machine and message text never leaves your network — the same self-hosted rule as transcription and search above. Powers reply suggestions in notifications.",
+  "endpointsLlmSubtitle": "Any OpenAI-compatible chat endpoint. Run Ollama or llama.cpp on your own machine and message text never leaves your network. Powers every AI feature.",
   "@endpointsLlmSubtitle": {
-    "description": "Subtitle under the LLM heading. 'OpenAI', 'Ollama' and 'llama.cpp' are product names and are never translated."
+    "description": "Subtitle under the LLM heading. 'OpenAI', 'Ollama' and 'llama.cpp' are product names and are never translated. About 150 chars."
   },
   "endpointsTestConnection": "Test connection",
   "@endpointsTestConnection": {
@@ -9171,17 +9171,17 @@
   "@personMemoryUseTemplate": {
     "description": "Button that fills an empty note with the suggested headings. Keep under ~24 chars."
   },
-  "personMemoryOnNotice": "Stored only on this device. Quick messages, auto-replies and reply suggestions send it to your AI model.",
+  "personMemoryOnNotice": "Only on this device. Every AI feature uses it.",
   "@personMemoryOnNotice": {
-    "description": "Notice above the note when personal memory is on. About 140 chars."
+    "description": "Notice above the note when personal memory is on. About 50 chars."
   },
-  "personMemoryOffNotice": "Stored only on this device, and never sent anywhere until you turn on personal memory for AI.",
+  "personMemoryOffNotice": "Only on this device. Nothing is sent while personal memory is off.",
   "@personMemoryOffNotice": {
-    "description": "Notice above the note when personal memory is off. About 120 chars."
+    "description": "Notice above the note when personal memory is off. About 70 chars."
   },
-  "personMemoryLearn": "Learn from chat",
+  "personMemoryLearn": "Learn now",
   "@personMemoryLearn": {
-    "description": "Button that asks the AI model to suggest facts about the person from the recent conversation. Keep under ~22 chars."
+    "description": "Button on a chat's memory screen: update the memory from the chat now. Keep under ~20 chars."
   },
   "personMemorySuggestionsTitle": "Suggested by AI",
   "@personMemorySuggestionsTitle": {
@@ -9199,25 +9199,21 @@
   "@personMemoryDismiss": {
     "description": "Tooltip of the button that throws a suggested fact away. Keep under ~16 chars."
   },
-  "personMemoryLearned": "{count, plural, =1{1 new fact from {name} to review} other{{count} new facts from {name} to review}}",
+  "personMemoryLearned": "{count, plural, =1{1 fact updated for {name}} other{{count} facts updated for {name}}}",
   "@personMemoryLearned": {
-    "description": "Toast after the AI suggested new facts from a chat. {name} is the chat's name. About 60 chars.",
+    "description": "Toast after learning updated the memory of a chat. {name} is the chat's name. About 40 chars.",
     "placeholders": {
       "count": {
         "type": "int",
-        "description": "How many.",
+        "description": "How many facts were added, rewritten or dropped.",
         "example": "3"
       },
       "name": {
         "type": "String",
-        "description": "The chat's name for the person.",
+        "description": "The chat's name.",
         "example": "Anna"
       }
     }
-  },
-  "personMemoryReview": "Review",
-  "@personMemoryReview": {
-    "description": "Action on the toast that opens the person's note to review suggestions. Keep under ~12 chars."
   },
   "personMemorySuggestionCount": "{count, plural, =1{1 suggestion to review} other{{count} suggestions to review}}",
   "@personMemorySuggestionCount": {
@@ -9254,7 +9250,9 @@
   "@personMemoryLearnHttpError": {
     "description": "Toast when the AI endpoint answered Learn from chat with an HTTP error. {status} is the number, such as 401 or 500. About 80 chars.",
     "placeholders": {
-      "status": {"type": "int"}
+      "status": {
+        "type": "int"
+      }
     }
   },
   "personMemoryLearnTimedOut": "Your AI model took too long to answer. Try again later.",
@@ -9277,40 +9275,25 @@
   "@personMemorySettingsSubtitle": {
     "description": "Subtitle of the personal memory row in AI settings. About 60 chars."
   },
-  "personMemoryExplainer": "Sennit keeps two kinds of notes. Each chat, groups included, has its own: what is going on, plans, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual, the key facts. Both are stored only on this device, encrypted in the system keychain, and are not synced to your other devices. When personal memory is on, quick messages, auto-replies and reply suggestions send the chat’s note and the notes of the people in it, shortened (more so for a model on your own computer), to your AI model, along with the messages those features already send. Learn from chat sends up to the last {count} messages, as many as your model''s context window has room for, to the same model and only ever suggests facts. Nothing is added until you accept it. Notes are included in backups and deleted with your account.",
+  "personMemoryExplainer": "Remembers what matters in your chats so AI replies sound like you. Stays on this device.",
   "@personMemoryExplainer": {
-    "description": "Privacy notice at the top of the personal memory settings screen: the two kinds of notes, what is stored where and what is sent where. {count} is the most recent messages Learn from chat sends, which depends on the AI model's context window. About 850 chars.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "description": "How many.",
-        "example": "3"
-      }
-    }
+    "description": "One- or two-line intro at the top of the personal memory settings screen. Must stay short: details are behind the Learn more button. At most ~130 chars."
   },
   "personMemoryUseInAi": "Use personal memory in AI",
   "@personMemoryUseInAi": {
     "description": "Master switch: whether notes about people are ever sent to the AI model. Keep under ~36 chars."
   },
-  "personMemoryUseInAiSubtitle": "Quick messages, auto-replies and reply suggestions include what you noted about the chat and its people",
+  "personMemoryUseInAiSubtitle": "Every AI feature uses what is remembered",
   "@personMemoryUseInAiSubtitle": {
-    "description": "Subtitle of the master switch. About 90 chars."
-  },
-  "personMemorySuggestTitle": "Suggest facts after quick messages",
-  "@personMemorySuggestTitle": {
-    "description": "Switch: whether the AI suggests facts after writing a quick message. Keep under ~40 chars."
-  },
-  "personMemorySuggestSubtitle": "Your AI model proposes what to remember; you accept or dismiss each one",
-  "@personMemorySuggestSubtitle": {
-    "description": "Subtitle of the suggest switch. About 90 chars."
+    "description": "Subtitle of the master switch. About 45 chars."
   },
   "personMemoryEncryptedTitle": "Learn from encrypted chats",
   "@personMemoryEncryptedTitle": {
     "description": "Switch: whether facts may be learned from end-to-end encrypted chats. Keep under ~36 chars."
   },
-  "personMemoryEncryptedSubtitle": "Off by default, like link previews: learning sends an encrypted conversation to your AI model",
+  "personMemoryEncryptedSubtitle": "Also sends encrypted chats to your AI model",
   "@personMemoryEncryptedSubtitle": {
-    "description": "Subtitle of the encrypted-chats switch. About 110 chars."
+    "description": "Subtitle of the learn-from-encrypted-chats switch. About 45 chars."
   },
   "personMemoryStoredTitle": "Only on this device",
   "@personMemoryStoredTitle": {
@@ -9389,6 +9372,98 @@
   "personMemoryReplace": "Replace note",
   "@personMemoryReplace": {
     "description": "Button replacing the person's note with the AI's short version. Keep under ~16 chars."
+  },
+  "personMemoryLearnMore": "Learn more",
+  "@personMemoryLearnMore": {
+    "description": "Small button under the personal memory intro that opens the full explanation. Keep under ~16 chars."
+  },
+  "personMemoryDetailsTitle": "How memory works",
+  "@personMemoryDetailsTitle": {
+    "description": "Title of the dialog with the full explanation of personal memory."
+  },
+  "personMemoryDetails": "Each chat, groups included, has a memory of its own: plans, topics, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual.\n\nWith automatic learning on, Sennit reads an active chat again after about 30 new messages, or once a day, while the app is open. It sends up to the last {count} messages to your AI model and updates the memory itself: it adds new facts, rewrites changed ones and drops stale ones. Each learned fact shows when it was learned. Edit, pin or delete it, or undo the last update; AI never changes a fact you edited or pinned.\n\nWith personal memory on, every AI feature (reply suggestions, quick messages, auto-replies, to-dos and calendar titles) sends a shortened memory of the chat and its people with its request.\n\nMemory is stored only on this device, encrypted in the system keychain, not synced, included in backups and deleted with your account. Turn personal memory off and nothing is sent.",
+  "@personMemoryDetails": {
+    "description": "The full explanation of personal memory, in a dialog behind Learn more: the two kinds of memory, how and when automatic learning runs, what is sent where, what is stored where. {count} is the most recent messages a learning pass sends, which depends on the AI model's context window.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many.",
+        "example": "200"
+      }
+    }
+  },
+  "personMemoryAutoTitle": "Learn automatically",
+  "@personMemoryAutoTitle": {
+    "description": "Switch title: memory updates itself in the background. Keep under ~28 chars."
+  },
+  "personMemoryAutoSubtitle": "Keeps memory up to date as you chat",
+  "@personMemoryAutoSubtitle": {
+    "description": "Subtitle of the automatic learning switch. About 40 chars."
+  },
+  "personMemoryLearnedTitle": "Learned automatically",
+  "@personMemoryLearnedTitle": {
+    "description": "Heading over the facts the AI learned on its own."
+  },
+  "personMemoryLearnedHint": "AI never changes a fact you edit or pin.",
+  "@personMemoryLearnedHint": {
+    "description": "Line under that heading. About 45 chars."
+  },
+  "personMemoryLearnedAt": "Learned {date}",
+  "@personMemoryLearnedAt": {
+    "description": "Under a learned fact: when it was learned. {date} is a short date such as 24 Nov.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "A short date, as the locale writes it.",
+        "example": "24 Nov"
+      }
+    }
+  },
+  "personMemoryEditedAt": "Edited {date}",
+  "@personMemoryEditedAt": {
+    "description": "Under a learned fact the user edited: when. {date} is a short date.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "A short date, as the locale writes it.",
+        "example": "24 Nov"
+      }
+    }
+  },
+  "personMemoryPin": "Pin",
+  "@personMemoryPin": {
+    "description": "Tooltip: pin a learned fact so the AI never changes it."
+  },
+  "personMemoryUnpin": "Unpin",
+  "@personMemoryUnpin": {
+    "description": "Tooltip: unpin a learned fact."
+  },
+  "personMemoryEditFact": "Edit fact",
+  "@personMemoryEditFact": {
+    "description": "Tooltip and dialog title: edit a learned fact."
+  },
+  "personMemoryDeleteFact": "Delete",
+  "@personMemoryDeleteFact": {
+    "description": "Tooltip: delete a learned fact."
+  },
+  "personMemoryUpdatedAt": "Updated automatically {date}",
+  "@personMemoryUpdatedAt": {
+    "description": "Banner on a memory screen after an automatic update. {date} is a short date.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "A short date, as the locale writes it.",
+        "example": "24 Nov"
+      }
+    }
+  },
+  "personMemoryUndo": "Undo",
+  "@personMemoryUndo": {
+    "description": "Button on that banner: take the last automatic update back."
+  },
+  "personMemoryUndone": "Last automatic update undone.",
+  "@personMemoryUndone": {
+    "description": "Toast after Undo."
   },
   "shareTitle": "Share to…",
   "@shareTitle": {
