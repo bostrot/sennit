@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hindi, machine-seeded 2026-11-24. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml` — the base file carries the reasoning
+     behind each string, and this one only the words. A key here that is not
+     there (or missing from here) fails `l10n_test.dart`. -->
+<resources>
+    <string name="weft_widget_unread_name">Sennit अनपढ़े</string>
+    <string name="weft_widget_unread_description">सभी बातचीत में आपके कितने मैसेज अनपढ़े हैं।</string>
+    <string name="weft_widget_inbox_name">Sennit बातचीत</string>
+    <string name="weft_widget_inbox_description">आपकी हाल की बातचीत। खोलने के लिए किसी पर टैप करें।</string>
+    <string name="weft_widget_inbox_heading">हाल की</string>
+    <string name="weft_widget_unread_label">अनपढ़े</string>
+    <string name="weft_widget_merged">जोड़ी गई बातचीत</string>
+    <string name="weft_widget_signed_out_title">Sennit में साइन इन करें</string>
+    <string name="weft_widget_signed_out_body">अपनी बातचीत यहाँ देखने के लिए Sennit खोलें और साइन इन करें।</string>
+    <string name="weft_widget_disabled_title">विजेट बंद हैं</string>
+    <string name="weft_widget_disabled_body">Sennit खोलें और विजेट और वॉच में होम स्क्रीन विजेट चालू करें।</string>
+    <string name="weft_widget_stale_title">अपने फ़ोन पर Sennit खोलें</string>
+    <string name="weft_widget_stale_body">यह पुराना है। ताज़ा करने के लिए Sennit खोलें।</string>
+    <string name="weft_widget_empty_title">कोई बातचीत नहीं</string>
+    <string name="weft_widget_empty_body">अभी दिखाने को कुछ नहीं। बाहर रखे नेटवर्क की बातचीत यहाँ कभी नहीं दिखती।</string>
+    <string name="call_channel_name">कॉल</string>
+    <string name="call_channel_description">आने वाली कॉल।</string>
+    <string name="call_incoming">आने वाली कॉल</string>
+    <string name="call_incoming_video">आने वाली वीडियो कॉल</string>
+    <string name="call_in_progress">कॉल जारी है</string>
+    <string name="call_in_progress_video">वीडियो कॉल जारी है</string>
+    <string name="call_phone_account">Sennit कॉल</string>
+    <string name="connection_channel_name">कनेक्शन</string>
+    <string name="connection_channel_description">Sennit को जोड़े रखता है ताकि बंद रहने पर भी मैसेज आएँ।</string>
+    <string name="connection_title">मैसेज का इंतज़ार</string>
+    <string name="connection_body">Sennit बैकग्राउंड में जुड़ा रहता है।</string>
+
+    <plurals name="weft_widget_unread_count">
+        <item quantity="one">%1$d अनपढ़ा मैसेज</item>
+        <item quantity="other">%1$d अनपढ़े मैसेज</item>
+    </plurals>
+</resources>

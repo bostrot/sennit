@@ -27,38 +27,38 @@
 ///   that is not. And `intl`'s `DateFormat` formats every timestamp in the
 ///   default locale for ever.
 ///
-/// ## Where the eight locales actually stand
+/// ## Where the nine locales actually stand
 ///
-/// Not all eight are the same kind of thing, and the list flattens a
+/// Not all nine are the same kind of thing, and the list flattens a
 /// distinction worth keeping:
 ///
 /// - **`en`** is the template. Every key is written here first, with the
 ///   `@key` description a translator works from.
-/// - **`de`, `es`, `fr`, `pt`, `zh`** have a complete ARB file — the same key
-///   set as the template, checked by `l10n_test.dart` and
+/// - **`de`, `es`, `fr`, `pt`, `zh`, `hi`, `ar`** have a complete ARB file —
+///   the same key set as the template, checked by `l10n_test.dart` and
 ///   `tooling/scripts/l10n_lint.dart`. Every one of them still carries an
 ///   `@@x-review` line, which means machine-seeded and machine-checked but not
 ///   yet read by somebody who speaks the language. That line's *absence* is
 ///   the claim that a person has; nothing else records it. See
 ///   `docs/TRANSLATING.md`.
-/// - **`ar`, `he`** have no ARB file and are not waiting for one here. They are
-///   declared for layout, and Sennit's own words in them are English.
+/// - **`he`** has no ARB file and is not waiting for one here. It is declared
+///   for layout, and Sennit's own words in it are English.
 ///
 /// So "supported" means three different things down this list, and the honest
-/// summary is: five translated languages awaiting a human reader, two declared
-/// for right-to-left with English words, and English underneath all of them
-/// wherever a string is missing.
+/// summary is: seven translated languages awaiting a human reader, one
+/// declared for right-to-left with English words, and English underneath all
+/// of them wherever a string is missing.
 ///
-/// That last case is why `ar` and `he` are on the list with no ARB file of
-/// their own, which looks like an oversight and is not. They are the two
+/// That last case is why `he` is on the list with no ARB file of its own,
+/// which looks like an oversight and is not. Arabic and Hebrew are the two
 /// right-to-left scripts the accessibility pass is verified against, and what
 /// is being verified is the *layout*: that the thread mirrors, that the tail on
-/// a bubble swaps sides, that a timestamp is Arabic-Indic. Declaring them turns
-/// the app right-to-left and hands Material its Arabic and Hebrew strings while
-/// Sennit's own text falls back to English — the honest half-state, and one that
-/// makes an RTL golden a test of the layout rather than of a translation. When
-/// Arabic and Hebrew ARB files are written they simply appear, and nothing
-/// here changes.
+/// a bubble swaps sides, that a timestamp is Arabic-Indic. Declaring Hebrew
+/// turns the app right-to-left and hands Material its Hebrew strings while
+/// Sennit's own text falls back to English — the honest half-state, and one
+/// that makes an RTL golden a test of the layout rather than of a translation.
+/// When a Hebrew ARB file is written it simply appears, and nothing here
+/// changes.
 library;
 
 import 'dart:ui' show PlatformDispatcher;
@@ -83,14 +83,15 @@ export '../l10n/gen/app_l10n.dart' show AppL10n, lookupAppL10n;
 /// written in, and `basicLocaleListResolution` returns the first entry when the
 /// device asks for something not on the list.
 ///
-/// Then the five translated locales, each with an ARB file beside `app_en.arb`.
+/// Then the seven translated locales, each with an ARB file beside `app_en.arb`.
 /// `zh` carries a `scriptCode` and `pt` a `countryCode` because both languages
 /// have a second written form Sennit does not ship — Traditional Chinese,
 /// European Portuguese — and a bare `zh` would claim to serve a reader in
 /// Taipei with text written for Shanghai.
 ///
-/// Then `ar` and `he`, declared for right-to-left layout and Material's own
-/// strings, with no ARB file of their own. See the library comment above.
+/// `ar` is the one right-to-left locale among them. `he` comes last, declared
+/// for right-to-left layout and Material's own strings, with no ARB file of
+/// its own. See the library comment above.
 const List<Locale> weftSupportedLocales = [
   Locale('en'),
   Locale('es'),
@@ -98,6 +99,7 @@ const List<Locale> weftSupportedLocales = [
   Locale('pt', 'BR'),
   Locale('de'),
   Locale('fr'),
+  Locale('hi'),
   Locale('ar'),
   Locale('he'),
 ];
@@ -121,16 +123,16 @@ const List<LocalizationsDelegate<dynamic>> weftLocalizationsDelegates = [
 /// translating.
 ///
 /// The generated delegate supports exactly the languages that have an ARB file.
-/// `ar` and `he` do not, deliberately — and a locale a delegate refuses is a
+/// `he` does not, deliberately — and a locale a delegate refuses is a
 /// locale where `Localizations` simply has no `AppL10n` in it, so
 /// `AppL10n.of(context)` is null and `context.l10n` throws a null check on the
-/// first widget that draws. A device set to Arabic would not get English text
+/// first widget that draws. A device set to Hebrew would not get English text
 /// in a mirrored layout; it would get a red screen.
 ///
 /// So [isSupported] answers for the whole of [weftSupportedLocales] and [load]
 /// hands back the English strings for anything the generator did not produce.
 /// That is the fallback the library comment above promises, made real: the
-/// declared-for-layout locales get RTL, Material's own Arabic, and Sennit's
+/// declared-for-layout locale gets RTL, Material's own Hebrew, and Sennit's
 /// English words.
 ///
 /// Matching on `languageCode` alone is the same rule the generated delegate
@@ -185,8 +187,8 @@ AppL10n weftPlatformL10n() {
     PlatformDispatcher.instance.locales,
     weftSupportedLocales,
   );
-  // `lookupAppL10n` throws for a locale with no generated class — `ar` and `he`
-  // are declared for layout and have none — so the same English fallback the
+  // `lookupAppL10n` throws for a locale with no generated class — `he` is
+  // declared for layout and has none — so the same English fallback the
   // delegate above makes applies here too.
   return weftSupportedLocales.contains(locale) &&
           AppL10n.delegate.isSupported(locale)

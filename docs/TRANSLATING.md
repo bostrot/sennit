@@ -10,7 +10,7 @@ related:
 
 # Translating Sennit
 
-Sennit speaks six languages and is honest about which ones it has been *read*
+Sennit speaks eight languages and is honest about which ones it has been *read*
 in. This is how to claim one, what the conventions are, and how to check your
 work before anyone else has to.
 
@@ -29,9 +29,14 @@ a patch.
 | `apps/weft/android/app/src/main/res/values-<code>/strings.xml` | The words Android draws itself: notification channel names, widget text, the watch. |
 | `apps/weft/ios/Runner/<code>.lproj/InfoPlist.strings` | The sentence in a permission dialog, drawn by iOS before Sennit has run a line of code. |
 
-Six locales ship today: `en`, `de`, `es`, `fr`, `pt` (Brazilian) and `zh`
-(Simplified). `ar` and `he` are *declared* but not translated — see
+Eight locales ship today: `en`, `de`, `es`, `fr`, `pt` (Brazilian), `zh`
+(Simplified), `hi` and `ar`. `he` is *declared* but not translated — see
 [[l10n-pipeline]] for what that means and why.
+
+`en`, `de`, `zh`, `hi`, `es` and `ar` are required: the lint fails if any of
+them is missing a catalogue or a key, and [AGENTS.md](../AGENTS.md) asks every
+change that adds or edits a string to translate it into all of them in the same
+pull request.
 
 ## Claiming a locale
 
@@ -84,9 +89,12 @@ A translated `paperless-ngx` matches nothing.
 ## Conventions
 
 **Register is informal, in every language.** `du` in German, `tu` in French,
-`tú` in Spanish, `você` in Portuguese. Sennit talks to one person, not to an
-institution. This is not negotiable per-locale: the whole app has to agree, and
-a single `vous` in a file of `tu` reads as a mistake rather than as politeness.
+`tú` in Spanish, `você` in Portuguese. Hindi is the one exception in form, not
+in spirit: it uses `आप`, which is what WhatsApp and every other Hindi app say
+to a friend — `तुम` on a screen reads as curt rather than close. Sennit talks
+to one person, not to an institution. This is not negotiable per-locale: the
+whole app has to agree, and a single `vous` in a file of `tu` reads as a
+mistake rather than as politeness.
 
 **Use the words your messengers use.** People arrive at Sennit from WhatsApp,
 Telegram and Signal, and "read receipt", "sticker", "reaction", "archive" and
@@ -135,6 +143,21 @@ there is nowhere for a Traditional character to be correct. Full-width
 punctuation (`，` `。` `：` `「」`), no spaces between Han characters, and a
 space between Han and Latin or digits (`通过 Sennit 发送`). The `zh-traditional`
 and `zh-plural` lint rules check the first and the last of those.
+
+### Hindi
+
+Devanagari, with the English loanwords Hindi apps actually use — `चैट`,
+`मैसेज`, `सेटिंग्स`, `ब्रिज` — rather than Sanskrit coinages nobody taps. The
+full stop is `।`. Plurals have `one` (which covers 0 and 1) and `other`.
+
+### Arabic
+
+Modern Standard Arabic, addressed to one person in the masculine singular the
+way WhatsApp's Arabic does. Use the Arabic comma `،` and question mark `؟`, and
+`«»` for quotations. Plurals use `=1`, `=2`, `few` (3–10) and `other`; a
+count of 3–10 takes a plural noun and 11+ a singular one, which is why `few`
+matters. The layout is right-to-left: check a new screen in `ar` before
+merging.
 
 ### German
 
@@ -186,6 +209,7 @@ reports them grouped by rule:
 
 | Rule | What it means |
 | --- | --- |
+| `missing-locale` | A required locale has no `app_<code>.arb` at all. |
 | `missing-key` / `extra-key` | The key set does not match the template. |
 | `placeholder` | A `{name}` was dropped, added or renamed. |
 | `icu` | The message does not parse — usually an unbalanced brace. |

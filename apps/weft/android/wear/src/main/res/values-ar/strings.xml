@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic, machine-seeded 2026-11-24. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml`, which carries the reasoning behind
+     each string; this one only the words. `app_name`, `tile_name` and
+     `complication_name` are the product's own name and stay as they are. -->
+<resources>
+    <string name="app_name">Weft</string>
+    <string name="tile_name">Weft</string>
+    <string name="tile_description">رسائلك غير المقروءة وأحدث محادثاتك.</string>
+    <string name="complication_name">Weft unread</string>
+    <string name="inbox_heading">الأحدث</string>
+    <string name="signed_out_title">سجّل الدخول إلى Weft</string>
+    <string name="signed_out_body">افتح Weft على هاتفك وسجّل الدخول.</string>
+    <string name="disabled_title">الساعة متوقفة</string>
+    <string name="disabled_body">افتح Weft على هاتفك وشغّل الساعة من الأدوات والساعة.</string>
+    <string name="stale_title">افتح Weft على هاتفك</string>
+    <string name="stale_body">هذا قديم. افتح Weft لتحديثه.</string>
+    <string name="empty_title">لا محادثات</string>
+    <string name="empty_body">لا شيء لعرضه بعد. محادثات الشبكات المستثناة لا تظهر هنا أبدًا.</string>
+    <string name="merged">محادثة مدمجة</string>
+    <string name="unread_label">غير مقروءة</string>
+    <string name="reply_heading">رد</string>
+    <string name="reply_dictate">إملاء</string>
+    <string name="reply_dictate_hint">الرد على %1$s</string>
+    <string name="reply_sending">جارٍ الإرسال…</string>
+    <string name="reply_sent">أُرسلت</string>
+    <string name="reply_sent_via">أُرسلت عبر %1$s</string>
+    <string name="reply_failed">لم تُرسل</string>
+    <string name="reply_failed_unknown_chat">لم تعد هذه المحادثة في Weft.</string>
+    <string name="reply_failed_not_signed_in">لم تُرسل. لا أحد مسجّل الدخول على هاتفك.</string>
+    <string name="reply_failed_send_failed">لم تُرسل. افتح Weft على هاتفك وحاول مجددًا.</string>
+    <string name="reply_failed_timed_out">لم تُرسل. لم يستجب هاتفك.</string>
+    <string name="reply_failed_overflowed">لم تُرسل. ردود كثيرة في وقت واحد.</string>
+    <string name="reply_failed_app_not_running">لم تُرسل. افتح Weft على هاتفك.</string>
+    <string name="canned_yes">نعم</string>
+    <string name="canned_no">لا</string>
+    <string name="canned_on_my_way">في الطريق</string>
+    <string name="canned_thanks">شكرًا!</string>
+    <string name="canned_call_later">هل أتصل بك لاحقًا؟</string>
+    <string name="canned_cant_talk">لا أستطيع التحدث الآن</string>
+
+    <plurals name="unread_count">
+        <item quantity="zero">لا رسائل غير مقروءة</item>
+        <item quantity="one">رسالة واحدة غير مقروءة</item>
+        <item quantity="two">رسالتان غير مقروءتين</item>
+        <item quantity="few">%1$d رسائل غير مقروءة</item>
+        <item quantity="many">%1$d رسالة غير مقروءة</item>
+        <item quantity="other">%1$d رسالة غير مقروءة</item>
+    </plurals>
+</resources>

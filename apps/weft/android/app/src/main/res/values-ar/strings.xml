@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arabic, machine-seeded 2026-11-24. TRANSLATOR REVIEW PENDING.
+
+     Keyed against `values/strings.xml` — the base file carries the reasoning
+     behind each string, and this one only the words. A key here that is not
+     there (or missing from here) fails `l10n_test.dart`. -->
+<resources>
+    <string name="weft_widget_unread_name">Sennit غير المقروءة</string>
+    <string name="weft_widget_unread_description">عدد رسائلك غير المقروءة في كل المحادثات.</string>
+    <string name="weft_widget_inbox_name">محادثات Sennit</string>
+    <string name="weft_widget_inbox_description">أحدث محادثاتك. انقر واحدة لفتحها.</string>
+    <string name="weft_widget_inbox_heading">الأحدث</string>
+    <string name="weft_widget_unread_label">غير مقروءة</string>
+    <string name="weft_widget_merged">محادثة مدمجة</string>
+    <string name="weft_widget_signed_out_title">سجّل الدخول إلى Sennit</string>
+    <string name="weft_widget_signed_out_body">افتح Sennit وسجّل الدخول لترى محادثاتك هنا.</string>
+    <string name="weft_widget_disabled_title">الأدوات متوقفة</string>
+    <string name="weft_widget_disabled_body">افتح Sennit وشغّل أدوات الشاشة الرئيسية من الأدوات والساعة.</string>
+    <string name="weft_widget_stale_title">افتح Sennit على هاتفك</string>
+    <string name="weft_widget_stale_body">هذا قديم. افتح Sennit لتحديثه.</string>
+    <string name="weft_widget_empty_title">لا محادثات</string>
+    <string name="weft_widget_empty_body">لا شيء لعرضه بعد. محادثات الشبكات المستثناة لا تظهر هنا أبدًا.</string>
+    <string name="call_channel_name">المكالمات</string>
+    <string name="call_channel_description">المكالمات الواردة.</string>
+    <string name="call_incoming">مكالمة واردة</string>
+    <string name="call_incoming_video">مكالمة فيديو واردة</string>
+    <string name="call_in_progress">مكالمة جارية</string>
+    <string name="call_in_progress_video">مكالمة فيديو جارية</string>
+    <string name="call_phone_account">مكالمات Sennit</string>
+    <string name="connection_channel_name">الاتصال</string>
+    <string name="connection_channel_description">يبقي Sennit متصلًا لتصل الرسائل وهو مغلق.</string>
+    <string name="connection_title">في انتظار الرسائل</string>
+    <string name="connection_body">يبقى Sennit متصلًا في الخلفية.</string>
+
+    <plurals name="weft_widget_unread_count">
+        <item quantity="zero">لا رسائل غير مقروءة</item>
+        <item quantity="one">رسالة واحدة غير مقروءة</item>
+        <item quantity="two">رسالتان غير مقروءتين</item>
+        <item quantity="few">%1$d رسائل غير مقروءة</item>
+        <item quantity="many">%1$d رسالة غير مقروءة</item>
+        <item quantity="other">%1$d رسالة غير مقروءة</item>
+    </plurals>
+</resources>

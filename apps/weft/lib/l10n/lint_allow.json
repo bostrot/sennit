@@ -98,5 +98,9 @@
     "linkPreviewSemanticsRole": "Brazilian Portuguese says 'link'; 'ligação' is a phone call.",
     "richSpoiler": "Brazilian messengers say 'Spoiler'."
   },
-  "zh": {}
+  "zh": {},
+  "ar": {},
+  "hi": {
+    "settingsAiTitle": "Hindi UIs say 'AI' (Google, Microsoft); 'कृत्रिम बुद्धिमत्ता' is a textbook word nobody taps."
+  }
 }
