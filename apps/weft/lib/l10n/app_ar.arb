@@ -803,7 +803,7 @@
   "loginPasswordField": "كلمة المرور",
   "loginWorking": "جارٍ العمل",
   "loginSignIn": "تسجيل الدخول",
-  "loginSso": "تسجيل الدخول الموحد (M8)",
+  "loginSso": "تسجيل الدخول الموحّد",
   "loginFooter": "يتصل Sennit بخادم Matrix الخاص بك. لا يمرر رسائلك عبر أي طرف آخر أبدًا.",
   "matrixInfoButton": "ما هو خادم Matrix؟",
   "matrixInfoBody": "Matrix شبكة محادثة مفتوحة ولا مركزية. لا تديرها شركة واحدة: خوادم مستقلة تتواصل فيما بينها، كما يفعل مزودو البريد الإلكتروني. يعيش حسابك على أحدها، خادمك المنزلي، ومنه تصل إلى الناس على أي خادم آخر.",
@@ -1639,5 +1639,14 @@
   "endpointsDetectLimits": "اكتشاف",
   "endpointsLimitsDetected": "{source}: النافذة {context}، والإجابة حتى {output}",
   "endpointsLimitsNotDetected": "لم يذكر الخادم ذلك. اكتب الأرقام بنفسك.",
-  "autoReplyOutcomeCutOff": "بلغ نموذجك حد طول الإجابة. ارفعه في الخوادم."
+  "autoReplyOutcomeCutOff": "بلغ نموذجك حد طول الإجابة. ارفعه في الخوادم.",
+  "loginContinueWith": "المتابعة باستخدام {name}",
+  "loginBrowserHint": "يسجّل {server} دخولك عبر صفحته الخاصة. يفتحها Sennit في متصفحك ثم يعيدك إلى هنا.",
+  "loginCreateInBrowser": "ينشئ {server} الحسابات عبر صفحة التسجيل الخاصة به. يفتحها Sennit في متصفحك ثم يسجّل دخولك بعد ذلك.",
+  "loginBrowserWaiting": "أكمل تسجيل الدخول في متصفحك.",
+  "loginBrowserDone": "تم تسجيل دخولك. يمكنك إغلاق علامة التبويب هذه والعودة إلى Sennit.",
+  "loginBrowserDenied": "أُلغي تسجيل الدخول على صفحة الخادم.",
+  "loginBrowserIncomplete": "لم تُكمل صفحة الخادم تسجيل الدخول. حاول مرة أخرى.",
+  "loginNoSupportedMethod": "لا يوفّر {server} إلا طرق تسجيل دخول لا يدعمها Sennit بعد.",
+  "devicesSignOutOnAccountPage": "يسجّل خادمك خروج الأجهزة من صفحة حسابك. فتحها Sennit في متصفحك."
 }

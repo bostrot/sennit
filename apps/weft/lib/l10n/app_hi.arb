@@ -803,7 +803,7 @@
   "loginPasswordField": "पासवर्ड",
   "loginWorking": "काम जारी",
   "loginSignIn": "साइन इन",
-  "loginSso": "सिंगल साइन-ऑन (M8)",
+  "loginSso": "सिंगल साइन-ऑन",
   "loginFooter": "Sennit आपके अपने Matrix सर्वर से जुड़ता है। यह आपके मैसेज कभी किसी और के ज़रिए नहीं भेजता।",
   "matrixInfoButton": "Matrix सर्वर क्या है?",
   "matrixInfoBody": "Matrix एक खुला, विकेंद्रीकृत चैट नेटवर्क है। इसे कोई एक कंपनी नहीं चलाती: स्वतंत्र सर्वर आपस में बात करते हैं, जैसे ईमेल प्रोवाइडर करते हैं। आपका खाता उनमें से एक पर रहता है, आपका होमसर्वर, और वहाँ से आप किसी भी दूसरे सर्वर के लोगों तक पहुँच सकते हैं।",
@@ -1639,5 +1639,14 @@
   "endpointsDetectLimits": "पता करें",
   "endpointsLimitsDetected": "{source}: विंडो {context}, जवाब {output} तक",
   "endpointsLimitsNotDetected": "सर्वर ने नहीं बताया। संख्याएँ खुद लिखें।",
-  "autoReplyOutcomeCutOff": "आपका मॉडल जवाब की लंबाई की सीमा तक पहुँच गया। एंडपॉइंट में इसे बढ़ाएँ।"
+  "autoReplyOutcomeCutOff": "आपका मॉडल जवाब की लंबाई की सीमा तक पहुँच गया। एंडपॉइंट में इसे बढ़ाएँ।",
+  "loginContinueWith": "{name} के साथ जारी रखें",
+  "loginBrowserHint": "{server} अपने पेज पर साइन इन करवाता है। Sennit उसे आपके ब्राउज़र में खोलता है और फिर आपको यहाँ वापस लाता है।",
+  "loginCreateInBrowser": "{server} अपने साइन-अप पेज पर खाते बनाता है। Sennit उसे आपके ब्राउज़र में खोलता है और उसके बाद आपको साइन इन कर देता है।",
+  "loginBrowserWaiting": "अपने ब्राउज़र में साइन इन पूरा करें।",
+  "loginBrowserDone": "आप साइन इन हो गए हैं। आप यह टैब बंद करके Sennit पर लौट सकते हैं।",
+  "loginBrowserDenied": "सर्वर के पेज पर साइन इन रद्द कर दिया गया।",
+  "loginBrowserIncomplete": "सर्वर के पेज ने साइन इन पूरा नहीं किया। फिर से कोशिश करें।",
+  "loginNoSupportedMethod": "{server} साइन इन के सिर्फ़ ऐसे तरीके देता है जिन्हें Sennit अभी सपोर्ट नहीं करता।",
+  "devicesSignOutOnAccountPage": "आपका सर्वर डिवाइस को अपने खाते के पेज पर साइन आउट करता है। Sennit ने उसे आपके ब्राउज़र में खोल दिया है।"
 }
