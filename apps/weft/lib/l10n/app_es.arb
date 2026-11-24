@@ -1674,5 +1674,17 @@
   "deviceSyncStatusWaiting": "Esperando el resto de la copia compartida…",
   "deviceSyncStatusFailed": "No se pudo contactar con tu servidor. Se reintentará en breve.",
   "deviceSyncNow": "Sincronizar ahora",
-  "deviceSyncReplace": "Reemplazar con este dispositivo"
+  "deviceSyncReplace": "Reemplazar con este dispositivo",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "Usa Sennit en un navegador, servido por este dispositivo",
+  "sennitWebNotice": "Sennit Web funciona en un navegador y lo recibe todo de este dispositivo, con cifrado de extremo a extremo. Sus archivos no forman parte de la app: descárgalos una vez desde la página de versiones de Sennit y Sennit comprobará su firma antes de usarlos.",
+  "sennitWebBundleTitle": "Archivos del navegador",
+  "sennitWebBundleAbsent": "No descargados",
+  "sennitWebBundleDownloading": "Descargando… {percent} %",
+  "sennitWebBundleReady": "Descargados y verificados · {megabytes} MB",
+  "sennitWebBundleUnavailable": "Aún no disponible para esta versión.",
+  "sennitWebBundleNetwork": "Error en la descarga. Comprueba tu conexión e inténtalo de nuevo.",
+  "sennitWebBundleRejected": "La descarga no superó la comprobación de firma y se eliminó.",
+  "sennitWebDownload": "Descargar",
+  "sennitWebRemove": "Eliminar"
 }

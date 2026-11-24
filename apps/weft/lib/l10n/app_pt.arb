@@ -1675,5 +1675,17 @@
   "deviceSyncStatusWaiting": "A aguardar o resto da cópia partilhada…",
   "deviceSyncStatusFailed": "Não foi possível contactar o servidor. Nova tentativa em breve.",
   "deviceSyncNow": "Sincronizar agora",
-  "deviceSyncReplace": "Substituir por este dispositivo"
+  "deviceSyncReplace": "Substituir por este dispositivo",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "Use o Sennit num navegador, servido por este dispositivo",
+  "sennitWebNotice": "O Sennit Web funciona num navegador e recebe tudo deste dispositivo, com encriptação ponto a ponto. Os ficheiros não fazem parte da app: transfira-os uma vez da página de versões do Sennit, que verifica a assinatura antes de os usar.",
+  "sennitWebBundleTitle": "Ficheiros do navegador",
+  "sennitWebBundleAbsent": "Não transferidos",
+  "sennitWebBundleDownloading": "A transferir… {percent}%",
+  "sennitWebBundleReady": "Transferidos e verificados · {megabytes} MB",
+  "sennitWebBundleUnavailable": "Ainda não disponível para esta versão.",
+  "sennitWebBundleNetwork": "A transferência falhou. Verifique a ligação e tente novamente.",
+  "sennitWebBundleRejected": "A transferência falhou a verificação de assinatura e foi eliminada.",
+  "sennitWebDownload": "Transferir",
+  "sennitWebRemove": "Remover"
 }

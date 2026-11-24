@@ -75,6 +75,7 @@ const String _allowFile = '$_arbDir/lint_allow.json';
 /// would delete the check instead.
 const Set<String> _neverTranslated = {
   'Sennit',
+  'Sennit Web',
   'Matrix',
   'MCP',
   'SMS',

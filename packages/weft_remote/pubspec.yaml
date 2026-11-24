@@ -11,6 +11,10 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
+  # Both already in the lock through the matrix SDK. For the bundle's
+  # signature, hash and archive.
+  archive: ^4.0.9
+  cryptography: ^2.9.0
   meta: ^1.17.0
   weft_domain: ^0.1.0
 

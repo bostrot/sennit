@@ -1674,5 +1674,17 @@
   "deviceSyncStatusWaiting": "بانتظار بقية النسخة المشتركة…",
   "deviceSyncStatusFailed": "تعذّر الوصول إلى خادمك المنزلي. ستتم إعادة المحاولة قريبًا.",
   "deviceSyncNow": "زامِن الآن",
-  "deviceSyncReplace": "استبدلها بنسخة هذا الجهاز"
+  "deviceSyncReplace": "استبدلها بنسخة هذا الجهاز",
+  "settingsSennitWebTitle": "Sennit Web",
+  "settingsSennitWebSubtitle": "استخدم Sennit في متصفح، يقدّمه هذا الجهاز",
+  "sennitWebNotice": "يعمل Sennit Web في المتصفح ويحصل على كل شيء من هذا الجهاز، مشفّرًا من طرف إلى طرف. ملفاته ليست جزءًا من التطبيق: نزّلها مرة واحدة من صفحة إصدارات Sennit، ويتحقق Sennit من توقيعها قبل استخدامها.",
+  "sennitWebBundleTitle": "ملفات المتصفح",
+  "sennitWebBundleAbsent": "لم يتم التنزيل",
+  "sennitWebBundleDownloading": "جارٍ التنزيل… {percent}%",
+  "sennitWebBundleReady": "تم التنزيل والتحقق · {megabytes} MB",
+  "sennitWebBundleUnavailable": "غير متاح لهذا الإصدار بعد.",
+  "sennitWebBundleNetwork": "فشل التنزيل. تحقّق من اتصالك وحاول مجددًا.",
+  "sennitWebBundleRejected": "فشل التنزيل في التحقق من التوقيع وتم حذفه.",
+  "sennitWebDownload": "تنزيل",
+  "sennitWebRemove": "إزالة"
 }

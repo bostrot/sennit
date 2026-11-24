@@ -9773,5 +9773,65 @@
   "deviceSyncReplace": "Replace with this device’s",
   "@deviceSyncReplace": {
     "description": "Button that overwrites a shared copy this device cannot read with this device's settings. About 30 chars."
+  },
+  "settingsSennitWebTitle": "Sennit Web",
+  "@settingsSennitWebTitle": {
+    "description": "Settings row and screen title for Sennit Web, the app in a browser served by this device. 'Sennit Web' is a product name; keep it."
+  },
+  "settingsSennitWebSubtitle": "Use Sennit in a browser, served by this device",
+  "@settingsSennitWebSubtitle": {
+    "description": "Subtitle of the Sennit Web settings row. About 50 chars."
+  },
+  "sennitWebNotice": "Sennit Web runs in a browser and gets everything from this device, end-to-end encrypted. Its files are not part of the app: download them once from Sennit’s release page and Sennit checks their signature before using them.",
+  "@sennitWebNotice": {
+    "description": "Notice at the top of the Sennit Web screen: what it is and where its files come from."
+  },
+  "sennitWebBundleTitle": "Browser files",
+  "@sennitWebBundleTitle": {
+    "description": "Section header for the downloadable browser files of Sennit Web."
+  },
+  "sennitWebBundleAbsent": "Not downloaded",
+  "@sennitWebBundleAbsent": {
+    "description": "Status: the browser files are not downloaded."
+  },
+  "sennitWebBundleDownloading": "Downloading… {percent}%",
+  "@sennitWebBundleDownloading": {
+    "description": "Status while downloading the browser files. {percent} is 0 to 100.",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "42"
+      }
+    }
+  },
+  "sennitWebBundleReady": "Downloaded and verified · {megabytes} MB",
+  "@sennitWebBundleReady": {
+    "description": "Status: the browser files are downloaded and verified. {megabytes} is their size.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int",
+        "example": "22"
+      }
+    }
+  },
+  "sennitWebBundleUnavailable": "Not available for this version yet.",
+  "@sennitWebBundleUnavailable": {
+    "description": "Status: the release has no browser files for this app version."
+  },
+  "sennitWebBundleNetwork": "Download failed. Check your connection and try again.",
+  "@sennitWebBundleNetwork": {
+    "description": "Status: the download failed for network reasons."
+  },
+  "sennitWebBundleRejected": "The download failed the signature check and was deleted.",
+  "@sennitWebBundleRejected": {
+    "description": "Status: the downloaded files failed the signature or hash check and were deleted."
+  },
+  "sennitWebDownload": "Download",
+  "@sennitWebDownload": {
+    "description": "Button: download the browser files."
+  },
+  "sennitWebRemove": "Remove",
+  "@sennitWebRemove": {
+    "description": "Button: delete the downloaded browser files."
   }
 }

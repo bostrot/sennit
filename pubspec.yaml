@@ -40,3 +40,7 @@ workspace:
 # a single unit and has lost packages to analyzer conflicts before.
 dev_dependencies:
   analyzer: ^12.1.0
+  # For `package_web_bundle.dart`, which zips and signs the browser build.
+  # Both already in the lock through the matrix SDK.
+  archive: ^4.0.9
+  cryptography: ^2.9.0
