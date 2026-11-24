@@ -57,13 +57,18 @@ Sennit talks exclusively to servers **you** configure:
   you point Sennit at a remote endpoint, the content you asked it to process
   is sent to that endpoint — which, again, you chose and control.
 - **Personal memory.** Notes you write about a chat ("This chat") or a
-  person ("About …", on the contact screen) stay on your device, encrypted in
-  the platform keychain, and are not synced to your other devices. They are
-  sent to your AI endpoint only after you turn on "Use personal memory in AI"
-  — then, shortened, with the quick messages, auto-replies and reply
-  suggestions written in that chat. "Learn from chat" sends the last 24
-  messages to the same endpoint and only ever suggests facts for you to
-  accept; it skips end-to-end encrypted chats unless you allow them.
+  person ("About …", on the contact screen), and the facts Sennit learns for
+  them, stay on your device, encrypted in the platform keychain, and are not
+  synced to your other devices. Nothing is sent to your AI endpoint until you
+  turn on "Use personal memory in AI" — then every AI feature (reply
+  suggestions, quick messages, auto-replies, to-dos and calendar titles)
+  sends a shortened memory of the chat and its people with its request. With
+  "Learn automatically" on (the default once memory is on), Sennit sends an
+  active chat's recent messages to the same endpoint after about 30 new
+  messages or once a day, only while the app is open, and writes what it
+  learns into the memory, marked with when it was learned, for you to edit,
+  pin, delete or undo. "Learn now" does the same on request. Both skip
+  end-to-end encrypted chats unless you allow them.
 
 ## Auto-reply
 

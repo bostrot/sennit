@@ -10,14 +10,12 @@ import 'package:weft_store/weft_store.dart';
 
 import '../support/golden_harness.dart';
 
-/// Goldens for personal memory: a chat's memory with the model's suggestions
-/// waiting under it, a person's short memory, and the settings screen that
-/// says what is sent where.
+/// Goldens for personal memory: a chat's memory with what Sennit learned by
+/// itself under it, a person's short memory, and the settings screen.
 ///
-/// The editor frame is the one that matters. A suggestion has to read as a
-/// question — a fact with a tick and a cross beside it, under a line saying
-/// nothing is added until it is accepted — and not as something already in
-/// the note above.
+/// The editor frame is the one that matters. A learned fact has to read as
+/// learned — marked, dated, one pinned — and apart from the user's own note
+/// above it, with the last automatic update one tap from undone.
 void main() {
   setUpAll(loadGoldenFonts);
 
@@ -33,22 +31,46 @@ void main() {
   const MemoryPerson anna = (name: 'Anna', keys: ['dm:!dm:example.org']);
 
   WeftStores stores() {
-    final stores = WeftStores.inMemory()
-      ..personMemory = MemoryBook.empty
-          .withNote(
-            keys,
-            '## Ongoing topics\nLisbon trip in May, she books the flat\n\n'
-            '## Tone in this chat\nGerman, du, lots of emojis',
-          )
-          .withNote(
-            anna.keys,
-            '- Annie, my sister\n- Birthday 3 June\n- Tom; Mia (5), Ben (3)',
-          )
-          .withProposals(keys, const [
-            'Started a new job at Deutsche Bahn in November',
-            'Mia’s birthday is on 12 March',
-          ])
-          .encode();
+    var book = MemoryBook.empty
+        .withNote(keys, '## Tone in this chat\nGerman, du, lots of emojis')
+        .withNote(anna.keys, '- Annie, my sister');
+    book = book
+        .applyLearning(
+          const MemoryUpdate(
+            adds: [
+              MemoryAddition('Lisbon trip in May, she books the flat'),
+              MemoryAddition('Birthday on 3 June', about: 'Anna'),
+              MemoryAddition(
+                'Works at Deutsche Bahn since November',
+                about: 'Anna',
+              ),
+            ],
+          ),
+          chatKeys: keys,
+          people: const [anna],
+          numbered: const [],
+          now: DateTime(2026, 11, 18, 9, 30),
+        )
+        .book;
+    book = book.pinLearned(
+      anna.keys,
+      book.learnedFor(anna.keys).first,
+      pinned: true,
+    );
+    book = book
+        .applyLearning(
+          const MemoryUpdate(
+            adds: [
+              MemoryAddition('Planning Mia’s birthday party, Sunday 15:00'),
+            ],
+          ),
+          chatKeys: keys,
+          people: const [anna],
+          numbered: const [],
+          now: DateTime(2026, 11, 24, 18, 5),
+        )
+        .book;
+    final stores = WeftStores.inMemory()..personMemory = book.encode();
     stores.settings.setBool(WeftSettings.personMemoryInAi, value: true);
     return stores;
   }
@@ -76,7 +98,7 @@ void main() {
     }
   }
 
-  testWidgets('a chat with suggestions waiting, both themes', (tester) async {
+  testWidgets('a chat with learned facts, both themes', (tester) async {
     await expectGolden(
       tester,
       'editor',

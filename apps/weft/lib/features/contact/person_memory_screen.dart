@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
@@ -35,8 +36,8 @@ final chatMemoryPeopleProvider = FutureProvider.autoDispose
       return memoryPeopleFor(repository.identityGraph, chat, messages);
     });
 
-/// The memory of the chat [chatId]: the detailed note, the facts the model
-/// has offered to add, and the button that asks it for more.
+/// The memory of the chat [chatId]: the detailed note, what was learned on
+/// its own, and the button that learns from the chat now.
 class ChatMemoryScreen extends ConsumerWidget {
   const ChatMemoryScreen({super.key, required this.chatId});
 
@@ -77,7 +78,7 @@ class PersonMemoryScreen extends StatelessWidget {
 /// which is what lets a test pump it without a repository.
 class MemoryEditor extends ConsumerStatefulWidget {
   /// A chat's memory. [people] are who a fact can be added to instead;
-  /// [loadMessages] is the conversation "Learn from chat" reads, at least
+  /// [loadMessages] is the conversation "Learn now" reads, at least
   /// the number of messages it is given when there are that many.
   MemoryEditor.chat({
     super.key,
@@ -240,7 +241,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
         client: ref.read(quickMessageClientProvider),
       );
     } on Object {
-      result = (outcome: PersonFactsOutcome.failed, added: 0, status: null);
+      result = (outcome: PersonFactsOutcome.failed, changed: 0, status: null);
     }
     if (!mounted) return;
     setState(() => _busy = false);
@@ -254,8 +255,8 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
           ? SnackBarAction(label: l10n.settingsTitle, onPressed: _openSettings)
           : null,
       switch (result.outcome) {
-        PersonFactsOutcome.proposed => l10n.personMemoryLearned(
-          result.added,
+        PersonFactsOutcome.learned => l10n.personMemoryLearned(
+          result.changed,
           chat.title,
         ),
         PersonFactsOutcome.nothingNew => l10n.personMemoryNothingNew,
@@ -311,6 +312,47 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
     if (short == null) showWeftMessage(context, l10n.personMemoryLearnFailed);
   }
 
+  void _undo() {
+    _memory.undoAutomatic();
+    showWeftMessage(context, context.l10n.personMemoryUndone);
+  }
+
+  Future<void> _editFact(LearnedFact fact) async {
+    final l10n = context.l10n;
+    final controller = TextEditingController(text: fact.text);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.personMemoryEditFact),
+        content: TextField(
+          key: const ValueKey('memory-fact-edit'),
+          controller: controller,
+          autofocus: true,
+          maxLines: null,
+          maxLength: kPersonFactMaxChars,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: Text(l10n.commonSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (text == null || !mounted) return;
+    _memory.editLearned(widget.keys, fact, text);
+  }
+
+  /// A short date as the app's locale writes it: "24 Nov", "24. Nov.".
+  static String _date(BuildContext context, DateTime at) =>
+      DateFormat.MMMd(Localizations.localeOf(context).toString()).format(at);
+
   void _openSettings() => Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => const PersonMemorySettingsScreen()),
   );
@@ -319,9 +361,12 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final settings = ref.watch(personMemorySettingsProvider);
+    final book = ref.watch(personMemoryProvider);
     final suggestions = _isChat
-        ? ref.watch(personMemoryProvider).suggestionsFor(widget.keys)
+        ? book.suggestionsFor(widget.keys)
         : const <String>[];
+    final learned = book.learnedFor(widget.keys);
+    final undo = book.undoTouches(widget.keys) ? book.undo : null;
     final hint = _isChat ? l10n.chatMemoryHint : l10n.personMemoryHint;
     final length = _note.text.trim().length;
     final long = !_isChat && length > kPersonMemorySoftLimit;
@@ -363,6 +408,18 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                 child: Text(l10n.personMemorySettingsTitle),
               ),
             ),
+            if (undo != null) ...[
+              const SizedBox(height: WeftSpace.sm),
+              _Notice(
+                key: const ValueKey('memory-undo'),
+                icon: Icons.history_rounded,
+                text: l10n.personMemoryUpdatedAt(_date(context, undo.at)),
+                action: TextButton(
+                  onPressed: _undo,
+                  child: Text(l10n.personMemoryUndo),
+                ),
+              ),
+            ],
             const SizedBox(height: WeftSpace.md),
             TextField(
               key: const ValueKey('memory-note'),
@@ -419,6 +476,25 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                   ),
               ],
             ),
+            if (learned.isNotEmpty) ...[
+              const SizedBox(height: WeftSpace.xl),
+              _Heading(
+                title: l10n.personMemoryLearnedTitle,
+                hint: l10n.personMemoryLearnedHint,
+              ),
+              for (final fact in learned)
+                _LearnedFactTile(
+                  fact: fact,
+                  date: _date(context, fact.at),
+                  onPin: () => _memory.pinLearned(
+                    widget.keys,
+                    fact,
+                    pinned: !fact.pinned,
+                  ),
+                  onEdit: () => _editFact(fact),
+                  onDelete: () => _memory.deleteLearned(widget.keys, fact),
+                ),
+            ],
             if (_condensed case final short?) ...[
               const SizedBox(height: WeftSpace.xl),
               _Heading(
@@ -512,7 +588,12 @@ class _Heading extends StatelessWidget {
 }
 
 class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.text, required this.action});
+  const _Notice({
+    super.key,
+    required this.icon,
+    required this.text,
+    required this.action,
+  });
 
   final IconData icon;
   final String text;
@@ -552,6 +633,95 @@ class _Notice extends StatelessWidget {
               ],
             ),
             Align(alignment: AlignmentDirectional.centerEnd, child: action),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One fact the model learned: what it says, that it was learned and when —
+/// or that the user edited it — and pin, edit and delete.
+class _LearnedFactTile extends StatelessWidget {
+  const _LearnedFactTile({
+    required this.fact,
+    required this.date,
+    required this.onPin,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final LearnedFact fact;
+  final String date;
+  final VoidCallback onPin;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = context.colors;
+    return Card(
+      margin: const EdgeInsets.only(bottom: WeftSpace.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          WeftSpace.md,
+          WeftSpace.sm,
+          WeftSpace.xs,
+          WeftSpace.sm,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(fact.text),
+                  const SizedBox(height: WeftSpace.xs),
+                  Row(
+                    children: [
+                      Icon(
+                        fact.edited
+                            ? Icons.edit_outlined
+                            : Icons.auto_awesome_outlined,
+                        size: 14,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: WeftSpace.xs),
+                      Flexible(
+                        child: Text(
+                          fact.edited
+                              ? l10n.personMemoryEditedAt(date)
+                              : l10n.personMemoryLearnedAt(date),
+                          style: context.text.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: fact.pinned
+                  ? l10n.personMemoryUnpin
+                  : l10n.personMemoryPin,
+              isSelected: fact.pinned,
+              icon: const Icon(Icons.push_pin_outlined),
+              selectedIcon: Icon(Icons.push_pin, color: colors.primary),
+              onPressed: onPin,
+            ),
+            IconButton(
+              tooltip: l10n.personMemoryEditFact,
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: onEdit,
+            ),
+            IconButton(
+              tooltip: l10n.personMemoryDeleteFact,
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: onDelete,
+            ),
           ],
         ),
       ),
@@ -631,7 +801,7 @@ class _MemoryTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final book = ref.watch(personMemoryProvider);
-    final note = book.noteFor(keys);
+    final note = book.memoryFor(keys);
     final waiting = withSuggestions ? book.suggestionsFor(keys).length : 0;
     return ListTile(
       leading: Icon(icon),
