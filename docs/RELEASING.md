@@ -4,7 +4,8 @@
 
 ```bash
 $EDITOR docs/release-notes/1.2.0.md      # the release notes; see below
-git commit -am "Write the 1.2.0 release notes"
+$EDITOR docs/release-notes/1.2.0.play.md docs/release-notes/1.2.0.play.de-DE.md  # Play's short text
+git add docs/release-notes && git commit -m "Write the 1.2.0 release notes"
 tooling/scripts/release.sh 1.2.0
 git push && git push origin v1.2.0
 ```
@@ -35,10 +36,11 @@ iOS's `CFBundleVersion` rise monotonically on their own.
 
 ## Release notes
 
-One text per version reaches four places: the GitHub release body, Play's
-"What's new" on the internal track, TestFlight's "What to Test" (and the App
-Store "What's New" when that version is open for editing), and the sheet the
-app shows once after it updates. All four come from
+One text per version reaches the GitHub release body, TestFlight's "What to
+Test" (and the App Store "What's New" when that version is open for
+editing), and the sheet the app shows once after it updates. Play gets a
+short text of its own, see [Play's short text](#plays-short-text). All of
+them come from
 `tooling/scripts/release_notes.py <version>`, which reads:
 
 1. `docs/release-notes/<version>.md` when it exists — write one for every
@@ -54,9 +56,31 @@ same everywhere and no workflow waits for another:
 | Workflow | Writes |
 |---|---|
 | `release.yml` (version bump on `main`, or tag `v*`) | the release body (`--github`); the app asset, into every platform build |
-| `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-en-US`, cut to 500 characters at a whole line; the app asset |
+| `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-<language>`, from the short Play text; the app asset |
 | `deploy_testflight.yml` (version bump on `main`) | the app asset; after the upload, "What to Test" and "What's New" through `tooling/store/build_notes.py` |
 | `promote_to_stores.yml` (nightly, 03:00 Berlin) | nothing new: Play open testing gets the internal release's "What's new"; the App Store version gets "What's New" from the script, run on the build's commit |
+
+### Play's short text
+
+Play's "What's new" shows at most 500 characters and puts "…" after the
+first bullet of anything longer, so every release also needs
+`docs/release-notes/<version>.play.md` (en-US) and
+`<version>.play.de-DE.md`: every highlight in one short line, at most 500
+characters each, counted as Play counts them (UTF-16 code units, so an emoji
+is two). Further languages go in `<version>.play.<Play language code>.md`
+(`es-ES`, `zh-CN`, `hi-IN`, `ar`, ...). The full notes stay for GitHub,
+TestFlight and the app.
+
+`release.sh` refuses to cut a release without both files, and CI
+(`release_notes.py --check`, in the store tooling job) fails when the
+pubspec version, or any version with notes since 1.0.25, lacks one or goes
+over 500. The 03:00 promotion copies the internal release's notes, so the
+open testing track gets the same short text.
+
+A release already on a track with the wrong text: fix the files on `main`,
+then run the **Play release notes** workflow (`play_release_notes.yml`) with
+the version and track — dry run first. It changes only the notes of that
+release; fixing `internal` before 03:00 fixes the beta it is promoted to.
 
 The app asset is `apps/weft/assets/release_notes.json`. The committed copy is
 empty, so a local build or a fork shows no sheet; CI overwrites it before

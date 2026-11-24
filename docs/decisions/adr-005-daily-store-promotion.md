@@ -143,8 +143,9 @@ concurrency group keeps two runs from overlapping.
 ### Release notes
 
 The script uses the same text the stores already show testers. On Play, the
-internal release's own "What's new" is copied. If it has none,
-`release_notes.py --play-dir` (500 characters) runs on the build's commit.
+internal release's own "What's new" is copied: the short Play text, in every
+language it has. If it has none, `release_notes.py --play-dir` runs on the
+build's commit.
 On the App Store, `release_notes.py --store` runs on the build's commit, in
 a temporary worktree.
 

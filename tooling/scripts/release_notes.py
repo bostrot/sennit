@@ -3,6 +3,7 @@
 
     release_notes.py <version> [--github FILE] [--store FILE]
                                [--play-dir DIR] [--app-asset FILE]
+    release_notes.py --check
 
 One source, so the GitHub release, Play, TestFlight / the App Store and the
 app's "What's new" sheet cannot disagree:
@@ -21,9 +22,16 @@ publish anything first. Needs the full history (`fetch-depth: 0`) for 2.
     --github     Markdown, for the GitHub release body.
     --store      Plain text for App Store Connect (TestFlight "What to Test",
                  App Store "What's New"), at most 4000 characters.
-    --play-dir   Writes `whatsnew-en-US` there, at most 500 characters, for
-                 r0adkll/upload-google-play's `whatsNewDirectory`.
+    --play-dir   Writes `whatsnew-<language>` there, one per language, for
+                 r0adkll/upload-google-play's `whatsNewDirectory`. Not
+                 from the notes above: Play shows 500 characters, so Play
+                 gets its own short text, `docs/release-notes/<version>.play.md`
+                 (en-US) and `<version>.play.<language>.md` (de-DE, ...).
+                 A text over the limit fails rather than being cut.
     --app-asset  The JSON `apps/weft/assets/release_notes.json` the app reads.
+    --check      Fails when the version in pubspec.yaml, or any version with
+                 notes since 1.0.25, lacks the en-US or de-DE Play text or
+                 has one over 500 characters. CI runs it.
 
 Python 3 and git, nothing else.
 """
@@ -38,6 +46,12 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 NOTES_DIR = os.path.join(REPO, 'docs', 'release-notes')
 
 PLAY_LIMIT = 500
+# The first version with a separate Play text; older ones were cut at 500.
+FIRST_PLAY_VERSION = (1, 0, 25)
+PLAY_NAME = re.compile(r'^(\d+\.\d+\.\d+)\.play(?:\.([A-Za-z]{2,3}(?:-[A-Za-z0-9]+)?))?\.md$')
+# Every release has these; more languages are welcome.
+PLAY_REQUIRED = ('en-US', 'de-DE')
+PUBSPEC = os.path.join(REPO, 'apps', 'weft', 'pubspec.yaml')
 APP_STORE_LIMIT = 4000
 
 RELEASE_SUBJECT = re.compile(r'^Release (\d+\.\d+\.\d+)$')
@@ -120,6 +134,65 @@ def fit(text, limit):
     return '\n'.join(kept) + suffix
 
 
+def play_length(text):
+    """Characters as Play's console counts them: UTF-16 code units, so an
+    emoji counts two."""
+    return len(text.encode('utf-16-le')) // 2
+
+
+def play_texts(version):
+    """{language: plain text} from the version's Play files; en-US is
+    `<version>.play.md`."""
+    texts = {}
+    for name in sorted(os.listdir(NOTES_DIR)):
+        match = PLAY_NAME.match(name)
+        if not match or match.group(1) != version:
+            continue
+        with open(os.path.join(NOTES_DIR, name), encoding='utf-8') as f:
+            texts[match.group(2) or 'en-US'] = plain(f.read())
+    return texts
+
+
+def play_problems(version):
+    texts = play_texts(version)
+    problems = []
+    for language in PLAY_REQUIRED:
+        if language not in texts:
+            name = 'play' if language == 'en-US' else f'play.{language}'
+            problems.append(f'{version}: no docs/release-notes/{version}.{name}.md (the '
+                            f'{language} Play "What\'s new" text, at most {PLAY_LIMIT} characters)')
+    for language, text in texts.items():
+        if not text:
+            problems.append(f'{version} {language}: the Play text is empty')
+        elif play_length(text) > PLAY_LIMIT:
+            problems.append(f'{version} {language}: the Play text has '
+                            f'{play_length(text)} characters, Play takes {PLAY_LIMIT}')
+    return problems
+
+
+def check():
+    versions = set()
+    with open(PUBSPEC, encoding='utf-8') as f:
+        match = re.search(r'^version: (\d+\.\d+\.\d+)\+', f.read(), re.M)
+    if match:
+        versions.add(match.group(1))
+    for name in os.listdir(NOTES_DIR):
+        match = re.match(r'^(\d+\.\d+\.\d+)(?:\.play.*)?\.md$', name)
+        if match:
+            versions.add(match.group(1))
+    key = lambda v: tuple(int(p) for p in v.split('.'))
+    problems = []
+    for version in sorted(versions, key=key):
+        if key(version) < FIRST_PLAY_VERSION:
+            continue
+        problems += play_problems(version)
+        for language, text in play_texts(version).items():
+            print(f'{version} {language}: {play_length(text)}/{PLAY_LIMIT}')
+    for problem in problems:
+        print(f'error: {problem}', file=sys.stderr)
+    sys.exit(1 if problems else 0)
+
+
 def write(path, text):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -128,6 +201,8 @@ def write(path, text):
 
 def main(argv):
     args = list(argv)
+    if args == ['--check']:
+        return check()
     if not args or not re.match(r'^\d+\.\d+\.\d+$', args[0]):
         sys.exit(__doc__)
     version = args.pop(0)
@@ -147,8 +222,19 @@ def main(argv):
     if '--store' in options:
         write(options['--store'], store + '\n')
     if '--play-dir' in options:
-        play = fit(plain(markdown), PLAY_LIMIT)
-        write(os.path.join(options['--play-dir'], 'whatsnew-en-US'), play + '\n')
+        texts = play_texts(version)
+        if texts:
+            problems = play_problems(version)
+            if problems:
+                sys.exit('\n'.join(problems))
+        else:
+            # A version from before the Play texts, or one released without:
+            # the notes, cut at a whole line. --check keeps this from main.
+            print(f'warning: no docs/release-notes/{version}.play.md — Play gets '
+                  f'the notes cut to {PLAY_LIMIT} characters', file=sys.stderr)
+            texts = {'en-US': fit(plain(markdown), PLAY_LIMIT)}
+        for language, text in texts.items():
+            write(os.path.join(options['--play-dir'], f'whatsnew-{language}'), text + '\n')
     if '--app-asset' in options:
         write(options['--app-asset'],
               json.dumps({'version': version, 'notes': store}, ensure_ascii=False) + '\n')
