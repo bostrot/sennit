@@ -376,6 +376,8 @@
   "savedMessagesEmpty": "لم تحفظ شيئًا بعد. اضغط مطولًا على رسالة واختر «حفظ».",
   "savedMessagesNoMatch": "لا توجد رسالة محفوظة مطابقة.",
   "savedMessagesCount": "{count, plural, =1{رسالة واحدة} =2{رسالتان} few{{count} رسائل} other{{count} رسالة}}",
+  "messageActionMarkUnreadFrom": "غير مقروءة من هنا",
+  "chatMarkedUnreadFrom": "تم وضع علامة غير مقروءة بدءًا من هذه الرسالة.",
   "messageActionSendToHomeAssistant": "إرسال إلى Home Assistant",
   "messageActionRetranscribe": "إعادة التفريغ بلغة…",
   "messageActionTranslate": "ترجمة",

@@ -2198,6 +2198,15 @@
       }
     }
   },
+  "messageActionMarkUnreadFrom": "Mark unread from here",
+  "@messageActionMarkUnreadFrom": {
+    "description": "Row in the message actions sheet: marks the conversation unread again, starting at this message, as if the user had stopped reading here. Keep under ~22 chars.",
+    "maxLength": 40
+  },
+  "chatMarkedUnreadFrom": "Marked unread from this message.",
+  "@chatMarkedUnreadFrom": {
+    "description": "Snackbar after the conversation was marked unread starting at the chosen message. It stays unread until it is opened again."
+  },
   "messageActionSendToHomeAssistant": "Send to Home Assistant",
   "@messageActionSendToHomeAssistant": {
     "description": "Row in the message actions sheet, shown only when a Home Assistant integration is configured. 'Home Assistant' is a product name and is never translated. Keep the rest under ~14 chars."

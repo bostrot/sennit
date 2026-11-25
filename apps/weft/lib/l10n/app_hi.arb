@@ -376,6 +376,8 @@
   "savedMessagesEmpty": "अभी कुछ नहीं सहेजा। किसी संदेश को देर तक दबाएँ और सहेजें चुनें।",
   "savedMessagesNoMatch": "कोई सहेजा गया संदेश मेल नहीं खाता।",
   "savedMessagesCount": "{count, plural, =1{1 संदेश} other{{count} संदेश}}",
+  "messageActionMarkUnreadFrom": "यहाँ से अपठित",
+  "chatMarkedUnreadFrom": "इस संदेश से अपठित चिह्नित किया गया।",
   "messageActionSendToHomeAssistant": "Home Assistant को भेजें",
   "messageActionRetranscribe": "इसमें फिर से ट्रांसक्राइब करें…",
   "messageActionTranslate": "अनुवाद करें",

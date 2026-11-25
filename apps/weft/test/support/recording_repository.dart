@@ -44,6 +44,22 @@ class RecordingChatRepository implements ChatRepository {
   Future<void> markUnread(String chatId) async {}
 
   @override
+  Future<void> markUnreadFrom(
+    String chatId,
+    String roomId,
+    String eventId, {
+    String? before,
+    int count = 1,
+  }) async => calls.add(
+    RecordedCall(
+      'markUnreadFrom',
+      eventId: eventId,
+      body: before,
+      key: '$count',
+    ),
+  );
+
+  @override
   Future<String?> createDirectChat(String matrixUserId) async => null;
 
   @override

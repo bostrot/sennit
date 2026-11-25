@@ -335,6 +335,20 @@ abstract class ChatRepository {
   /// until it is actually opened. Opening — [markRead] — clears it.
   Future<void> markUnread(String chatId) async {}
 
+  /// Flags the conversation unread from [eventId] in [roomId] on: the
+  /// read marker moves back to [before] — the message just older than it —
+  /// and the badge counts the [count] messages from there.
+  ///
+  /// A no-op past [markUnread] by default, which is the same promise with a
+  /// badge of one.
+  Future<void> markUnreadFrom(
+    String chatId,
+    String roomId,
+    String eventId, {
+    String? before,
+    int count = 1,
+  }) => markUnread(chatId);
+
   /// Moves a chat out of the inbox without leaving the room.
   Future<void> setArchived(String chatId, {required bool archived});
 

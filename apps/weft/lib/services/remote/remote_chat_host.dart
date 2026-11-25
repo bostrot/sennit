@@ -351,6 +351,15 @@ class RemoteChatHost {
       ),
       RemoteMethods.markRead: act((p) => _repo.markRead(s(p, 'chat'))),
       RemoteMethods.markUnread: act((p) => _repo.markUnread(s(p, 'chat'))),
+      RemoteMethods.markUnreadFrom: act(
+        (p) => _repo.markUnreadFrom(
+          s(p, 'chat'),
+          s(p, 'room'),
+          s(p, 'event'),
+          before: p['before'] as String?,
+          count: (p['count'] as num?)?.toInt() ?? 1,
+        ),
+      ),
       RemoteMethods.retryFailedSend: act(
         (p) => _repo.retryFailedSend(s(p, 'room'), s(p, 'event')),
       ),
