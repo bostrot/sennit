@@ -523,7 +523,17 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       await _requireSms().send(source.roomId, body);
       return;
     }
-    await _roomFor(source).sendTextEvent(body);
+    final room = _roomFor(source);
+    for (final piece in _piecesFor(source.network, body)) {
+      await room.sendTextEvent(piece);
+    }
+  }
+
+  /// [body] as the messages [network] can carry: itself, unless the network
+  /// caps a message's length and this one is over it.
+  List<String> _piecesFor(ChatNetwork network, String body) {
+    final limit = textLimitFor(network);
+    return limit == null ? [body] : splitForLimit(body, limit);
   }
 
   @override
@@ -1072,7 +1082,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // `inReplyTo` is what puts the `m.in_reply_to` block *and* the quoted
     // fallback into the event, so every client that does not render rich
     // replies still shows what this answers.
-    await target.room.sendTextEvent(body, inReplyTo: target.event);
+    // Only the first piece of a long reply quotes; the rest follow it.
+    final pieces = _piecesFor(_networkOf(target.room), body);
+    await target.room.sendTextEvent(pieces.first, inReplyTo: target.event);
+    for (final piece in pieces.skip(1)) {
+      await target.room.sendTextEvent(piece);
+    }
   }
 
   @override
@@ -1104,12 +1119,21 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         ? null
         : await _findEvent(chatId, replyToEventId);
 
-    await root.room.sendTextEvent(
-      body,
-      threadRootEventId: threadRootId,
-      threadLastEventId: threadLatestEventId ?? threadRootId,
-      inReplyTo: explicit?.event,
-    );
+    // Every piece of a long message stays in the thread, each the fallback
+    // reply to the one before it; only the first answers [replyToEventId].
+    var latest = threadLatestEventId ?? threadRootId;
+    var answering = explicit?.event;
+    for (final piece in _piecesFor(_networkOf(root.room), body)) {
+      latest =
+          await root.room.sendTextEvent(
+            piece,
+            threadRootEventId: threadRootId,
+            threadLastEventId: latest,
+            inReplyTo: answering,
+          ) ??
+          latest;
+      answering = null;
+    }
   }
 
   @override

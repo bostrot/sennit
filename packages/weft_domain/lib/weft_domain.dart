@@ -11,6 +11,7 @@ export 'src/handle.dart';
 export 'src/link.dart';
 export 'src/media_preview.dart';
 export 'src/message.dart';
+export 'src/message_split.dart';
 export 'src/network.dart';
 export 'src/poll.dart';
 export 'src/relations.dart';
