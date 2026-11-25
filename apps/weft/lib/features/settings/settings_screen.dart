@@ -38,6 +38,7 @@ import 'notifications_screen.dart';
 import 'pro_screen.dart';
 import 'security_screen.dart';
 import 'sennit_web_screen.dart';
+import 'settings_search.dart';
 import 'shortcuts_sheet.dart';
 import 'sms_screen.dart';
 import 'storage_screen.dart';
@@ -49,7 +50,7 @@ import 'surfaces_screen.dart';
 /// popup, where "Devices" sat between "Show archived" and "Keyboard
 /// shortcuts". A menu is for things you do *to the inbox*; configuration
 /// belongs on a screen with room for grouping and a sentence per entry.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   static bool get _hasKeyboard => switch (defaultTargetPlatform) {
@@ -60,7 +61,42 @@ class SettingsScreen extends ConsumerWidget {
   };
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+
+  /// Flutter's About dialog, which carries the licence page with it.
+  ///
+  /// A test build adds its commit and build date under the version, so a bug
+  /// report can name the exact build; see [BuildInfo.summary].
+  static void _showAbout(BuildContext context) {
+    final build = BuildInfo.current.summary;
+    showAboutDialog(
+      context: context,
+      applicationName: 'Sennit',
+      applicationVersion: kSennitVersion,
+      children: [if (build != null) SelectableText(build)],
+    );
+  }
+}
+
+/// A heading on the settings screen and the rows under it.
+///
+/// Rows are [SettingsSearchEntry]s rather than bare widgets so the search
+/// field reads the same titles and descriptions the screen shows: a row added
+/// here is found by search without a second list to remember.
+typedef _Section = ({String title, List<SettingsSearchEntry> rows});
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final pro = ref.watch(proControllerProvider);
     final userId = ref.watch(ownUserIdProvider);
@@ -73,7 +109,7 @@ class SettingsScreen extends ConsumerWidget {
 
     // A row for a paid feature leads to the Pro screen until it is unlocked,
     // rather than into a screen whose settings would do nothing.
-    Widget tile({
+    SettingsSearchEntry tile({
       required IconData icon,
       required String title,
       required String subtitle,
@@ -81,19 +117,306 @@ class SettingsScreen extends ConsumerWidget {
       ProFeature? feature,
     }) {
       final locked = feature != null && !pro.unlocks(feature);
-      return ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: locked
-            ? const ProBadge()
-            : const Icon(Icons.chevron_right_rounded),
-        onTap: locked ? () => pushProScreen(context) : onTap,
+      return SettingsSearchEntry(
+        title: title,
+        subtitle: subtitle,
+        child: ListTile(
+          leading: Icon(icon),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: locked
+              ? const ProBadge()
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: locked ? () => pushProScreen(context) : onTap,
+        ),
       );
     }
 
+    // A row with state of its own, found by its fixed title and description.
+    SettingsSearchEntry row(Widget child, String title, [String? subtitle]) =>
+        SettingsSearchEntry(title: title, subtitle: subtitle, child: child);
+
     // Sennit Web only: forget the phone and start over at the connect screen.
     void unpairBrowser() => forgetPhone();
+
+    final sections = <_Section>[
+      (
+        title: l10n.settingsSectionChats,
+        rows: [
+          tile(
+            icon: Icons.call_merge_rounded,
+            title: l10n.settingsMergedChatsTitle,
+            subtitle: l10n.settingsMergedChatsSubtitle,
+            onTap: () => push(const MergeScreen()),
+          ),
+          if (!kRemoteClient)
+            tile(
+              icon: Icons.schedule_send_outlined,
+              title: l10n.settingsScheduledTitle,
+              subtitle: l10n.settingsScheduledSubtitle,
+              onTap: () => push(const ScheduledScreen()),
+            ),
+          if (!kRemoteClient)
+            tile(
+              icon: Icons.hub_outlined,
+              title: l10n.settingsBridgesTitle,
+              subtitle: l10n.settingsBridgesSubtitle,
+              onTap: () => push(const BridgesScreen()),
+            ),
+          if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
+            tile(
+              icon: Icons.sms_outlined,
+              title: l10n.settingsSmsTitle,
+              subtitle: l10n.settingsSmsSubtitle,
+              onTap: () => push(const SmsScreen()),
+            ),
+          if (!kRemoteClient)
+            tile(
+              icon: Icons.sd_storage_outlined,
+              title: l10n.settingsStorageTitle,
+              subtitle: l10n.settingsStorageSubtitle,
+              onTap: () => push(const StorageScreen()),
+            ),
+          if (!kRemoteClient)
+            row(
+              const _StatusRingsToggle(),
+              l10n.settingsStatusesTitle,
+              l10n.settingsStatusesSubtitleRings,
+            ),
+        ],
+      ),
+      (
+        title: l10n.settingsSectionLookAndFeel,
+        rows: [
+          tile(
+            icon: Icons.palette_outlined,
+            title: l10n.settingsAppearanceTitle,
+            subtitle: l10n.settingsAppearanceSubtitle,
+            onTap: () => showAppearanceSheet(context),
+          ),
+          if (!kRemoteClient)
+            tile(
+              icon: Icons.notifications_outlined,
+              title: l10n.settingsNotificationsTitle,
+              subtitle: l10n.settingsNotificationsSubtitle,
+              onTap: () => push(const NotificationsScreen()),
+            ),
+          if (SettingsScreen._hasKeyboard)
+            tile(
+              icon: Icons.keyboard_outlined,
+              title: l10n.settingsShortcutsTitle,
+              subtitle: l10n.settingsShortcutsSubtitle,
+              onTap: () => showShortcutsSheet(context),
+            ),
+        ],
+      ),
+
+      // Sennit Web shows what belongs to the browser; everything else is
+      // the phone's, and set there.
+      if (kRemoteClient)
+        (
+          title: l10n.settingsSectionThisBrowser,
+          rows: [
+            row(
+              const _SendOnEnterToggle(),
+              l10n.settingsSendOnEnterTitle,
+              l10n.settingsSendOnEnterSubtitleOff,
+            ),
+            tile(
+              icon: Icons.link_off_rounded,
+              title: l10n.sennitWebUnpairTitle,
+              subtitle: l10n.sennitWebUnpairSubtitle,
+              onTap: unpairBrowser,
+            ),
+            row(
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: WeftSpace.lg,
+                  vertical: WeftSpace.sm,
+                ),
+                child: Text(
+                  l10n.sennitWebSettingsOnPhone,
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              l10n.sennitWebSettingsOnPhone,
+            ),
+          ],
+        )
+      else ...[
+        (
+          title: l10n.settingsSectionSearchAndIntelligence,
+          rows: [
+            tile(
+              icon: Icons.auto_awesome_outlined,
+              title: l10n.settingsAiTitle,
+              subtitle: l10n.settingsAiSubtitle,
+              feature: ProFeature.aiReplies,
+              onTap: () => push(const AiSettingsScreen()),
+            ),
+            row(
+              const _AgendaToggle(),
+              l10n.settingsAgendaTitle,
+              l10n.settingsAgendaSubtitle,
+            ),
+            row(
+              const _SendOnEnterToggle(),
+              l10n.settingsSendOnEnterTitle,
+              l10n.settingsSendOnEnterSubtitleOff,
+            ),
+            row(
+              const _MediaQualityTile(),
+              l10n.settingsMediaQualityTitle,
+              null,
+            ),
+            row(
+              const _HiddenNetworksSection(),
+              l10n.settingsHiddenNetworksTitle,
+              l10n.settingsHiddenNetworksNone,
+            ),
+          ],
+        ),
+        (
+          title: l10n.settingsSectionPrivacyAndSecurity,
+          rows: [
+            row(
+              const _ReadReceiptsToggle(),
+              l10n.settingsReadReceiptsTitle,
+              l10n.settingsReadReceiptsSubtitle,
+            ),
+            row(
+              const _ContactNamesToggle(),
+              l10n.settingsContactNamesTitle,
+              l10n.settingsContactNamesSubtitle,
+            ),
+            tile(
+              icon: Icons.link_rounded,
+              title: l10n.settingsLinkPreviewsTitle,
+              subtitle: l10n.settingsLinkPreviewsSubtitle,
+              onTap: () => push(const LinkPreviewsScreen()),
+            ),
+            if (!kDemoMode)
+              tile(
+                icon: Icons.sync_rounded,
+                title: l10n.settingsDeviceSyncTitle,
+                subtitle: l10n.settingsDeviceSyncSubtitle,
+                onTap: () => push(const DeviceSyncScreen()),
+              ),
+            tile(
+              icon: Icons.devices_rounded,
+              title: l10n.settingsDevicesTitle,
+              subtitle: l10n.settingsDevicesSubtitle,
+              onTap: () => push(const DevicesScreen()),
+            ),
+            tile(
+              icon: Icons.lock_outline_rounded,
+              title: l10n.settingsEncryptionTitle,
+              subtitle: l10n.settingsEncryptionSubtitle,
+              onTap: () => push(const SecurityScreen()),
+            ),
+            tile(
+              icon: Icons.archive_outlined,
+              title: l10n.settingsBackupTitle,
+              subtitle: l10n.settingsBackupSubtitle,
+              onTap: () => push(const BackupScreen()),
+            ),
+          ],
+        ),
+        (
+          title: l10n.settingsSectionConnections,
+          rows: [
+            tile(
+              icon: Icons.widgets_outlined,
+              title: l10n.settingsSurfacesTitle,
+              subtitle: l10n.settingsSurfacesSubtitle,
+              onTap: () => push(const SurfacesScreen()),
+            ),
+            tile(
+              icon: Icons.home_outlined,
+              title: l10n.settingsIntegrationsTitle,
+              subtitle: l10n.settingsIntegrationsSubtitle,
+              feature: ProFeature.integrations,
+              onTap: () => push(const IntegrationsScreen()),
+            ),
+            // The browser build is the client; it does not serve itself.
+            if (!kDemoMode && !kIsWeb)
+              tile(
+                icon: Icons.language_rounded,
+                title: l10n.settingsSennitWebTitle,
+                subtitle: l10n.settingsSennitWebSubtitle,
+                onTap: () => push(const SennitWebScreen()),
+              ),
+            tile(
+              icon: Icons.terminal_rounded,
+              title: l10n.settingsMcpTitle,
+              subtitle: l10n.settingsMcpSubtitle,
+              feature: ProFeature.mcpServer,
+              onTap: () => push(const McpScreen()),
+            ),
+          ],
+        ),
+        if (userId != null)
+          (
+            title: l10n.settingsSectionAccount,
+            rows: [
+              row(
+                ListTile(
+                  leading: Icon(
+                    Icons.person_remove_outlined,
+                    color: context.colors.error,
+                  ),
+                  title: Text(
+                    l10n.settingsDeleteAccountTitle,
+                    style: TextStyle(color: context.colors.error),
+                  ),
+                  subtitle: Text(
+                    l10n.settingsDeleteAccountSubtitle(serverOfUserId(userId)),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => push(const DeleteAccountScreen()),
+                ),
+                l10n.settingsDeleteAccountTitle,
+              ),
+            ],
+          ),
+      ],
+
+      (
+        title: l10n.settingsSectionAbout,
+        rows: [
+          if (pro.charges && !kRemoteClient)
+            tile(
+              icon: Icons.workspace_premium_outlined,
+              title: l10n.proTitle,
+              subtitle: pro.owned()
+                  ? l10n.proSettingsSubtitleOwned
+                  : l10n.proSettingsSubtitle,
+              onTap: () => pushProScreen(context),
+            ),
+          tile(
+            icon: Icons.info_outline_rounded,
+            title: l10n.settingsAboutTitle,
+            subtitle: l10n.settingsAboutSubtitle,
+            onTap: () => SettingsScreen._showAbout(context),
+          ),
+          if (!kRemoteClient)
+            tile(
+              icon: Icons.explore_outlined,
+              title: l10n.settingsTourTitle,
+              subtitle: l10n.settingsTourSubtitle,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (route) => WalkthroughScreen(
+                    onDone: () => Navigator.of(route).pop(),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ];
 
     Widget header(String text) => Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -114,240 +437,69 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
 
+    List<Widget> results() {
+      final all = [
+        for (final section in sections) ...section.rows,
+        // The browser mirrors the phone's settings without holding them.
+        if (!kRemoteClient)
+          ...nestedSettingsEntries(
+            l10n,
+            android: defaultTargetPlatform == TargetPlatform.android,
+            showSms:
+                !kDemoMode && defaultTargetPlatform == TargetPlatform.android,
+            showSennitWeb: !kDemoMode && !kIsWeb,
+            push: (context, screen) => push(screen),
+            locked: (feature) => !pro.unlocks(feature),
+            openPro: pushProScreen,
+          ),
+      ];
+      final hits = searchSettings(all, _query);
+      if (hits.isEmpty) {
+        return [
+          Padding(
+            padding: const EdgeInsets.all(WeftSpace.xl),
+            child: Text(
+              l10n.settingsSearchNoResults,
+              textAlign: TextAlign.center,
+              style: context.text.bodyMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ];
+      }
+      return [for (final hit in hits) SettingsSearchResult(entry: hit)];
+    }
+
     return Scaffold(
       appBar: WeftAppBar(title: Text(l10n.settingsTitle)),
       body: WeftReadingPane(
         child: ListView(
           padding: const EdgeInsets.only(bottom: WeftSpace.xxl),
           children: [
-            header(l10n.settingsSectionChats),
-            tile(
-              icon: Icons.call_merge_rounded,
-              title: l10n.settingsMergedChatsTitle,
-              subtitle: l10n.settingsMergedChatsSubtitle,
-              onTap: () => push(const MergeScreen()),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                WeftSpace.lg,
+                WeftSpace.sm,
+                WeftSpace.lg,
+                0,
+              ),
+              child: SettingsSearchField(
+                controller: _search,
+                onChanged: (value) => setState(() => _query = value),
+              ),
             ),
-            if (!kRemoteClient)
-              tile(
-                icon: Icons.schedule_send_outlined,
-                title: l10n.settingsScheduledTitle,
-                subtitle: l10n.settingsScheduledSubtitle,
-                onTap: () => push(const ScheduledScreen()),
-              ),
-            if (!kRemoteClient)
-              tile(
-                icon: Icons.hub_outlined,
-                title: l10n.settingsBridgesTitle,
-                subtitle: l10n.settingsBridgesSubtitle,
-                onTap: () => push(const BridgesScreen()),
-              ),
-            if (!kDemoMode && defaultTargetPlatform == TargetPlatform.android)
-              tile(
-                icon: Icons.sms_outlined,
-                title: l10n.settingsSmsTitle,
-                subtitle: l10n.settingsSmsSubtitle,
-                onTap: () => push(const SmsScreen()),
-              ),
-            if (!kRemoteClient)
-              tile(
-                icon: Icons.sd_storage_outlined,
-                title: l10n.settingsStorageTitle,
-                subtitle: l10n.settingsStorageSubtitle,
-                onTap: () => push(const StorageScreen()),
-              ),
-
-            if (!kRemoteClient) const _StatusRingsToggle(),
-
-            header(l10n.settingsSectionLookAndFeel),
-            tile(
-              icon: Icons.palette_outlined,
-              title: l10n.settingsAppearanceTitle,
-              subtitle: l10n.settingsAppearanceSubtitle,
-              onTap: () => showAppearanceSheet(context),
-            ),
-            if (!kRemoteClient)
-              tile(
-                icon: Icons.notifications_outlined,
-                title: l10n.settingsNotificationsTitle,
-                subtitle: l10n.settingsNotificationsSubtitle,
-                onTap: () => push(const NotificationsScreen()),
-              ),
-            if (_hasKeyboard)
-              tile(
-                icon: Icons.keyboard_outlined,
-                title: l10n.settingsShortcutsTitle,
-                subtitle: l10n.settingsShortcutsSubtitle,
-                onTap: () => showShortcutsSheet(context),
-              ),
-
-            // Sennit Web shows what belongs to the browser; everything else is
-            // the phone's, and set there.
-            if (kRemoteClient) ...[
-              header(l10n.settingsSectionThisBrowser),
-              const _SendOnEnterToggle(),
-              tile(
-                icon: Icons.link_off_rounded,
-                title: l10n.sennitWebUnpairTitle,
-                subtitle: l10n.sennitWebUnpairSubtitle,
-                onTap: unpairBrowser,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: WeftSpace.lg,
-                  vertical: WeftSpace.sm,
-                ),
-                child: Text(
-                  l10n.sennitWebSettingsOnPhone,
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.colors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ] else ...[
-              header(l10n.settingsSectionSearchAndIntelligence),
-              tile(
-                icon: Icons.auto_awesome_outlined,
-                title: l10n.settingsAiTitle,
-                subtitle: l10n.settingsAiSubtitle,
-                feature: ProFeature.aiReplies,
-                onTap: () => push(const AiSettingsScreen()),
-              ),
-              const _AgendaToggle(),
-              const _SendOnEnterToggle(),
-              const _MediaQualityTile(),
-              const _HiddenNetworksSection(),
-
-              header(l10n.settingsSectionPrivacyAndSecurity),
-              const _ReadReceiptsToggle(),
-              const _ContactNamesToggle(),
-              tile(
-                icon: Icons.link_rounded,
-                title: l10n.settingsLinkPreviewsTitle,
-                subtitle: l10n.settingsLinkPreviewsSubtitle,
-                onTap: () => push(const LinkPreviewsScreen()),
-              ),
-              if (!kDemoMode)
-                tile(
-                  icon: Icons.sync_rounded,
-                  title: l10n.settingsDeviceSyncTitle,
-                  subtitle: l10n.settingsDeviceSyncSubtitle,
-                  onTap: () => push(const DeviceSyncScreen()),
-                ),
-              tile(
-                icon: Icons.devices_rounded,
-                title: l10n.settingsDevicesTitle,
-                subtitle: l10n.settingsDevicesSubtitle,
-                onTap: () => push(const DevicesScreen()),
-              ),
-              tile(
-                icon: Icons.lock_outline_rounded,
-                title: l10n.settingsEncryptionTitle,
-                subtitle: l10n.settingsEncryptionSubtitle,
-                onTap: () => push(const SecurityScreen()),
-              ),
-              tile(
-                icon: Icons.archive_outlined,
-                title: l10n.settingsBackupTitle,
-                subtitle: l10n.settingsBackupSubtitle,
-                onTap: () => push(const BackupScreen()),
-              ),
-
-              header(l10n.settingsSectionConnections),
-              tile(
-                icon: Icons.widgets_outlined,
-                title: l10n.settingsSurfacesTitle,
-                subtitle: l10n.settingsSurfacesSubtitle,
-                onTap: () => push(const SurfacesScreen()),
-              ),
-              tile(
-                icon: Icons.home_outlined,
-                title: l10n.settingsIntegrationsTitle,
-                subtitle: l10n.settingsIntegrationsSubtitle,
-                feature: ProFeature.integrations,
-                onTap: () => push(const IntegrationsScreen()),
-              ),
-              // The browser build is the client; it does not serve itself.
-              if (!kDemoMode && !kIsWeb)
-                tile(
-                  icon: Icons.language_rounded,
-                  title: l10n.settingsSennitWebTitle,
-                  subtitle: l10n.settingsSennitWebSubtitle,
-                  onTap: () => push(const SennitWebScreen()),
-                ),
-              tile(
-                icon: Icons.terminal_rounded,
-                title: l10n.settingsMcpTitle,
-                subtitle: l10n.settingsMcpSubtitle,
-                feature: ProFeature.mcpServer,
-                onTap: () => push(const McpScreen()),
-              ),
-
-              if (userId != null) ...[
-                header(l10n.settingsSectionAccount),
-                ListTile(
-                  leading: Icon(
-                    Icons.person_remove_outlined,
-                    color: context.colors.error,
-                  ),
-                  title: Text(
-                    l10n.settingsDeleteAccountTitle,
-                    style: TextStyle(color: context.colors.error),
-                  ),
-                  subtitle: Text(
-                    l10n.settingsDeleteAccountSubtitle(serverOfUserId(userId)),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => push(const DeleteAccountScreen()),
-                ),
-              ],
-            ],
-
-            header(l10n.settingsSectionAbout),
-            if (pro.charges && !kRemoteClient)
-              tile(
-                icon: Icons.workspace_premium_outlined,
-                title: l10n.proTitle,
-                subtitle: pro.owned()
-                    ? l10n.proSettingsSubtitleOwned
-                    : l10n.proSettingsSubtitle,
-                onTap: () => pushProScreen(context),
-              ),
-            tile(
-              icon: Icons.info_outline_rounded,
-              title: l10n.settingsAboutTitle,
-              subtitle: l10n.settingsAboutSubtitle,
-              onTap: () => _showAbout(context),
-            ),
-            if (!kRemoteClient)
-              tile(
-                icon: Icons.explore_outlined,
-                title: l10n.settingsTourTitle,
-                subtitle: l10n.settingsTourSubtitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (route) => WalkthroughScreen(
-                      onDone: () => Navigator.of(route).pop(),
-                    ),
-                  ),
-                ),
-              ),
+            if (_query.trim().isNotEmpty)
+              ...results()
+            else
+              for (final section in sections)
+                if (section.rows.isNotEmpty) ...[
+                  header(section.title),
+                  for (final row in section.rows) row.child!,
+                ],
           ],
         ),
       ),
-    );
-  }
-
-  /// Flutter's About dialog, which carries the licence page with it.
-  ///
-  /// A test build adds its commit and build date under the version, so a bug
-  /// report can name the exact build; see [BuildInfo.summary].
-  static void _showAbout(BuildContext context) {
-    final build = BuildInfo.current.summary;
-    showAboutDialog(
-      context: context,
-      applicationName: 'Sennit',
-      applicationVersion: kSennitVersion,
-      children: [if (build != null) SelectableText(build)],
     );
   }
 }

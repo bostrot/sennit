@@ -76,7 +76,12 @@ void main() {
       stores: WeftStores.inMemory(),
     );
     final about = find.text('About Sennit');
-    await tester.scrollUntilVisible(about, 200);
+    await tester.scrollUntilVisible(
+      about,
+      200,
+      // The list, not the search field's own scrollable.
+      scrollable: find.byType(Scrollable).first,
+    );
     // scrollUntilVisible stops once any of the row is in the viewport, which
     // can leave its centre — where tap() aims — below the window's edge.
     await tester.ensureVisible(about);

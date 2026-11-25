@@ -5,6 +5,20 @@
     "description": "App bar title of the main settings screen, reached from the inbox. One word if the language has one; keep under ~14 chars so it does not truncate on a narrow phone.",
     "maxLength": 28
   },
+  "settingsSearchHint": "Search settings",
+  "@settingsSearchHint": {
+    "description": "Placeholder in the search field at the top of the settings screen. Finds any setting by its name or description. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "settingsSearchClear": "Clear search",
+  "@settingsSearchClear": {
+    "description": "Tooltip and screen-reader name of the x button that empties the settings search field. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "settingsSearchNoResults": "No settings match",
+  "@settingsSearchNoResults": {
+    "description": "Shown under the settings search field when no setting matches the typed words."
+  },
   "settingsSectionChats": "Chats",
   "@settingsSectionChats": {
     "description": "Section heading on the settings screen, above the rows about conversations and messenger networks. A short noun, not a sentence; keep under ~20 chars.",
