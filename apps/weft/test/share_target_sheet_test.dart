@@ -908,9 +908,11 @@ void main() {
         );
 
         expect(find.text('huge.mov is larger than 100 MB.'), findsOneWidget);
-        expect(listedTitles(tester), [
-          'Recent Contact',
-        ], reason: 'one file refused is not the whole share refused');
+        expect(
+          listedTitles(tester),
+          ['Recent Contact'],
+          reason: 'one file refused is not the whole share refused',
+        );
       });
     });
   });
