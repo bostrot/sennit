@@ -57,6 +57,7 @@ from iap_products import (
     ASC, PACKAGE, PLAY, PRODUCT_ID, ApiError, asc_all, asc_token, call,
     play_token,
 )
+from listings import LOCALES, whats_new
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BERLIN = ZoneInfo('Europe/Berlin')
@@ -673,13 +674,20 @@ def appstore_apply(token, app, best, candidate, steps):
             notes = release_notes(candidate.sha, candidate.version, '--store')
             localizations = call('GET', f'{ASC}/v1/appStoreVersions/{version_id}'
                                         '/appStoreVersionLocalizations', token)['data']
-            english = next((l for l in localizations
-                            if l['attributes'].get('locale') == 'en-US'), None)
-            if english is None:
+            if not any(l['attributes'].get('locale') == 'en-US' for l in localizations):
                 raise ApiError(f'version {candidate.version} has no en-US localization')
-            call('PATCH', f'{ASC}/v1/appStoreVersionLocalizations/{english["id"]}', token,
-                 body={'data': {'type': 'appStoreVersionLocalizations', 'id': english['id'],
-                                'attributes': {'whatsNew': notes}}})
+            # Apple wants "What's New" in every language of an update, and a new
+            # version starts with the previous one's: each gets this version's
+            # Play text in its language, or a generic line (listings.py).
+            for loc in localizations:
+                locale = loc['attributes'].get('locale')
+                language = next((lang for lang, (_, apple) in LOCALES.items()
+                                 if locale in apple), 'en')
+                text = notes if locale == 'en-US' else whats_new(
+                    language, locale, candidate.version)
+                call('PATCH', f'{ASC}/v1/appStoreVersionLocalizations/{loc["id"]}', token,
+                     body={'data': {'type': 'appStoreVersionLocalizations', 'id': loc['id'],
+                                    'attributes': {'whatsNew': text}}})
         elif kind == 'export_compliance' and best['encryption'] is None:
             source, answer, declaration = compliance_source(token, app)
             if source is None:

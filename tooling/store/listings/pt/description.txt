@@ -1,0 +1,34 @@
+Uma caixa de entrada. Seu servidor. Ninguém no meio.
+
+O Sennit reúne todas as suas conversas numa caixa de entrada privada. Ele é um cliente Matrix feito para pontes: conecte-o a um servidor doméstico que você administra e às pontes que escolher, e as conversas de redes como WhatsApp, Signal, Telegram, Google Messages, Mattermost, SMS e Matrix chegam numa única lista. Sem intermediários, sem conta no Sennit, e nenhuma mensagem passa pelos nossos servidores. Não temos nenhum.
+
+UMA PESSOA, UMA CONVERSA
+A mesma pessoa em três redes vira uma única conversa. As respostas saem pela rede de onde veio a última mensagem dela, ou pela que você escolher. Só correspondências exatas são mescladas sozinhas; o resto é uma sugestão que você decide.
+
+PRIVACIDADE DESDE A ORIGEM
+• Criptografia de ponta a ponta via Matrix, com verificação de dispositivos, assinatura cruzada e backup de chaves
+• Mensagens temporárias, ajustáveis por conversa
+• Confirmações de leitura, indicador de digitação e status online, cada um com seu próprio botão
+• Sem análises, sem rastreamento, sem anúncios
+• Código aberto sob a licença AGPL-3.0: cada linha é pública
+
+SUA PRÓPRIA IA (SENNIT PRO)
+• Sugestões de resposta e mensagens rápidas de um modelo de linguagem que você hospeda: qualquer servidor com API compatível com OpenAI, como Ollama ou llama.cpp
+• Transcrição de voz e busca semântica no próprio aparelho, para que áudio e mensagens fiquem no seu hardware, ou em servidores que você administra
+• Um servidor MCP embutido, para que seus próprios agentes possam buscar e enviar, limitados por chaves de API com permissões restritas
+• Integrações com Home Assistant, paperless-ngx e agendas compartilhadas
+
+MENSAGENS DO DIA A DIA, DE GRAÇA
+• Chamadas, mensagens de voz, fotos e vídeos, enquetes, compartilhamento de localização
+• Envio agendado e lembretes
+• Convites de agenda para aceitar, recusar ou remarcar direto no chat
+• No Android: notificações sem os serviços do Google, pela sua própria conexão de sincronização ou UnifiedPush
+• Widgets na tela inicial, app para relógio e layout de tablet em duas colunas
+• Backups criptografados
+
+SEU SERVIDOR, SUAS PONTES
+O Sennit é o app; você traz um servidor doméstico Matrix e as pontes das redes que usa (as pontes mautrix são a configuração de referência). O Sennit encontra suas pontes e guia você na conexão de cada rede, inclusive com login por QR code. Administrar um servidor exige alguma familiaridade técnica, e essa independência é justamente a ideia.
+
+Conversar é grátis. O Sennit Pro é uma compra única no app, sem assinatura, que libera os recursos de IA, a busca semântica, a transcrição, o servidor MCP e as integrações.
+
+O Sennit não tem vínculo com as redes acessíveis por pontes. Uma ponte automatiza as suas próprias contas; se os termos de cada rede permitem isso é algo entre você e essa rede.

@@ -1,0 +1,34 @@
+One inbox. Your server. Nobody in between.
+
+Sennit brings all your chats into one private inbox. It is a Matrix client built for bridges: connect it to a homeserver you run and the bridges you choose, and conversations from networks like WhatsApp, Signal, Telegram, Google Messages, Mattermost, SMS and Matrix land in a single list. No hosted middleman, no Sennit account, and no message ever passes through our servers. We don't run any.
+
+ONE PERSON, ONE THREAD
+The same person on three networks becomes one conversation. Replies go out on the network their last message came from, or the one you pick. Only exact matches merge on their own; everything else is a suggestion you decide on.
+
+PRIVATE BY DESIGN
+• End-to-end encryption via Matrix, with device verification, cross-signing and key backup
+• Disappearing messages, set per conversation
+• Read receipts, typing indicators and online status, each with its own switch
+• No analytics, no tracking, no ads
+• Open source under the AGPL-3.0: every line is public
+
+BRING YOUR OWN AI (SENNIT PRO)
+• Reply suggestions and quick messages from a language model you host: any server with an OpenAI-compatible API, such as Ollama or llama.cpp
+• Voice-note transcription and semantic search on your device, so audio and messages stay on your hardware, or on endpoints you run
+• A built-in MCP server, so your own agents can search and send, limited by scoped API keys
+• Home Assistant, paperless-ngx and shared calendar integrations
+
+EVERYDAY MESSAGING, FREE
+• Calls, voice messages, photos and videos, polls, location sharing
+• Scheduled sending and reminders
+• Calendar invites you can accept, decline or reschedule right in the chat
+• On Android: notifications without Google services, through your own sync connection or UnifiedPush
+• Home screen widgets, a watch app and a two-pane tablet layout
+• Encrypted backups
+
+YOUR SERVER, YOUR BRIDGES
+Sennit is the app; you bring a Matrix homeserver and bridges for the networks you use (mautrix bridges are the reference setup). Sennit finds your bridges and walks you through connecting each network, QR code logins included. Running a homeserver takes some technical comfort, and that independence is the whole point.
+
+Messaging is free. Sennit Pro is a single in-app purchase, not a subscription, and unlocks the AI features, semantic search, transcription, the MCP server and the integrations.
+
+Sennit is not affiliated with the networks reachable through bridges. Bridging automates your own accounts; whether a network's terms allow that is between you and the network.

@@ -1,0 +1,1 @@
+matrix,ponte,privado,chat,criptografia,e2ee,código aberto,auto-hospedado,ia local,privacidade,sms

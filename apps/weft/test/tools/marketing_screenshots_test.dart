@@ -9,19 +9,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import 'package:weft/app/design_strings.dart';
+import 'package:weft/app/localisation.dart';
 import 'package:weft/data/chat_repository.dart';
+import 'package:weft/data/demo_repository.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft/features/inbox/inbox_shell.dart';
 
 import '../support/attachment_fixtures.dart';
 import '../support/golden_harness.dart';
 
-/// Renders the App Store / Play Store screenshots, and the ones in the
-/// README, from the demo fixtures.
+/// Renders the App Store / Play Store screenshots, one set per listing
+/// language, and the ones in the README, from the demo fixtures.
 ///
 /// The same trick as `brand_assets_test.dart`: a test, because rasterising
 /// widgets needs a Flutter binding, writing real files under
-/// `tooling/store/screenshots/` and `docs/images/`. The scenes lay out at the device's logical
+/// `tooling/store/screenshots/<language>/` and `docs/images/`. The scenes lay out at the device's logical
 /// size and are captured at its scale factor, which yields exactly the pixel
 /// dimensions the stores demand — 1320×2868 for the 6.9" iPhone, 2064×2752
 /// for the 13" iPad — with no simulator involved (the ffmpeg plugin ships no
@@ -38,6 +41,17 @@ void main() {
     if (emoji.existsSync()) {
       final loader = FontLoader('Roboto')
         ..addFont(Future.value(emoji.readAsBytesSync().buffer.asByteData()));
+      await loader.load();
+    }
+    // The scripts Roboto has no glyphs for, each under a family of its own
+    // and handed to every text style as a fallback in [capture] — an extra
+    // Roboto face is not consulted for them — so the Chinese, Hindi and
+    // Arabic listings are not rows of boxes.
+    for (final (family, path) in _fallbackFonts) {
+      final face = File(path);
+      if (!face.existsSync()) continue;
+      final loader = FontLoader(family)
+        ..addFont(Future.value(face.readAsBytesSync().buffer.asByteData()));
       await loader.load();
     }
   });
@@ -62,6 +76,7 @@ void main() {
     /// carry no pictures, so a conversation with media in it has to bring its
     /// own.
     ChatRepository? repository,
+    Locale locale = const Locale('en'),
   }) async {
     // Shadows as shadows. The test binding paints every shadow as a solid
     // black box so that goldens do not depend on a blur — which is why the
@@ -80,13 +95,25 @@ void main() {
           child: Builder(
             builder: (context) => MediaQuery(
               data: MediaQuery.of(context).copyWith(devicePixelRatio: scale),
-              child: child,
+              child: Theme(
+                data: _withFallbackFonts(Theme.of(context)),
+                // What `main.dart` puts under `Localizations`: without it a
+                // chat tile's own words stay English in every language.
+                child: WeftDesignStringsScope(
+                  strings: weftDesignStringsFrom(context.l10n),
+                  child: child,
+                ),
+              ),
             ),
           ),
         ),
         size: logical,
         mode: mode,
         repository: repository,
+        variant: WeftGoldenVariant(
+          name: locale.toLanguageTag(),
+          locale: locale,
+        ),
       );
       await tester.pumpAndSettle();
       if (chatToOpen != null) {
@@ -125,138 +152,107 @@ void main() {
   const iphone = Size(440, 956);
   // 13" iPad, portrait: 1032×1376 points at 2× — 2064×2752.
   const ipad = Size(1032, 1376);
-
-  testWidgets('iphone inbox light', (tester) async {
-    await capture(
-      tester,
-      'iphone_69_01_inbox_light',
-      child: const InboxShell(),
-      logical: iphone,
-      scale: 3,
-    );
-  });
-
-  testWidgets('iphone chat light', (tester) async {
-    await capture(
-      tester,
-      'iphone_69_02_chat_light',
-      child: const ChatView(chatId: 'merged:anna'),
-      logical: iphone,
-      scale: 3,
-    );
-  });
-
-  testWidgets('iphone inbox dark', (tester) async {
-    await capture(
-      tester,
-      'iphone_69_03_inbox_dark',
-      child: const InboxShell(),
-      logical: iphone,
-      scale: 3,
-      mode: WeftThemeMode.dark,
-    );
-  });
-
-  testWidgets('iphone chat dark', (tester) async {
-    await capture(
-      tester,
-      'iphone_69_04_chat_dark',
-      child: const ChatView(chatId: 'merged:anna'),
-      logical: iphone,
-      scale: 3,
-      mode: WeftThemeMode.dark,
-    );
-  });
-
-  testWidgets('ipad inbox light two-pane', (tester) async {
-    await capture(
-      tester,
-      'ipad_13_01_inbox_light',
-      child: const InboxShell(),
-      logical: ipad,
-      scale: 2,
-    );
-  });
-
-  testWidgets('ipad inbox dark two-pane', (tester) async {
-    await capture(
-      tester,
-      'ipad_13_02_inbox_dark',
-      child: const InboxShell(),
-      logical: ipad,
-      scale: 2,
-      mode: WeftThemeMode.dark,
-    );
-  });
-
   // Google Play is strict about aspect ratio: phone shots must be 16:9 or
   // 9:16, and the Apple sets above are 9:19.6 — the shape of a modern iPhone,
   // which Play rejects outright. These are exactly 9:16 and 16:9.
   const playPhone = Size(360, 640);
   const playTablet = Size(960, 540);
 
-  testWidgets('play phone inbox light', (tester) async {
-    await capture(
-      tester,
+  const inbox = InboxShell();
+  const chat = ChatView(chatId: 'merged:anna');
+  const scenes = [
+    (
+      'iphone_69_01_inbox_light',
+      inbox,
+      iphone,
+      3.0,
+      WeftThemeMode.light,
+      false,
+    ),
+    ('iphone_69_02_chat_light', chat, iphone, 3.0, WeftThemeMode.light, false),
+    ('iphone_69_03_inbox_dark', inbox, iphone, 3.0, WeftThemeMode.dark, false),
+    ('iphone_69_04_chat_dark', chat, iphone, 3.0, WeftThemeMode.dark, false),
+    ('ipad_13_01_inbox_light', inbox, ipad, 2.0, WeftThemeMode.light, true),
+    ('ipad_13_02_inbox_dark', inbox, ipad, 2.0, WeftThemeMode.dark, true),
+    (
       'play_phone_01_inbox_light',
-      child: const InboxShell(),
-      logical: playPhone,
-      scale: 3,
-    );
-  });
-
-  testWidgets('play phone chat light', (tester) async {
-    await capture(
-      tester,
+      inbox,
+      playPhone,
+      3.0,
+      WeftThemeMode.light,
+      false,
+    ),
+    (
       'play_phone_02_chat_light',
-      child: const ChatView(chatId: 'merged:anna'),
-      logical: playPhone,
-      scale: 3,
-    );
-  });
-
-  testWidgets('play phone inbox dark', (tester) async {
-    await capture(
-      tester,
+      chat,
+      playPhone,
+      3.0,
+      WeftThemeMode.light,
+      false,
+    ),
+    (
       'play_phone_03_inbox_dark',
-      child: const InboxShell(),
-      logical: playPhone,
-      scale: 3,
-      mode: WeftThemeMode.dark,
-    );
-  });
-
-  testWidgets('play phone chat dark', (tester) async {
-    await capture(
-      tester,
+      inbox,
+      playPhone,
+      3.0,
+      WeftThemeMode.dark,
+      false,
+    ),
+    (
       'play_phone_04_chat_dark',
-      child: const ChatView(chatId: 'merged:anna'),
-      logical: playPhone,
-      scale: 3,
-      mode: WeftThemeMode.dark,
-    );
-  });
-
-  testWidgets('play tablet inbox light', (tester) async {
-    await capture(
-      tester,
+      chat,
+      playPhone,
+      3.0,
+      WeftThemeMode.dark,
+      false,
+    ),
+    (
       'play_tablet_01_inbox_light',
-      child: const InboxShell(),
-      logical: playTablet,
-      scale: 2,
-    );
-  });
-
-  testWidgets('play tablet inbox dark', (tester) async {
-    await capture(
-      tester,
+      inbox,
+      playTablet,
+      2.0,
+      WeftThemeMode.light,
+      true,
+    ),
+    (
       'play_tablet_02_inbox_dark',
-      child: const InboxShell(),
-      logical: playTablet,
-      scale: 2,
-      mode: WeftThemeMode.dark,
-    );
-  });
+      inbox,
+      playTablet,
+      2.0,
+      WeftThemeMode.dark,
+      true,
+    ),
+  ];
+
+  // One set per listing language, in `tooling/store/screenshots/<language>/`,
+  // which is where `tooling/store/listings.py` uploads them from. The app's
+  // own strings come from its catalogues; the conversations come from
+  // [_demoLines], so a German listing does not show a German app full of
+  // English chats.
+  for (final language in _demoLines.keys) {
+    group(language, () {
+      for (final (name, child, logical, scale, mode, twoPane) in scenes) {
+        testWidgets(name, (tester) async {
+          final repository = _LocalizedDemoRepository(_demoLines[language]!);
+          addTearDown(repository.dispose);
+          await capture(
+            tester,
+            name,
+            child: child,
+            logical: logical,
+            scale: scale,
+            mode: mode,
+            outDir: '$storeDir/$language',
+            repository: repository,
+            locale: _locales[language]!,
+            // A tablet shows the list and a conversation side by side, so
+            // the conversation pane gets one rather than its placeholder.
+            chatToOpen: twoPane ? 'Anna Maven' : null,
+          );
+        });
+      }
+    });
+  }
 
   // The README's images. Captured at 2× so they stay sharp on a high-density
   // display; GitHub scales them down to the width of their table cell.
@@ -379,6 +375,306 @@ void main() {
     );
   });
 }
+
+/// System faces for the glyphs Roboto lacks, as (family, file). macOS-only by
+/// nature, which is where these images are produced anyway.
+const _fallbackFonts = [
+  ('StoreEmoji', '/System/Library/Fonts/Apple Color Emoji.ttc'),
+  ('StoreHans', '/System/Library/Fonts/Hiragino Sans GB.ttc'),
+  ('StoreDevanagari', '/System/Library/Fonts/Kohinoor.ttc'),
+  ('StoreArabic', '/System/Library/Fonts/GeezaPro.ttc'),
+];
+
+ThemeData _withFallbackFonts(ThemeData theme) {
+  final families = [for (final (family, _) in _fallbackFonts) family];
+  return theme.copyWith(
+    textTheme: theme.textTheme.apply(fontFamilyFallback: families),
+    primaryTextTheme: theme.primaryTextTheme.apply(
+      fontFamilyFallback: families,
+    ),
+  );
+}
+
+/// The demo inbox with its conversations in another language.
+///
+/// The fixtures are English and stay so for the goldens; a store listing in
+/// German wants the chats in German too. Lines without a translation are left
+/// as they are, so a fixture added later shows up in English rather than not at
+/// all.
+class _LocalizedDemoRepository extends DemoChatRepository {
+  _LocalizedDemoRepository(this.lines) : super(uploadTick: Duration.zero);
+
+  /// English fixture text to the text shown instead — message bodies and
+  /// chat titles alike.
+  final Map<String, String> lines;
+
+  String _say(String text) => lines[text] ?? text;
+
+  WeftMessage? _message(WeftMessage? message) =>
+      message?.copyWith(body: _say(message.body));
+
+  @override
+  Stream<List<Chat>> watchChats() => super.watchChats().map(
+    (chats) => [
+      for (final chat in chats)
+        chat.copyWith(
+          title: _say(chat.title),
+          lastMessage: _message(chat.lastMessage),
+        ),
+    ],
+  );
+
+  @override
+  List<WeftMessage> historyFor(ChatSource source, String title) => [
+    for (final message in super.historyFor(source, title)) _message(message)!,
+  ];
+}
+
+const _locales = {
+  'en': Locale('en'),
+  'de': Locale('de'),
+  'es': Locale('es'),
+  'fr': Locale('fr'),
+  'pt': Locale('pt', 'BR'),
+  'zh': Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+  'hi': Locale('hi'),
+  'ar': Locale('ar'),
+};
+
+/// The demo conversations per listing language, keyed by the English fixture
+/// text in `demo_repository.dart`. English replaces only the inbox previews
+/// that read as placeholders.
+const _demoLines = <String, Map<String, String>>{
+  'en': {
+    'Hi! I have a short message to convey': 'Photos from Saturday are up 📸',
+    "Here's a brief note for you": 'Notes from the call are in the doc',
+    'Greetings! Just a quick word from me': 'Office hours moved to 3 pm',
+    'Hey there! Just wanted to share a': 'Shared the Q3 deck with the team',
+    'Hey! I wanted to drop a quick line': 'Dinner on Friday? 🍝',
+  },
+  'de': {
+    'Can you send the clinical trial summary?':
+        'Kannst du mir die Zusammenfassung der Studie schicken?',
+    'Hey, are we still on for Thursday?': 'Hey, bleibt es bei Donnerstag?',
+    "Let me know when it's done": 'Sag Bescheid, wenn es fertig ist',
+    'Hi, is this the right number for Sam?':
+        'Hallo, ist das die Nummer von Sam?',
+    'We have to talk about the results':
+        'Wir müssen über die Ergebnisse sprechen',
+    'Hi! I have a short message to convey':
+        'Die Fotos von Samstag sind online 📸',
+    "Here's a brief note for you": 'Die Notizen vom Call sind im Dokument',
+    'Greetings! Just a quick word from me':
+        'Die Sprechstunde ist jetzt um 15 Uhr',
+    'Hey there! Just wanted to share a':
+        'Hab die Q3-Präsentation mit dem Team geteilt',
+    'Hey! I wanted to drop a quick line': 'Freitag zusammen essen? 🍝',
+    'Pushed the new rail animation': 'Neue Animation für die Leiste ist drin',
+    'Design Team': 'Designteam',
+    'Morning! Did you get a chance to look at it?':
+        'Morgen! Konntest du schon reinschauen?',
+    'Yes, reviewing now.': 'Ja, sehe es mir gerade an.',
+    'Perfect, thanks.': 'Perfekt, danke.',
+    'Let me check and get back to you.': 'Ich schau nach und melde mich.',
+    'Sending the details over here instead.':
+        'Ich schick dir die Details lieber hier.',
+    'Got it, thanks for switching.': 'Alles klar, danke fürs Wechseln.',
+    'Can you provide more details about the timeline?':
+        'Kannst du mehr zum Zeitplan sagen?',
+    'That does sound promising.': 'Das klingt vielversprechend.',
+    'Quick update from my side.': 'Kurzes Update von mir.',
+    'Sounds good, ship it': 'Klingt gut, raus damit',
+    'Are we still meeting Thursday?': 'Treffen wir uns noch am Donnerstag?',
+    'Yes, 14:00 works.': 'Ja, 14:00 passt.',
+  },
+  'es': {
+    'Can you send the clinical trial summary?':
+        '¿Me envías el resumen del ensayo clínico?',
+    'Hey, are we still on for Thursday?': 'Oye, ¿sigue en pie lo del jueves?',
+    "Let me know when it's done": 'Avísame cuando esté listo',
+    'Hi, is this the right number for Sam?': 'Hola, ¿es este el número de Sam?',
+    'We have to talk about the results': 'Tenemos que hablar de los resultados',
+    'Hi! I have a short message to convey': 'Ya están las fotos del sábado 📸',
+    "Here's a brief note for you":
+        'Las notas de la llamada están en el documento',
+    'Greetings! Just a quick word from me': 'La tutoría pasa a las 15:00',
+    'Hey there! Just wanted to share a':
+        'Compartí la presentación del T3 con el equipo',
+    'Hey! I wanted to drop a quick line': '¿Cenamos el viernes? 🍝',
+    'Pushed the new rail animation': 'Subí la nueva animación de la barra',
+    'Design Team': 'Equipo de diseño',
+    'Morning! Did you get a chance to look at it?':
+        '¡Buenos días! ¿Pudiste echarle un vistazo?',
+    'Yes, reviewing now.': 'Sí, lo estoy revisando.',
+    'Perfect, thanks.': 'Perfecto, gracias.',
+    'Let me check and get back to you.': 'Lo miro y te digo.',
+    'Sending the details over here instead.':
+        'Mejor te paso los detalles por aquí.',
+    'Got it, thanks for switching.': 'Entendido, gracias por cambiar.',
+    'Can you provide more details about the timeline?':
+        '¿Me das más detalles sobre los plazos?',
+    'That does sound promising.': 'Suena prometedor.',
+    'Quick update from my side.': 'Una actualización rápida.',
+    'Sounds good, ship it': 'Me parece bien, adelante',
+    'Are we still meeting Thursday?': '¿Seguimos quedando el jueves?',
+    'Yes, 14:00 works.': 'Sí, a las 14:00 me va bien.',
+  },
+  'fr': {
+    'Can you send the clinical trial summary?':
+        'Tu peux m’envoyer le résumé de l’essai clinique ?',
+    'Hey, are we still on for Thursday?': 'Salut, on maintient jeudi ?',
+    "Let me know when it's done": 'Dis-moi quand c’est fini',
+    'Hi, is this the right number for Sam?':
+        'Bonjour, c’est bien le numéro de Sam ?',
+    'We have to talk about the results': 'Il faut qu’on parle des résultats',
+    'Hi! I have a short message to convey':
+        'Les photos de samedi sont en ligne 📸',
+    "Here's a brief note for you": 'Les notes de l’appel sont dans le doc',
+    'Greetings! Just a quick word from me': 'La permanence passe à 15 h',
+    'Hey there! Just wanted to share a':
+        'J’ai partagé la présentation T3 avec l’équipe',
+    'Hey! I wanted to drop a quick line': 'Dîner vendredi ? 🍝',
+    'Pushed the new rail animation': 'Nouvelle animation de la barre en ligne',
+    'Design Team': 'Équipe design',
+    'Morning! Did you get a chance to look at it?':
+        'Bonjour ! Tu as pu y jeter un œil ?',
+    'Yes, reviewing now.': 'Oui, je regarde ça.',
+    'Perfect, thanks.': 'Parfait, merci.',
+    'Let me check and get back to you.': 'Je vérifie et je te redis.',
+    'Sending the details over here instead.':
+        'Je t’envoie plutôt les détails ici.',
+    'Got it, thanks for switching.': 'C’est noté, merci d’avoir changé.',
+    'Can you provide more details about the timeline?':
+        'Tu peux m’en dire plus sur le calendrier ?',
+    'That does sound promising.': 'Ça a l’air prometteur.',
+    'Quick update from my side.': 'Petit point de mon côté.',
+    'Sounds good, ship it': 'Ça marche, on publie',
+    'Are we still meeting Thursday?': 'On se voit toujours jeudi ?',
+    'Yes, 14:00 works.': 'Oui, 14 h me va.',
+  },
+  'pt': {
+    'Can you send the clinical trial summary?':
+        'Pode me mandar o resumo do estudo clínico?',
+    'Hey, are we still on for Thursday?': 'E aí, quinta continua de pé?',
+    "Let me know when it's done": 'Me avisa quando terminar',
+    'Hi, is this the right number for Sam?': 'Oi, esse é o número do Sam?',
+    'We have to talk about the results':
+        'Precisamos conversar sobre os resultados',
+    'Hi! I have a short message to convey':
+        'As fotos de sábado já estão no ar 📸',
+    "Here's a brief note for you": 'As anotações da call estão no documento',
+    'Greetings! Just a quick word from me':
+        'O plantão de dúvidas mudou para 15h',
+    'Hey there! Just wanted to share a':
+        'Compartilhei a apresentação do 3º tri com o time',
+    'Hey! I wanted to drop a quick line': 'Jantar na sexta? 🍝',
+    'Pushed the new rail animation': 'Subi a nova animação da barra',
+    'Design Team': 'Time de design',
+    'Morning! Did you get a chance to look at it?':
+        'Bom dia! Conseguiu dar uma olhada?',
+    'Yes, reviewing now.': 'Sim, estou revisando.',
+    'Perfect, thanks.': 'Perfeito, valeu.',
+    'Let me check and get back to you.': 'Vou ver e te retorno.',
+    'Sending the details over here instead.':
+        'Vou mandar os detalhes por aqui.',
+    'Got it, thanks for switching.': 'Beleza, obrigado por trocar.',
+    'Can you provide more details about the timeline?':
+        'Pode dar mais detalhes sobre o cronograma?',
+    'That does sound promising.': 'Parece promissor.',
+    'Quick update from my side.': 'Uma atualização rápida.',
+    'Sounds good, ship it': 'Show, pode publicar',
+    'Are we still meeting Thursday?': 'Ainda vamos nos ver na quinta?',
+    'Yes, 14:00 works.': 'Sim, 14h funciona.',
+  },
+  'zh': {
+    'Can you send the clinical trial summary?': '能把临床试验的总结发给我吗？',
+    'Hey, are we still on for Thursday?': '嘿，周四的安排还照旧吗？',
+    "Let me know when it's done": '弄好了告诉我一声',
+    'Hi, is this the right number for Sam?': '你好，这是 Sam 的号码吗？',
+    'We have to talk about the results': '我们得谈谈结果',
+    'Hi! I have a short message to convey': '周六的照片已经上传了 📸',
+    "Here's a brief note for you": '通话纪要已经放进文档了',
+    'Greetings! Just a quick word from me': '答疑时间改到下午 3 点',
+    'Hey there! Just wanted to share a': '已把第三季度的演示文稿分享给团队',
+    'Hey! I wanted to drop a quick line': '周五一起吃晚饭？🍝',
+    'Pushed the new rail animation': '新的侧栏动画已推送',
+    'Design Team': '设计组',
+    'Morning! Did you get a chance to look at it?': '早！你看过了吗？',
+    'Yes, reviewing now.': '看了，正在审阅。',
+    'Perfect, thanks.': '太好了，谢谢。',
+    'Let me check and get back to you.': '我看一下再回复你。',
+    'Sending the details over here instead.': '细节我改在这里发给你。',
+    'Got it, thanks for switching.': '收到，谢谢你换过来。',
+    'Can you provide more details about the timeline?': '能详细说说时间安排吗？',
+    'That does sound promising.': '听起来很有希望。',
+    'Quick update from my side.': '我这边简单更新一下。',
+    'Sounds good, ship it': '不错，发布吧',
+    'Are we still meeting Thursday?': '周四还见面吗？',
+    'Yes, 14:00 works.': '可以，14:00 没问题。',
+  },
+  'hi': {
+    'Can you send the clinical trial summary?':
+        'क्या आप क्लिनिकल ट्रायल का सारांश भेज सकते हैं?',
+    'Hey, are we still on for Thursday?': 'अरे, गुरुवार का प्लान पक्का है न?',
+    "Let me know when it's done": 'हो जाए तो बता देना',
+    'Hi, is this the right number for Sam?': 'नमस्ते, क्या यह Sam का नंबर है?',
+    'We have to talk about the results': 'हमें नतीजों पर बात करनी होगी',
+    'Hi! I have a short message to convey': 'शनिवार की फ़ोटो आ गई हैं 📸',
+    "Here's a brief note for you": 'कॉल के नोट्स डॉक में हैं',
+    'Greetings! Just a quick word from me': 'ऑफ़िस आवर्स अब दोपहर 3 बजे',
+    'Hey there! Just wanted to share a':
+        'Q3 की प्रेज़ेंटेशन टीम के साथ शेयर कर दी',
+    'Hey! I wanted to drop a quick line': 'शुक्रवार को डिनर? 🍝',
+    'Pushed the new rail animation': 'नई साइडबार एनिमेशन पुश कर दी',
+    'Design Team': 'डिज़ाइन टीम',
+    'Morning! Did you get a chance to look at it?':
+        'सुप्रभात! क्या आपने इसे देख लिया?',
+    'Yes, reviewing now.': 'हाँ, अभी समीक्षा चल रही है।',
+    'Perfect, thanks.': 'बढ़िया, धन्यवाद।',
+    'Let me check and get back to you.': 'देखकर जल्द जवाब देते हैं।',
+    'Sending the details over here instead.': 'डिटेल्स अब यहीं भेज रहे हैं।',
+    'Got it, thanks for switching.': 'ठीक है, यहाँ आने के लिए धन्यवाद।',
+    'Can you provide more details about the timeline?':
+        'क्या टाइमलाइन के बारे में और बता सकते हैं?',
+    'That does sound promising.': 'यह तो काफ़ी उम्मीद भरा लगता है।',
+    'Quick update from my side.': 'मेरी तरफ़ से छोटा-सा अपडेट।',
+    'Sounds good, ship it': 'बढ़िया, रिलीज़ कर दो',
+    'Are we still meeting Thursday?': 'गुरुवार को मिल रहे हैं न?',
+    'Yes, 14:00 works.': 'हाँ, 14:00 ठीक है।',
+  },
+  'ar': {
+    'Can you send the clinical trial summary?':
+        'هل يمكنك إرسال ملخص التجربة السريرية؟',
+    'Hey, are we still on for Thursday?':
+        'مرحبًا، هل ما زال موعد الخميس قائمًا؟',
+    "Let me know when it's done": 'أخبرني عندما تنتهي',
+    'Hi, is this the right number for Sam?': 'مرحبًا، هل هذا رقم سام؟',
+    'We have to talk about the results': 'علينا أن نتحدث عن النتائج',
+    'Hi! I have a short message to convey': 'صور يوم السبت أصبحت متاحة 📸',
+    "Here's a brief note for you": 'ملاحظات المكالمة في المستند',
+    'Greetings! Just a quick word from me':
+        'الساعات المكتبية أصبحت الساعة 3 عصرًا',
+    'Hey there! Just wanted to share a': 'شاركتُ عرض الربع الثالث مع الفريق',
+    'Hey! I wanted to drop a quick line': 'عشاء يوم الجمعة؟ 🍝',
+    'Pushed the new rail animation': 'رفعتُ الحركة الجديدة للشريط الجانبي',
+    'Design Team': 'فريق التصميم',
+    'Morning! Did you get a chance to look at it?':
+        'صباح الخير! هل أتيحت لك فرصة للاطلاع عليه؟',
+    'Yes, reviewing now.': 'نعم، أراجعه الآن.',
+    'Perfect, thanks.': 'ممتاز، شكرًا.',
+    'Let me check and get back to you.': 'سأتحقق وأعود إليك.',
+    'Sending the details over here instead.':
+        'سأرسل التفاصيل هنا بدلًا من ذلك.',
+    'Got it, thanks for switching.': 'تمام، شكرًا على الانتقال.',
+    'Can you provide more details about the timeline?':
+        'هل يمكنك توضيح الجدول الزمني أكثر؟',
+    'That does sound promising.': 'يبدو هذا واعدًا.',
+    'Quick update from my side.': 'تحديث سريع من جهتي.',
+    'Sounds good, ship it': 'يبدو جيدًا، انشره',
+    'Are we still meeting Thursday?': 'هل ما زلنا نلتقي يوم الخميس؟',
+    'Yes, 14:00 works.': 'نعم، الساعة 14:00 مناسبة.',
+  },
+};
 
 /// [StubChatRepository] with a different picture behind each message.
 class _PictureRepository extends StubChatRepository {

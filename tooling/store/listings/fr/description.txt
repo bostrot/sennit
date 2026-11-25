@@ -1,0 +1,34 @@
+Une boîte de réception. Votre serveur. Personne entre les deux.
+
+Sennit réunit toutes vos discussions dans une boîte de réception privée. C’est un client Matrix conçu pour les passerelles : connectez-le à un serveur d’accueil que vous gérez et aux passerelles de votre choix, et les conversations de réseaux comme WhatsApp, Signal, Telegram, Google Messages, Mattermost, SMS et Matrix arrivent dans une seule liste. Aucun intermédiaire, aucun compte Sennit, et aucun message ne transite par nos serveurs. Nous n’en avons pas.
+
+UNE PERSONNE, UNE CONVERSATION
+La même personne sur trois réseaux devient une seule conversation. Vos réponses partent par le réseau d’où vient son dernier message, ou par celui que vous choisissez. Seules les correspondances exactes fusionnent d’elles-mêmes ; le reste est une suggestion que vous validez.
+
+PRIVÉ PAR CONCEPTION
+• Chiffrement de bout en bout via Matrix, avec vérification des appareils, signature croisée et sauvegarde des clés
+• Messages éphémères, réglables par conversation
+• Accusés de lecture, indicateur de saisie et statut en ligne, chacun avec son propre interrupteur
+• Aucune analyse, aucun pistage, aucune publicité
+• Open source sous licence AGPL-3.0 : chaque ligne est publique
+
+VOTRE PROPRE IA (SENNIT PRO)
+• Suggestions de réponse et messages rapides par un modèle de langage que vous hébergez : tout serveur doté d’une API compatible OpenAI, comme Ollama ou llama.cpp
+• Transcription vocale et recherche sémantique sur l’appareil : l’audio et les messages restent sur votre matériel, ou sur des serveurs que vous gérez
+• Un serveur MCP intégré, pour que vos propres agents puissent chercher et envoyer, limités par des clés d’API aux droits restreints
+• Intégrations Home Assistant, paperless-ngx et calendriers partagés
+
+LA MESSAGERIE AU QUOTIDIEN, GRATUITE
+• Appels, messages vocaux, photos et vidéos, sondages, partage de position
+• Envoi programmé et rappels
+• Invitations d’agenda à accepter, refuser ou reprogrammer directement dans la discussion
+• Sur Android : notifications sans les services Google, via votre propre connexion de synchronisation ou UnifiedPush
+• Widgets d’écran d’accueil, app pour montre et affichage tablette sur deux colonnes
+• Sauvegardes chiffrées
+
+VOTRE SERVEUR, VOS PASSERELLES
+Sennit est l’app ; vous apportez un serveur d’accueil Matrix et les passerelles des réseaux que vous utilisez (les passerelles mautrix sont la configuration de référence). Sennit détecte vos passerelles et vous guide pour connecter chaque réseau, connexion par code QR comprise. Gérer un serveur demande un peu d’aisance technique, et cette indépendance est tout l’intérêt.
+
+La messagerie est gratuite. Sennit Pro est un achat intégré unique, sans abonnement, qui débloque les fonctions d’IA, la recherche sémantique, la transcription, le serveur MCP et les intégrations.
+
+Sennit n’est affilié à aucun des réseaux accessibles via des passerelles. Une passerelle automatise vos propres comptes ; savoir si les conditions d’un réseau le permettent relève de vous et de ce réseau.
