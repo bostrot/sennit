@@ -42,6 +42,7 @@ import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
 import '../../app/stores.dart';
+import '../../app/text_size.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
 import '../../services/ai/event_title.dart'
@@ -5174,28 +5175,32 @@ class _MessageBubble extends StatelessWidget {
                                 spacing: WeftSpace.sm,
                                 runSpacing: 0,
                                 children: [
-                                  RichTextView.message(
-                                    message: message,
-                                    baseStyle:
-                                        context.text.bodyMedium?.copyWith(
-                                          color: own
-                                              ? palette.ownBubbleText
-                                              : palette.peerBubbleText,
-                                        ) ??
-                                        TextStyle(
-                                          color: own
-                                              ? palette.ownBubbleText
-                                              : palette.peerBubbleText,
-                                        ),
-                                    // Links and mention pills take the network's colour
-                                    // on a peer bubble and the bubble's own ink on the
-                                    // user's, where the accent would be invisible
-                                    // against the primary fill it is derived from.
-                                    accent: own
-                                        ? palette.ownBubbleText
-                                        : accent,
-                                    onTapLink: onTapLink,
-                                    onTapMention: onTapMention,
+                                  MessageTextScale(
+                                    child: RichTextView.message(
+                                      message: message,
+                                      baseStyle:
+                                          context.text.bodyMedium?.copyWith(
+                                            color: own
+                                                ? palette.ownBubbleText
+                                                : palette.peerBubbleText,
+                                          ) ??
+                                          TextStyle(
+                                            color: own
+                                                ? palette.ownBubbleText
+                                                : palette.peerBubbleText,
+                                          ),
+                                      // Links and mention pills take the
+                                      // network's colour on a peer bubble and
+                                      // the bubble's own ink on the user's,
+                                      // where the accent would be invisible
+                                      // against the primary fill it is
+                                      // derived from.
+                                      accent: own
+                                          ? palette.ownBubbleText
+                                          : accent,
+                                      onTapLink: onTapLink,
+                                      onTapMention: onTapMention,
+                                    ),
                                   ),
                                   meta,
                                 ],
