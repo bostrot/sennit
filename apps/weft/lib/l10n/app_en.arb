@@ -6984,6 +6984,17 @@
   "@nicknamePhotoFailed": {
     "description": "Toast when the picture chosen for a nickname could not be decoded."
   },
+  "contactOpenInApp": "Open in {network}",
+  "@contactOpenInApp": {
+    "description": "Tooltip and screen-reader label of the button beside one of a contact's accounts that opens this person in the messenger's own app (for things the bridge cannot do). The messenger's name is never translated.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
   "contactMedia": "Media",
   "@contactMedia": {
     "description": "Section heading in the chat info screen above a row of thumbnails of the photos and videos shared in this conversation, and the title of the screen showing all of them as a grid. Keep under ~20 chars."
