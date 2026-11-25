@@ -1,3 +1,5 @@
+import 'dart:io' show File;
+
 import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -19,6 +21,9 @@ ImageProvider Function(String url)? weftAvatarImageOverride;
 /// place, before [weftAvatarImageOverride]: there is nothing to fetch. One
 /// [MemoryImage] per url, kept, because a fresh one per build is a fresh image
 /// cache key per build and the picture would be decoded again every frame.
+///
+/// A `file://` url is a photo from the phone's own address book, written to
+/// the app's storage; everything else is fetched.
 ImageProvider weftAvatarImage(String url, {Map<String, String>? headers}) {
   if (url.startsWith('data:')) {
     final cached = _inlineAvatars.remove(url);
@@ -28,6 +33,9 @@ ImageProvider weftAvatarImage(String url, {Map<String, String>? headers}) {
       _inlineAvatars.remove(_inlineAvatars.keys.first);
     }
     return image;
+  }
+  if (url.startsWith('file://') && weftAvatarImageOverride == null) {
+    return FileImage(File.fromUri(Uri.parse(url)));
   }
   return weftAvatarImageOverride?.call(url) ??
       NetworkImage(url, headers: headers);

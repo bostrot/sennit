@@ -170,13 +170,33 @@
   "@settingsContactNamesTitle": {
     "description": "Title of a switch row. 'Address book' = the phone's contacts app. Keep under ~30 chars."
   },
-  "settingsContactNamesSubtitle": "Name people the way your contacts app does when a phone number matches, instead of the name WhatsApp or Signal reports. Matched on this device only.",
+  "settingsContactNamesSubtitle": "Show names and photos from your contacts when a number matches, in SMS too. Matched on this device only.",
   "@settingsContactNamesSubtitle": {
-    "description": "Three-line subtitle under the 'Use address book names' switch. 'WhatsApp' and 'Signal' are product names and stay. The last sentence is the privacy reassurance: no phone numbers leave the device."
+    "description": "Two-line subtitle under the 'Use address book names' switch: names and photos from the phone's contacts replace numbers and network names, SMS conversations included. 'SMS' stays. The last sentence is the privacy reassurance: no phone numbers leave the device."
   },
   "settingsContactsDenied": "Sennit was not allowed to read your contacts.",
   "@settingsContactsDenied": {
     "description": "Snackbar shown when the reader turns on 'Use address book names' and then denies the operating system's contacts permission. One short sentence. 'Sennit' is the app name and stays."
+  },
+  "smsContactsOff": "Threads show numbers until Sennit may read your contacts.",
+  "@smsContactsOff": {
+    "description": "Line under the 'Contact names' header on the SMS screen when contacts are not in use; a 'Use my contacts' button follows. 'Sennit' is the app name and stays."
+  },
+  "smsContactsOn": "Names and photos come from your contacts.",
+  "@smsContactsOn": {
+    "description": "Line under the 'Contact names' header on the SMS screen when contacts are in use. One short sentence."
+  },
+  "smsContactsTitle": "Contact names",
+  "@smsContactsTitle": {
+    "description": "Section header on the SMS settings screen about showing contact names. Keep under ~25 chars."
+  },
+  "smsContactsPrompt": "See names from your contacts instead of numbers?",
+  "@smsContactsPrompt": {
+    "description": "One-line strip at the top of an SMS conversation offering to show contact names instead of phone numbers. Buttons next to it: 'Use my contacts' and 'Not now'. Keep short (max ~55 chars)."
+  },
+  "contactsBlocked": "Contacts access is off. Turn it on in system settings.",
+  "@contactsBlocked": {
+    "description": "Snackbar when the contacts permission was refused for good ('Don't ask again'); its action button opens the system settings. One short sentence."
   },
   "settingsSendOnEnterTitle": "Return sends the message",
   "@settingsSendOnEnterTitle": {

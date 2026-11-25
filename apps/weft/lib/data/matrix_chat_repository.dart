@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
-import 'package:collection/collection.dart' show MapEquality;
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_attachments/weft_attachments.dart';
@@ -946,54 +945,26 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     return markers;
   }
 
-  /// Address-book names by phone digits; see [setContactNameOverrides].
-  Map<String, String> _contactNames = const {};
+  /// The address book the user opted into; see [setDeviceContacts].
+  ContactBook _contacts = ContactBook.empty;
 
   @override
-  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {
-    if (const MapEquality<String, String>().equals(
-      _contactNames,
-      namesByPhoneDigits,
-    )) {
-      return;
-    }
-    _contactNames = Map.unmodifiable(namesByPhoneDigits);
-    _contactNamesBySuffix = {
-      for (final entry in namesByPhoneDigits.entries)
-        if (entry.key.length >= 9)
-          entry.key.substring(entry.key.length - 9): entry.value
-        else
-          entry.key: entry.value,
-    };
+  void setDeviceContacts(ContactBook contacts) {
+    // SMS titles come from the same book, and an SMS repository told about it
+    // rebuilds whether or not anything here changed.
+    _sms?.setContacts(contacts);
+    if (contacts == _contacts) return;
+    _contacts = contacts;
     _scheduleRebuild();
   }
 
-  /// The same names keyed by the last nine digits, so a lookup is a hash
-  /// probe instead of a scan — the scan ran per room per rebuild, which the
-  /// launch stutter could feel.
-  Map<String, String> _contactNamesBySuffix = const {};
-
   /// The address-book name for any of [phones], or null.
   ///
-  /// Suffix matching, because the two sides rarely agree on formatting: the
-  /// bridge says `4915112345678` where the address book says `0151 1234 5678`.
-  /// Seven digits of agreement is the threshold under which numbers collide.
-  String? _contactNameForPhones(Iterable<String?> phones) {
-    if (_contactNames.isEmpty) return null;
-    for (final phone in phones) {
-      if (phone == null) continue;
-      final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-      if (digits.length < 7) continue;
-      final direct = _contactNames[digits];
-      if (direct != null) return direct;
-      final suffix = digits.length >= 9
-          ? digits.substring(digits.length - 9)
-          : digits;
-      final bySuffix = _contactNamesBySuffix[suffix];
-      if (bySuffix != null) return bySuffix;
-    }
-    return null;
-  }
+  /// The matching rules — E.164, as written, then the last nine digits — are
+  /// [ContactBook]'s, so an SMS thread and a bridged chat with the same person
+  /// resolve to the same name.
+  String? _contactNameForPhones(Iterable<String?> phones) =>
+      _contacts.lookupAny(phones)?.name;
 
   @override
   Future<void> createPoll(
@@ -2814,8 +2785,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
         (_mergedContactIds ??= _graph.mergedContactIds()).contains(contactId)) {
       return true;
     }
-    final digits = handle.phoneE164?.replaceAll(RegExp(r'\D'), '');
-    return digits != null && _contactNames.containsKey(digits);
+    return _contacts.lookup(handle.phoneE164) != null;
   }
 
   /// Which contacts hold more than one handle, as of the current rebuild.

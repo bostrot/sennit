@@ -10,6 +10,7 @@ import '../../app/providers.dart';
 import '../../data/sms_chat_repository.dart';
 import '../../services/sms/sms_platform.dart';
 import '../bridges/bridges_screen.dart';
+import 'contacts_access.dart';
 import 'settings_section.dart';
 
 /// The one place Weft asks for Android's default-SMS-app role.
@@ -104,6 +105,11 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
           context.l10n.smsMissingPermissions,
           style: context.text.bodySmall?.copyWith(color: context.colors.error),
         ),
+      ],
+
+      if (status.isReady) ...[
+        const SizedBox(height: WeftSpace.lg),
+        const SmsContactsSection(),
       ],
 
       const SizedBox(height: WeftSpace.lg),
@@ -324,6 +330,12 @@ class _SmsScreenState extends ConsumerState<SmsScreen> {
       final outcome = await repository.requestRole();
       if (!mounted) return;
       setState(() => _outcome = outcome);
+      // Sennit now reads every thread on the phone, and every one of them is
+      // a bare number until contacts say otherwise — so this is the moment to
+      // ask, with the screen saying why right under the dialog.
+      if (outcome == SmsRoleOutcome.granted) {
+        await requestDeviceContacts(context, ref);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

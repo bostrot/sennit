@@ -497,5 +497,11 @@ SmsThread? smsThreadFromPlatform(Map<Object?, Object?> map) {
       _ => null,
     },
     archived: map['archived'] == true,
+    e164: {
+      for (final entry
+          in ((map['e164'] as Map?) ?? const <Object?, Object?>{}).entries)
+        if (entry.key is String && entry.value is String)
+          entry.key as String: entry.value as String,
+    },
   );
 }

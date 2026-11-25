@@ -8,7 +8,7 @@ import 'package:weft_store/weft_store.dart';
 
 import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
 
-import '../../app/a11y.dart';
+import 'contacts_access.dart' show showContactsAccessResult;
 import '../../app/billing_providers.dart';
 import '../../app/build_info.dart';
 import '../../app/localisation.dart';
@@ -441,14 +441,12 @@ class _ContactNamesToggle extends ConsumerWidget {
       onChanged: (value) async {
         if (value) {
           // The permission prompt belongs to the tap, not to a later sync.
-          final names = await loadDeviceContactNames();
-          if (names == null) {
-            if (context.mounted) {
-              showWeftMessage(context, context.l10n.settingsContactsDenied);
-            }
-            return;
-          }
-          stores.settings.setJson(kContactNamesCacheKey, names);
+          final access = await enableDeviceContacts(
+            stores.settings,
+            onChanged: ref.read(settingsRevisionProvider.notifier).bump,
+          );
+          if (context.mounted) showContactsAccessResult(context, access);
+          return;
         }
         stores.settings.setBool(
           WeftSettings.useDeviceContactNames,

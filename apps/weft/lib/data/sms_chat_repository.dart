@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_sms/weft_sms.dart';
 
+import '../services/contacts/contact_book.dart';
 import '../services/sms/sms_platform.dart';
 
 /// Hands loaded SMS bodies to the search index.
@@ -156,6 +157,29 @@ class SmsChatRepository {
 
   SmsPlatformStatus _status = SmsPlatformStatus.unsupported;
 
+  /// The address book the user opted into, or [ContactBook.empty].
+  ContactBook _contacts = ContactBook.empty;
+
+  /// Names and photos threads are shown with from now on.
+  ///
+  /// Applied at read time rather than written into each [SmsThread], so a
+  /// thread loaded before contacts were allowed — every thread, on the run the
+  /// permission is granted — is renamed by the same rebuild as a new one.
+  void setContacts(ContactBook contacts) {
+    if (contacts == _contacts) return;
+    _contacts = contacts;
+    // A snippet preview was named when it was built; build it again.
+    for (final entry in _previews.entries.toList()) {
+      final thread = _threads[entry.key];
+      if (thread == null || !entry.value.eventId.startsWith('sms:snippet:')) {
+        continue;
+      }
+      final preview = _snippetPreview(thread);
+      if (preview != null) _previews[entry.key] = preview;
+    }
+    _emit();
+  }
+
   /// Threads by synthetic room id, newest activity first.
   final Map<String, SmsThread> _threads = {};
 
@@ -193,10 +217,15 @@ class SmsChatRepository {
   List<Chat> get chats {
     final out = [
       for (final entry in _threads.entries)
-        entry.value.toChat(
-          lastMessage: _previews[entry.key],
-          handleId: _handleIdFor(entry.value),
-        ),
+        entry.value
+            .toChat(
+              lastMessage: _previews[entry.key],
+              handleId: _handleIdFor(entry.value),
+            )
+            .copyWith(
+              title: _titleFor(entry.value),
+              avatarUrl: _contactFor(entry.value)?.photoUrl,
+            ),
     ];
     out.sort((a, b) {
       final at = a.lastMessage?.timestamp;
@@ -214,9 +243,19 @@ class SmsChatRepository {
   /// group conversations is not a "same person" question, and a group member's
   /// handle carrying the group's room id would fold that whole thread into
   /// somebody's DM the moment they were merged.
+  ///
+  /// A thread's handle carries the address-book name and photo when there is
+  /// one: the merge scorer compares names and avatars as well as numbers, so
+  /// "Anna" over SMS and "Anna" on WhatsApp are a suggestion even when one of
+  /// the two numbers could not be read as E.164.
   List<NetworkHandle> get handles => [
     for (final thread in _threads.values)
-      if (!thread.isGroup) ...linkSmsThreadIdentities(thread, parser: _parser),
+      if (!thread.isGroup)
+        for (final handle in linkSmsThreadIdentities(thread, parser: _parser))
+          handle.copyWith(
+            displayName: _contactFor(thread)?.name,
+            avatarUrl: _contactFor(thread)?.photoUrl,
+          ),
   ];
 
   /// Reads the role, subscribes, and loads the inbox.
@@ -397,6 +436,7 @@ class SmsChatRepository {
       snippet: thread.snippet,
       lastMessageAt: thread.lastMessageAt,
       archived: thread.archived,
+      e164: thread.e164,
     );
     _emit();
   }
@@ -462,6 +502,7 @@ class SmsChatRepository {
                 : existing.unreadCount,
             lastMessageAt: message.timestamp,
             archived: existing.archived,
+            e164: existing.e164,
           );
 
     _sources[roomId]?.prepend(weft);
@@ -488,16 +529,46 @@ class SmsChatRepository {
 
   /// The best name available for a message's sender.
   ///
-  /// The thread title when contacts resolved one and the thread is one person;
-  /// the raw address otherwise, which is what every other SMS app shows and is
-  /// still better than an empty label. Never a name for a *group* thread's
-  /// member: the title there names the group, not whoever just spoke.
+  /// The sender's own address-book entry first — in a group thread too, where
+  /// it names whoever spoke rather than the group. Then a 1:1 thread's title;
+  /// null otherwise, which shows the raw address like every other SMS app.
   String? _nameFor(String roomId, SmsMessage message) {
     if (message.isOutgoing) return null;
     final thread = _threads[roomId];
+    final contact = _contacts.lookupAny([
+      if (thread != null) thread.e164[message.address],
+      message.address,
+    ]);
+    if (contact != null) return contact.name;
     if (thread == null || thread.isGroup) return null;
     final title = thread.title;
     return title == null || title.isEmpty ? null : title;
+  }
+
+  /// The address-book entry a one-person [thread] is with, or null.
+  DeviceContact? _contactFor(SmsThread thread) {
+    if (thread.isGroup) return null;
+    final address = thread.addresses.firstOrNull;
+    if (address == null) return null;
+    return _contacts.lookupAny([thread.e164[address], address]);
+  }
+
+  /// What the inbox calls [thread]: the contact's name, else the numbers.
+  ///
+  /// A group is its members' names joined, each falling back to its number on
+  /// its own — two names and a number reads better than three numbers.
+  String _titleFor(SmsThread thread) {
+    if (!thread.isGroup) {
+      return _contactFor(thread)?.name ??
+          thread.title ??
+          thread.addresses.join(', ');
+    }
+    return thread.title ??
+        [
+          for (final address in thread.addresses)
+            _contacts.lookupAny([thread.e164[address], address])?.name ??
+                address,
+        ].join(', ');
   }
 
   /// The inbox preview built from the provider's `snippet` column.
@@ -517,7 +588,7 @@ class SmsChatRepository {
       roomId: thread.roomId,
       network: ChatNetwork.sms,
       senderId: thread.addresses.firstOrNull ?? '',
-      senderName: thread.title ?? thread.addresses.join(', '),
+      senderName: _titleFor(thread),
       timestamp: at,
       kind: MessageKind.text,
       isOwn: false,
@@ -536,7 +607,8 @@ class SmsChatRepository {
   void _index(String roomId, List<WeftMessage> messages) {
     final index = indexer;
     if (index == null || messages.isEmpty) return;
-    index(roomId, messages, chatTitle: _threads[roomId]?.title ?? '');
+    final thread = _threads[roomId];
+    index(roomId, messages, chatTitle: thread == null ? '' : _titleFor(thread));
   }
 
   Future<List<WeftMessage>> _read(String threadId, int limit) async {
@@ -554,7 +626,10 @@ class SmsChatRepository {
     if (thread.isGroup) return null;
     final address = thread.addresses.firstOrNull;
     if (address == null) return null;
-    return linkSmsIdentity(address, parser: _parser)?.id;
+    return linkSmsIdentity(
+      thread.normalizedAddress(address),
+      parser: _parser,
+    )?.id;
   }
 
   String _threadIdOf(String roomId) =>
