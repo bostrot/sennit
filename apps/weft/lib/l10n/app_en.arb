@@ -1093,6 +1093,27 @@
   "@voiceSendLabel": {
     "description": "Screen-reader-only label for the send button on the recording bar. Not visible: its tooltip says only 'Send'."
   },
+  "voicePauseLabel": "Pause recording",
+  "@voicePauseLabel": {
+    "description": "Button and tooltip on the voice recording bar that holds the recording without ending it. Keep short.",
+    "maxLength": 32
+  },
+  "voiceResumeLabel": "Resume recording",
+  "@voiceResumeLabel": {
+    "description": "Button and tooltip on the voice recording bar that carries on recording into the same voice message after a pause. Keep short.",
+    "maxLength": 32
+  },
+  "voicePausedSemantics": "Recording paused, {clock}",
+  "@voicePausedSemantics": {
+    "description": "Screen-reader-only live label for the voice recording bar while the recording is paused. Same shape as voiceRecordingSemantics.",
+    "placeholders": {
+      "clock": {
+        "type": "String",
+        "description": "Recorded time so far as minutes and seconds.",
+        "example": "0:07"
+      }
+    }
+  },
   "paperlessFetchFailed": "Could not fetch the document: {error}",
   "@paperlessFetchFailed": {
     "description": "Toast shown when a document could not be downloaded from the paperless-ngx server. 'Paperless' is the product's name; the error text is the server's and is not translated.",
@@ -2410,6 +2431,34 @@
   "@chatVoicePlay": {
     "description": "Screen-reader-only label for the play button on a voice-message bubble. Keep under ~24 chars.",
     "maxLength": 44
+  },
+  "chatVoiceSpeedValue": "{speed}×",
+  "@chatVoiceSpeedValue": {
+    "description": "Visible text of the small speed button beside a playing voice message: the playback rate followed by a multiplication sign, e.g. 1×, 1.5×, 2×. Must stay tiny.",
+    "maxLength": 6,
+    "placeholders": {
+      "speed": {
+        "type": "double",
+        "format": "decimalPattern",
+        "example": "1.5"
+      }
+    }
+  },
+  "chatVoiceSpeedLabel": "Playback speed, {speed} times",
+  "@chatVoiceSpeedLabel": {
+    "description": "Screen-reader-only label for the speed button beside a playing voice message. Tapping it steps through 1, 1.5 and 2 times normal speed.",
+    "placeholders": {
+      "speed": {
+        "type": "double",
+        "format": "decimalPattern",
+        "example": "1.5"
+      }
+    }
+  },
+  "chatVoiceSpeedTooltip": "Change playback speed",
+  "@chatVoiceSpeedTooltip": {
+    "description": "Tooltip on the speed button beside a playing voice message.",
+    "maxLength": 32
   },
   "chatVoiceTranscribing": "transcribing",
   "@chatVoiceTranscribing": {

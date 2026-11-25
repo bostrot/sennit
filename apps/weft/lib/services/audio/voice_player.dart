@@ -21,9 +21,19 @@ class VoicePlayback {
     this.loading = false,
     this.position = Duration.zero,
     this.duration,
+    this.speed = 1,
   });
 
-  const VoicePlayback.idle() : this();
+  const VoicePlayback.idle({double speed = 1}) : this(speed: speed);
+
+  /// The speeds the speed button steps through, in order.
+  static const speeds = [1.0, 1.5, 2.0];
+
+  /// The speed after [speed] on the speed button: 1× → 1.5× → 2× → 1×.
+  static double nextSpeed(double speed) {
+    final i = speeds.indexOf(speed);
+    return speeds[(i + 1) % speeds.length];
+  }
 
   /// The message being played, or null when idle.
   final String? eventId;
@@ -36,6 +46,10 @@ class VoicePlayback {
 
   final Duration position;
   final Duration? duration;
+
+  /// Playback rate. Belongs to the listener rather than the note: someone who
+  /// hears voice notes at 2× wants the next one at 2× too.
+  final double speed;
 
   /// Played fraction, for drawing progress over the waveform.
   double get progress {
@@ -50,6 +64,7 @@ class VoicePlayback {
     bool? loading,
     Duration? position,
     Duration? duration,
+    double? speed,
   }) {
     return VoicePlayback(
       eventId: eventId ?? this.eventId,
@@ -57,6 +72,7 @@ class VoicePlayback {
       loading: loading ?? this.loading,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      speed: speed ?? this.speed,
     );
   }
 }
@@ -106,17 +122,29 @@ class VoicePlayer extends Notifier<VoicePlayback> {
     await _start(message);
   }
 
+  /// Steps to the next playback speed, for this note and every one after it.
+  Future<void> cycleSpeed() async {
+    final speed = VoicePlayback.nextSpeed(state.speed);
+    state = state.copyWith(speed: speed);
+    await _player?.setSpeed(speed);
+  }
+
   Future<void> _start(WeftMessage message) async {
     final serial = ++_requestSerial;
     await _teardown();
-    state = VoicePlayback(eventId: message.eventId, loading: true);
+    final speed = state.speed;
+    state = VoicePlayback(
+      eventId: message.eventId,
+      loading: true,
+      speed: speed,
+    );
 
     final bytes = await ref
         .read(chatRepositoryProvider)
         .attachmentBytes(message.roomId, message.eventId, thumbnail: false);
     if (serial != _requestSerial) return;
     if (bytes == null) {
-      state = const VoicePlayback.idle();
+      state = VoicePlayback.idle(speed: speed);
       throw Exception('The audio could not be downloaded.');
     }
 
@@ -134,7 +162,9 @@ class VoicePlayer extends Notifier<VoicePlayback> {
       await player.setFilePath(file.path);
     } on Exception {
       await player.dispose();
-      if (serial == _requestSerial) state = const VoicePlayback.idle();
+      if (serial == _requestSerial) {
+        state = VoicePlayback.idle(speed: speed);
+      }
       throw Exception('This platform cannot decode this voice message.');
     }
     if (serial != _requestSerial) {
@@ -143,9 +173,11 @@ class VoicePlayer extends Notifier<VoicePlayback> {
     }
 
     _player = player;
+    await player.setSpeed(state.speed);
     state = VoicePlayback(
       eventId: message.eventId,
       playing: true,
+      speed: state.speed,
       duration:
           player.duration ??
           (message.durationMs == null

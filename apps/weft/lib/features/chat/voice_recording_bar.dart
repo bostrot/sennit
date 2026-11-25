@@ -13,6 +13,8 @@ import '../../services/audio/voice_recorder.dart';
 /// buttons: the bin, which throws the take away and brings the keyboard row
 /// back, or send. There is no state where audio is being kept without the row
 /// saying so — the pulsing dot and the counting timer are the whole contract.
+/// Pause holds the take in between: the dot stops breathing and the clock
+/// stops counting, so a paused note looks as still as it is.
 ///
 /// Deliberately buttons rather than WhatsApp's hold-and-slide: the *point* of
 /// that gesture is that cancelling is easy, and an explicit bin next to an
@@ -23,6 +25,7 @@ class VoiceRecordingBar extends StatefulWidget {
     super.key,
     required this.onCancel,
     required this.onSend,
+    this.recorder,
   });
 
   /// The take was discarded — nothing was kept.
@@ -31,15 +34,20 @@ class VoiceRecordingBar extends StatefulWidget {
   /// A finished note the caller should now send.
   final ValueChanged<VoiceRecording> onSend;
 
+  /// The recorder to drive; a real one when null. Tests pass a fake, because
+  /// there is no microphone in a widget test.
+  final VoiceRecorder? recorder;
+
   @override
   State<VoiceRecordingBar> createState() => _VoiceRecordingBarState();
 }
 
 class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
-  final VoiceRecorder _recorder = VoiceRecorder();
+  late final VoiceRecorder _recorder = widget.recorder ?? VoiceRecorder();
   Timer? _tick;
   bool _started = false;
   bool _finishing = false;
+  bool _paused = false;
   double _level = 0;
   StreamSubscription<Object?>? _amplitude;
 
@@ -66,9 +74,24 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
       if (mounted) setState(() {});
     });
     _amplitude = _recorder.amplitude.listen((a) {
-      if (!mounted) return;
+      if (!mounted || _paused) return;
       // dBFS, roughly -45 (silence) to 0 (clipping) → 0..1.
       setState(() => _level = ((a.current + 45) / 45).clamp(0.0, 1.0));
+    });
+  }
+
+  Future<void> _togglePause() async {
+    if (!_started || _finishing) return;
+    if (_paused) {
+      await _recorder.resume();
+    } else {
+      await _recorder.pause();
+    }
+    if (!mounted) return;
+    setState(() {
+      _paused = _recorder.paused;
+      // A held take hears nothing; a full bar would say otherwise.
+      if (_paused) _level = 0;
     });
   }
 
@@ -127,9 +150,11 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
         child: Semantics(
           container: true,
           liveRegion: true,
-          label: _started
-              ? context.l10n.voiceRecordingSemantics(_clock)
-              : context.l10n.voiceStarting,
+          label: !_started
+              ? context.l10n.voiceStarting
+              : _paused
+              ? context.l10n.voicePausedSemantics(_clock)
+              : context.l10n.voiceRecordingSemantics(_clock),
           child: Row(
             children: [
               NamedButton(
@@ -143,7 +168,7 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
                 ),
               ),
               const SizedBox(width: WeftSpace.sm),
-              _PulsingDot(active: _started),
+              _PulsingDot(active: _started, paused: _paused),
               const SizedBox(width: WeftSpace.sm),
               Text(
                 _clock,
@@ -165,7 +190,20 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
                   ),
                 ),
               ),
-              const SizedBox(width: WeftSpace.md),
+              const SizedBox(width: WeftSpace.xs),
+              NamedButton(
+                label: _paused
+                    ? context.l10n.voiceResumeLabel
+                    : context.l10n.voicePauseLabel,
+                onPressed: _started ? _togglePause : null,
+                child: IconButton(
+                  icon: Icon(_paused ? Icons.mic_rounded : Icons.pause_rounded),
+                  tooltip: _paused
+                      ? context.l10n.voiceResumeLabel
+                      : context.l10n.voicePauseLabel,
+                  onPressed: _started ? _togglePause : null,
+                ),
+              ),
               NamedButton(
                 label: context.l10n.voiceSendLabel,
                 onPressed: _finish,
@@ -183,11 +221,12 @@ class _VoiceRecordingBarState extends State<VoiceRecordingBar> {
   }
 }
 
-/// The red recording dot, breathing.
+/// The red recording dot, breathing — and holding still while paused.
 class _PulsingDot extends StatefulWidget {
-  const _PulsingDot({required this.active});
+  const _PulsingDot({required this.active, this.paused = false});
 
   final bool active;
+  final bool paused;
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -199,6 +238,18 @@ class _PulsingDotState extends State<_PulsingDot>
     vsync: this,
     duration: const Duration(milliseconds: 900),
   )..repeat(reverse: true);
+
+  @override
+  void didUpdateWidget(_PulsingDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.paused == oldWidget.paused) return;
+    if (widget.paused) {
+      _pulse.stop();
+      _pulse.value = 0;
+    } else {
+      _pulse.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
