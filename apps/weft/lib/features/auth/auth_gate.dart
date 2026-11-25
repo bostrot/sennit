@@ -18,9 +18,16 @@ import 'walkthrough_screen.dart';
 
 /// Chooses the screen for the current session state.
 ///
-/// The verification step is skippable, and that choice is remembered for the
-/// session — otherwise every sync that re-emits `unverified` would yank the
-/// user back out of their inbox.
+/// After sign-in the steps come in one order: verifying this device, then
+/// first-start setup, then the walkthrough, then the inbox — and only then
+/// does anything else get to ask the user something; see
+/// [signInStepsDoneProvider].
+///
+/// The verification step is skippable, and that choice is remembered until
+/// the next sign-in — otherwise every sync that re-emits `unverified` would
+/// yank the user back out of their inbox. Once shown it also stays until the
+/// user verifies or skips, even if the state turns `ready` underneath it:
+/// a step that vanished by itself read as having been skipped for them.
 class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
@@ -29,7 +36,7 @@ class AuthGate extends ConsumerStatefulWidget {
 }
 
 class _AuthGateState extends ConsumerState<AuthGate> {
-  bool _verificationDismissed = false;
+  _Verification _verification = _Verification.notAsked;
 
   SettingsStore? get _settings {
     try {
@@ -113,16 +120,22 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   }
 
   Widget _forState(WeftSessionState state) {
-    if (state == WeftSessionState.loggedOut) _armWalkthrough();
-    return switch (state) {
+    if (state == WeftSessionState.loggedOut) {
+      _armWalkthrough();
+      _verification = _Verification.notAsked;
+    }
+    if (state == WeftSessionState.unverified &&
+        _verification == _Verification.notAsked) {
+      _verification = _Verification.owed;
+    }
+    final screen = switch (state) {
       WeftSessionState.loggedOut || WeftSessionState.softLoggedOut =>
         const LoginScreen(key: ValueKey('login')),
       WeftSessionState.connecting => const _Splash(key: ValueKey('splash')),
-      WeftSessionState.unverified when !_verificationDismissed =>
-        VerificationScreen(
-          key: const ValueKey('verify'),
-          onContinue: () => setState(() => _verificationDismissed = true),
-        ),
+      _ when _verification == _Verification.owed => VerificationScreen(
+        key: const ValueKey('verify'),
+        onContinue: () => setState(() => _verification = _Verification.settled),
+      ),
       _ when !_setupDone => SetupScreen(
         key: const ValueKey('setup'),
         onDone: _finishSetup,
@@ -133,7 +146,31 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       ),
       _ => const WhatsNewGate(key: ValueKey('inbox'), child: InboxShell()),
     };
+    _reportStepsDone(screen is WhatsNewGate);
+    return screen;
   }
+
+  /// Tells [signInStepsDoneProvider] whether the inbox is up. After the
+  /// frame, because a provider must not change while the tree is building.
+  void _reportStepsDone(bool done) {
+    if (ref.read(signInStepsDoneProvider) == done) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(signInStepsDoneProvider.notifier).report(done: done);
+    });
+  }
+}
+
+/// Where this sign-in is with verifying the device.
+enum _Verification {
+  /// Not shown yet: the session has not reported `unverified`.
+  notAsked,
+
+  /// Shown and waiting for the user to verify or skip.
+  owed,
+
+  /// Verified or skipped; not asked again until the next sign-in.
+  settled,
 }
 
 class _Splash extends StatelessWidget {

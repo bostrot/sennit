@@ -197,3 +197,37 @@ final sessionSignedInProvider = Provider<bool>((ref) {
     WeftSessionState.softLoggedOut => false,
   };
 });
+
+/// Whether the steps after sign-in — verifying this device, first-start setup
+/// and the walkthrough — are behind the user and the inbox is on screen.
+///
+/// Set by the auth gate, which owns that sequence. Anything that wants to ask
+/// the user something of its own after sign-in waits for this, so that it
+/// does not pop up over a step the user is still in the middle of: the
+/// notification prompt did, over the verification screen.
+final signInStepsDoneProvider = NotifierProvider<SignInStepsDone, bool>(
+  SignInStepsDone.new,
+);
+
+class SignInStepsDone extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  // A method rather than a setter: the gate reports where it is, it does not
+  // hold a value of its own.
+  // ignore: use_setters_to_change_properties
+  void report({required bool done}) => state = done;
+}
+
+/// Resolves once [signInStepsDoneProvider] is true — at once if it already is.
+Future<void> untilSignInStepsDone(WidgetRef ref) {
+  if (ref.read(signInStepsDoneProvider)) return Future.value();
+  final done = Completer<void>();
+  late final ProviderSubscription<bool> subscription;
+  subscription = ref.listenManual(signInStepsDoneProvider, (_, isDone) {
+    if (!isDone || done.isCompleted) return;
+    done.complete();
+    subscription.close();
+  });
+  return done.future;
+}

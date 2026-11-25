@@ -619,11 +619,14 @@ class WeftMatrixSession {
   }
 
   void _onLoginStateChanged(sdk.LoginState loginState) {
-    _emit(switch (loginState) {
-      sdk.LoginState.loggedIn => _deriveState(),
-      sdk.LoginState.loggedOut => WeftSessionState.loggedOut,
-      sdk.LoginState.softLoggedOut => WeftSessionState.softLoggedOut,
-    });
+    _emit(
+      sessionStateAfterLogin(
+        loginState,
+        current: _state,
+        refreshable: _client?.accessTokenExpiresAt != null,
+        derive: _deriveState,
+      ),
+    );
   }
 
   WeftSessionState _deriveState() {
@@ -642,6 +645,39 @@ class WeftMatrixSession {
     _state = next;
     if (!_stateController.isClosed) _stateController.add(next);
   }
+}
+
+/// What the session becomes when the SDK reports [login].
+///
+/// A token refresh reaches here as a soft logout followed by a login, and
+/// neither half changes who is signed in or whether this device is verified.
+/// Both are held at [current]: the soft logout so that the sign-in screen
+/// does not flash up — taking a verification in progress down with it — while
+/// the SDK fetches a new token by itself, and the login so that the state is
+/// not worked out again halfway through setup. By then the SDK has downloaded
+/// this device's keys and trusts its own device, so [derive] answers `ready`
+/// and the verification step was skipped for the notification prompt. OAuth
+/// sessions refresh every few minutes, which is where that showed up.
+///
+/// [refreshable] is whether the token expires, and so whether the SDK can
+/// recover by itself; a soft logout it cannot recover from still signs out.
+@visibleForTesting
+WeftSessionState sessionStateAfterLogin(
+  sdk.LoginState login, {
+  required WeftSessionState current,
+  required bool refreshable,
+  required WeftSessionState Function() derive,
+}) {
+  final signedIn =
+      current == WeftSessionState.unverified ||
+      current == WeftSessionState.ready;
+  return switch (login) {
+    sdk.LoginState.loggedOut => WeftSessionState.loggedOut,
+    sdk.LoginState.softLoggedOut when signedIn && refreshable => current,
+    sdk.LoginState.softLoggedOut => WeftSessionState.softLoggedOut,
+    sdk.LoginState.loggedIn when signedIn => current,
+    sdk.LoginState.loggedIn => derive(),
+  };
 }
 
 /// The OAuth server [client]'s session signed in through, or null for a

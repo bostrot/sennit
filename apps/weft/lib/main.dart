@@ -368,6 +368,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // assistant on in the to-do list's settings.
     ref.read(todoAgentProvider)?.start();
 
+    // Not over the steps after sign-in: a rationale sheet that slid up over
+    // the verification screen made it look skipped. The steps include the
+    // notification question on a first start, which settles this one.
+    await untilSignInStepsDone(ref);
+    if (!mounted) return;
     await _ensureNotificationPermission();
     // Siri's own prompt, once: after sign-in and after the notification
     // question has been settled, so the two system sheets never stack and
