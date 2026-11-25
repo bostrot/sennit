@@ -19,6 +19,8 @@ and what was noticed but not done.
 
 - 2026-11-24 · User experience · Escape empties the Mac toolbar's search field (and leaves it once empty), and the field's clear button shows up while you type instead of only after a focus change · https://github.com/bostrot/sennit/pull/35
 
+- 2026-11-25 · Feature · Tapping a contact's profile picture opens it full screen, uncropped and zoomable, fetched larger from the homeserver's thumbnail API · https://github.com/bostrot/sennit/pull/48
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -58,6 +60,12 @@ and what was noticed but not done.
   `build` without listening to it works in a test that pumps it fresh and
   fails in the app, whose parent never rebuilds: test the typing path
   (`enterText`, then `pump`), not only a controller created with text.
+
+- 2026-11-25 · #35 merged with no review comments; nothing closed
+  unmerged, no issues open. `main` is checked out in the main worktree, so
+  `git checkout main` fails in a run's worktree: branch from `origin/main`
+  instead. The image hook `weftAvatarImageOverride` (there for Sennit Web) is
+  also the cleanest way to serve avatars from memory in a widget test.
 
 ## Ideas backlog
 
@@ -135,10 +143,9 @@ and what was noticed but not done.
 - **Chinese lists of three networks use ", ".** `networkNames` in
   `l10n_labels.dart` joins all but the last with `', '`; Chinese wants `、`.
   A `networkNamesSeparator` key (", " in most files, "、" in zh) would fix it.
-- **Tap an avatar to see it full size.** Element X Android 26.06.3 made the
-  avatar in a member sheet open a preview
-  (https://newreleases.io/project/github/element-hq/element-x-android/release/v26.06.3).
-  Check whether `contact_profile.dart`'s avatar does anything on tap.
+- ~~**Tap an avatar to see it full size.**~~ Done 2026-11-25 for the
+  contact profile. Left out: a member's avatar in a group (there is no member
+  sheet yet) and the avatar in a chat's app bar, which opens the profile.
 - **Copy a link to a message — needs the other half first.** A copied
   `matrix.to/#/!room/$event` link opens only the room in Sennit:
   `links.dart` turns an event permalink into a room `RichMention` and drops
@@ -164,3 +171,10 @@ and what was noticed but not done.
   Sennit has chat requests (`chat_requests_test.dart`); check which MSC the
   servers support and whether a "block invites from people you don't share a
   room with" switch fits there. Probably a design note first.
+- **The avatar's screen-reader label is English in every language.**
+  `WeftAvatar._label` in `packages/weft_design/lib/src/components/weft_avatar.dart`
+  builds "merged across 3 networks: …", "on Signal" and "online" by hand,
+  inside a package with no `AppL10n`, so the l10n audit does not look there.
+  Needs the words passed in (a `semanticsDetail` parameter, or a small
+  strings object the app fills from `context.l10n`) by every caller: the
+  inbox tile, the Mac sidebar, the profile.

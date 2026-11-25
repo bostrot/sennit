@@ -11,6 +11,7 @@ import '../../app/retention_providers.dart';
 import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
+import 'avatar_viewer.dart';
 import 'person_memory_screen.dart';
 import 'shared_media.dart';
 
@@ -68,12 +69,9 @@ class ContactProfileScreen extends ConsumerWidget {
             Center(
               child: Column(
                 children: [
-                  WeftAvatar(
-                    label: chat.title,
-                    imageUrl: chat.avatarUrl,
-                    imageHeaders: ref.watch(mediaHeadersProvider),
-                    networks: chat.networks,
-                    size: 96,
+                  _ProfileAvatar(
+                    chat: chat,
+                    headers: ref.watch(mediaHeadersProvider),
                   ),
                   const SizedBox(height: WeftSpace.md),
                   Text(
@@ -272,6 +270,51 @@ class _SectionHeader extends StatelessWidget {
         style: context.text.labelLarge?.copyWith(
           color: context.colors.onSurfaceVariant,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// The big avatar at the top, which opens the picture full screen when there
+/// is one.
+///
+/// Without a picture it is initials in a circle, and a screen showing the same
+/// initials larger is a tap that leads nowhere, so then it is not a button.
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.chat, required this.headers});
+
+  final Chat chat;
+  final Map<String, String>? headers;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = WeftAvatar(
+      label: chat.title,
+      imageUrl: chat.avatarUrl,
+      imageHeaders: headers,
+      networks: chat.networks,
+      size: 96,
+    );
+    final imageUrl = chat.avatarUrl;
+    if (imageUrl == null) return avatar;
+
+    void open() =>
+        openAvatarViewer(context, name: chat.title, imageUrl: imageUrl);
+    // The avatar keeps its own label (who, on which networks); the hint is
+    // what a tap does, the way the chat title says it opens these details.
+    return Semantics(
+      button: true,
+      hint: context.l10n.contactPhotoOpen,
+      onTap: open,
+      child: Tooltip(
+        message: context.l10n.contactPhotoOpen,
+        excludeFromSemantics: true,
+        child: InkResponse(
+          onTap: open,
+          customBorder: const CircleBorder(),
+          excludeFromSemantics: true,
+          child: avatar,
         ),
       ),
     );

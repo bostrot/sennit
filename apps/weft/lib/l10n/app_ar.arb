@@ -1720,5 +1720,7 @@
   "sennitWebRelayConnected": "متصل. يمكن للمتصفحات المقترنة فتح العنوان أدناه من أي مكان.",
   "sennitWebRelayRefused": "رفض المُرحِّل هذا الجهاز. تحقّق من العنوان.",
   "sennitWebRelayUnreachable": "تعذّر الوصول إلى المُرحِّل. جارٍ إعادة المحاولة…",
-  "sennitWebRelayHowTo": "كيفية إعداد مُرحِّل"
+  "sennitWebRelayHowTo": "كيفية إعداد مُرحِّل",
+  "contactPhotoOpen": "عرض الصورة الشخصية",
+  "contactPhotoLabel": "الصورة الشخصية لـ{name}"
 }

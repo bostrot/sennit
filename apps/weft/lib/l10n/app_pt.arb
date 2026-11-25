@@ -1721,5 +1721,7 @@
   "sennitWebRelayConnected": "Conectado. Navegadores pareados podem abrir o endereço abaixo de qualquer lugar.",
   "sennitWebRelayRefused": "O relay recusou este dispositivo. Verifique o endereço.",
   "sennitWebRelayUnreachable": "Não foi possível alcançar o relay. Tentando de novo…",
-  "sennitWebRelayHowTo": "Como configurar um relay"
+  "sennitWebRelayHowTo": "Como configurar um relay",
+  "contactPhotoOpen": "Ver foto de perfil",
+  "contactPhotoLabel": "Foto de perfil de {name}"
 }

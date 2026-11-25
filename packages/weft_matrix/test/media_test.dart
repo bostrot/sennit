@@ -133,6 +133,57 @@ void main() {
     });
   });
 
+  group('largerThumbnailUrl', () {
+    for (final authenticated in [true, false]) {
+      test('asks for the whole picture, bigger '
+          '(${authenticated ? 'authenticated' : 'legacy'} media)', () {
+        final small = mxcToThumbnailUrl(
+          clientAt('https://matrix.example.org:8448'),
+          mxc,
+          authenticatedMedia: authenticated,
+        )!;
+        final large = Uri.parse(largerThumbnailUrl(small));
+        final before = Uri.parse(small);
+
+        expect(large.origin, before.origin);
+        expect(large.path, before.path);
+        expect(large.queryParameters, {
+          'width': '800',
+          'height': '800',
+          'method': 'scale',
+          'animated': 'false',
+        });
+      });
+    }
+
+    test('takes the size it is given', () {
+      final small = mxcToThumbnailUrl(
+        clientAt('https://matrix.example.org'),
+        mxc,
+        authenticatedMedia: true,
+      )!;
+      expect(
+        Uri.parse(largerThumbnailUrl(small, size: 320)).queryParameters,
+        containsPair('width', '320'),
+      );
+    });
+
+    // A download is already the original, and anything off the media API is
+    // not ours to rewrite.
+    test('leaves every other url alone', () {
+      const others = [
+        'https://matrix.example.org/_matrix/client/v1/media/download/a/b',
+        'https://cdn.example.org/thumbnail/a.png?width=96',
+        'https://matrix.example.org/thumbnail?width=96',
+        'not a uri at all',
+        '',
+      ];
+      for (final url in others) {
+        expect(largerThumbnailUrl(url), url, reason: url);
+      }
+    });
+  });
+
   group('attachmentServesAsThumbnail', () {
     // The rule this started as, kept because a photo with no thumbnail block is
     // the ordinary case on several bridges and the picture is its own preview.

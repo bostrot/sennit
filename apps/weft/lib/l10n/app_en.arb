@@ -9987,5 +9987,20 @@
   "sennitWebRelayHowTo": "How to set up a relay",
   "@sennitWebRelayHowTo": {
     "description": "Button that opens the relay setup guide."
+  },
+  "contactPhotoOpen": "View profile picture",
+  "@contactPhotoOpen": {
+    "description": "Tooltip and screen-reader hint on the large avatar at the top of a contact's profile; tapping it shows the picture full screen. Keep under ~26 chars.",
+    "maxLength": 40
+  },
+  "contactPhotoLabel": "Profile picture of {name}",
+  "@contactPhotoLabel": {
+    "description": "What a screen reader says for a contact's profile picture shown full screen. {name} is the contact or chat name.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
   }
 }
