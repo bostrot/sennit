@@ -146,6 +146,8 @@
   "inboxFilterUnread": "Non lues",
   "inboxFilterGroups": "Groupes",
   "inboxFilterPeople": "Personnes",
+  "inboxFilterNeedsReply": "À répondre",
+  "inboxFilterArchived": "Archivées",
   "inboxClearNetworkFilter": "Effacer le filtre réseau",
   "inboxSearchAll": "Rechercher dans toutes les conversations",
   "inboxEmptyTitle": "Rien sur ces réseaux",

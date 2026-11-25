@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
+import 'package:weft_notify/weft_notify.dart' show kReplyReminderMaxGroupPeers;
 import 'package:weft_sms/weft_sms.dart';
 
 import '../data/chat_repository.dart';
@@ -522,8 +523,25 @@ final hiddenFromAllProvider =
     );
 
 /// One-tap slices of the inbox: just what's unread, just the groups, just
-/// the one-on-ones. A second tap on the active chip turns it back off.
-enum InboxQuickFilter { unread, groups, people }
+/// the one-on-ones, just the ones waiting on an answer. A second tap on the
+/// active chip turns it back off.
+enum InboxQuickFilter { unread, groups, people, needsReply }
+
+/// Whether someone in [chat] spoke last and is waiting on the user.
+///
+/// Read or not: an unread message needs an answer as much as a read one. Only
+/// people and small groups, by the same measure reply reminders use — in a
+/// big group the last word is rarely addressed to anyone.
+bool needsReply(Chat chat) {
+  final last = chat.lastMessage;
+  if (last == null || last.isOwn || last.redacted || last.isBridgeNotice) {
+    return false;
+  }
+  if (last.kind == MessageKind.event) return false;
+  if (!chat.isGroup) return true;
+  final peers = chat.participantCount;
+  return peers != null && peers <= kReplyReminderMaxGroupPeers;
+}
 
 class InboxQuickFilterNotifier extends Notifier<InboxQuickFilter?> {
   @override
@@ -587,6 +605,7 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
                 InboxQuickFilter.unread => c.unreadCount > 0,
                 InboxQuickFilter.groups => c.isGroup,
                 InboxQuickFilter.people => !c.isGroup,
+                InboxQuickFilter.needsReply => needsReply(c),
               },
         )
         .toList(),

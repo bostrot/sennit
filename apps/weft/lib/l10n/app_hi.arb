@@ -146,6 +146,8 @@
   "inboxFilterUnread": "अनपढ़े",
   "inboxFilterGroups": "ग्रुप",
   "inboxFilterPeople": "लोग",
+  "inboxFilterNeedsReply": "जवाब बाकी",
+  "inboxFilterArchived": "आर्काइव",
   "inboxClearNetworkFilter": "नेटवर्क फ़िल्टर हटाएँ",
   "inboxSearchAll": "सभी बातचीत में खोजें",
   "inboxEmptyTitle": "इन नेटवर्क पर कुछ नहीं",

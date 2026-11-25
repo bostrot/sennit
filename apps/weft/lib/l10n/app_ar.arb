@@ -146,6 +146,8 @@
   "inboxFilterUnread": "غير مقروءة",
   "inboxFilterGroups": "مجموعات",
   "inboxFilterPeople": "أشخاص",
+  "inboxFilterNeedsReply": "بانتظار ردك",
+  "inboxFilterArchived": "المؤرشفة",
   "inboxClearNetworkFilter": "مسح فلتر الشبكة",
   "inboxSearchAll": "البحث في كل المحادثات",
   "inboxEmptyTitle": "لا شيء على هذه الشبكات",
