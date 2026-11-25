@@ -46,10 +46,31 @@ Future<void> showShareTargetSheet(BuildContext context, SharedPayload payload) {
   );
 }
 
+/// One message, written once, sent to several conversations — each its own
+/// copy, so nobody sees who else got it.
+///
+/// The share sheet with nothing shared yet: the user ticks the chats first
+/// and writes the message on the confirmation, which already sends text to
+/// many chats, picks a network per merged chat and reports per chat.
+Future<void> showSendToManySheet(BuildContext context) {
+  return showWeftPanel<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (_) =>
+        const _ShareTargetSheet(payload: SharedPayload(), compose: true),
+  );
+}
+
 class _ShareTargetSheet extends ConsumerStatefulWidget {
-  const _ShareTargetSheet({required this.payload});
+  const _ShareTargetSheet({required this.payload, this.compose = false});
 
   final SharedPayload payload;
+
+  /// Started from Sennit to write a message to several chats, rather than
+  /// from content another app shared: the list ticks rather than picks, and
+  /// the message is written on the confirmation.
+  final bool compose;
 
   @override
   ConsumerState<_ShareTargetSheet> createState() => _ShareTargetSheetState();
@@ -104,6 +125,8 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   @override
   void initState() {
     super.initState();
+    // The send button follows the message being written.
+    if (widget.compose) _caption.addListener(_captionChanged);
     if (widget.payload.uris.isEmpty) {
       _resolved = const ResolvedShare();
       _content = ShareContent(text: widget.payload.text);
@@ -112,8 +135,11 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     }
   }
 
+  void _captionChanged() => setState(() {});
+
   @override
   void dispose() {
+    _caption.removeListener(_captionChanged);
     _caption.dispose();
     _search.dispose();
     super.dispose();
@@ -309,7 +335,8 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     // no text alongside them, or the files are still being read. Either way the
     // list would be a row of taps that do nothing.
     final hasContent =
-        resolved != null && (text.isNotEmpty || resolved.sources.isNotEmpty);
+        resolved != null &&
+        (widget.compose || text.isNotEmpty || resolved.sources.isNotEmpty);
 
     // The same ranker the launcher shortcuts are published from, including this
     // run's send counts, so the four faces in Android's share sheet and the top
@@ -405,6 +432,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                 caption: _caption,
                 textOnly: _content.isTextOnly,
                 enabled: hasContent && !_sending,
+                canSend: !widget.compose || _caption.text.trim().isNotEmpty,
                 networkFor: _networkFor,
                 capableNetworks: _capableNetworks,
                 onPickNetwork: (chat, network) =>
@@ -478,8 +506,9 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
                 chosen: _chosen,
                 enabled: hasContent && !_sending,
                 query: _query,
-                onTap: (chat) =>
-                    _chosen.isEmpty ? _chooseOnly(chat) : _toggle(chat.id),
+                onTap: (chat) => _chosen.isEmpty && !widget.compose
+                    ? _chooseOnly(chat)
+                    : _toggle(chat.id),
                 onToggle: (chat) => _toggle(chat.id),
               ),
             ),
@@ -513,7 +542,9 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
 
   String _title(bool confirming, List<Chat> targets) {
     final l10n = context.l10n;
-    if (!confirming) return l10n.shareTitle;
+    if (!confirming) {
+      return widget.compose ? l10n.sendToManyTitle : l10n.shareTitle;
+    }
     return targets.length == 1
         ? l10n.shareSendToOne(targets.single.title)
         : l10n.shareSendToMany(targets.length);
@@ -522,6 +553,7 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
   /// What is about to be sent, in one line.
   String _summary(String text, ResolvedShare? resolved) {
     final l10n = context.l10n;
+    if (widget.compose) return l10n.sendToManyHint;
     if (resolved == null) {
       return l10n.shareReadingFiles(widget.payload.uris.length);
     }
@@ -817,6 +849,7 @@ class _ConfirmStep extends StatelessWidget {
     required this.caption,
     required this.textOnly,
     required this.enabled,
+    this.canSend = true,
     required this.networkFor,
     required this.capableNetworks,
     required this.onPickNetwork,
@@ -834,6 +867,10 @@ class _ConfirmStep extends StatelessWidget {
 
   /// False while the files are still being read, and after the send has begun.
   final bool enabled;
+
+  /// False while there is nothing to send yet: a message to several chats
+  /// that has not been written.
+  final bool canSend;
 
   final ChatNetwork? Function(Chat chat) networkFor;
   final List<ChatNetwork> Function(Chat chat) capableNetworks;
@@ -858,6 +895,8 @@ class _ConfirmStep extends StatelessWidget {
               TextField(
                 controller: caption,
                 enabled: enabled,
+                // A message to several chats is written here, so start here.
+                autofocus: !canSend,
                 minLines: 1,
                 maxLines: 4,
                 decoration: InputDecoration(
@@ -899,7 +938,7 @@ class _ConfirmStep extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: enabled ? onSend : null,
+                    onPressed: enabled && canSend ? onSend : null,
                     icon: const Icon(Icons.send),
                     label: Text(
                       targets.length == 1

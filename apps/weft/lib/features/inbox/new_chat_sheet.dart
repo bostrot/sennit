@@ -11,6 +11,7 @@ import '../../app/providers.dart';
 import '../../app/stores.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../chat/chat_view.dart';
+import '../share/share_target_sheet.dart';
 
 /// Starts a conversation — from a readable list of people, not a form.
 ///
@@ -120,6 +121,17 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
               leading: const Icon(Icons.group_add_rounded),
               title: Text(l10n.newChatNewGroup),
               onTap: () => unawaited(_newGroup(context, ref)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.forward_to_inbox_rounded),
+              title: Text(l10n.sendToManyTitle),
+              subtitle: Text(l10n.sendToManySubtitle),
+              onTap: () {
+                // Over the inbox rather than over this screen: once sent, the
+                // user is back where they started.
+                final navigator = Navigator.of(context)..pop();
+                unawaited(showSendToManySheet(navigator.context));
+              },
             ),
             if (chats.isNotEmpty)
               _header(context, l10n.newChatYourConversations),
