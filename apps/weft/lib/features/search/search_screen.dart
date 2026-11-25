@@ -13,6 +13,7 @@ import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/search_providers.dart';
 import '../chat/chat_view.dart';
+import '../chat/saved_messages_screen.dart';
 
 /// Search across every conversation.
 ///
@@ -175,6 +176,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmarks_outlined),
+            tooltip: context.l10n.savedMessagesTitle,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SavedMessagesScreen(),
+              ),
+            ),
+          ),
           if (_searching)
             Padding(
               padding: const EdgeInsets.all(WeftSpace.lg),

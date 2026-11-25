@@ -26,6 +26,9 @@ enum MessageAction {
   /// Translate the message with the user's own AI model.
   translate,
   forward,
+
+  /// Save the message to the saved list, or take it off when it is on it.
+  toggleSaved,
   delete,
 
   /// Take the message out of this account's view only; see
@@ -97,6 +100,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   List<String> quickReactions = kQuickReactions,
   bool canTranslate = false,
   SendFailure? sendFailure,
+  bool isSaved = false,
 }) {
   return showWeftPanel<MessageActionChoice>(
     context: context,
@@ -115,6 +119,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
       quickReactions: quickReactions,
       canTranslate: canTranslate,
       sendFailure: sendFailure,
+      isSaved: isSaved,
     ),
   );
 }
@@ -128,6 +133,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.quickReactions,
     required this.canTranslate,
     this.sendFailure,
+    required this.isSaved,
   });
 
   final WeftMessage message;
@@ -144,6 +150,9 @@ class _MessageActionsSheet extends StatelessWidget {
   /// Why the message failed, said under Retry so the choice is an informed
   /// one.
   final SendFailure? sendFailure;
+
+  /// Whether the message is on the saved list already.
+  final bool isSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +314,19 @@ class _MessageActionsSheet extends StatelessWidget {
                   onTap: () => choose(MessageAction.forward),
                 ),
                 ListTile(
+                  leading: Icon(
+                    isSaved
+                        ? Icons.bookmark_remove_outlined
+                        : Icons.bookmark_add_outlined,
+                  ),
+                  title: Text(
+                    isSaved
+                        ? context.l10n.messageActionUnsave
+                        : context.l10n.messageActionSave,
+                  ),
+                  onTap: () => choose(MessageAction.toggleSaved),
+                ),
+                ListTile(
                   leading: const Icon(Icons.alarm_add_rounded),
                   title: Text(context.l10n.messageActionRemind),
                   onTap: () => choose(MessageAction.remind),
@@ -372,6 +394,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
   bool homeAssistant = false,
   List<String> quickReactions = kQuickReactions,
   bool canTranslate = false,
+  bool isSaved = false,
 }) {
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final l10n = context.l10n;
@@ -462,6 +485,13 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
           MessageAction.forward,
           Icons.forward_rounded,
           l10n.messageActionForward,
+        ),
+        item(
+          MessageAction.toggleSaved,
+          isSaved
+              ? Icons.bookmark_remove_outlined
+              : Icons.bookmark_add_outlined,
+          isSaved ? l10n.messageActionUnsave : l10n.messageActionSave,
         ),
         item(
           MessageAction.remind,

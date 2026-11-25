@@ -36,6 +36,7 @@ import '../../app/person_memory_providers.dart';
 import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
 import '../../app/review_providers.dart';
+import '../../app/saved_messages.dart';
 import '../../app/session_providers.dart' show kRemoteClient;
 import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
@@ -1601,6 +1602,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
               ref.read(reactionRecentsProvider),
             ),
             canTranslate: ref.read(autoReplyEndpointProvider) != null,
+            isSaved: ref
+                .read(savedMessageIdsProvider)
+                .contains(message.eventId),
           )
         : await showMessageActionsSheet(
             context,
@@ -1615,6 +1619,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
               ref.read(reactionRecentsProvider),
             ),
             canTranslate: ref.read(autoReplyEndpointProvider) != null,
+            isSaved: ref
+                .read(savedMessageIdsProvider)
+                .contains(message.eventId),
           );
     if (choice == null || !mounted) return;
 
@@ -1660,6 +1667,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
             SharedPayload(text: messageDocument(message).plainText),
           );
         }
+      case MessageAction.toggleSaved:
+        _toggleSaved(message);
       case MessageAction.delete:
         await _delete(message);
       case MessageAction.hideForMe:
@@ -1743,6 +1752,35 @@ class _ChatViewState extends ConsumerState<ChatView> {
         label: l10n.chatMessageHiddenUndo,
         onPressed: () {
           setMessageHidden(settings, message, hidden: false);
+          revision.bump();
+        },
+      ),
+    );
+  }
+
+  /// Puts [message] on the saved list, or takes it off, with an undo.
+  void _toggleSaved(WeftMessage message) {
+    final l10n = context.l10n;
+    final settings = ref.read(storesProvider).settings;
+    final revision = ref.read(settingsRevisionProvider.notifier);
+    final wasSaved = ref
+        .read(savedMessageIdsProvider)
+        .contains(message.eventId);
+    final words = messageDocument(message).plainText.trim();
+    final saved = SavedMessage.of(
+      message,
+      chatId: _chatId,
+      text: words.isNotEmpty ? words : (message.transcript ?? message.body),
+    );
+    setMessageSaved(settings, saved, isSaved: !wasSaved);
+    revision.bump();
+    showWeftMessage(
+      context,
+      wasSaved ? l10n.savedMessagesRemoved : l10n.chatMessageSaved,
+      action: SnackBarAction(
+        label: l10n.chatMessageSavedUndo,
+        onPressed: () {
+          setMessageSaved(settings, saved, isSaved: wasSaved);
           revision.bump();
         },
       ),

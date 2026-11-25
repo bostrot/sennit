@@ -46,6 +46,8 @@ abstract final class SyncPolicy {
     'notify.',
     // Messages hidden on this account only, one row each.
     'hidden.',
+    // Saved messages, one row each.
+    'saved.',
   ];
 
   static const Set<String> _localPrefixes = {
