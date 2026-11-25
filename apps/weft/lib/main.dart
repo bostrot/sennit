@@ -477,21 +477,17 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     final useSennit = await showPushExplanation(context);
     if (useSennit == null || !mounted) return;
 
-    ref
-        .read(storesProvider)
-        .settings
-        .setString(
-          WeftSettings.notifyPushMode,
-          (useSennit ? PushGatewayMode.sennit : PushGatewayMode.off).name,
-        );
+    final mode = useSennit ? PushGatewayMode.sennit : PushGatewayMode.off;
+    final settings = ref.read(storesProvider).settings;
+    settings.setString(WeftSettings.notifyPushMode, mode.name);
     ref.read(settingsRevisionProvider.notifier).bump();
     // "Another way" lands where the other ways are.
-    if (!useSennit) {
-      unawaited(
-        _navigatorKey.currentState?.push(
-          MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
-        ),
+    final navigator = _navigatorKey.currentState;
+    if (!useSennit && navigator != null) {
+      final route = MaterialPageRoute<void>(
+        builder: (_) => const NotificationsScreen(),
       );
+      unawaited(navigator.push(route));
     }
   }
 
