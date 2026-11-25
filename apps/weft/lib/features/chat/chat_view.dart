@@ -25,6 +25,7 @@ import '../../app/auto_reply_providers.dart' show autoReplyEndpointProvider;
 import '../../app/billing_providers.dart';
 import '../../app/quick_message_providers.dart';
 import '../../app/call_providers.dart';
+import '../../app/draft_providers.dart';
 import '../../app/intents.dart';
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
@@ -202,6 +203,21 @@ class _ChatViewState extends ConsumerState<ChatView> {
   String? _unavailable;
 
   final _composer = TextEditingController();
+
+  /// Where the composer's unsent text is kept between visits. Held rather
+  /// than read in [dispose], for the same reason as [_composerHandle].
+  late final DraftsNotifier _drafts;
+
+  /// The chat the composer's text is a draft for, once one has been restored.
+  String? _draftChatId;
+
+  /// Saves the draft a second after the last keystroke, so a crash or a
+  /// killed app loses at most that second.
+  Timer? _draftSave;
+
+  /// A preview is a peek and a thread has a composer of its own; only the
+  /// conversation itself keeps a draft.
+  bool get _keepsDraft => !widget.preview && widget.threadRootId == null;
 
   /// The quick message being written or just written, which the bar above
   /// the composer shows; null when there is none.
@@ -390,6 +406,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.addListener(_onComposerChanged);
     _scroll.addListener(_onScrolled);
     _open();
+    _drafts = ref.read(draftsProvider.notifier);
+    _restoreDraft();
     _prefill = ref.read(composerPrefillProvider)..addListener(_takePrefill);
     _takePrefill();
   }
@@ -413,6 +431,35 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
   }
 
+  /// Puts what was left unsent in this conversation back into the composer.
+  void _restoreDraft() {
+    if (!_keepsDraft) return;
+    final chatId = _chatId;
+    _draftChatId = chatId;
+    final text = _drafts.draftFor({chatId, widget.chatId});
+    if (text == null || _composer.text.isNotEmpty) return;
+    _composer.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  /// Keeps the composer's text as the draft; [leaving] also shows it in the
+  /// inbox.
+  ///
+  /// Not while editing: the composer then holds a sent message's words, and
+  /// the draft from before the edit is the one worth keeping.
+  void _saveDraft({bool leaving = false}) {
+    _draftSave?.cancel();
+    final chatId = _draftChatId;
+    if (chatId == null || _composerContext?.mode == ComposerMode.edit) return;
+    if (leaving) {
+      _drafts.keep(chatId, _composer.text);
+    } else {
+      _drafts.save(chatId, _composer.text);
+    }
+  }
+
   /// Who is typing and whether the peer is online, refreshed per sync tick.
   ///
   /// A notifier rather than state: in a live group someone starts or stops
@@ -432,6 +479,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
   bool _typingSent = false;
 
   void _onComposerChanged() {
+    if (_draftChatId != null) {
+      _draftSave?.cancel();
+      _draftSave = Timer(const Duration(seconds: 1), _saveDraft);
+    }
     final repository = ref.read(chatRepositoryProvider);
     final hasText = _composer.text.trim().isNotEmpty;
     // Sent, or deleted by hand: the bar's "check it, then send" is about a
@@ -575,7 +626,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _messageKeys.clear();
     _highlightEventId = null;
     _startAtNewest = true;
+    // The composer's text and what it was answering belong to the chat that
+    // was left; the next one gets its own draft back.
+    _saveDraft(leaving: true);
+    _draftChatId = null;
+    _composer.clear();
+    _composerContext = null;
     _open();
+    _restoreDraft();
   }
 
   @override
@@ -590,6 +648,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _reportOnScreen(null);
     // A conversation left before it arrived.
     _stopWaitingForChat();
+    _saveDraft(leaving: true);
     _composerFocus.dispose();
     _composer.dispose();
     _scroll.dispose();

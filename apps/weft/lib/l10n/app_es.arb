@@ -1202,6 +1202,7 @@
   "chatTileUnread": "{count, plural, =1{1 sin leer} other{{count} sin leer}}",
   "chatTileNoMessages": "Aún no hay mensajes",
   "chatTileReply": "Respuesta",
+  "chatTileDraft": "Borrador:",
   "searchResultInChat": "En {chat}",
   "searchResultMatchedMeaning": "coincide por el sentido, no por estas palabras",
   "searchResultMatchedBoth": "coincide por palabras y por sentido",

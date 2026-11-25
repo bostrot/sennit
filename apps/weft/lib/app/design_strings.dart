@@ -28,4 +28,5 @@ WeftDesignStrings weftDesignStringsFrom(AppL10n l10n) => WeftDesignStrings(
   messageDeleted: l10n.chatMessageDeleted,
   messageKind: l10n.messageKind,
   reply: l10n.chatTileReply,
+  draft: l10n.chatTileDraft,
 );

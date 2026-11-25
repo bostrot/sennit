@@ -1203,6 +1203,7 @@
   "chatTileUnread": "{count, plural, other{{count} 条未读}}",
   "chatTileNoMessages": "暂无消息",
   "chatTileReply": "回复",
+  "chatTileDraft": "草稿：",
   "searchResultInChat": "在 {chat} 中",
   "searchResultMatchedMeaning": "按语义匹配，而非按这些字词",
   "searchResultMatchedBoth": "按字词和语义同时匹配",

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' show DateFormat, Intl;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
+import '../../app/draft_providers.dart';
 import '../../app/labels.dart';
 import '../../app/localisation.dart';
 import '../../services/contacts/device_contacts.dart';
@@ -294,10 +295,12 @@ class LiveChatTile extends ConsumerWidget {
         );
       }),
     );
+    final draft = ref.watch(draftsProvider.select((d) => d[chat.id]));
     return ChatTile(
       chat: chat,
       avatarHeaders: avatarHeaders,
       typing: typing,
+      draft: draft,
       online: online,
       selected: selected,
       checked: checked,

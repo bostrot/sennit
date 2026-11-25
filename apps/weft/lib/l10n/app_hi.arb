@@ -1202,6 +1202,7 @@
   "chatTileUnread": "{count, plural, =1{1 अनपढ़ा} other{{count} अनपढ़े}}",
   "chatTileNoMessages": "अभी कोई मैसेज नहीं",
   "chatTileReply": "जवाब",
+  "chatTileDraft": "ड्राफ़्ट:",
   "searchResultInChat": "{chat} में",
   "searchResultMatchedMeaning": "इन शब्दों से नहीं, अर्थ से मिला",
   "searchResultMatchedBoth": "शब्दों और अर्थ दोनों से मिला",

@@ -12,6 +12,9 @@ abstract final class SyncKeys {
   /// A keychain value — an API key, the person notes — by its keychain name.
   /// Only ever present while [SyncPolicy.secretsGate] is on.
   static const String secret = 'x:';
+
+  /// What was typed into a chat and not sent yet, by chat id.
+  static const String draft = 'd:';
 }
 
 /// What travels between devices and what stays on the one it was set on.
@@ -77,6 +80,7 @@ abstract final class SyncPolicy {
     }
     if (docKey.startsWith(SyncKeys.secret)) return secrets;
     return docKey.startsWith(SyncKeys.merge) ||
-        docKey.startsWith(SyncKeys.chatNetwork);
+        docKey.startsWith(SyncKeys.chatNetwork) ||
+        docKey.startsWith(SyncKeys.draft);
   }
 }

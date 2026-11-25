@@ -1202,6 +1202,7 @@
   "chatTileUnread": "{count, plural, =1{1 non lu} other{{count} non lus}}",
   "chatTileNoMessages": "Pas encore de messages",
   "chatTileReply": "Réponse",
+  "chatTileDraft": "Brouillon :",
   "searchResultInChat": "Dans {chat}",
   "searchResultMatchedMeaning": "trouvé par le sens, pas par ces mots",
   "searchResultMatchedBoth": "trouvé par les mots et par le sens",
