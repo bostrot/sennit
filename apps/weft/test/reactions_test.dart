@@ -75,6 +75,30 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Searches the open picker for [query] and picks [emoji] from the results.
+  /// The full set is a grid per group, so a key outside the first group is
+  /// reached the way a reader would reach it.
+  Future<void> searchAndPick(
+    WidgetTester tester,
+    String query,
+    String emoji,
+  ) async {
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(TextField),
+      ),
+      query,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .descendant(of: find.byType(BottomSheet), matching: find.text(emoji))
+          .first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   /// The message an event id names, across every leg.
   Future<WeftMessage> messageFor(String eventId) async {
     final timeline = await demo.timelineFor(mergedChat);
@@ -189,12 +213,7 @@ void main() {
     await tester.tap(find.byTooltip('More reactions'));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find
-          .descendant(of: find.byType(BottomSheet), matching: find.text('🎉'))
-          .first,
-    );
-    await tester.pumpAndSettle();
+    await searchAndPick(tester, 'party', '🎉');
 
     expect(repository.lastCallTo('react')?.key, '🎉');
     expect(
@@ -214,10 +233,7 @@ void main() {
     // can see a chip is looking at the bar.
     await tester.tap(find.byIcon(Icons.add_reaction_outlined));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(of: find.byType(BottomSheet), matching: find.text('🎉')),
-    );
-    await tester.pumpAndSettle();
+    await searchAndPick(tester, 'party', '🎉');
 
     // First-reaction order, never by count: a bar that re-sorted itself would
     // move the chip out from under a thumb already travelling towards it.

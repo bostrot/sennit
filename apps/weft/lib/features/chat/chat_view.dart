@@ -1444,6 +1444,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
             canTranscribe: message.canTranscribe,
             hasTranscript: message.transcript != null,
             homeAssistant: ref.read(homeAssistantProvider) != null,
+            quickReactions: quickReactionsWith(
+              ref.read(reactionRecentsProvider),
+            ),
           )
         : await showMessageActionsSheet(
             context,
@@ -1451,6 +1454,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
             canTranscribe: message.canTranscribe,
             hasTranscript: message.transcript != null,
             homeAssistant: ref.read(homeAssistantProvider) != null,
+            quickReactions: quickReactionsWith(
+              ref.read(reactionRecentsProvider),
+            ),
           );
     if (choice == null || !mounted) return;
 
@@ -1901,9 +1907,25 @@ class _ChatViewState extends ConsumerState<ChatView> {
       return;
     }
 
-    final repository = ref.read(chatRepositoryProvider);
     ref.read(reactionRecentsProvider.notifier).note(key);
-    await _run(() => repository.react(_chatId, message.eventId, key));
+    await _sendReaction(message, key);
+  }
+
+  /// Sends [key], and says so plainly when the bridge's network refused it —
+  /// a reaction outside the fixed set some networks allow is not a failure the
+  /// reader can fix by trying again, and "That did not go through" would
+  /// invite exactly that.
+  Future<void> _sendReaction(WeftMessage message, String key) async {
+    final repository = ref.read(chatRepositoryProvider);
+    final l10n = context.l10n;
+    await _run(() async {
+      try {
+        await repository.react(_chatId, message.eventId, key);
+      } on ReactionRejectedException catch (rejected) {
+        debugPrint('weft: reaction refused: $rejected');
+        _showMessage(l10n.reactionRejectedByNetwork(rejected.network.label));
+      }
+    });
   }
 
   Future<void> _toggleReaction(WeftMessage message, ReactionTally tally) async {
@@ -1915,7 +1937,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       return;
     }
     ref.read(reactionRecentsProvider.notifier).note(tally.key);
-    await _run(() => repository.react(_chatId, message.eventId, tally.key));
+    await _sendReaction(message, tally.key);
   }
 
   /// Opens a link a message carried.

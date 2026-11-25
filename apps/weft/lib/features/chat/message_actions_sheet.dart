@@ -86,6 +86,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   bool canTranscribe = false,
   bool hasTranscript = false,
   bool homeAssistant = false,
+  List<String> quickReactions = kQuickReactions,
 }) {
   return showWeftPanel<MessageActionChoice>(
     context: context,
@@ -101,6 +102,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
       canTranscribe: canTranscribe,
       hasTranscript: hasTranscript,
       homeAssistant: homeAssistant,
+      quickReactions: quickReactions,
     ),
   );
 }
@@ -111,12 +113,16 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.canTranscribe,
     required this.hasTranscript,
     required this.homeAssistant,
+    required this.quickReactions,
   });
 
   final WeftMessage message;
   final bool canTranscribe;
   final bool hasTranscript;
   final bool homeAssistant;
+
+  /// The quick row — see `quickReactionsWith`.
+  final List<String> quickReactions;
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +185,7 @@ class _MessageActionsSheet extends StatelessWidget {
                         // to a screen reader — it is a character, announced by
                         // whatever name the platform has for that glyph, with no
                         // hint that tapping it sends a reaction.
-                        for (final key in kQuickReactions)
+                        for (final key in quickReactions)
                           Semantics(
                             button: true,
                             label: context.l10n.messageActionReactWith(key),
@@ -329,6 +335,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
   bool canTranscribe = false,
   bool hasTranscript = false,
   bool homeAssistant = false,
+  List<String> quickReactions = kQuickReactions,
 }) {
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final l10n = context.l10n;
@@ -364,7 +371,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final key in kQuickReactions)
+              for (final key in quickReactions)
                 InkWell(
                   borderRadius: WeftRadius.pill,
                   onTap: () => Navigator.of(
