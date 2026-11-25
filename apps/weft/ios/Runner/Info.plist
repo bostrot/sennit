@@ -48,6 +48,8 @@
 	<string>Sennit shares your position only when you tap "share location" in a chat. It never follows it in the background.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Sennit adds an event to your calendar only when you ask it to, for a date mentioned in a chat.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Sennit uses Face ID to unlock the app when you turn on App lock.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Sennit shows your address book names for people instead of the names messaging networks assign them. Contacts are matched on this device and never uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>

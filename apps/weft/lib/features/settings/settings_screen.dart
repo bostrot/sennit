@@ -25,6 +25,7 @@ import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
 import '../schedule/scheduled_screen.dart';
+import 'app_lock_screen.dart';
 import 'appearance_sheet.dart';
 import 'ai_screen.dart';
 import 'backup_screen.dart';
@@ -310,6 +311,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: l10n.settingsDevicesSubtitle,
               onTap: () => push(const DevicesScreen()),
             ),
+            if (!kDemoMode)
+              tile(
+                icon: Icons.pin_outlined,
+                title: l10n.settingsAppLockTitle,
+                subtitle: l10n.settingsAppLockSubtitle,
+                onTap: () => push(const AppLockSettingsScreen()),
+              ),
             tile(
               icon: Icons.lock_outline_rounded,
               title: l10n.settingsEncryptionTitle,

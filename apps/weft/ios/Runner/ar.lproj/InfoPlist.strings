@@ -14,6 +14,7 @@
 "NSLocationWhenInUseUsageDescription" = "لا يشارك Sennit موقعك إلا حين تنقر «مشاركة الموقع» في محادثة.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "لا يشارك Sennit موقعك إلا حين تنقر «مشاركة الموقع» في محادثة. لا يتتبعه Sennit في الخلفية أبدًا.";
 "NSCalendarsUsageDescription" = "لا يضيف Sennit موعدًا إلى تقويمك إلا حين تطلب ذلك لتاريخ من محادثة.";
+"NSFaceIDUsageDescription" = "يستخدم Sennit بصمة الوجه Face ID لفتح التطبيق عند تشغيل قفل التطبيق.";
 "NSContactsUsageDescription" = "يعرض Sennit الأسماء من دفتر عناوينك بدل الأسماء التي تضعها شبكات المراسلة. تتم المطابقة على هذا الجهاز ولا تُرفع أبدًا.";
 "NSMicrophoneUsageDescription" = "يحتاج Sennit إلى الميكروفون لتتحدث في مكالمة صوتية أو مكالمة فيديو.";
 "NSSiriUsageDescription" = "يمكن لـ Siri أن يقرأ لك رسائلك الجديدة ويرسل ردودك المملاة، على iPhone وفي CarPlay. إن كانت معاينات الرسائل متوقفة، يقول Siri فقط من كتب.";

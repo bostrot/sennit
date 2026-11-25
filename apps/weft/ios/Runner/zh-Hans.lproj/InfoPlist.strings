@@ -14,6 +14,7 @@
 "NSLocationWhenInUseUsageDescription" = "Sennit 只有在你于聊天中点按「共享位置」时才会共享你的位置。";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit 只有在你于聊天中点按「共享位置」时才会共享你的位置，绝不会在后台持续获取。";
 "NSCalendarsUsageDescription" = "Sennit 只有在你要求时，才会把聊天中提到的日期添加为日历日程。";
+"NSFaceIDUsageDescription" = "开启应用锁后，Sennit 会用面容 ID 解锁应用。";
 "NSContactsUsageDescription" = "Sennit 会显示你通讯录中的名字，而不是消息网络分配的名字。匹配只在本设备上进行，绝不会上传。";
 "NSMicrophoneUsageDescription" = "Sennit 需要使用麦克风，以便你在语音或视频通话中讲话。";
 "NSSiriUsageDescription" = "Siri 可以朗读你的新消息，并发送你口述的回复，在手机和 CarPlay 上均可。关闭消息预览后，Siri 只会说出是谁发来的。";

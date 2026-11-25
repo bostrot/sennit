@@ -14,6 +14,7 @@
 "NSLocationWhenInUseUsageDescription" = "Sennit आपकी लोकेशन सिर्फ़ तब शेयर करता है जब आप किसी चैट में “लोकेशन शेयर करें” पर टैप करते हैं।";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit आपकी लोकेशन सिर्फ़ तब शेयर करता है जब आप किसी चैट में “लोकेशन शेयर करें” पर टैप करते हैं। बैकग्राउंड में Sennit इसे कभी ट्रैक नहीं करता।";
 "NSCalendarsUsageDescription" = "Sennit आपके कैलेंडर में इवेंट तभी जोड़ता है जब आप चैट की किसी तारीख के लिए कहें।";
+"NSFaceIDUsageDescription" = "ऐप लॉक चालू करने पर Sennit ऐप अनलॉक करने के लिए Face ID का इस्तेमाल करता है।";
 "NSContactsUsageDescription" = "Sennit मैसेजिंग नेटवर्क के दिए नामों की जगह आपकी एड्रेस बुक के नाम दिखाता है। मिलान इसी डिवाइस पर होता है और कभी अपलोड नहीं होता।";
 "NSMicrophoneUsageDescription" = "वॉइस या वीडियो कॉल में बोलने के लिए Sennit को माइक्रोफ़ोन चाहिए।";
 "NSSiriUsageDescription" = "Siri आपके नए मैसेज पढ़कर सुना सकता है और आपके बोले जवाब भेज सकता है, iPhone और CarPlay पर। मैसेज प्रीव्यू बंद हों तो Siri सिर्फ़ बताता है कि किसने लिखा।";

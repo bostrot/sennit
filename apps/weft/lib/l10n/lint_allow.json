@@ -52,6 +52,7 @@
     "threadTitle": "Same word as threadOpen."
   },
   "es": {
+    "appLockAfterMinutes": "'min' is the usual Spanish abbreviation for minutes.",
     "endpointsTitle": "Spanish technical writing keeps 'endpoint'; the rest of this screen does too.",
     "messageKindAudio": "'Audio' is Spanish.",
     "messageKindSticker": "WhatsApp and Telegram in Spanish both say 'Sticker'.",
@@ -59,6 +60,7 @@
     "settingsSectionChats": "Spanish messengers say 'Chats'."
   },
   "fr": {
+    "appLockAfterMinutes": "'min' is the usual French abbreviation for minutes.",
     "attachmentContactFallbackName": "'Contact' is French.",
     "attachmentKindApplication": "'Application' is French.",
     "attachmentKindArchive": "'Archive' is French.",
@@ -90,6 +92,7 @@
     "snapshotRedactedRowTitle": "'Conversation' is French."
   },
   "pt": {
+    "appLockAfterMinutes": "'min' is the usual Portuguese abbreviation for minutes.",
     "attachmentPreviewVia": "'via' is Portuguese.",
     "chatSubtitleOnline": "'online' is the ordinary Brazilian Portuguese word for it.",
     "chatTileOnline": "'online' is the ordinary Brazilian Portuguese word for it.",

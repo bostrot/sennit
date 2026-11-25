@@ -12,7 +12,7 @@ import com.bostrot.weft.sync.SyncControlChannel
 import com.bostrot.weft.sync.SyncEngineHolder
 import com.bostrot.weft.wear.WeftWatchChannel
 import com.bostrot.weft.widget.WeftSnapshotChannel
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -25,7 +25,7 @@ import java.io.File
 /// `readSharedFileMeta` for a name and a size, so a file too large to send is
 /// turned away before it is touched, and `stageSharedFile` for a copy it can
 /// open later.
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val channelName = "com.bostrot.weft/intents"
     private var channel: MethodChannel? = null
 
@@ -48,6 +48,7 @@ class MainActivity : FlutterActivity() {
         SyncControlChannel.register(this, flutterEngine)
         CalendarChannel.register(this, flutterEngine)
         BrowserAuth.register(this, flutterEngine)
+        PrivacyChannel.register(this, flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
         channel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -210,7 +211,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    @Deprecated("Flutter's FlutterActivity has not migrated to the Activity Result APIs")
+    @Deprecated("Flutter's FlutterFragmentActivity has not migrated to the Activity Result APIs")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (SmsBridge.onRoleResult(requestCode)) return
         @Suppress("DEPRECATION")

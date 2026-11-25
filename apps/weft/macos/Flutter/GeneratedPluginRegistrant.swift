@@ -22,6 +22,7 @@ import geolocator_apple
 import in_app_purchase_storekit
 import in_app_review
 import just_audio
+import local_auth_darwin
 import package_info_plus
 import patrol
 import pdfium_flutter
@@ -52,6 +53,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   InAppPurchasePlugin.register(with: registry.registrar(forPlugin: "InAppPurchasePlugin"))
   InAppReviewPlugin.register(with: registry.registrar(forPlugin: "InAppReviewPlugin"))
   JustAudioPlugin.register(with: registry.registrar(forPlugin: "JustAudioPlugin"))
+  LocalAuthPlugin.register(with: registry.registrar(forPlugin: "LocalAuthPlugin"))
   FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
   PatrolPlugin.register(with: registry.registrar(forPlugin: "PatrolPlugin"))
   PDFiumFlutterPlugin.register(with: registry.registrar(forPlugin: "PDFiumFlutterPlugin"))

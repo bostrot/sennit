@@ -14,6 +14,7 @@
 "NSLocationWhenInUseUsageDescription" = "O Sennit compartilha sua localização apenas quando você toca em \"compartilhar localização\" em uma conversa.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "O Sennit compartilha sua localização apenas quando você toca em \"compartilhar localização\" em uma conversa. Ele nunca a acompanha em segundo plano.";
 "NSCalendarsUsageDescription" = "O Sennit adiciona um evento ao seu calendário apenas quando você pede, para uma data mencionada em uma conversa.";
+"NSFaceIDUsageDescription" = "O Sennit usa o Face ID para desbloquear o app quando você ativa o bloqueio do app.";
 "NSContactsUsageDescription" = "O Sennit mostra os nomes da sua agenda em vez dos nomes que as redes de mensagens atribuem. Os contatos são comparados neste dispositivo e nunca são enviados.";
 "NSMicrophoneUsageDescription" = "O Sennit precisa do microfone para você poder falar em uma chamada de voz ou de vídeo.";
 "NSSiriUsageDescription" = "A Siri pode ler suas novas mensagens em voz alta e enviar as respostas que você ditar, no celular e no CarPlay. Com as prévias de mensagens desativadas, a Siri só diz quem escreveu.";
