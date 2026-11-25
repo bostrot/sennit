@@ -1721,5 +1721,7 @@
   "sennitWebRelayConnected": "已连接。已配对的浏览器可在任何地方打开下方地址。",
   "sennitWebRelayRefused": "中继拒绝了此设备。请检查地址。",
   "sennitWebRelayUnreachable": "无法连接中继，正在重试…",
-  "sennitWebRelayHowTo": "如何设置中继"
+  "sennitWebRelayHowTo": "如何设置中继",
+  "contactPhotoOpen": "查看头像",
+  "contactPhotoLabel": "{name}的头像"
 }

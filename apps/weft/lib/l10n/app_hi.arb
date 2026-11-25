@@ -1720,5 +1720,7 @@
   "sennitWebRelayConnected": "जुड़ गया। पेयर किए गए ब्राउज़र नीचे दिया पता कहीं से भी खोल सकते हैं।",
   "sennitWebRelayRefused": "रिले ने इस डिवाइस को मना कर दिया। पता जाँचें।",
   "sennitWebRelayUnreachable": "रिले तक नहीं पहुँच सके। फिर कोशिश हो रही है…",
-  "sennitWebRelayHowTo": "रिले कैसे सेट करें"
+  "sennitWebRelayHowTo": "रिले कैसे सेट करें",
+  "contactPhotoOpen": "प्रोफ़ाइल फ़ोटो देखें",
+  "contactPhotoLabel": "{name} की प्रोफ़ाइल फ़ोटो"
 }

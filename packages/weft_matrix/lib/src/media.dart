@@ -35,6 +35,45 @@ String? mxcToThumbnailUrl(
   );
 }
 
+/// The same avatar as [url], asked for at [size] pixels and uncropped.
+///
+/// A chat's avatar is held as the 96-pixel square crop the lists draw, and
+/// the original `mxc://` URI is gone by the time a screen sees it. Opening the
+/// picture full screen needs more pixels than that, and the whole picture
+/// rather than its middle: `scale` keeps the aspect ratio, `crop` does not.
+///
+/// A thumbnail rather than [mxcToDownloadUrl]'s original, because an avatar's
+/// original can be a 4000-pixel photo straight off a camera, and a thumbnail
+/// is still the homeserver's own media API, which is all Sennit Web's phone
+/// will fetch for a browser.
+///
+/// Anything that is not a Matrix thumbnail URL comes back unchanged: there is
+/// no larger version of it to ask for.
+String largerThumbnailUrl(String url, {int size = 800}) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return url;
+  final segments = uri.pathSegments;
+  // `/_matrix/client/v1/media/thumbnail/…` or `/_matrix/media/v3/thumbnail/…`,
+  // followed by the server and the media id.
+  final at = segments.indexOf('thumbnail');
+  if (at < 2 ||
+      segments.first != '_matrix' ||
+      !segments.take(at).contains('media') ||
+      segments.length != at + 3) {
+    return url;
+  }
+  return uri
+      .replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          'width': '$size',
+          'height': '$size',
+          'method': 'scale',
+        },
+      )
+      .toString();
+}
+
 /// Turns an `mxc://` URI into an HTTP URL for the media *itself*, full size.
 ///
 /// The download counterpart of [mxcToThumbnailUrl], and it exists for exactly

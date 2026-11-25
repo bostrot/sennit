@@ -1720,5 +1720,7 @@
   "sennitWebRelayConnected": "Verbunden. Gekoppelte Browser können die Adresse unten von überall öffnen.",
   "sennitWebRelayRefused": "Das Relay hat dieses Gerät abgewiesen. Prüfe die Adresse.",
   "sennitWebRelayUnreachable": "Relay nicht erreichbar. Neuer Versuch …",
-  "sennitWebRelayHowTo": "So richtest du ein Relay ein"
+  "sennitWebRelayHowTo": "So richtest du ein Relay ein",
+  "contactPhotoOpen": "Profilbild ansehen",
+  "contactPhotoLabel": "Profilbild von {name}"
 }
