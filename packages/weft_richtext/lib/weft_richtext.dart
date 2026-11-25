@@ -22,6 +22,7 @@
 library;
 
 // Consumers import this barrel, never src/.
+export 'src/bridge_buttons.dart';
 export 'src/fallback.dart';
 export 'src/links.dart';
 export 'src/mentions.dart';

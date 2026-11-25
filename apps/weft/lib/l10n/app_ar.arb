@@ -1736,5 +1736,14 @@
   "emojiGroupFlags": "الأعلام",
   "emojiSkinTone": "لون البشرة",
   "emojiSkinToneName": "{tone, select, none{بلا لون بشرة} light{فاتح} mediumLight{فاتح متوسط} medium{متوسط} mediumDark{داكن متوسط} other{داكن}}",
-  "reactionRejectedByNetwork": "لم يقبل {network} هذا التفاعل. ربما لا يسمح إلا ببعض الرموز التعبيرية."
+  "reactionRejectedByNetwork": "لم يقبل {network} هذا التفاعل. ربما لا يسمح إلا ببعض الرموز التعبيرية.",
+  "linkActionOpen": "فتح الرابط",
+  "linkActionCopyLink": "نسخ الرابط",
+  "linkActionCall": "اتصال",
+  "linkActionSendSms": "إرسال رسالة نصية",
+  "linkActionCopyNumber": "نسخ الرقم",
+  "linkActionWriteEmail": "كتابة بريد إلكتروني",
+  "linkActionCopyAddress": "نسخ العنوان",
+  "bridgeButtonsHint": "افتح {network} للرد",
+  "bridgeButtonsOpenApp": "فتح في {network}"
 }

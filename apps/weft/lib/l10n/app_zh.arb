@@ -1737,5 +1737,14 @@
   "emojiGroupFlags": "旗帜",
   "emojiSkinTone": "肤色",
   "emojiSkinToneName": "{tone, select, none{默认肤色} light{浅肤色} mediumLight{中等偏浅肤色} medium{中等肤色} mediumDark{中等偏深肤色} other{深肤色}}",
-  "reactionRejectedByNetwork": "{network} 未接受该回应，可能只允许部分表情符号。"
+  "reactionRejectedByNetwork": "{network} 未接受该回应，可能只允许部分表情符号。",
+  "linkActionOpen": "打开链接",
+  "linkActionCopyLink": "复制链接",
+  "linkActionCall": "拨打电话",
+  "linkActionSendSms": "发送短信",
+  "linkActionCopyNumber": "复制号码",
+  "linkActionWriteEmail": "写邮件",
+  "linkActionCopyAddress": "复制地址",
+  "bridgeButtonsHint": "请在 {network} 中回复",
+  "bridgeButtonsOpenApp": "在 {network} 中打开"
 }

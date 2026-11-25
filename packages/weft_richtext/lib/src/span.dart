@@ -270,10 +270,22 @@ final class RichMention extends RichSpan {
 /// [RichLink] tappable without re-checking, and there is exactly one place in
 /// the codebase where that check can be got wrong.
 final class RichLink extends RichSpan {
-  const RichLink({required this.url, required this.children});
+  const RichLink({
+    required this.url,
+    required this.children,
+    this.inferred = false,
+  });
 
   final String url;
   final List<RichSpan> children;
+
+  /// Whether [url] was worked out rather than written: a bare `example.org`
+  /// given an `https://`, an address given a `mailto:`, a number a `tel:`.
+  ///
+  /// Tappable all the same, but never previewed. A sender who types a domain
+  /// in passing is naming a site, not sharing a page, and asking the homeserver
+  /// to fetch it would be a request nobody made.
+  final bool inferred;
 
   @override
   String get plainText => children.map((c) => c.plainText).join();
@@ -282,14 +294,16 @@ final class RichLink extends RichSpan {
   bool operator ==(Object other) =>
       other is RichLink &&
       other.url == url &&
+      other.inferred == inferred &&
       const ListEquality<RichSpan>().equals(other.children, children);
 
   @override
   int get hashCode =>
-      Object.hash(url, const ListEquality<RichSpan>().hash(children));
+      Object.hash(url, inferred, const ListEquality<RichSpan>().hash(children));
 
   @override
-  String toString() => 'RichLink($url, $children)';
+  String toString() =>
+      'RichLink($url${inferred ? ', inferred' : ''}, $children)';
 }
 
 /// A block container: paragraph, heading, quote, list, list item, code block.

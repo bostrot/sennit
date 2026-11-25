@@ -71,7 +71,9 @@ import 'chat_search.dart';
 import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
+import 'bridge_buttons_bar.dart';
 import 'jump_to_latest_button.dart';
+import 'link_actions_sheet.dart';
 import 'link_preview_card.dart';
 import 'media_gallery.dart';
 import 'media_viewer.dart';
@@ -1954,6 +1956,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final l10n = context.l10n;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
+
+    // A number has more than one thing it could mean; the sheet asks which.
+    if (uri.scheme.toLowerCase() == 'tel') {
+      await showLinkActions(context, url: url, label: label, onOpen: () {});
+      return;
+    }
 
     if (linkLabelMisleads(label, uri) && !await _confirmLink(url)) return;
 
@@ -4829,7 +4837,7 @@ class _MessageBubble extends StatelessWidget {
                                 onTranscribe: onTranscribe,
                                 onRetranscribe: onRetranscribe,
                               )
-                            else
+                            else ...[
                               // The time rides the last line of the words
                               // when there is room beside them and drops
                               // under, at the trailing edge, when there is
@@ -4868,6 +4876,18 @@ class _MessageBubble extends StatelessWidget {
                                   meta,
                                 ],
                               ),
+                              // Buttons a business sent, which the bridge
+                              // could only write out as text — see
+                              // [BridgeButtonsBar].
+                              if (messageContent(message).buttons
+                                  case final buttons when buttons.isNotEmpty)
+                                BridgeButtonsBar(
+                                  buttons: buttons,
+                                  senderId: message.senderId,
+                                  accent: own ? palette.ownBubbleText : accent,
+                                  onTapLink: onTapLink,
+                                ),
+                            ],
                             if (!inlineMeta) ...[
                               const SizedBox(height: 2),
                               meta,
