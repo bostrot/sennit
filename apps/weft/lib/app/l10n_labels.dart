@@ -193,6 +193,8 @@ extension WeftAutoReplyLabels on AppL10n {
 WeftNotifyStrings weftNotifyStringsFrom(AppL10n l10n) => WeftNotifyStrings(
   hiddenPreview: l10n.notificationHiddenPreview,
   messageKind: l10n.messageKind,
+  reaction: l10n.notificationReaction,
+  reactionHidden: l10n.notificationReactionHidden,
 );
 
 /// Whether a conversation can carry a call, in the reader's language.

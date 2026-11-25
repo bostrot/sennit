@@ -4277,6 +4277,20 @@
   "@notificationsMentionsBypassSubtitle": {
     "description": "Subtitle under the mentions-bypass toggle, giving both readings. 'Matrix' is the protocol name and is never translated."
   },
+  "notificationsReactionsDirectTitle": "Reactions in direct chats",
+  "@notificationsReactionsDirectTitle": {
+    "description": "Notification settings switch: notify when someone reacts (with an emoji) to the user's message in a one-to-one chat. Keep under ~32 chars.",
+    "maxLength": 40
+  },
+  "notificationsReactionsSubtitle": "When someone reacts to your message",
+  "@notificationsReactionsSubtitle": {
+    "description": "Subtitle under the reaction notification switches, saying what they cover. Keep short."
+  },
+  "notificationsReactionsGroupsTitle": "Reactions in groups",
+  "@notificationsReactionsGroupsTitle": {
+    "description": "Notification settings switch: notify when someone reacts (with an emoji) to the user's message in a group. Keep under ~32 chars.",
+    "maxLength": 40
+  },
   "notificationsShowPreviewsTitle": "Show message text on the lock screen",
   "@notificationsShowPreviewsTitle": {
     "description": "Toggle: whether message text appears on the lock screen. Keep under ~44 chars."
@@ -7067,6 +7081,25 @@
   "notificationHiddenPreview": "New message",
   "@notificationHiddenPreview": {
     "description": "What a notification says instead of the message when 'Show message text on the lock screen' is off. The sender and the conversation are still shown — only the words are replaced, which is what that setting actually promises. Keep under ~20 chars.",
+    "maxLength": 40
+  },
+  "notificationReaction": "Reacted {emoji} to “{message}”",
+  "@notificationReaction": {
+    "description": "Body of a notification telling the user someone reacted to their message. The sender's name is shown separately as the notification title. {emoji} is the reaction, {message} the user's own message it was put on (may be cut short).",
+    "placeholders": {
+      "emoji": {
+        "type": "String",
+        "example": "👍"
+      },
+      "message": {
+        "type": "String",
+        "example": "See you at eight"
+      }
+    }
+  },
+  "notificationReactionHidden": "Reacted to your message",
+  "@notificationReactionHidden": {
+    "description": "Body of a reaction notification when message text is hidden on the lock screen: neither the emoji nor the message is shown. Keep under ~30 chars.",
     "maxLength": 40
   },
   "attachmentRejectedEmpty": "This file is empty, so there is nothing to send.",

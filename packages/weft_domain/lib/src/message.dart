@@ -163,6 +163,7 @@ class WeftMessage {
     required this.isOwn,
     this.isAutoReply = false,
     this.isBridgeNotice = false,
+    this.reactionKey,
     this.body = '',
     this.formattedBody,
     this.transcript,
@@ -244,6 +245,19 @@ class WeftMessage {
   /// management room is a control channel the user opens on purpose, and a
   /// bridge that reconnects nightly otherwise buzzes twice at 02:00 forever.
   final bool isBridgeNotice;
+
+  /// Set when this stands for somebody reacting to one of the user's own
+  /// messages rather than for a message of its own.
+  ///
+  /// Only the notification path builds these: a reaction is folded into its
+  /// target's [reactions] everywhere else and never becomes a bubble. The
+  /// emoji is here, [replyToEventId] names the message it was put on, and
+  /// [body] carries that message's text so the notification can say what was
+  /// reacted to.
+  final String? reactionKey;
+
+  /// Whether this is a reaction notice; see [reactionKey].
+  bool get isReaction => reactionKey != null;
 
   /// Plain-text body, already stripped of formatting. Indexed for search.
   final String body;
@@ -490,6 +504,7 @@ class WeftMessage {
       isOwn: isOwn,
       isAutoReply: isAutoReply,
       isBridgeNotice: isBridgeNotice,
+      reactionKey: reactionKey,
       body: body ?? this.body,
       formattedBody: identical(formattedBody, _unchanged)
           ? this.formattedBody

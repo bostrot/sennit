@@ -1173,4 +1173,77 @@ void main() {
       );
     });
   });
+
+  group('reactions', () {
+    WeftMessage reaction({String body = 'See you at eight, Ada'}) =>
+        msg(eventId: r'$reaction_1', body: body, reactionKey: '👍');
+
+    test('a reaction in a direct chat notifies by default', () {
+      expect(decide(message: reaction()), const NotifyDecision());
+    });
+
+    test('a reaction in a group is quiet by default', () {
+      expect(
+        reasonFor(decide(message: reaction(), forChat: chat(isGroup: true))),
+        NotificationSuppression.reactionsOff,
+      );
+    });
+
+    test('each kind of chat follows its own switch', () {
+      final policy = NotificationPolicy(
+        reactionsInDirectChats: false,
+        reactionsInGroups: true,
+      );
+      expect(
+        reasonFor(decide(message: reaction(), policy: policy)),
+        NotificationSuppression.reactionsOff,
+      );
+      expect(
+        decide(
+          message: reaction(),
+          forChat: chat(isGroup: true),
+          policy: policy,
+        ).delivers,
+        isTrue,
+      );
+    });
+
+    test('the switches leave ordinary messages alone', () {
+      final policy = NotificationPolicy(
+        reactionsInDirectChats: false,
+        reactionsInGroups: false,
+      );
+      expect(decide(policy: policy).delivers, isTrue);
+    });
+
+    test('the user own words in a reaction are not a mention', () {
+      // The body is the reacted-to message, which the user wrote — their own
+      // name in it must not page them through a mute.
+      final decision = decide(
+        message: reaction(body: '@ada:example.org see you at eight'),
+        forChat: chat(muted: true),
+      );
+      expect(reasonFor(decision), NotificationSuppression.chatMuted);
+    });
+
+    test('a muted chat still silences reactions', () {
+      expect(
+        reasonFor(decide(message: reaction(), forChat: chat(muted: true))),
+        NotificationSuppression.chatMuted,
+      );
+    });
+
+    test('the switches round-trip through json', () {
+      final policy = NotificationPolicy(
+        reactionsInDirectChats: false,
+        reactionsInGroups: true,
+      );
+      expect(NotificationPolicy.fromJson(policy.toJson()), policy);
+      expect(
+        NotificationPolicy.fromJson(const {}).reactionsInDirectChats,
+        isTrue,
+      );
+      expect(NotificationPolicy.fromJson(const {}).reactionsInGroups, isFalse);
+    });
+  });
 }

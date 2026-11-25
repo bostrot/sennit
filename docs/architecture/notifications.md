@@ -286,11 +286,21 @@ suppression that is unconditional *and* durable is pushed down.
 
 Rule order inside `evaluateNotification` is first-match-wins and the match is
 reported as *the* reason: duplicate → own → redacted → state event → bridge
-notice → globally disabled → already read → network disabled → network muted →
-chat muted → source muted → mentions-only → quiet hours. So a muted chat during
-quiet hours reads as "That chat is muted" — the setting the user would actually
-go and change, which is what the settings screen's test button prints back at
-them.
+notice → globally disabled → reactions off → already read → network disabled →
+network muted → chat muted → source muted → mentions-only → quiet hours. So a
+muted chat during quiet hours reads as "That chat is muted" — the setting the
+user would actually go and change, which is what the settings screen's test
+button prints back at them.
+
+`reactionsOff` covers the one kind of notice that is not a message. A reaction
+to one of the user's own messages is mapped by `mapReactionNotice` into a
+`WeftMessage` with `reactionKey` set and the reacted-to message's text as its
+body, so the shade reads "Reacted 👍 to “See you at eight”". Whether it may
+notify at all is `reactionsInDirectChats` or `reactionsInGroups` — on and off by
+default — and after that it takes the same rules as any message, except that it
+is never a mention: its body is the user's own words. Only reactions that reach
+the app are seen: through sync, and through push for encrypted rooms. The
+homeserver's default `.m.rule.reaction` keeps a plain-text room from pushing one.
 
 `bridgeNotice` is the one rule in that list nobody chose. A mautrix bridge
 narrates its own plumbing into its management room — "State update for

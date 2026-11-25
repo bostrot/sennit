@@ -21,6 +21,8 @@ class WeftNotifyStrings {
   const WeftNotifyStrings({
     required this.hiddenPreview,
     required this.messageKind,
+    this.reaction = _englishReaction,
+    this.reactionHidden = 'Reacted to your message',
   });
 
   /// What a notification says instead of the message when previews are off.
@@ -32,11 +34,21 @@ class WeftNotifyStrings {
   /// "camera Photo IMG_4021.jpg" is not an improvement.
   final String Function(MessageKind kind) messageKind;
 
+  /// The body of a notification about somebody reacting to the user's
+  /// message: the emoji, then the message it was put on.
+  final String Function(String emoji, String message) reaction;
+
+  /// The same with previews off, which hides the emoji too.
+  final String reactionHidden;
+
   static const WeftNotifyStrings english = WeftNotifyStrings(
     hiddenPreview: 'New message',
     messageKind: _englishKind,
   );
 }
+
+String _englishReaction(String emoji, String message) =>
+    'Reacted $emoji to “$message”';
 
 String _englishKind(MessageKind kind) => switch (kind) {
   MessageKind.image => 'Photo',

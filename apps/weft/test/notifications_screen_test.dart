@@ -234,6 +234,20 @@ void main() {
     expect(container.read(notificationPolicyProvider).mentionsOnly, isTrue);
   });
 
+  testWidgets('the reaction switches persist, one per kind of chat', (
+    tester,
+  ) async {
+    final (:stores, container: _) = await pump(tester);
+
+    // Direct chats start on and groups off; flip both.
+    await tester.tap(find.text('Reactions in direct chats'));
+    await tester.tap(find.text('Reactions in groups'));
+    await tester.pumpAndSettle();
+
+    expect(persisted(stores).reactionsInDirectChats, isFalse);
+    expect(persisted(stores).reactionsInGroups, isTrue);
+  });
+
   testWidgets('a network with no bridge says so instead of showing nothing', (
     tester,
   ) async {

@@ -269,6 +269,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               SwitchListTile(
+                title: Text(context.l10n.notificationsReactionsDirectTitle),
+                subtitle: Text(context.l10n.notificationsReactionsSubtitle),
+                value: policy.reactionsInDirectChats,
+                onChanged: (v) =>
+                    _update((p) => p.copyWith(reactionsInDirectChats: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile(
+                title: Text(context.l10n.notificationsReactionsGroupsTitle),
+                value: policy.reactionsInGroups,
+                onChanged: (v) =>
+                    _update((p) => p.copyWith(reactionsInGroups: v)),
+                contentPadding: EdgeInsets.zero,
+              ),
+              SwitchListTile(
                 title: Text(context.l10n.notificationsShowPreviewsTitle),
                 subtitle: Text(context.l10n.notificationsShowPreviewsSubtitle),
                 value: policy.showPreviews,

@@ -570,6 +570,49 @@ ReactionEvent? mapReaction(sdk.Event event) {
   );
 }
 
+/// Turns a reaction to one of the user's own messages into something the
+/// notification rules can decide on, or null when it is not one.
+///
+/// [target] is the event the reaction was put on, which the caller has to
+/// fetch: a reaction carries only its id. Null when the reaction is the user's
+/// own, when the target is somebody else's message — a thumbs-up between two
+/// other people is not the user's business — or when either side does not map.
+///
+/// The result borrows the target's kind and text, so the notification renders
+/// "Photo · beach.jpg" for a photo exactly as it would have for the photo
+/// itself, and carries the emoji as [WeftMessage.reactionKey].
+WeftMessage? mapReactionNotice(
+  sdk.Event reaction, {
+  required sdk.Event? target,
+  required ChatNetwork network,
+  required String? ownUserId,
+}) {
+  final annotation = mapReaction(reaction);
+  if (annotation == null || target == null || ownUserId == null) return null;
+  if (reaction.senderId == ownUserId) return null;
+  if (target.eventId != annotation.targetEventId) return null;
+  if (target.senderId != ownUserId) return null;
+
+  final reactedTo = mapEvent(target, network: network, ownUserId: ownUserId);
+  if (reactedTo == null || reactedTo.redacted) return null;
+
+  return WeftMessage(
+    eventId: reaction.eventId,
+    roomId: reaction.roomId ?? '',
+    network: network,
+    senderId: reaction.senderId,
+    senderName: reaction.senderFromMemoryOrFallback.calcDisplayname(),
+    timestamp: reaction.originServerTs,
+    kind: reactedTo.kind,
+    isOwn: false,
+    reactionKey: annotation.key,
+    replyToEventId: target.eventId,
+    body: reactedTo.body,
+    formattedBody: reactedTo.formattedBody,
+    transcript: reactedTo.transcript,
+  );
+}
+
 /// Maps an `m.replace` event, or null for anything that is not one.
 ///
 /// The replacement text comes from `m.new_content`, which is the authoritative
