@@ -19,6 +19,8 @@ and what was noticed but not done.
 
 - 2026-11-24 · User experience · Escape empties the Mac toolbar's search field (and leaves it once empty), and the field's clear button shows up while you type instead of only after a focus change · https://github.com/bostrot/sennit/pull/35
 
+- 2026-11-25 · Feature · Tapping a contact's profile picture opens it full screen, uncropped and zoomable, fetched larger from the homeserver's thumbnail API · https://github.com/bostrot/sennit/pull/48
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
