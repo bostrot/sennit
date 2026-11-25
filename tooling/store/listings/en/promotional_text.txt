@@ -1,0 +1,1 @@
+Every chat network in one encrypted inbox on your own Matrix server. Open source, no tracking, and AI that runs on hardware you control.

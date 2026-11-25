@@ -1,0 +1,44 @@
+name: Store listings
+
+# Puts the listings in tooling/store/listings/ and the screenshots in
+# tooling/store/screenshots/ into Google Play and App Store Connect, with the
+# credentials the deploy workflows already use. Run by hand; leave "apply" off
+# to see what would change. Nothing is released or submitted for review.
+
+on:
+  workflow_dispatch:
+    inputs:
+      store:
+        description: Which store
+        type: choice
+        options: [all, play, appstore]
+        default: all
+      screenshots:
+        description: Replace the screenshots too
+        type: boolean
+        default: false
+      apply:
+        description: Change the stores (off = report only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  listings:
+    name: Store listings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check, and change when asked
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+          PLAY_CHANGES_NOT_SENT_FOR_REVIEW: ${{ vars.PLAY_CHANGES_NOT_SENT_FOR_REVIEW }}
+          STORE: ${{ inputs.store }}
+          SCREENSHOTS: ${{ inputs.screenshots && '--screenshots' || '' }}
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+        run: python3 tooling/store/listings.py "$STORE" $SCREENSHOTS $APPLY

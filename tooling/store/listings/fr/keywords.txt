@@ -1,0 +1,1 @@
+matrix,passerelle,privé,chat,chiffré,e2ee,open source,auto-hébergé,ia locale,confidentialité,sms

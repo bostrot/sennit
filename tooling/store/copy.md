@@ -5,71 +5,44 @@ noted where they matter. Trademarked network names appear only in
 descriptions (nominative use), never in the Apple keyword field — Apple
 rejects other brands as keywords outright.
 
-## Names
+## Listing text
 
-| Field | Value | Limit |
+The text of both stores lives in [`listings/`](listings/), one folder per
+language (`en`, `de`, `es`, `fr`, `pt`, `zh`, `hi`, `ar`) and one plain-text
+file per field, with English as the source. `listings.py` checks every field
+against its store's limit and sends it (dry run by default; the
+**Store listings** workflow runs it with the repository's credentials):
+
+```
+python3 tooling/store/listings.py all --screenshots --apply
+```
+
+| File | Store field | Limit |
 |---|---|---|
-| Apple app name | `Sennit Messenger` | 30 |
-| Apple subtitle | `Self-hosted unified inbox` | 30 |
-| Play title | `Sennit — Self-hosted Messenger` | 30 |
-| Play short description | `One private inbox for every chat, on your own Matrix server and bridges.` | 80 |
+| `name.txt` | Apple app name | 30 |
+| `subtitle.txt` | Apple subtitle | 30 |
+| `title.txt` | Play title | 30 |
+| `short_description.txt` | Play short description | 80 |
+| `description.txt` | both stores' description | 4000 |
+| `keywords.txt` | Apple keywords, comma-separated | 100 |
+| `promotional_text.txt` | Apple promotional text, changeable without review | 170 |
 
-## Apple keywords (100 chars max, comma-separated)
+When changing the English, change every language in the same pull request,
+as with the app's own strings. Write each one natively rather than word for
+word, with the terms the app's catalogue uses (bridges, merged chats,
+disappearing messages), and keep it true: the AI features, semantic search,
+transcription, MCP server and integrations are Sennit Pro.
 
-```
-matrix,unified,inbox,bridge,self-hosted,private,chat,messaging,encrypted,federated,transcribe
-```
+## Screenshots
 
-## Description (both stores)
-
-**One inbox. Your server. Nobody in between.**
-
-Sennit weaves every conversation you have — across networks like WhatsApp,
-Signal, Telegram, Google Messages, Mattermost, SMS and Matrix — into a
-single private inbox. It connects to a Matrix homeserver that you run,
-through bridges that you control. No hosted middleman, no account with us,
-no message that ever touches our infrastructure. We couldn't read your
-messages if we wanted to: there is no "us" in the loop.
-
-MERGED CONVERSATIONS
-The same person on three networks becomes one thread. Replies go out on the
-network the last message arrived on — or the one you pin. Automatic merging
-only happens for exact matches; everything else is a suggestion you decide.
-
-PRIVATE BY ARCHITECTURE
-• End-to-end encryption via Matrix, with device verification and key backup
-• On-device voice transcription — audio never leaves your hardware
-• On-device semantic search across your whole history
-• Optional AI reply suggestions from a language model you host yourself
-• No analytics, no telemetry, no tracking. None.
-
-BUILT FOR REAL LIFE
-• Reliable notifications without Google, through your own sync connection
-  or UnifiedPush
-• Calendar invites you can accept, decline or counter-propose inside chats
-• Voice messages, polls, location sharing, scheduled sending, reminders
-• Home screen widgets and a watch companion
-• Desktop-class experience on tablets
-
-BRING YOUR OWN SERVER
-Sennit is the client. You bring a Matrix homeserver and the bridges for the
-networks you use (mautrix bridges are the reference setup). The app
-discovers your bridges and walks you through connecting each network, QR
-logins included. Setting up a homeserver takes some technical comfort —
-that independence is the entire point.
-
-Sennit is open source under the AGPL-3.0 license.
-
-*Sennit is not affiliated with the third-party networks reachable through
-bridges. Bridging automates your own accounts on those networks; whether
-their terms permit it is between you and them.*
-
-## Promotional text (Apple, 170 chars, changeable without review)
-
-```
-Self-hosted, open source, and yours: every chat network in one encrypted
-inbox on your own Matrix server. No cloud between you and your messages.
-```
+`tooling/store/screenshots/<language>/` holds one set per listing language,
+rendered from the demo fixtures by
+`flutter test test/tools/marketing_screenshots_test.dart` (from `apps/weft`,
+on a Mac, which supplies the emoji, Chinese, Devanagari and Arabic faces).
+The chats are translated in that test; the app's own words come from its
+catalogues, and Arabic is drawn right to left. `play_*` are Play's 9:16 phone
+and 16:9 tablet shots, `iphone_69_*` and `ipad_13_*` Apple's 6.9" iPhone and
+13" iPad sizes.
 
 ## URLs
 

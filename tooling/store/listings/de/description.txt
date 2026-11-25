@@ -1,0 +1,34 @@
+Ein Posteingang. Dein Server. Niemand dazwischen.
+
+Sennit bringt alle deine Chats in einen privaten Posteingang. Die App ist ein Matrix-Client, gebaut für Bridges: Verbinde sie mit einem Homeserver, den du selbst betreibst, und den Bridges deiner Wahl, und Unterhaltungen aus Netzwerken wie WhatsApp, Signal, Telegram, Google Messages, Mattermost, SMS und Matrix landen in einer einzigen Liste. Kein Vermittler, kein Sennit-Konto, und keine Nachricht läuft über unsere Server. Wir betreiben gar keine.
+
+EINE PERSON, EIN VERLAUF
+Dieselbe Person in drei Netzwerken wird zu einer Unterhaltung. Antworten gehen über das Netzwerk, aus dem die letzte Nachricht kam, oder über das, das du wählst. Von selbst zusammengeführt wird nur bei exakter Übereinstimmung; alles andere ist ein Vorschlag, über den du entscheidest.
+
+PRIVAT VON GRUND AUF
+• Ende-zu-Ende-Verschlüsselung über Matrix, mit Geräteverifizierung, Cross-Signing und Schlüssel-Backup
+• Selbstlöschende Nachrichten, pro Unterhaltung einstellbar
+• Lesebestätigungen, Tippanzeige und Online-Status, jeweils einzeln abschaltbar
+• Keine Analyse, kein Tracking, keine Werbung
+• Open Source unter der AGPL-3.0: jede Zeile ist öffentlich
+
+DEINE EIGENE KI (SENNIT PRO)
+• Antwortvorschläge und Schnellnachrichten von einem Sprachmodell, das du selbst hostest: jeder Server mit OpenAI-kompatibler API, etwa Ollama oder llama.cpp
+• Sprachtranskription und semantische Suche auf dem Gerät, damit Audio und Nachrichten auf deiner Hardware bleiben, oder auf Endpunkten, die du betreibst
+• Ein eingebauter MCP-Server, über den deine eigenen Agenten suchen und senden können, begrenzt durch API-Schlüssel mit festen Rechten
+• Integrationen für Home Assistant, paperless-ngx und geteilte Kalender
+
+MESSAGING FÜR JEDEN TAG, KOSTENLOS
+• Anrufe, Sprachnachrichten, Fotos und Videos, Umfragen, Standort teilen
+• Zeitversetztes Senden und Erinnerungen
+• Kalendereinladungen direkt im Chat annehmen, ablehnen oder verschieben
+• Auf Android: Benachrichtigungen ohne Google-Dienste, über deine eigene Sync-Verbindung oder UnifiedPush
+• Widgets für den Startbildschirm, eine Smartwatch-App und eine zweispaltige Tablet-Ansicht
+• Verschlüsselte Sicherungen
+
+DEIN SERVER, DEINE BRIDGES
+Sennit ist die App; den Matrix-Homeserver und die Bridges für deine Netzwerke bringst du mit (mautrix-Bridges sind das Referenz-Setup). Sennit findet deine Bridges und führt dich durch die Verbindung jedes Netzwerks, Anmeldung per QR-Code inklusive. Einen Homeserver zu betreiben braucht etwas technisches Geschick, und genau diese Unabhängigkeit ist der Sinn der Sache.
+
+Chatten ist kostenlos. Sennit Pro ist ein einmaliger In-App-Kauf, kein Abo, und schaltet die KI-Funktionen, die semantische Suche, die Transkription, den MCP-Server und die Integrationen frei.
+
+Sennit steht in keiner Verbindung zu den Netzwerken, die über Bridges erreichbar sind. Eine Bridge automatisiert deine eigenen Konten; ob die Bedingungen eines Netzwerks das erlauben, klärst du mit dem jeweiligen Netzwerk.

@@ -1,0 +1,1 @@
+matrix,puente,bridge,privado,chat,cifrado,e2ee,código abierto,autoalojado,ia local,privacidad,sms

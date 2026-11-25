@@ -1,0 +1,1 @@
+Todas as suas redes de chat numa caixa criptografada no seu próprio servidor Matrix. Código aberto, sem rastreamento e com IA no hardware que é seu.
