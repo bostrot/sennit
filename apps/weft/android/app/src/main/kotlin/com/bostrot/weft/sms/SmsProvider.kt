@@ -6,7 +6,10 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.Telephony
+import android.telephony.PhoneNumberUtils
+import android.telephony.TelephonyManager
 import android.util.Log
+import java.util.Locale
 
 /// The system SMS/MMS provider, read and written.
 ///
@@ -60,6 +63,7 @@ object SmsProvider {
             .build()
         val addresses = canonicalAddresses(context)
         val unread = unreadCounts(context)
+        val region = deviceRegion(context)
         val threads = mutableListOf<Map<String, Any?>>()
 
         query(
@@ -80,6 +84,7 @@ object SmsProvider {
                 threads += mapOf(
                     "id" to id.toString(),
                     "addresses" to recipients,
+                    "e164" to e164Of(recipients, region),
                     "snippet" to cursor.stringOrNull(Telephony.Threads.SNIPPET),
                     "unreadCount" to (unread[id.toString()] ?: 0),
                     "lastMessageAt" to cursor.longOrNull(Telephony.Threads.DATE),
@@ -253,6 +258,38 @@ object SmsProvider {
             Log.w(TAG, "could not write to $target", e)
             null
         }
+    }
+
+    /// The country national-format numbers on this phone were dialled in.
+    ///
+    /// The SIM's first, because that is the network the number was typed for;
+    /// then the network the phone is on; then the locale, which is a guess
+    /// but only ever used to *format* a number, never to merge one.
+    private fun deviceRegion(context: Context): String? {
+        val telephony = context.getSystemService(TelephonyManager::class.java)
+        return listOfNotNull(
+            telephony?.simCountryIso,
+            telephony?.networkCountryIso,
+            Locale.getDefault().country,
+        ).firstOrNull { it.isNotBlank() }?.uppercase(Locale.ROOT)
+    }
+
+    /// Each address Android's libphonenumber can read as a full number, in
+    /// E.164. Alphanumeric senders and short codes are left out.
+    private fun e164Of(addresses: List<String>, region: String?): Map<String, String> {
+        if (region == null) return emptyMap()
+        val out = mutableMapOf<String, String>()
+        for (address in addresses) {
+            val digits = address.count { it.isDigit() }
+            if (digits < 7) continue
+            val e164 = try {
+                PhoneNumberUtils.formatNumberToE164(address, region)
+            } catch (error: RuntimeException) {
+                null
+            }
+            if (e164 != null) out[address] = e164
+        }
+        return out
     }
 
     /// `canonical_address._id` → the number it holds.

@@ -78,7 +78,7 @@ class _NoRoomsRepository implements ChatRepository {
   ) => _inner.answerChatRequest(chatId, action);
 
   @override
-  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+  void setDeviceContacts(ContactBook contacts) {}
 
   @override
   String? avatarUrlFor(String userId, {String? roomId}) => null;

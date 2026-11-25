@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/data/sms_chat_repository.dart';
+import 'package:weft/services/contacts/contact_book.dart';
 import 'package:weft/services/sms/sms_platform.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
@@ -467,6 +468,120 @@ void main() {
 
       expect(platform.arguments['markThreadRead'], {'threadId': '7'});
       expect(sms.chats.single.unreadCount, 0);
+    });
+  });
+
+  group('contacts', () {
+    /// An address book in the formats people actually save numbers in.
+    final book = ContactBook.fromEntries([
+      (name: 'Anna', photoPath: '/c/anna.jpg', numbers: ['07700 900123']),
+      (name: 'Ben', photoPath: null, numbers: ['+44 7700-900456']),
+      (name: 'Bank', photoPath: null, numbers: ['22020']),
+    ]);
+
+    test('threads read before contacts are renamed once they arrive', () async {
+      platform.threads = [
+        smsThreadRow(id: '1', addresses: const ['+447700900123']),
+        smsThreadRow(id: '2', addresses: const ['07700 900456']),
+        smsThreadRow(id: '3', addresses: const ['22020']),
+        smsThreadRow(id: '4', addresses: const ['+447700900999']),
+      ];
+      await start();
+      expect(sms.chats.map((c) => c.title), contains('+447700900123'));
+
+      var emitted = 0;
+      final sub = sms.updates.listen((_) => emitted++);
+      sms.setContacts(book);
+      await Future<void>.delayed(Duration.zero);
+      await sub.cancel();
+
+      expect(emitted, 1);
+      final byId = {for (final c in sms.chats) c.id: c};
+      expect(byId['sms:thread:1']?.title, 'Anna');
+      expect(byId['sms:thread:1']?.avatarUrl, 'file:///c/anna.jpg');
+      expect(byId['sms:thread:2']?.title, 'Ben');
+      expect(byId['sms:thread:3']?.title, 'Bank');
+      // A stranger stays a number.
+      expect(byId['sms:thread:4']?.title, '+447700900999');
+      expect(byId['sms:thread:4']?.avatarUrl, isNull);
+      // The inbox preview speaks with the same name.
+      expect(byId['sms:thread:1']?.lastMessage?.senderName, 'Anna');
+    });
+
+    test('turning contacts off brings the numbers back', () async {
+      platform.threads = [
+        smsThreadRow(addresses: const ['+447700900123']),
+      ];
+      await start();
+      sms.setContacts(book);
+      expect(sms.chats.single.title, 'Anna');
+
+      sms.setContacts(ContactBook.empty);
+
+      expect(sms.chats.single.title, '+447700900123');
+    });
+
+    test('a group is named by its members', () async {
+      platform.threads = [
+        smsThreadRow(
+          addresses: const ['+447700900123', '+447700900456', '+447700900999'],
+        ),
+      ];
+      await start();
+      sms.setContacts(book);
+
+      expect(sms.chats.single.title, 'Anna, Ben, +447700900999');
+      expect(sms.chats.single.avatarUrl, isNull);
+    });
+
+    test('received messages carry the contact name', () async {
+      platform.threads = [
+        smsThreadRow(addresses: const ['+447700900123']),
+      ];
+      platform.messages = [smsRow(id: '11', address: '+447700900123')];
+      await start();
+      sms.setContacts(book);
+
+      final timeline = await sms.openTimeline('sms:thread:7');
+      await timeline!.loadMore();
+
+      expect(timeline.loaded.single.senderName, 'Anna');
+    });
+
+    test('the platform E.164 makes a national thread merge evidence', () async {
+      // No region on the parser: on its own `07700 900123` names nobody. The
+      // platform read it against the SIM's country.
+      platform.threads = [
+        smsThreadRow(
+          addresses: const ['07700 900123'],
+          e164: const {'07700 900123': '+447700900123'},
+        ),
+      ];
+      await start(parser: const PhoneNumberParser());
+      sms.setContacts(book);
+
+      final handle = sms.handles.single;
+      expect(handle.phoneE164, '+447700900123');
+      expect(handle.displayName, 'Anna');
+      expect(handle.avatarUrl, 'file:///c/anna.jpg');
+      expect(sms.chats.single.sources.single.handleId, 'sms:+447700900123');
+
+      final graph = IdentityGraph(
+        handles: const [
+          NetworkHandle(
+            id: 'wa-anna',
+            network: ChatNetwork.whatsapp,
+            remoteId: '447700900123',
+            matrixUserId: '@whatsapp_447700900123:example.org',
+            roomId: '!wa:example.org',
+            phoneE164: '+447700900123',
+          ),
+        ],
+      );
+      for (final handle in sms.handles) {
+        graph.upsertHandle(handle);
+      }
+      expect(graph.suggestions(), hasLength(1));
     });
   });
 }

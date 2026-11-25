@@ -177,9 +177,11 @@ Map<String, Object?> smsThreadRow({
   int unreadCount = 0,
   int lastMessageAt = 1700000000000,
   bool archived = false,
+  Map<String, String> e164 = const {},
 }) => {
   'id': id,
   'addresses': addresses,
+  'e164': e164,
   'title': title,
   'snippet': snippet,
   'unreadCount': unreadCount,

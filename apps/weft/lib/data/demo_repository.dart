@@ -131,7 +131,7 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
-  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+  void setDeviceContacts(ContactBook contacts) {}
 
   @override
   String? avatarUrlFor(String userId, {String? roomId}) => null;

@@ -99,11 +99,11 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
 
   Future<void> _enableContactNames() async {
     final settings = _settings;
-    final names = await loadDeviceContactNames();
-    if (names == null || settings == null) return;
-    settings.setJson(kContactNamesCacheKey, names);
-    settings.setBool(WeftSettings.useDeviceContactNames, value: true);
-    ref.read(settingsRevisionProvider.notifier).bump();
+    if (settings == null) return;
+    await enableDeviceContacts(
+      settings,
+      onChanged: ref.read(settingsRevisionProvider.notifier).bump,
+    );
   }
 
   Future<void> _advance({required bool granted}) async {

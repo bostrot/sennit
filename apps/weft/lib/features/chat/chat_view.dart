@@ -49,6 +49,7 @@ import '../../services/audio/voice_recorder.dart';
 import '../../services/attachments/clipboard_images.dart';
 import '../../services/notifications/open_chats.dart';
 import '../../services/schedule/scheduled_actions.dart';
+import '../settings/contacts_access.dart' show SmsContactsBanner;
 import '../settings/endpoints_screen.dart';
 import '../settings/integrations_screen.dart';
 import '../settings/pro_screen.dart';
@@ -2175,6 +2176,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
                   ).select((trust) => trust.value ?? RoomTrust.none),
                 ),
                 onVerify: _verifyOwnDevice,
+              ),
+              SmsContactsBanner(
+                visible: chat.networks.contains(ChatNetwork.sms),
               ),
               Expanded(
                 child: FocusTraversalOrder(

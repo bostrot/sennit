@@ -222,6 +222,7 @@ class SmsThread {
     this.unreadCount = 0,
     this.lastMessageAt,
     this.archived = false,
+    this.e164 = const {},
   });
 
   /// The provider's `thread_id`.
@@ -242,6 +243,17 @@ class SmsThread {
   final int unreadCount;
   final DateTime? lastMessageAt;
   final bool archived;
+
+  /// Each address the platform could read as a full number, in E.164.
+  ///
+  /// Android formats these with its own copy of libphonenumber against the
+  /// SIM's country, which is the region `0151 1234567` was dialled in. Kept
+  /// beside [addresses] rather than replacing them: a reply goes to the number
+  /// as the provider stored it, and the provider files it by that spelling.
+  final Map<String, String> e164;
+
+  /// [address] in E.164 when the platform knew it, else as stored.
+  String normalizedAddress(String address) => e164[address] ?? address;
 
   bool get isGroup => addresses.length > 1;
 
@@ -281,7 +293,8 @@ class SmsThread {
       other.snippet == snippet &&
       other.unreadCount == unreadCount &&
       other.archived == archived &&
-      const ListEquality<String>().equals(other.addresses, addresses);
+      const ListEquality<String>().equals(other.addresses, addresses) &&
+      const MapEquality<String, String>().equals(other.e164, e164);
 
   @override
   int get hashCode => Object.hash(

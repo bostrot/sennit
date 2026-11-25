@@ -261,7 +261,7 @@ class RemoteChatRepository implements ChatRepository {
 
   /// Names from an address book belong to the device that has one.
   @override
-  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+  void setDeviceContacts(ContactBook contacts) {}
 
   // --------------------------------------------------------------- acting
 

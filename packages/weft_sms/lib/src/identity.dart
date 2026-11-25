@@ -67,7 +67,7 @@ List<NetworkHandle> linkSmsThreadIdentities(
   return thread.addresses
       .map(
         (address) => linkSmsIdentity(
-          address,
+          thread.normalizedAddress(address),
           parser: parser,
           threadId: thread.id,
           // A group thread's title names the group, not the member, so it is

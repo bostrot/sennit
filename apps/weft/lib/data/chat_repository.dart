@@ -6,6 +6,10 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
+import '../services/contacts/contact_book.dart';
+
+export '../services/contacts/contact_book.dart' show ContactBook, DeviceContact;
+
 /// Everything the inbox and chat UI need from the world below them.
 ///
 /// The UI is written against this interface rather than against the Matrix SDK,
@@ -134,10 +138,10 @@ abstract class ChatRepository {
     String chatId,
   ) => const [];
 
-  /// Address-book names by phone digits, applied on top of whatever the
-  /// bridges call people. Set by the app when the user opts in; an empty map
-  /// turns the preference back off.
-  void setContactNameOverrides(Map<String, String> namesByPhoneDigits) {}
+  /// The address book, whose names and photos go on top of whatever the
+  /// bridges and the SMS provider call people. Set by the app when the user
+  /// opts in; [ContactBook.empty] turns the preference back off.
+  void setDeviceContacts(ContactBook contacts) {}
 
   /// Opens (or finds) a direct conversation with a Matrix user and returns
   /// its chat id, or null when this repository cannot create rooms.
