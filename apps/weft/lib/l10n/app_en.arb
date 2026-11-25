@@ -36,6 +36,44 @@
   "@settingsMergedChatsSubtitle": {
     "description": "One-line subtitle under 'Merged chats'. Explains the feature; may wrap to two lines on a phone, so keep under ~60 chars."
   },
+  "settingsScheduledTitle": "Scheduled messages",
+  "@settingsScheduledTitle": {
+    "description": "Settings row opening the list of scheduled messages and reminders. Keep under ~28 chars.",
+    "maxLength": 36
+  },
+  "settingsScheduledSubtitle": "Messages to send later, and your reminders",
+  "@settingsScheduledSubtitle": {
+    "description": "Subtitle of the settings row for scheduled messages: what the list holds. Keep short."
+  },
+  "scheduledTitle": "Scheduled",
+  "@scheduledTitle": {
+    "description": "Title of the screen listing scheduled messages and reminders. Keep under ~20 chars.",
+    "maxLength": 28
+  },
+  "scheduledMessagesHeader": "Send later",
+  "@scheduledMessagesHeader": {
+    "description": "Section header on the scheduled screen above messages waiting to be sent. Same wording as the 'Send later' action. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "scheduledRemindersHeader": "Reminders",
+  "@scheduledRemindersHeader": {
+    "description": "Section header on the scheduled screen above reminders the user set on messages. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "scheduledEmpty": "Nothing scheduled. Long-press Send to send a message later, or choose Remind me on a message.",
+  "@scheduledEmpty": {
+    "description": "Shown on the scheduled screen when nothing is waiting. Says how to schedule a message (long-press Send) and set a reminder (Remind me in a message's menu)."
+  },
+  "scheduledEditText": "Edit text",
+  "@scheduledEditText": {
+    "description": "Menu item and dialog title: change the text of a scheduled message. Keep under ~20 chars.",
+    "maxLength": 28
+  },
+  "scheduledChangeTime": "Change time",
+  "@scheduledChangeTime": {
+    "description": "Menu item: move a scheduled message or reminder to another time. Keep under ~20 chars.",
+    "maxLength": 28
+  },
   "settingsBridgesTitle": "Messengers",
   "@settingsBridgesTitle": {
     "description": "Title of a settings row that opens the bridges screen. A 'bridge' is server software that relays another messenger (WhatsApp, Signal) into Matrix. Keep the established Matrix term for the language if there is one. Under ~20 chars."

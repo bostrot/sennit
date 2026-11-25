@@ -35,6 +35,18 @@ class ScheduledMessage {
 
   DateTime get dueAt => DateTime.fromMillisecondsSinceEpoch(dueAtMs);
 
+  /// The same message with new words or a new time — what editing it in the
+  /// overview writes back.
+  ScheduledMessage copyWith({String? body, DateTime? dueAt}) =>
+      ScheduledMessage(
+        id: id,
+        chatId: chatId,
+        chatTitle: chatTitle,
+        body: body ?? this.body,
+        dueAtMs: dueAt?.millisecondsSinceEpoch ?? dueAtMs,
+        networkId: networkId,
+      );
+
   Map<String, Object?> toJson() => {
     'id': id,
     'chatId': chatId,
@@ -120,6 +132,15 @@ class MessageScheduler extends Notifier<List<ScheduledMessage>> {
     _persist();
   }
 
+  /// Puts an edited [message] in place of the one with its id. A message that
+  /// sent in the meantime is gone and stays gone.
+  void replace(ScheduledMessage message) {
+    if (!state.any((m) => m.id == message.id)) return;
+    _attempts.remove(message.id);
+    state = [for (final m in state) m.id == message.id ? message : m];
+    _persist();
+  }
+
   Future<void> _tick() async {
     final now = DateTime.now();
     final due = [
@@ -175,6 +196,12 @@ class ReminderScheduler {
   final FlutterLocalNotificationsPlugin _plugin;
   static var _tzReady = false;
 
+  /// The id a reminder for [chatId] at [at] is posted under.
+  ///
+  /// Stable per chat+time so re-scheduling the same reminder replaces it.
+  static int idFor(String chatId, DateTime at) =>
+      Object.hash(chatId, at.millisecondsSinceEpoch) & 0x7fffffff;
+
   Future<void> remind({
     required String chatId,
     required String title,
@@ -190,8 +217,7 @@ class ReminderScheduler {
     final when = tz.TZDateTime.now(tz.UTC).add(delay);
 
     await _plugin.zonedSchedule(
-      // Stable per chat+time so re-scheduling the same reminder replaces it.
-      id: Object.hash(chatId, at.millisecondsSinceEpoch) & 0x7fffffff,
+      id: idFor(chatId, at),
       title: title,
       body: body,
       scheduledDate: when,
@@ -215,8 +241,141 @@ class ReminderScheduler {
       payload: 'weft://chat/${Uri.encodeComponent(chatId)}',
     );
   }
+
+  /// Takes back a reminder that has not fired yet.
+  Future<void> cancel(int id) => _plugin.cancel(id: id);
+}
+
+/// A reminder the user asked for and that has not come due yet.
+@immutable
+class PendingReminder {
+  const PendingReminder({
+    required this.chatId,
+    required this.chatTitle,
+    required this.title,
+    required this.body,
+    required this.dueAtMs,
+  });
+
+  final String chatId;
+
+  /// For the overview: the notification title names the sender, not the chat.
+  final String chatTitle;
+
+  /// What the notification will say.
+  final String title;
+  final String body;
+  final int dueAtMs;
+
+  DateTime get dueAt => DateTime.fromMillisecondsSinceEpoch(dueAtMs);
+
+  /// The OS notification it is scheduled as.
+  int get id => ReminderScheduler.idFor(chatId, dueAt);
+
+  PendingReminder at(DateTime when) => PendingReminder(
+    chatId: chatId,
+    chatTitle: chatTitle,
+    title: title,
+    body: body,
+    dueAtMs: when.millisecondsSinceEpoch,
+  );
+
+  Map<String, Object?> toJson() => {
+    'chatId': chatId,
+    'chatTitle': chatTitle,
+    'title': title,
+    'body': body,
+    'dueAtMs': dueAtMs,
+  };
+
+  static PendingReminder? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final chatId = raw['chatId'];
+    final title = raw['title'];
+    final body = raw['body'];
+    final dueAtMs = raw['dueAtMs'];
+    if (chatId is! String || title is! String || body is! String) return null;
+    if (dueAtMs is! int) return null;
+    return PendingReminder(
+      chatId: chatId,
+      chatTitle: raw['chatTitle'] is String ? raw['chatTitle'] as String : '',
+      title: title,
+      body: body,
+      dueAtMs: dueAtMs,
+    );
+  }
+}
+
+/// The reminders still to come, so they can be listed, moved and taken back.
+///
+/// The OS holds the reminder itself and fires it with the app closed; this is
+/// the app's own note of what it asked for, because the OS will not list an
+/// app's pending notifications back on every platform. Entries whose time has
+/// passed are dropped when read: by then the reminder has fired.
+class ReminderList extends Notifier<List<PendingReminder>> {
+  static const _key = 'schedule.reminders';
+
+  @override
+  List<PendingReminder> build() {
+    final json = storesOrNull(ref)?.settings.getJson(_key);
+    final list = json?['pending'];
+    if (list is! List) return const [];
+    final now = DateTime.now();
+    return [
+      for (final entry in list)
+        if (PendingReminder.fromJson(entry) case final reminder?
+            when reminder.dueAt.isAfter(now))
+          reminder,
+    ];
+  }
+
+  /// Schedules [reminder] with the OS and notes it.
+  Future<void> add(PendingReminder reminder) async {
+    await ref
+        .read(reminderSchedulerProvider)
+        .remind(
+          chatId: reminder.chatId,
+          title: reminder.title,
+          body: reminder.body,
+          at: reminder.dueAt,
+        );
+    state = [
+      for (final r in state)
+        if (r.id != reminder.id) r,
+      reminder,
+    ];
+    _persist();
+  }
+
+  /// Moves [reminder] to [when].
+  Future<void> reschedule(PendingReminder reminder, DateTime when) async {
+    await cancel(reminder);
+    await add(reminder.at(when));
+  }
+
+  Future<void> cancel(PendingReminder reminder) async {
+    await ref.read(reminderSchedulerProvider).cancel(reminder.id);
+    state = [
+      for (final r in state)
+        if (r.id != reminder.id) r,
+    ];
+    _persist();
+  }
+
+  void _persist() {
+    final now = DateTime.now();
+    storesOrNull(ref)?.settings.setJson(_key, {
+      'pending': [
+        for (final r in state)
+          if (r.dueAt.isAfter(now)) r.toJson(),
+      ],
+    });
+  }
 }
 
 final reminderSchedulerProvider = Provider<ReminderScheduler>(
   (ref) => ReminderScheduler(),
 );
+
+final reminderListProvider =
+    NotifierProvider<ReminderList, List<PendingReminder>>(ReminderList.new);
