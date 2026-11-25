@@ -147,6 +147,7 @@
   "inboxFilterGroups": "Gruppen",
   "inboxFilterPeople": "Personen",
   "inboxFilterNeedsReply": "Antwort offen",
+  "inboxFilterDrafts": "Entwürfe",
   "inboxFilterArchived": "Archiviert",
   "inboxClearNetworkFilter": "Netzwerkfilter aufheben",
   "inboxSearchAll": "Alle Unterhaltungen durchsuchen",

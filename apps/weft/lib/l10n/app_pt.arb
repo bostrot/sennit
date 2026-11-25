@@ -148,6 +148,7 @@
   "inboxFilterGroups": "Grupos",
   "inboxFilterPeople": "Pessoas",
   "inboxFilterNeedsReply": "Para responder",
+  "inboxFilterDrafts": "Rascunhos",
   "inboxFilterArchived": "Arquivadas",
   "inboxClearNetworkFilter": "Limpar filtro de rede",
   "inboxSearchAll": "Buscar em todas as conversas",

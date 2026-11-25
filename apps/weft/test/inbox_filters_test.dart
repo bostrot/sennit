@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/draft_providers.dart';
 import 'package:weft/app/providers.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -7,7 +8,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'support/attachment_fixtures.dart';
 
 /// The inbox's quick filters beyond unread, groups and people: the chats
-/// waiting on an answer, and the archive narrowed to the networks picked.
+/// waiting on an answer, the ones with a draft, and the archive narrowed to the networks picked.
 void main() {
   WeftMessage message({
     bool isOwn = false,
@@ -130,6 +131,15 @@ void main() {
           .read(inboxQuickFilterProvider.notifier)
           .toggle(InboxQuickFilter.needsReply);
       expect(visible(), ['!waiting']);
+    });
+
+    test('drafts keeps only the chats with something half-written', () {
+      stores.settings.setString('${DraftsNotifier.prefix}!answered', 'See y');
+      container.read(draftsProvider.notifier).reload();
+      container
+          .read(inboxQuickFilterProvider.notifier)
+          .toggle(InboxQuickFilter.drafts);
+      expect(visible(), ['!answered']);
     });
 
     test('the archive narrows to the network picked', () {

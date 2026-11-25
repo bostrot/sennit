@@ -300,6 +300,11 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
             context.l10n.inboxFilterNeedsReply,
             Icons.reply_rounded,
           ),
+          (
+            InboxQuickFilter.drafts,
+            context.l10n.inboxFilterDrafts,
+            Icons.edit_note_rounded,
+          ),
         ])
           MacSidebarRow(
             icon: icon,
@@ -412,6 +417,7 @@ class _MacInboxShellState extends ConsumerState<MacInboxShell> {
       (_, InboxQuickFilter.groups, _) => context.l10n.inboxFilterGroups,
       (_, InboxQuickFilter.people, _) => context.l10n.inboxFilterPeople,
       (_, InboxQuickFilter.needsReply, _) => context.l10n.inboxFilterNeedsReply,
+      (_, InboxQuickFilter.drafts, _) => context.l10n.inboxFilterDrafts,
       (_, _, false) => networks.map((n) => n.label).join(' · '),
       // Short on purpose. The pane is 300pt wide and shares its toolbar with a
       // search field and two buttons; "All conversations" truncates to "All

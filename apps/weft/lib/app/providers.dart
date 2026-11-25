@@ -19,6 +19,7 @@ import '../services/sms/sms_platform.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../services/status/status_feed.dart';
+import 'draft_providers.dart';
 import 'labels.dart';
 import 'nickname_providers.dart';
 import 'session_providers.dart';
@@ -523,9 +524,10 @@ final hiddenFromAllProvider =
     );
 
 /// One-tap slices of the inbox: just what's unread, just the groups, just
-/// the one-on-ones, just the ones waiting on an answer. A second tap on the
+/// the one-on-ones, just the ones waiting on an answer, just the ones with
+/// something half-written. A second tap on the
 /// active chip turns it back off.
-enum InboxQuickFilter { unread, groups, people, needsReply }
+enum InboxQuickFilter { unread, groups, people, needsReply, drafts }
 
 /// Whether someone in [chat] spoke last and is waiting on the user.
 ///
@@ -576,6 +578,9 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
       ? null
       : ref.watch(statusChatProvider)?.id;
   final quick = ref.watch(inboxQuickFilterProvider);
+  final drafts = quick == InboxQuickFilter.drafts
+      ? ref.watch(draftsProvider)
+      : const <String, String>{};
   // A network hidden from "All" only appears when the rail filter names it
   // (alone or with others) — the combined view stays clean, the door stays
   // one tap away. A merged chat with any visible leg is not hidden: hiding
@@ -606,6 +611,9 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
                 InboxQuickFilter.groups => c.isGroup,
                 InboxQuickFilter.people => !c.isGroup,
                 InboxQuickFilter.needsReply => needsReply(c),
+                // Kept per room as well as per merged chat; any will do.
+                InboxQuickFilter.drafts =>
+                  drafts.containsKey(c.id) || c.roomIds.any(drafts.containsKey),
               },
         )
         .toList(),

@@ -147,6 +147,7 @@
   "inboxFilterGroups": "ग्रुप",
   "inboxFilterPeople": "लोग",
   "inboxFilterNeedsReply": "जवाब बाकी",
+  "inboxFilterDrafts": "ड्राफ़्ट",
   "inboxFilterArchived": "आर्काइव",
   "inboxClearNetworkFilter": "नेटवर्क फ़िल्टर हटाएँ",
   "inboxSearchAll": "सभी बातचीत में खोजें",

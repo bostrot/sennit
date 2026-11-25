@@ -147,6 +147,7 @@
   "inboxFilterGroups": "مجموعات",
   "inboxFilterPeople": "أشخاص",
   "inboxFilterNeedsReply": "بانتظار ردك",
+  "inboxFilterDrafts": "المسودات",
   "inboxFilterArchived": "المؤرشفة",
   "inboxClearNetworkFilter": "مسح فلتر الشبكة",
   "inboxSearchAll": "البحث في كل المحادثات",

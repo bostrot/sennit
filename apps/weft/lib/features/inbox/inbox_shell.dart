@@ -1014,6 +1014,7 @@ class _FilterRows extends ConsumerWidget {
                     InboxQuickFilter.needsReply,
                     context.l10n.inboxFilterNeedsReply,
                   ),
+                  (InboxQuickFilter.drafts, context.l10n.inboxFilterDrafts),
                 ]) ...[
                   FilterChip(
                     label: Text(label),
