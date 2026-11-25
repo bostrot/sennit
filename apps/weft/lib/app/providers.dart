@@ -12,6 +12,7 @@ import 'package:weft_sms/weft_sms.dart';
 import '../data/chat_repository.dart';
 import '../data/demo_repository.dart';
 import '../data/matrix_chat_repository.dart';
+import '../data/send_queue_source.dart';
 import '../data/sms_chat_repository.dart';
 import '../services/background/background_work.dart';
 import '../services/sms/sms_platform.dart';
@@ -300,6 +301,23 @@ final chatUploadsProvider = StreamProvider.family<List<UploadTask>, String>((
   chatId,
 ) {
   return ref.watch(chatRepositoryProvider).watchUploads(chatId);
+});
+
+/// Why each failed message did not leave, by its event id.
+///
+/// Empty for a repository with no send queue to report on — the demo, Sennit
+/// Web — where a failed message simply says "Not sent".
+final sendFailuresProvider = StreamProvider<Map<String, SendFailure>>((
+  ref,
+) async* {
+  final repo = ref.watch(chatRepositoryProvider);
+  if (repo is! SendQueueSource) {
+    yield const {};
+    return;
+  }
+  final queue = repo as SendQueueSource;
+  yield queue.sendFailures;
+  yield* queue.sendFailureChanges;
 });
 
 /// Reads a picked file's bytes.

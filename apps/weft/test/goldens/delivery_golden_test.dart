@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/data/demo_repository.dart';
+import 'package:weft/data/send_queue_source.dart';
 import 'package:weft/features/chat/chat_view.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -77,6 +78,7 @@ void main() {
     WidgetTester tester,
     String name, {
     bool readReceipts = true,
+    Map<String, SendFailure> sendFailures = const {},
   }) async {
     for (final (mode, variant, suffix) in [
       (WeftThemeMode.dark, weftGoldenBaseline, 'dark'),
@@ -94,7 +96,12 @@ void main() {
       await pumpWeft(
         tester,
         const ChatView(chatId: 'seeded:chat'),
-        repository: _ReadUpTo(demo, messages: everyState(), readUpTo: r'$read'),
+        repository: _ReadUpTo(
+          demo,
+          messages: everyState(),
+          readUpTo: r'$read',
+          sendFailures: sendFailures,
+        ),
         size: const Size(560, 900),
         mode: mode,
         variant: variant,
@@ -123,13 +130,37 @@ void main() {
       readReceipts: false,
     );
   });
+
+  testWidgets('a failed message that is waiting for the connection', (
+    tester,
+  ) async {
+    // The clock it drew while sending, not the red mark: it has not given up,
+    // it goes out by itself once the server can be reached.
+    await expectGolden(
+      tester,
+      'delivery_states_waiting',
+      sendFailures: const {r'$failed': SendFailure.offline},
+    );
+  });
 }
 
 /// A one-to-one chat whose peer has read up to a stated event.
-class _ReadUpTo extends SeededChatRepository {
-  _ReadUpTo(super.inner, {required super.messages, required this.readUpTo});
+class _ReadUpTo extends SeededChatRepository implements SendQueueSource {
+  _ReadUpTo(
+    super.inner, {
+    required super.messages,
+    required this.readUpTo,
+    this.sendFailures = const {},
+  });
 
   final String readUpTo;
+
+  @override
+  final Map<String, SendFailure> sendFailures;
+
+  @override
+  Stream<Map<String, SendFailure>> get sendFailureChanges =>
+      const Stream.empty();
 
   @override
   List<({String roomId, String userId, String eventId, DateTime at})>
