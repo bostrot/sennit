@@ -9,6 +9,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_share/weft_share.dart';
+import 'package:weft_store/weft_store.dart' show WeftSettings;
 
 import 'app/auto_reply_providers.dart';
 import 'app/billing_providers.dart';
@@ -36,6 +37,8 @@ import 'features/auth/verification_screen.dart';
 import 'features/call/call_overlay.dart';
 import 'features/chat/chat_view.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
+import 'features/notifications/push_explanation_screen.dart';
+import 'features/settings/notifications_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
 import 'services/notifications/background_actions.dart';
@@ -357,6 +360,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // the plugin's own isolate. While this one is alive they are done here,
     // on this client, rather than on a second one opened beside it.
     NotificationActionServer.serve(actions.handle);
+    // And pokes from Sennit's gateway that FCM delivers to its own isolate
+    // while this one is in the background.
+    servePushes(service.handlePush);
     // Siri and CarPlay: "Read my messages", dictated replies, "mark as read".
     // iOS delivers these intents only once the user has allowed Siri for
     // Sennit, which is asked for below, after the notification prompt.
@@ -395,6 +401,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // Registration and rule reconciliation both need permission to have been
     // settled first: on iOS the APNs token does not exist until the user has
     // said yes, so registering before the prompt reliably yields `noToken`.
+    await _explainPushOnce();
     await ref.read(pushRegistrationProvider.future);
     await reconcilePushRules(
       session: ref.read(matrixSessionProvider),
@@ -456,6 +463,36 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     markNotificationPermissionAsked(settings);
     final service = await ref.read(notificationServiceProvider.future);
     await service?.requestPermission();
+  }
+
+  /// Explains Sennit's push gateway, once, before a store build registers
+  /// with it; nothing reaches the gateway until the user has answered.
+  Future<void> _explainPushOnce() async {
+    if (!NotificationPlatform.supportsPush) return;
+    if (ref.read(pushModeProvider) != null) return;
+    if (await ref.read(pushTransportProvider.future) == null) return;
+
+    final context = _navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final useSennit = await showPushExplanation(context);
+    if (useSennit == null || !mounted) return;
+
+    ref
+        .read(storesProvider)
+        .settings
+        .setString(
+          WeftSettings.notifyPushMode,
+          (useSennit ? PushGatewayMode.sennit : PushGatewayMode.off).name,
+        );
+    ref.read(settingsRevisionProvider.notifier).bump();
+    // "Another way" lands where the other ways are.
+    if (!useSennit) {
+      unawaited(
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+        ),
+      );
+    }
   }
 
   void _handleLink(WeftLink link) {
@@ -533,9 +570,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           (false, true) => l10n.composeRecipientUnclear(link.recipient),
           (false, false) => l10n.composeRecipientUnclearCopied(link.recipient),
         };
-        ScaffoldMessenger.maybeOf(
-          navigator.context,
-        )?.showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.maybeOf(navigator.context)
+            ?.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 

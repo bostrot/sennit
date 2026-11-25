@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "Sennit zeigt die Namen aus deinem Adressbuch statt der Namen, die Messaging-Netzwerke vergeben. Der Abgleich passiert auf diesem Gerät und wird nie hochgeladen.";
 "NSMicrophoneUsageDescription" = "Sennit braucht das Mikrofon, damit du in einem Sprach- oder Videoanruf sprechen kannst.";
 "NSSiriUsageDescription" = "Siri kann dir neue Nachrichten vorlesen und deine diktierten Antworten senden, auf dem iPhone und in CarPlay. Sind Nachrichtenvorschauen aus, liest Siri nur vor, wer geschrieben hat.";
+"SennitPushNewMessage" = "Neue Nachricht";

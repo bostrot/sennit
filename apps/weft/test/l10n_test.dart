@@ -338,9 +338,10 @@ void main() {
       multiLine: true,
     ).allMatches(file.readAsStringSync()).map((m) => m.group(1)!).toSet();
 
-    /// The `NS…UsageDescription` keys an `Info.plist` declares.
+    /// The `NS…UsageDescription` keys an `Info.plist` declares, and Sennit's
+    /// own `Sennit…` strings that its extensions read from the same tables.
     Set<String> usageDescriptionKeys(File file) => RegExp(
-      r'<key>(NS[A-Za-z]*UsageDescription)</key>',
+      r'<key>(NS[A-Za-z]*UsageDescription|Sennit[A-Za-z]+)</key>',
     ).allMatches(file.readAsStringSync()).map((m) => m.group(1)!).toSet();
 
     for (final platform in ['ios', 'macos']) {

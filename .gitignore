@@ -41,3 +41,7 @@ apps/weft/ios/Flutter/ephemeral/
 .slim/deepwork/
 __pycache__/
 *.pyc
+
+# Firebase resources, generated in CI from the GOOGLE_SERVICES_JSON secret
+# by tooling/scripts/firebase_android_config.py.
+apps/weft/android/app/src/main/res/values/firebase.xml

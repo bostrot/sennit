@@ -19,6 +19,7 @@ import '../../app/reply_reminder_providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
 import '../../services/notifications/push_registration.dart';
+import '../notifications/push_explanation_screen.dart';
 import '../../services/notifications/unified_push.dart';
 import 'reply_reminders_screen.dart';
 import 'settings_section.dart';
@@ -195,8 +196,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  void _setPushMode(PushGatewayMode? mode) {
+    if (mode == null) return;
+    _settings?.setString(WeftSettings.notifyPushMode, mode.name);
+    ref.read(settingsRevisionProvider.notifier).bump();
+    ref.invalidate(pushRegistrationProvider);
+  }
+
   void _saveGateway() {
     _settings?.setString(WeftSettings.notifyPushGateway, _gateway.text.trim());
+    _settings?.setString(
+      WeftSettings.notifyPushMode,
+      PushGatewayMode.custom.name,
+    );
     ref.read(settingsRevisionProvider.notifier).bump();
     // The pusher is registered from the gateway URL, so a new one has to be
     // registered afresh. Invalidating is the whole retry button.
@@ -209,6 +221,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final chats = ref.watch(chatsProvider).value ?? const <Chat>[];
     final networks = ref.watch(chatRepositoryProvider).availableNetworks;
     final quiet = policy.quietHours;
+    final pushMode = ref.watch(pushModeProvider);
 
     return Scaffold(
       appBar: WeftAppBar(title: Text(context.l10n.notificationsTitle)),
@@ -369,26 +382,66 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               subtitle: context.l10n.notificationsPushSubtitle,
             ),
             const _PushStatus(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: WeftSpace.md),
-              child: TextField(
-                controller: _gateway,
-                autocorrect: false,
-                keyboardType: TextInputType.url,
-                decoration: InputDecoration(
-                  labelText: context.l10n.notificationsGatewayField,
-                  hintText: 'https://sygnal.example.org/_matrix/push/v1/notify',
-                ),
-                onSubmitted: (_) => _saveGateway(),
+            RadioGroup<PushGatewayMode>(
+              groupValue: pushMode,
+              onChanged: _setPushMode,
+              child: Column(
+                children: [
+                  RadioListTile<PushGatewayMode>(
+                    value: PushGatewayMode.sennit,
+                    title: Text(context.l10n.notificationsPushModeSennit),
+                    subtitle: Text(
+                      context.l10n.notificationsPushModeSennitDetail,
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<PushGatewayMode>(
+                    value: PushGatewayMode.custom,
+                    title: Text(context.l10n.notificationsPushModeCustom),
+                    subtitle: Text(
+                      context.l10n.notificationsPushModeCustomDetail,
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<PushGatewayMode>(
+                    value: PushGatewayMode.off,
+                    title: Text(context.l10n.notificationsPushModeOff),
+                    subtitle: Text(context.l10n.notificationsPushModeOffDetail),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
               ),
             ),
             Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: FilledButton.tonal(
-                onPressed: _saveGateway,
-                child: Text(context.l10n.notificationsSaveGateway),
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () => showPushExplanation(context, ask: false),
+                child: Text(context.l10n.notificationsPushWhatIsSent),
               ),
             ),
+            if (pushMode == PushGatewayMode.custom) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: WeftSpace.md),
+                child: TextField(
+                  controller: _gateway,
+                  autocorrect: false,
+                  keyboardType: TextInputType.url,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.notificationsGatewayField,
+                    hintText:
+                        'https://sygnal.example.org/_matrix/push/v1/notify',
+                  ),
+                  onSubmitted: (_) => _saveGateway(),
+                ),
+              ),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FilledButton.tonal(
+                  onPressed: _saveGateway,
+                  child: Text(context.l10n.notificationsSaveGateway),
+                ),
+              ),
+            ],
 
             const Divider(height: WeftSpace.xl),
             SettingsSectionHeader(
@@ -776,6 +829,8 @@ String _pushStatusLabel(AppL10n l10n, PushRegistrationStatus status) =>
       PushRegistrationStatus.unchanged => l10n.pushStatusRegistered,
       PushRegistrationStatus.unsupportedPlatform => l10n.pushStatusUnsupported,
       PushRegistrationStatus.notConfigured => l10n.pushStatusNotConfigured,
+      PushRegistrationStatus.off => l10n.pushStatusOff,
+      PushRegistrationStatus.undecided => l10n.pushStatusUndecided,
       PushRegistrationStatus.noToken => l10n.pushStatusNoToken,
       PushRegistrationStatus.failed => l10n.pushStatusFailed,
     };

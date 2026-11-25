@@ -20,6 +20,25 @@ import flutter_local_notifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  /// APNs answered `registerForRemoteNotifications`: the token Sennit's
+  /// gateway addresses this device by. Not passed on to `super`, which would
+  /// hand it to firebase_messaging's iOS half — a Firebase app this build
+  /// never configures, because iOS pushes go to APNs directly.
+  override func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    WeftApns.received(token: deviceToken)
+  }
+
+  override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    NSLog("weft: APNs registration failed: \(error.localizedDescription)")
+    WeftApns.failed()
+  }
+
   /// SiriKit messaging, handled in-app. See `SiriIntents.swift`.
   override func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any? {
     switch intent {
@@ -74,10 +93,79 @@ import flutter_local_notifications
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftSiriChannel") {
       WeftSiriChannel.register(with: registrar)
     }
+    // The APNs token for Sennit's push gateway. On the launch path so a
+    // token iOS reissues is passed on even before Dart asks for it.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftApns") {
+      WeftApns.register(with: registrar)
+    }
     // Sign-in in the person's own browser. Costs nothing until used.
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WeftBrowserAuth") {
       WeftBrowserAuth.register(with: registrar)
     }
+  }
+}
+
+/// `com.bostrot.weft/apns`: the iOS end of `ApnsPushTransport`.
+///
+/// `token` registers with APNs and answers with the hex token, or nil when
+/// iOS has not answered within ten seconds; a token that arrives or changes
+/// later is sent as `tokenChanged`. `environment` reads `aps-environment`
+/// from the embedded profile, so a development build registers under the
+/// gateway's sandbox app id. An App Store install has no embedded profile
+/// and is production.
+enum WeftApns {
+  private static var channel: FlutterMethodChannel?
+  private static var token: String?
+  private static var waiting: [FlutterResult] = []
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(
+      name: "com.bostrot.weft/apns", binaryMessenger: registrar.messenger())
+    self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "environment":
+        result(environment())
+      case "token":
+        if let token {
+          result(token)
+          return
+        }
+        waiting.append(result)
+        UIApplication.shared.registerForRemoteNotifications()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { answer(nil) }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  static func received(token data: Data) {
+    let hex = data.map { String(format: "%02x", $0) }.joined()
+    let changed = hex != token
+    token = hex
+    answer(hex)
+    if changed { channel?.invokeMethod("tokenChanged", arguments: hex) }
+  }
+
+  static func failed() { answer(nil) }
+
+  private static func answer(_ value: String?) {
+    let pending = waiting
+    waiting = []
+    pending.forEach { $0(value) }
+  }
+
+  private static func environment() -> String {
+    guard
+      let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+      let data = try? Data(contentsOf: url),
+      let text = String(data: data, encoding: .isoLatin1),
+      let key = text.range(of: "<key>aps-environment</key>"),
+      let open = text.range(of: "<string>", range: key.upperBound..<text.endIndex),
+      let close = text.range(of: "</string>", range: open.upperBound..<text.endIndex)
+    else { return "production" }
+    return String(text[open.upperBound..<close.lowerBound])
   }
 }
 

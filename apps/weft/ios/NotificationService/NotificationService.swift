@@ -88,11 +88,21 @@ class NotificationService: UNNotificationServiceExtension {
 
     // Deliberately *not* "1 new message": the count in the payload is the
     // homeserver's unread total at push time, which is stale the moment the
-    // user reads on another device.
-    content.body = content.body.isEmpty ? "New message" : content.body
+    // user reads on another device. The payload's own body is the gateway's
+    // English placeholder; this is the same words in the user's language.
+    content.body = Self.newMessageText ?? content.body
 
     contentHandler(content)
   }
+
+  /// "New message" in the user's language, from the app's InfoPlist.strings
+  /// (`SennitPushNewMessage`). The extension lives at
+  /// `Sennit.app/PlugIns/NotificationService.appex`, two levels below the
+  /// app bundle that holds the translations.
+  private static let newMessageText: String? = {
+    let app = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
+    return Bundle(url: app)?.object(forInfoDictionaryKey: "SennitPushNewMessage") as? String
+  }()
 
   override func serviceExtensionTimeWillExpire() {
     // Out of time. Show what there is rather than nothing — iOS will otherwise

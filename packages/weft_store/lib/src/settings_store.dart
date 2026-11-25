@@ -471,11 +471,19 @@ abstract final class WeftSettings {
 
   /// The push gateway's `/_matrix/push/v1/notify` endpoint.
   ///
-  /// Deliberately a *setting* and not a constant. Weft hosts nothing, and which
-  /// sygnal instance a user's pokes travel through is a deployment decision
-  /// they make, exactly like their homeserver. Empty means "no push" — the app
-  /// still notifies from the foreground sync path.
+  /// The user's own gateway, used when [notifyPushMode] is `custom`. Empty
+  /// means "no push" in that mode — the app still notifies from the
+  /// foreground sync path.
   static const String notifyPushGateway = 'notify.push_gateway';
+
+  /// Which gateway wakes this device: `sennit`, `custom` (the URL under
+  /// [notifyPushGateway]) or `off`.
+  ///
+  /// Unset means the user has not chosen yet. A store build then explains
+  /// Sennit's gateway once and registers nothing until they answer; any other
+  /// build, or an install that already has a URL under [notifyPushGateway],
+  /// reads unset as `custom`.
+  static const String notifyPushMode = 'notify.push_mode';
 
   /// The push key this device registered with last time.
   ///

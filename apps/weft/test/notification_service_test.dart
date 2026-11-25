@@ -2064,6 +2064,12 @@ class _FakePushTransport implements PushTransport {
 
   @override
   Stream<String> get tokenRefreshes => const Stream.empty();
+
+  @override
+  String get appId => kAndroidPushAppId;
+
+  @override
+  Future<void> release() async {}
 }
 
 /// The native half of `flutter_local_notifications`, faked.

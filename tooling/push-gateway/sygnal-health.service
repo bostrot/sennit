@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart sygnal when it stops answering
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sygnal-health

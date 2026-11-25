@@ -1,2 +1,5 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+// APNs environment for Runner.entitlements: Xcode runs are signed with a
+// development profile and get sandbox tokens.
+APS_ENVIRONMENT=development

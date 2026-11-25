@@ -4470,9 +4470,9 @@
     "description": "Section heading for the push gateway, which is how the device is woken with the app closed. One word. Keep under ~14 chars.",
     "maxLength": 28
   },
-  "notificationsPushSubtitle": "How this device is woken when Sennit is not running. Sennit hosts no gateway; point this at a sygnal instance you run, exactly as you do your homeserver. Left empty, notifications still arrive while the app is open.",
+  "notificationsPushSubtitle": "How this device is woken when Sennit is not running. With push off, notifications still arrive while the app is open.",
   "@notificationsPushSubtitle": {
-    "description": "Subtitle under 'Push'. 'Sennit' is the app's name and 'sygnal' the name of the gateway software; neither is translated."
+    "description": "Subtitle under the Push section heading: what push is for. Long text is fine."
   },
   "notificationsGatewayField": "Push gateway",
   "@notificationsGatewayField": {
@@ -10283,5 +10283,81 @@
         "example": "WhatsApp"
       }
     }
+  },
+  "notificationsPushModeSennit": "Sennit’s gateway",
+  "@notificationsPushModeSennit": {
+    "description": "Option in the Push section: use the push gateway Sennit runs. Short."
+  },
+  "notificationsPushModeSennitDetail": "Push token, room and event IDs, unread count and timing pass through Sennit’s gateway and Google or Apple. Never message text.",
+  "@notificationsPushModeSennitDetail": {
+    "description": "Subtitle of the 'Sennit's gateway' option: what passes through it."
+  },
+  "notificationsPushModeCustom": "Your own gateway",
+  "@notificationsPushModeCustom": {
+    "description": "Option in the Push section: a push gateway the user runs. Short."
+  },
+  "notificationsPushModeCustomDetail": "A sygnal or other Matrix push gateway you run.",
+  "@notificationsPushModeCustomDetail": {
+    "description": "Subtitle of the 'Your own gateway' option. 'sygnal' and 'Matrix' are product names."
+  },
+  "notificationsPushModeOff": "Off",
+  "@notificationsPushModeOff": {
+    "description": "Option in the Push section: no push at all. One word."
+  },
+  "notificationsPushModeOffDetail": "No push. Notifications arrive while Sennit is running, or through the built-in connection or UnifiedPush.",
+  "@notificationsPushModeOffDetail": {
+    "description": "Subtitle of the 'Off' push option: what still works."
+  },
+  "notificationsPushWhatIsSent": "What is sent?",
+  "@notificationsPushWhatIsSent": {
+    "description": "Button in the Push section that opens the explanation of what Sennit's gateway receives. Short."
+  },
+  "pushStatusOff": "Push is off for this device.",
+  "@pushStatusOff": {
+    "description": "Push status line when the user turned push off."
+  },
+  "pushStatusUndecided": "Choose how this device is woken.",
+  "@pushStatusUndecided": {
+    "description": "Push status line before the user has chosen a gateway."
+  },
+  "pushIntroTitle": "Notifications while Sennit is closed",
+  "@pushIntroTitle": {
+    "description": "Title of the one-time screen that explains Sennit's push gateway before it is used."
+  },
+  "pushIntroBody": "To wake this device when a message arrives, your homeserver sends a short signal through Sennit’s push gateway and Google’s or Apple’s push service. Sennit then fetches and decrypts the message itself, on this device.",
+  "@pushIntroBody": {
+    "description": "First paragraph of the push explanation screen: how push works."
+  },
+  "pushIntroSentTitle": "What is sent",
+  "@pushIntroSentTitle": {
+    "description": "Heading on the push explanation screen. Short."
+  },
+  "pushIntroSent": "This device’s push token, the room and event IDs, your unread count, and when it happened. Never the message text or who wrote it.",
+  "@pushIntroSent": {
+    "description": "Paragraph on the push explanation screen: exactly what the gateway receives."
+  },
+  "pushIntroWhoTitle": "Who gets it",
+  "@pushIntroWhoTitle": {
+    "description": "Heading on the push explanation screen. Short."
+  },
+  "pushIntroWho": "Sennit’s push gateway, and Google (Firebase Cloud Messaging) or Apple (APNs), which deliver it to this device. The gateway keeps no log that links your token to your account.",
+  "@pushIntroWho": {
+    "description": "Paragraph on the push explanation screen: who receives the push metadata. 'Firebase Cloud Messaging' and 'APNs' are product names."
+  },
+  "pushIntroOptOutTitle": "Your choice",
+  "@pushIntroOptOutTitle": {
+    "description": "Heading on the push explanation screen. Short."
+  },
+  "pushIntroOptOut": "You can use your own gateway or turn push off at any time in Notification settings. On Android, the built-in connection and UnifiedPush work without Google.",
+  "@pushIntroOptOut": {
+    "description": "Paragraph on the push explanation screen: the alternatives and where to change it later."
+  },
+  "pushIntroAccept": "Use Sennit’s gateway",
+  "@pushIntroAccept": {
+    "description": "Primary button on the push explanation screen: register with Sennit's gateway. Short."
+  },
+  "pushIntroOther": "Choose another way",
+  "@pushIntroOther": {
+    "description": "Secondary button on the push explanation screen: don't use Sennit's gateway and open the settings. Short."
   }
 }

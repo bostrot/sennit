@@ -21,6 +21,13 @@
 	     to the team on 2026-11-19, and both capabilities are enabled on the
 	     com.bostrot.weft App ID, so automatic signing puts them in the
 	     profile. See docs/car-integrations.md. -->
+	<!-- Push Notifications, for Sennit's push gateway (APNs, token-based).
+	     Development or production per configuration, from APS_ENVIRONMENT in
+	     Flutter/Debug.xcconfig and Release.xcconfig, so it always matches the
+	     profile the build is signed with. The App ID has the capability
+	     enabled; see docs/ops/push-gateway.md. -->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.siri</key>
 	<true/>
 	<key>com.apple.developer.carplay-communication</key>

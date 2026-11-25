@@ -1,0 +1,29 @@
+# /etc/systemd/system/sygnal.service on push-01
+[Unit]
+Description=Sennit push gateway (sygnal)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sygnal
+Group=sygnal
+Environment=SYGNAL_CONF=/etc/sygnal/sygnal.yaml
+ExecStart=/opt/sygnal/bin/python -m sygnal.sygnal
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+MemoryMax=384M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadOnlyPaths=/etc/sygnal
+
+[Install]
+WantedBy=multi-user.target
