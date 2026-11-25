@@ -292,6 +292,9 @@ abstract final class WeftSettings {
   /// app's language and any improvement to a shipped prompt.
   static const String quickMessages = 'ai.quick_messages';
 
+  /// The language code messages are translated into, as last picked.
+  static const String translateLanguage = 'ai.translate_language';
+
   /// Whether what the user noted about a person goes to the model with the
   /// quick messages, auto-replies and reply chips written for them.
   ///

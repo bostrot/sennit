@@ -15,6 +15,7 @@ import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_call/weft_call.dart' show CallBlocked, CallBlocker;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_store/weft_store.dart' show WeftSettings;
 import 'package:weft_matrix/weft_matrix.dart' show RoomTrust;
 import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_richtext/weft_richtext.dart';
@@ -36,9 +37,12 @@ import '../../app/session_providers.dart' show kRemoteClient;
 import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
+import '../../app/stores.dart';
 import '../../app/transcription_service.dart';
 import '../../data/chat_repository.dart';
-import '../../services/ai/event_title.dart' show recentConversationTranscript;
+import '../../services/ai/event_title.dart'
+    show messageWords, recentConversationTranscript;
+import '../../services/ai/translate_message.dart';
 import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/quick_messages.dart';
 import '../../services/attachments/attachment_picker.dart';
@@ -81,6 +85,7 @@ import 'reply_chip.dart';
 import 'rich_text_view.dart';
 import 'send_network_chip.dart';
 import 'thread_indicator.dart';
+import 'translation_sheet.dart';
 import 'voice_recording_bar.dart';
 import 'sms_composer_bar.dart';
 import 'unverified_devices_banner.dart';
@@ -1447,6 +1452,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
             quickReactions: quickReactionsWith(
               ref.read(reactionRecentsProvider),
             ),
+            canTranslate: ref.read(autoReplyEndpointProvider) != null,
           )
         : await showMessageActionsSheet(
             context,
@@ -1457,6 +1463,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
             quickReactions: quickReactionsWith(
               ref.read(reactionRecentsProvider),
             ),
+            canTranslate: ref.read(autoReplyEndpointProvider) != null,
           );
     if (choice == null || !mounted) return;
 
@@ -1477,6 +1484,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
         await _copySelectionOr(message, selected: selected);
       case MessageAction.selectText:
         await _selectText(message);
+      case MessageAction.translate:
+        await _translate(message);
       case MessageAction.retrySend:
         await _run(
           () => ref
@@ -1532,6 +1541,36 @@ class _ChatViewState extends ConsumerState<ChatView> {
     } on Object catch (error) {
       _showMessage(l10n.chatHomeAssistantRefused('$error'));
     }
+  }
+
+  /// Translates [message] with the user's own model, into the language they
+  /// last translated into — or the app's, the first time.
+  Future<void> _translate(WeftMessage message) async {
+    final endpoint = ref.read(autoReplyEndpointProvider);
+    if (endpoint == null) return;
+    final settings = ref.read(storesProvider).settings;
+    final revision = ref.read(settingsRevisionProvider.notifier);
+    final text = messageWords(message) ?? message.body;
+    await showTranslationSheet(
+      context,
+      text: text,
+      language:
+          settings.getString(WeftSettings.translateLanguage) ??
+          defaultTranslationLanguage(
+            Localizations.localeOf(context).languageCode,
+          ),
+      translate: (language) => translateMessage(
+        baseUrl: endpoint.baseUrl,
+        model: endpoint.model,
+        apiKey: endpoint.apiKey,
+        text: text,
+        language: language,
+      ),
+      onLanguage: (language) {
+        settings.setString(WeftSettings.translateLanguage, language);
+        revision.bump();
+      },
+    );
   }
 
   /// "Remind me": a handful of natural offsets, then the OS carries it.

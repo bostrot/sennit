@@ -21,6 +21,9 @@ enum MessageAction {
 
   /// Copy *part* of the message: opens the text in a selectable view.
   selectText,
+
+  /// Translate the message with the user's own AI model.
+  translate,
   forward,
   delete,
   transcribe,
@@ -87,6 +90,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   bool hasTranscript = false,
   bool homeAssistant = false,
   List<String> quickReactions = kQuickReactions,
+  bool canTranslate = false,
 }) {
   return showWeftPanel<MessageActionChoice>(
     context: context,
@@ -103,6 +107,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
       hasTranscript: hasTranscript,
       homeAssistant: homeAssistant,
       quickReactions: quickReactions,
+      canTranslate: canTranslate,
     ),
   );
 }
@@ -114,6 +119,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.hasTranscript,
     required this.homeAssistant,
     required this.quickReactions,
+    required this.canTranslate,
   });
 
   final WeftMessage message;
@@ -123,6 +129,9 @@ class _MessageActionsSheet extends StatelessWidget {
 
   /// The quick row — see `quickReactionsWith`.
   final List<String> quickReactions;
+
+  /// Whether the user has an AI model set up to translate with.
+  final bool canTranslate;
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +277,12 @@ class _MessageActionsSheet extends StatelessWidget {
                     title: Text(context.l10n.messageActionSelectText),
                     onTap: () => choose(MessageAction.selectText),
                   ),
+                  if (canTranslate)
+                    ListTile(
+                      leading: const Icon(Icons.g_translate_rounded),
+                      title: Text(context.l10n.messageActionTranslate),
+                      onTap: () => choose(MessageAction.translate),
+                    ),
                 ],
                 ListTile(
                   leading: const Icon(Icons.forward_rounded),
@@ -336,6 +351,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
   bool hasTranscript = false,
   bool homeAssistant = false,
   List<String> quickReactions = kQuickReactions,
+  bool canTranslate = false,
 }) {
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final l10n = context.l10n;
@@ -415,6 +431,12 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
             Icons.text_fields_rounded,
             l10n.messageActionSelectText,
           ),
+          if (canTranslate)
+            item(
+              MessageAction.translate,
+              Icons.g_translate_rounded,
+              l10n.messageActionTranslate,
+            ),
         ],
         item(
           MessageAction.forward,
