@@ -398,6 +398,8 @@
   "chatSearchNoResults": "لا نتائج",
   "chatSearchNotLoaded": "تعذر تحميل هذه الرسالة. ربما هي قديمة جدًا في السجل.",
   "chatMessagesFromDate": "رسائل {date}",
+  "chatJumpToDate": "الانتقال إلى تاريخ",
+  "chatJumpToDateNearest": "لا رسائل في ذلك اليوم. يُعرض {date}.",
   "chatQuickReact": "تفاعل",
   "chatShowActionsHint": "عرض الإجراءات",
   "chatMessageDeleted": "حُذفت الرسالة",

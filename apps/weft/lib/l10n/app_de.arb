@@ -398,6 +398,8 @@
   "chatSearchNoResults": "Keine Treffer",
   "chatSearchNotLoaded": "Diese Nachricht konnte nicht geladen werden. Sie liegt vielleicht zu weit zurück im Verlauf.",
   "chatMessagesFromDate": "Nachrichten vom {date}",
+  "chatJumpToDate": "Zu Datum springen",
+  "chatJumpToDateNearest": "An dem Tag keine Nachrichten. Hier ist der {date}.",
   "chatQuickReact": "Reagieren",
   "chatShowActionsHint": "Aktionen anzeigen",
   "chatMessageDeleted": "Nachricht gelöscht",

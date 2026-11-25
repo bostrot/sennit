@@ -398,6 +398,8 @@
   "chatSearchNoResults": "कोई मिलान नहीं",
   "chatSearchNotLoaded": "यह मैसेज लोड नहीं हो सका। शायद यह इतिहास में बहुत पीछे है।",
   "chatMessagesFromDate": "{date} के मैसेज",
+  "chatJumpToDate": "तारीख़ पर जाएँ",
+  "chatJumpToDateNearest": "उस दिन कोई संदेश नहीं। {date} दिखाया जा रहा है।",
   "chatQuickReact": "प्रतिक्रिया",
   "chatShowActionsHint": "विकल्प दिखाएँ",
   "chatMessageDeleted": "मैसेज हटाया गया",

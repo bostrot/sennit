@@ -2365,6 +2365,21 @@
       }
     }
   },
+  "chatJumpToDate": "Jump to date",
+  "@chatJumpToDate": {
+    "description": "Tooltip and screen-reader hint on the day separator in a conversation, and the title of the date picker it opens. Tapping it picks a day and scrolls to that day's first message. Short."
+  },
+  "chatJumpToDateNearest": "No messages that day. Showing {date}.",
+  "@chatJumpToDateNearest": {
+    "description": "Shown after jumping to a date that has no messages: the conversation scrolled to the next day that has some.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "The day that was scrolled to, already formatted for this locale.",
+        "example": "4 Sep 2026"
+      }
+    }
+  },
   "chatQuickReact": "React",
   "@chatQuickReact": {
     "description": "Tooltip on the react button in the cluster that appears when a pointer hovers a message. Keep under ~12 chars.",

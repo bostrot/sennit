@@ -399,6 +399,8 @@
   "chatSearchNoResults": "无结果",
   "chatSearchNotLoaded": "无法加载该消息。它可能在历史记录中太靠前了。",
   "chatMessagesFromDate": "{date} 的消息",
+  "chatJumpToDate": "跳转到日期",
+  "chatJumpToDateNearest": "当天没有消息，已显示 {date}。",
   "chatQuickReact": "回应",
   "chatShowActionsHint": "显示操作",
   "chatMessageDeleted": "消息已删除",

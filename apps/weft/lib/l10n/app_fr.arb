@@ -398,6 +398,8 @@
   "chatSearchNoResults": "Aucun résultat",
   "chatSearchNotLoaded": "Impossible de charger ce message. Il est peut-être trop loin dans l’historique.",
   "chatMessagesFromDate": "Messages du {date}",
+  "chatJumpToDate": "Aller à une date",
+  "chatJumpToDateNearest": "Aucun message ce jour-là. Affichage du {date}.",
   "chatQuickReact": "Réagir",
   "chatShowActionsHint": "afficher les actions",
   "chatMessageDeleted": "Message supprimé",
