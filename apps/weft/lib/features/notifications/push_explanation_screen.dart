@@ -49,7 +49,7 @@ class PushExplanationScreen extends StatelessWidget {
       appBar: AppBar(),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
+          padding: const EdgeInsetsDirectional.fromSTEB(
             WeftSpace.xl,
             0,
             WeftSpace.xl,
