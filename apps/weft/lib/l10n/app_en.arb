@@ -90,6 +90,79 @@
   "@settingsSmsSubtitle": {
     "description": "One-line subtitle under 'SMS'. Means the phone's own text messages appear alongside other conversations. Keep under ~60 chars."
   },
+  "settingsStorageTitle": "Storage and media",
+  "@settingsStorageTitle": {
+    "description": "Settings row and screen title for media downloads and the space attachments take on this device. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "settingsStorageSubtitle": "Auto-download and space used",
+  "@settingsStorageSubtitle": {
+    "description": "One-line subtitle under 'Storage and media'. Keep under ~60 chars.",
+    "maxLength": 80
+  },
+  "storageAutoDownloadTitle": "Download media automatically",
+  "@storageAutoDownloadTitle": {
+    "description": "Switch on the storage screen: photos, video previews and stickers in chats download by themselves. Keep under ~36 chars.",
+    "maxLength": 48
+  },
+  "storageAutoDownloadSubtitle": "Off: photos and videos load when you tap them",
+  "@storageAutoDownloadSubtitle": {
+    "description": "Subtitle under the auto-download switch, saying what turning it off does. Keep under ~60 chars.",
+    "maxLength": 90
+  },
+  "storageSpaceTitle": "Space on this device",
+  "@storageSpaceTitle": {
+    "description": "Section heading on the storage screen above the space used, the limit and the clear button. Keep under ~30 chars.",
+    "maxLength": 40
+  },
+  "storageSpaceSubtitle": "Downloaded photos, videos and voice messages. They can always be downloaded again.",
+  "@storageSpaceSubtitle": {
+    "description": "One sentence under 'Space on this device': what is stored and that clearing it loses nothing for good."
+  },
+  "storageUsed": "Using {size}",
+  "@storageUsed": {
+    "description": "How much space downloaded attachments take on this device.",
+    "maxLength": 40,
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "description": "A human-readable byte size, already formatted.",
+        "example": "212 MB"
+      }
+    }
+  },
+  "storageCounting": "Counting…",
+  "@storageCounting": {
+    "description": "Shown in place of the space used while it is still being added up. Keep under ~20 chars.",
+    "maxLength": 32
+  },
+  "storageLimitTitle": "Keep at most",
+  "@storageLimitTitle": {
+    "description": "Label above size choices (500 MB, 1 GB, …, No limit). The oldest downloads are removed once they take more than this. Keep under ~30 chars.",
+    "maxLength": 40
+  },
+  "storageLimitNone": "No limit",
+  "@storageLimitNone": {
+    "description": "Last of the size-limit choices: keep downloads without any size limit. Chip label; keep under ~14 chars.",
+    "maxLength": 20
+  },
+  "storageClear": "Clear local media",
+  "@storageClear": {
+    "description": "Button that deletes every downloaded attachment from this device. They download again when looked at. Keep under ~28 chars.",
+    "maxLength": 36
+  },
+  "storageCleared": "Freed {size}",
+  "@storageCleared": {
+    "description": "Snackbar after clearing local media.",
+    "maxLength": 40,
+    "placeholders": {
+      "size": {
+        "type": "String",
+        "description": "A human-readable byte size, already formatted.",
+        "example": "212 MB"
+      }
+    }
+  },
   "settingsAppearanceTitle": "Appearance",
   "@settingsAppearanceTitle": {
     "description": "Title of a settings row that opens the appearance sheet. Keep under ~20 chars.",
@@ -1692,6 +1765,10 @@
   "attachmentLoading": "loading",
   "@attachmentLoading": {
     "description": "Screen-reader-only clause appended to a picture bubble's label while the image is still downloading. Lower case, no full stop — one clause in a comma-joined sentence."
+  },
+  "attachmentTapToLoad": "not downloaded, tap to load",
+  "@attachmentTapToLoad": {
+    "description": "Screen-reader-only clause appended to a picture bubble's label when automatic media download is off and the picture waits for a tap. Lower case, no full stop — one clause in a comma-joined sentence."
   },
   "attachmentAudioLoading": "Loading audio",
   "@attachmentAudioLoading": {
