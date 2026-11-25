@@ -19,6 +19,7 @@ import 'package:weft_store/weft_store.dart';
 
 import '../services/status/status_feed.dart';
 import 'labels.dart';
+import 'nickname_providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
 
@@ -157,7 +158,10 @@ final mediaHeadersProvider = Provider<Map<String, String>?>((ref) {
 });
 
 final chatsProvider = StreamProvider<List<Chat>>((ref) {
-  return ref.watch(chatRepositoryProvider).watchChats();
+  final chats = ref.watch(chatRepositoryProvider).watchChats();
+  // The user's own names for people, over whatever the networks call them.
+  final nicknames = ref.watch(chatNicknamesProvider);
+  return nicknames.isEmpty ? chats : chats.map(nicknames.applyTo);
 });
 
 /// One conversation, compared by what it says rather than by which one it is.

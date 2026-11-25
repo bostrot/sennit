@@ -45,7 +45,7 @@ class AvatarViewer extends ConsumerWidget {
   final String imageUrl;
 
   ImageProvider _image(String url, Map<String, String>? headers) =>
-      weftAvatarImageOverride?.call(url) ?? NetworkImage(url, headers: headers);
+      weftAvatarImage(url, headers: headers);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

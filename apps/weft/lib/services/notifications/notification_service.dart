@@ -368,7 +368,11 @@ class MatrixNotificationAvatars {
       '${_cacheDirectory.path}/avatar_${stableNotificationId(url)}.img',
     );
     try {
-      if (!file.existsSync()) {
+      if (!file.existsSync() && uri.scheme == 'data') {
+        // A picture the user gave the chat themselves: nothing to fetch.
+        await file.create(recursive: true);
+        await file.writeAsBytes(uri.data!.contentAsBytes());
+      } else if (!file.existsSync()) {
         final response = await _client.get(uri, headers: _headers);
         if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
           return _resolved[url] = null;

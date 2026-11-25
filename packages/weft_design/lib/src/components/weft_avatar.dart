@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:weft_domain/weft_domain.dart';
 
@@ -11,6 +12,37 @@ import 'network_glyph.dart';
 /// the phone for each picture over the encrypted link instead. Null — the
 /// default everywhere else — means a [NetworkImage] with the given headers.
 ImageProvider Function(String url)? weftAvatarImageOverride;
+
+/// The picture behind an avatar [url].
+///
+/// A `data:` url is a picture the user chose themselves and is decoded in
+/// place, before [weftAvatarImageOverride]: there is nothing to fetch. One
+/// [MemoryImage] per url, kept, because a fresh one per build is a fresh image
+/// cache key per build and the picture would be decoded again every frame.
+ImageProvider weftAvatarImage(String url, {Map<String, String>? headers}) {
+  if (url.startsWith('data:')) {
+    final cached = _inlineAvatars.remove(url);
+    final image = cached ?? MemoryImage(_inlineBytes(url));
+    _inlineAvatars[url] = image;
+    if (_inlineAvatars.length > 64) {
+      _inlineAvatars.remove(_inlineAvatars.keys.first);
+    }
+    return image;
+  }
+  return weftAvatarImageOverride?.call(url) ??
+      NetworkImage(url, headers: headers);
+}
+
+final Map<String, MemoryImage> _inlineAvatars = {};
+
+Uint8List _inlineBytes(String url) {
+  try {
+    return UriData.parse(url).contentAsBytes();
+  } on FormatException {
+    // Undecodable: the image fails, and the initials underneath stay.
+    return Uint8List(0);
+  }
+}
 
 /// Avatar for a contact or chat.
 ///
@@ -123,8 +155,7 @@ class WeftAvatar extends StatelessWidget {
                 image: ResizeImage.resizeIfNeeded(
                   (inner * 3).round(),
                   null,
-                  weftAvatarImageOverride?.call(imageUrl!) ??
-                      NetworkImage(imageUrl!, headers: imageHeaders),
+                  weftAvatarImage(imageUrl!, headers: imageHeaders),
                 ),
                 width: inner,
                 height: inner,

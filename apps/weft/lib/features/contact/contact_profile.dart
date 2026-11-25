@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 
 import '../../app/labels.dart';
 import '../../app/localisation.dart';
+import '../../app/nickname_providers.dart';
 import '../../app/providers.dart';
 import '../../app/reply_reminder_providers.dart';
 import '../../app/retention_providers.dart';
@@ -12,6 +13,7 @@ import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
 import 'avatar_viewer.dart';
+import 'nickname_dialog.dart';
 import 'person_memory_screen.dart';
 import 'shared_media.dart';
 
@@ -147,6 +149,7 @@ class ContactProfileScreen extends ConsumerWidget {
                 ),
               ),
             _SectionHeader(context.l10n.contactForThisContact),
+            _NicknameTile(chat: chat),
             if (chat.networks.length > 1)
               ListTile(
                 leading: const Icon(Icons.send_rounded),
@@ -247,6 +250,39 @@ class ContactProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The way into the user's private name and picture for this conversation.
+class _NicknameTile extends ConsumerWidget {
+  const _NicknameTile({required this.chat});
+
+  final Chat chat;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nicknames = ref.watch(chatNicknamesProvider);
+    final nickname = nicknames.nameFor(chat);
+    final repository = ref.watch(chatRepositoryProvider);
+    // What the networks call it: the repository's chat has no nickname on it.
+    final original =
+        chat.roomIds
+            .map(repository.chatForRoom)
+            .whereType<Chat>()
+            .firstOrNull
+            ?.title ??
+        chat.title;
+    return ListTile(
+      leading: const Icon(Icons.badge_outlined),
+      title: Text(context.l10n.nicknameTitle),
+      subtitle: Text(
+        nickname == null
+            ? context.l10n.nicknameSubtitle
+            : context.l10n.nicknameSubtitleSet(original),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () => showNicknameDialog(context, chat: chat, original: original),
     );
   }
 }
