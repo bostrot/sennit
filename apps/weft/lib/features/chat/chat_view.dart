@@ -1626,16 +1626,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     final preview = messageDocument(message).plainText;
     await ref
-        .read(reminderSchedulerProvider)
-        .remind(
-          chatId: _chatId,
-          title: l10n.chatReminderTitle(
-            message.isOwn ? l10n.chatReminderSelf : message.senderName,
+        .read(reminderListProvider.notifier)
+        .add(
+          PendingReminder(
+            chatId: _chatId,
+            chatTitle:
+                ref
+                    .read(chatsProvider)
+                    .value
+                    ?.where((c) => c.id == _chatId)
+                    .firstOrNull
+                    ?.title ??
+                '',
+            title: l10n.chatReminderTitle(
+              message.isOwn ? l10n.chatReminderSelf : message.senderName,
+            ),
+            body: preview.length > 120
+                ? '${preview.substring(0, 117)}…'
+                : preview,
+            dueAtMs: choice.millisecondsSinceEpoch,
           ),
-          body: preview.length > 120
-              ? '${preview.substring(0, 117)}…'
-              : preview,
-          at: choice,
         );
     if (mounted) {
       _showMessage(

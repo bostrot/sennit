@@ -24,6 +24,7 @@ import '../../services/billing/entitlements.dart';
 import '../../services/contacts/device_contacts.dart';
 import '../../services/status/status_feed.dart';
 import '../merge/merge_screen.dart';
+import '../schedule/scheduled_screen.dart';
 import 'appearance_sheet.dart';
 import 'ai_screen.dart';
 import 'backup_screen.dart';
@@ -125,6 +126,13 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: l10n.settingsMergedChatsSubtitle,
               onTap: () => push(const MergeScreen()),
             ),
+            if (!kRemoteClient)
+              tile(
+                icon: Icons.schedule_send_outlined,
+                title: l10n.settingsScheduledTitle,
+                subtitle: l10n.settingsScheduledSubtitle,
+                onTap: () => push(const ScheduledScreen()),
+              ),
             if (!kRemoteClient)
               tile(
                 icon: Icons.hub_outlined,
