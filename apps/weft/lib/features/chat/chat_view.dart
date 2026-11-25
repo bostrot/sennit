@@ -27,6 +27,7 @@ import '../../app/billing_providers.dart';
 import '../../app/quick_message_providers.dart';
 import '../../app/call_providers.dart';
 import '../../app/intents.dart';
+import '../../app/hidden_messages.dart';
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
@@ -1337,6 +1338,41 @@ class _ChatViewState extends ConsumerState<ChatView> {
   })?
   _grouping;
 
+  /// [messages] less the ones the user hid for themselves and, when they
+  /// asked for it, the deleted ones. Kept while neither the list nor the
+  /// choice changes, so the row index after it keeps its cache too.
+  List<WeftMessage> _shown(List<WeftMessage> messages) {
+    final hidden = ref.watch(hiddenMessagesProvider);
+    final hideDeleted = ref.watch(hideDeletedMessagesProvider);
+    final cached = _shownCache;
+    if (cached != null &&
+        identical(cached.messages, messages) &&
+        identical(cached.hidden, hidden) &&
+        cached.hideDeleted == hideDeleted) {
+      return cached.shown;
+    }
+    final shown = withoutHidden(
+      messages,
+      hidden: hidden,
+      hideDeleted: hideDeleted,
+    );
+    _shownCache = (
+      messages: messages,
+      hidden: hidden,
+      hideDeleted: hideDeleted,
+      shown: shown,
+    );
+    return shown;
+  }
+
+  ({
+    List<WeftMessage> messages,
+    Set<String> hidden,
+    bool hideDeleted,
+    List<WeftMessage> shown,
+  })?
+  _shownCache;
+
   /// The albums in [visible], kept for as long as [visible] is the list drawn.
   GalleryLayout _galleriesFor(
     List<WeftMessage> visible,
@@ -1517,6 +1553,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
         }
       case MessageAction.delete:
         await _delete(message);
+      case MessageAction.hideForMe:
+        _hideForMe(message);
       case MessageAction.transcribe:
         await _transcribe(message);
       case MessageAction.retranscribe:
@@ -1576,6 +1614,29 @@ class _ChatViewState extends ConsumerState<ChatView> {
         settings.setString(WeftSettings.translateLanguage, language);
         revision.bump();
       },
+    );
+  }
+
+  /// Takes [message] out of this account's view and offers it back.
+  ///
+  /// No confirmation, unlike a deletion: nothing leaves the device but the
+  /// sealed sync of the choice itself, and the undo is right there.
+  void _hideForMe(WeftMessage message) {
+    final l10n = context.l10n;
+    final settings = ref.read(storesProvider).settings;
+    final revision = ref.read(settingsRevisionProvider.notifier);
+    setMessageHidden(settings, message, hidden: true);
+    revision.bump();
+    showWeftMessage(
+      context,
+      l10n.chatMessageHidden,
+      action: SnackBarAction(
+        label: l10n.chatMessageHiddenUndo,
+        onPressed: () {
+          setMessageHidden(settings, message, hidden: false);
+          revision.bump();
+        },
+      ),
     );
   }
 
@@ -2143,12 +2204,14 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // `threadMessages`, which returns reading order, because the list widget
     // below is itself reversed.
     final rootId = widget.threadRootId;
-    final visible = rootId == null
-        ? grouping.messages
-        : threadMessages(
-            messages: _view.messages,
-            rootEventId: rootId,
-          ).reversed.toList(growable: false);
+    final visible = _shown(
+      rootId == null
+          ? grouping.messages
+          : threadMessages(
+              messages: _view.messages,
+              rootEventId: rootId,
+            ).reversed.toList(growable: false),
+    );
     // Photos sent as a batch fold into one album bubble, drawn by the row of
     // the batch's newest photo; the rows of the others draw nothing.
     _drawn = visible;

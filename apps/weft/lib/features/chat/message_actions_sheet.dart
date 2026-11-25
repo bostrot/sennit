@@ -26,6 +26,10 @@ enum MessageAction {
   translate,
   forward,
   delete,
+
+  /// Take the message out of this account's view only; see
+  /// `hiddenMessagesProvider`.
+  hideForMe,
   transcribe,
   retranscribe,
 
@@ -319,6 +323,11 @@ class _MessageActionsSheet extends StatelessWidget {
                     onTap: () => choose(MessageAction.retranscribe),
                   ),
               ],
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: Text(context.l10n.messageActionHideForMe),
+                onTap: () => choose(MessageAction.hideForMe),
+              ),
               if (message.isOwn)
                 ListTile(
                   leading: Icon(
@@ -473,6 +482,11 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
             l10n.messageActionRetranscribe,
           ),
       ],
+      item(
+        MessageAction.hideForMe,
+        Icons.visibility_off_outlined,
+        l10n.messageActionHideForMe,
+      ),
       if (message.isOwn)
         item(
           MessageAction.delete,

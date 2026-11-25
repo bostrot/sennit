@@ -2378,6 +2378,20 @@
   "@chatMessageDeleted": {
     "description": "Drawn in italics in place of a message that was redacted. Also the inbox preview for one. Keep under ~22 chars."
   },
+  "messageActionHideForMe": "Hide for me",
+  "@messageActionHideForMe": {
+    "description": "Row in the message actions sheet: removes the message from the user's own view of the conversation only. Nothing is deleted and nobody else is told. Keep under ~18 chars.",
+    "maxLength": 36
+  },
+  "chatMessageHidden": "Hidden for you. Others still see it.",
+  "@chatMessageHidden": {
+    "description": "Snackbar after the user hid a message for themselves. Says that the others in the chat still see it."
+  },
+  "chatMessageHiddenUndo": "Undo",
+  "@chatMessageHiddenUndo": {
+    "description": "Action on the snackbar after hiding a message: shows the message again. Keep under ~12 chars.",
+    "maxLength": 24
+  },
   "chatSentAt": "Sent {time}",
   "@chatSentAt": {
     "description": "Screen-reader-only clause saying when a message was sent, opening the metadata sentence under a bubble.",
@@ -2787,6 +2801,15 @@
   "appearanceRailMultiSelectSubtitle": "Off: the rail is one-network-at-a-time.",
   "@appearanceRailMultiSelectSubtitle": {
     "description": "One-line subtitle under the rail multi-select toggle, saying what 'off' means. The 'rail' is the vertical strip of network icons. Keep under ~46 chars."
+  },
+  "appearanceHideDeletedTitle": "Hide deleted messages",
+  "@appearanceHideDeletedTitle": {
+    "description": "Toggle in the appearance sheet: leave the placeholders of deleted messages out of conversations. Keep under ~40 chars.",
+    "maxLength": 64
+  },
+  "appearanceHideDeletedSubtitle": "No “Message deleted” rows in chats.",
+  "@appearanceHideDeletedSubtitle": {
+    "description": "One-line subtitle under the hide-deleted-messages toggle. The quoted text is the placeholder shown where a deleted message was; use the same words as chatMessageDeleted. Keep under ~46 chars."
   },
   "appearanceAccentSwatch": "{name} accent",
   "@appearanceAccentSwatch": {

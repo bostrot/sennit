@@ -136,6 +136,14 @@ abstract final class WeftSettings {
   /// network shows only it, tapping again returns to All.
   static const String railMultiSelect = 'rail.multi_select';
 
+  /// Leaves the "Message deleted" placeholders out of conversations.
+  static const String hideDeletedMessages = 'appearance.hide_deleted';
+
+  /// One row per message the user hid for themselves, keyed by this prefix
+  /// and the event id; the value is the room it is in. Rows rather than one
+  /// list, so two devices hiding different messages at once both keep theirs.
+  static const String hiddenMessagePrefix = 'hidden.';
+
   /// Whether Return sends the message.
   ///
   /// False by default, which is the opposite of most messengers and is the
