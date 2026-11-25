@@ -15,6 +15,7 @@ import 'package:weft_store/weft_store.dart';
 
 import '../services/attachments/video_poster.dart';
 import 'auto_reply_transport.dart';
+import 'room_joiner.dart';
 import 'chat_repository.dart';
 import 'profile_lookups.dart';
 import 'send_queue_source.dart';
@@ -49,7 +50,7 @@ Future<Uint8List> readAttachmentFile(AttachmentSource source) =>
 /// same person and get folded into one merged conversation. The UI above this
 /// is identical to the demo path — that is the point of the interface.
 class MatrixChatRepository
-    implements ChatRepository, AutoReplyTransport, SendQueueSource {
+    implements ChatRepository, AutoReplyTransport, SendQueueSource, RoomJoiner {
   MatrixChatRepository(
     this._session, {
     IdentityStore? store,
@@ -792,6 +793,52 @@ class MatrixChatRepository
   @override
   Future<String?> createDirectChat(String matrixUserId) async {
     final roomId = await _client.startDirectChat(matrixUserId.trim());
+    _rebuild();
+    return chatForRoom(roomId)?.id ?? roomId;
+  }
+
+  @override
+  Chat? chatForRoomLink(String roomIdOrAlias) {
+    final id = roomIdOrAlias.trim();
+    if (id.startsWith('!')) return chatForRoom(id);
+    for (final room in _client.rooms) {
+      if (room.membership != sdk.Membership.join) continue;
+      if (room.canonicalAlias == id || _altAliases(room).contains(id)) {
+        return chatForRoom(room.id);
+      }
+    }
+    return null;
+  }
+
+  static List<String> _altAliases(sdk.Room room) {
+    final alt = room
+        .getState(sdk.EventTypes.RoomCanonicalAlias)
+        ?.content
+        .tryGetList<String>('alt_aliases');
+    return alt ?? const [];
+  }
+
+  @override
+  Future<String> joinRoom(
+    String roomIdOrAlias, {
+    List<String> via = const [],
+  }) async {
+    final id = roomIdOrAlias.trim();
+    // A room id names no server; without a hint, the one in its id is the
+    // likeliest to be in the room.
+    final servers = [
+      ...via,
+      if (via.isEmpty && id.contains(':')) id.substring(id.indexOf(':') + 1),
+    ];
+    final roomId = await _client.joinRoom(
+      id,
+      via: servers.isEmpty ? null : servers,
+    );
+    if (_client.getRoomById(roomId)?.membership != sdk.Membership.join) {
+      await _client
+          .waitForRoomInSync(roomId, join: true)
+          .timeout(const Duration(seconds: 30));
+    }
     _rebuild();
     return chatForRoom(roomId)?.id ?? roomId;
   }

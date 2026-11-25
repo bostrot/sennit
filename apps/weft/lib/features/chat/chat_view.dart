@@ -94,6 +94,7 @@ import 'reply_chip.dart';
 import 'rich_text_view.dart';
 import 'send_network_chip.dart';
 import 'thread_indicator.dart';
+import 'room_link.dart';
 import 'translation_sheet.dart';
 import 'voice_recording_bar.dart';
 import 'sms_composer_bar.dart';
@@ -2273,14 +2274,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
     switch (mention.kind) {
       case MentionKind.roomAlias:
       case MentionKind.roomId:
-        final chat = ref
-            .read(chatRepositoryProvider)
-            .chatForRoom(mention.targetId);
-        if (chat == null) {
-          _showMessage(context.l10n.chatUnavailableNotInInbox);
-          return;
-        }
-        unawaited(pushChat(Navigator.of(context), chat.id));
+        final navigator = Navigator.of(context);
+        unawaited(
+          openRoomLink(
+            context,
+            repository: ref.read(chatRepositoryProvider),
+            link: OpenRoomLink(mention.targetId),
+            open: (chatId) => unawaited(pushChat(navigator, chatId)),
+          ),
+        );
       case MentionKind.user:
       case MentionKind.roomWide:
         // Opening a DM from a mention needs the start-chat flow, which is the
