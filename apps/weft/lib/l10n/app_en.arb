@@ -190,6 +190,41 @@
   "@settingsSendOnEnterSubtitleOff": {
     "description": "Subtitle under the 'Return sends the message' switch when it is OFF. Cmd is the macOS modifier key, Ctrl the Windows and Linux one; keep both. Two short sentences."
   },
+  "settingsMediaQualityTitle": "Photo quality",
+  "@settingsMediaQualityTitle": {
+    "description": "Settings row that opens the choice of how large sent photos are. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "mediaQualityOriginal": "Original",
+  "@mediaQualityOriginal": {
+    "description": "Photo quality choice: send the file as it is. Keep under ~16 chars.",
+    "maxLength": 20
+  },
+  "mediaQualityOriginalHint": "Full size, scaled only to fit a network",
+  "@mediaQualityOriginalHint": {
+    "description": "One line under the 'Original' photo quality choice. Keep under ~50 chars.",
+    "maxLength": 60
+  },
+  "mediaQualityHigh": "High",
+  "@mediaQualityHigh": {
+    "description": "Photo quality choice: scaled to a large but smaller size. Keep under ~16 chars.",
+    "maxLength": 20
+  },
+  "mediaQualityHighHint": "Up to 2560 px, much smaller files",
+  "@mediaQualityHighHint": {
+    "description": "One line under the 'High' photo quality choice. Keep under ~50 chars.",
+    "maxLength": 60
+  },
+  "mediaQualityDataSaver": "Data saver",
+  "@mediaQualityDataSaver": {
+    "description": "Photo quality choice: smallest files, for a metered connection. Keep under ~16 chars.",
+    "maxLength": 20
+  },
+  "mediaQualityDataSaverHint": "Up to 1280 px, uses the least data",
+  "@mediaQualityDataSaverHint": {
+    "description": "One line under the 'Data saver' photo quality choice. Keep under ~50 chars.",
+    "maxLength": 60
+  },
   "settingsAgendaTitle": "Detect appointments",
   "@settingsAgendaTitle": {
     "description": "Title of a switch row. When on, the app spots dates and times in messages and offers to add them to the calendar. Keep under ~30 chars."

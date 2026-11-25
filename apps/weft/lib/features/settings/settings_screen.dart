@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
+import 'package:weft_attachments/weft_attachments.dart' show MediaQuality;
 import 'package:weft_store/weft_store.dart';
 
 import 'package:weft_domain/weft_domain.dart' show ChatNetwork;
@@ -197,6 +198,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const _AgendaToggle(),
               const _SendOnEnterToggle(),
+              const _MediaQualityTile(),
               const _HiddenNetworksSection(),
 
               header(l10n.settingsSectionPrivacyAndSecurity),
@@ -497,6 +499,79 @@ class _SendOnEnterToggle extends ConsumerWidget {
     );
   }
 }
+
+/// How large the photos the user sends go out.
+///
+/// A sheet of three rather than a switch: the middle choice is the one most
+/// people want, and a switch has no middle.
+class _MediaQualityTile extends ConsumerWidget {
+  const _MediaQualityTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      return const SizedBox.shrink();
+    }
+    final l10n = context.l10n;
+    final current = MediaQuality.fromId(
+      stores.settings.getString(WeftSettings.mediaQuality),
+    );
+
+    Future<void> choose() async {
+      final picked = await showModalBottomSheet<MediaQuality>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final quality in MediaQuality.values)
+                ListTile(
+                  title: Text(mediaQualityLabel(l10n, quality)),
+                  subtitle: Text(mediaQualityHint(l10n, quality)),
+                  trailing: quality == current
+                      ? const Icon(Icons.check_rounded)
+                      : null,
+                  selected: quality == current,
+                  onTap: () => Navigator.of(context).pop(quality),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (picked == null || picked == current) return;
+      stores.settings.setString(WeftSettings.mediaQuality, picked.id);
+      ref.read(settingsRevisionProvider.notifier).bump();
+    }
+
+    return ListTile(
+      leading: const Icon(Icons.photo_size_select_large_rounded),
+      title: Text(l10n.settingsMediaQualityTitle),
+      subtitle: Text(mediaQualityLabel(l10n, current)),
+      onTap: choose,
+    );
+  }
+}
+
+/// The name of [quality], as the settings row and its sheet show it.
+String mediaQualityLabel(AppL10n l10n, MediaQuality quality) =>
+    switch (quality) {
+      MediaQuality.original => l10n.mediaQualityOriginal,
+      MediaQuality.high => l10n.mediaQualityHigh,
+      MediaQuality.dataSaver => l10n.mediaQualityDataSaver,
+    };
+
+/// What [quality] does, in a line.
+String mediaQualityHint(AppL10n l10n, MediaQuality quality) =>
+    switch (quality) {
+      MediaQuality.original => l10n.mediaQualityOriginalHint,
+      MediaQuality.high => l10n.mediaQualityHighHint,
+      MediaQuality.dataSaver => l10n.mediaQualityDataSaverHint,
+    };
 
 /// Its own widget because it is the one row on this screen with state. Fully
 /// on-device — rules plus, when installed, the local embedding model — which

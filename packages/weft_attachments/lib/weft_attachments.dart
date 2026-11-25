@@ -13,4 +13,5 @@ library;
 export 'src/detect.dart';
 export 'src/format.dart';
 export 'src/plan.dart';
+export 'src/quality.dart';
 export 'src/queue.dart';
