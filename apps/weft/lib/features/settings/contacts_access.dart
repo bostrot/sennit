@@ -38,14 +38,10 @@ void showContactsAccessResult(BuildContext context, ContactsAccess access) {
 
 /// Asks for the address book from a tap, and reports a refusal.
 Future<void> requestDeviceContacts(BuildContext context, WidgetRef ref) async {
-  final WeftStores stores;
-  try {
-    stores = ref.read(storesProvider);
-  } on Object {
-    return;
-  }
+  final settings = ref.read(storesBootstrapProvider).value?.settings;
+  if (settings == null) return;
   final access = await enableDeviceContacts(
-    stores.settings,
+    settings,
     onChanged: ref.read(settingsRevisionProvider.notifier).bump,
   );
   if (context.mounted) showContactsAccessResult(context, access);
@@ -69,13 +65,10 @@ class SmsContactsBanner extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     ref.watch(settingsRevisionProvider);
-    final WeftStores stores;
-    try {
-      stores = ref.watch(storesProvider);
-    } on Object {
-      return const SizedBox.shrink();
-    }
-    final settings = stores.settings;
+    // The bootstrap's value rather than [storesProvider]: a chat view drawn
+    // before the database is open must not be an error, just no strip.
+    final settings = ref.watch(storesBootstrapProvider).value?.settings;
+    if (settings == null) return const SizedBox.shrink();
     if (settings.getBool(WeftSettings.useDeviceContactNames) ||
         settings.getBool(kContactsSmsPromptDismissedKey)) {
       return const SizedBox.shrink();
@@ -155,15 +148,9 @@ class SmsContactsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(settingsRevisionProvider);
-    final bool enabled;
-    try {
-      enabled = ref
-          .watch(storesProvider)
-          .settings
-          .getBool(WeftSettings.useDeviceContactNames);
-    } on Object {
-      return const SizedBox.shrink();
-    }
+    final settings = ref.watch(storesBootstrapProvider).value?.settings;
+    if (settings == null) return const SizedBox.shrink();
+    final enabled = settings.getBool(WeftSettings.useDeviceContactNames);
     final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
