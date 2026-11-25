@@ -566,8 +566,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           (false, true) => l10n.composeRecipientUnclear(link.recipient),
           (false, false) => l10n.composeRecipientUnclearCopied(link.recipient),
         };
-        ScaffoldMessenger.maybeOf(navigator.context)
-            ?.showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.maybeOf(
+          navigator.context,
+        )?.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
