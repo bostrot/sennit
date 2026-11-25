@@ -6862,6 +6862,50 @@
   "@contactForThisContact": {
     "description": "Section heading in the contact profile, above the settings that apply to this person only. Keep under ~28 chars."
   },
+  "nicknameTitle": "Nickname and photo",
+  "@nicknameTitle": {
+    "description": "Row on a contact's details screen, and title of its dialog: the user's own private name and picture for this person or chat. Nobody else sees them. Keep short.",
+    "maxLength": 32
+  },
+  "nicknameSubtitle": "Only you see them",
+  "@nicknameSubtitle": {
+    "description": "Subtitle of the 'Nickname and photo' row while none is set: says that only the user sees them.",
+    "maxLength": 40
+  },
+  "nicknameSubtitleSet": "Instead of {name}, only for you",
+  "@nicknameSubtitleSet": {
+    "description": "Subtitle of the 'Nickname and photo' row once a nickname is set, naming what the chat is really called.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "description": "The name the messaging network gives the chat or person.",
+        "example": "Grace Hopper"
+      }
+    }
+  },
+  "nicknameField": "Nickname",
+  "@nicknameField": {
+    "description": "Label of the text field in the nickname dialog. The chat's real name is shown as the hint.",
+    "maxLength": 24
+  },
+  "nicknamePrivacy": "Only you see these. They sync to your other devices and are never sent to anyone.",
+  "@nicknamePrivacy": {
+    "description": "Note at the bottom of the nickname dialog: the nickname and photo are private, sync between the user's own devices, and are never sent."
+  },
+  "nicknameChoosePhoto": "Choose photo",
+  "@nicknameChoosePhoto": {
+    "description": "Button in the nickname dialog that picks a private picture for this chat.",
+    "maxLength": 24
+  },
+  "nicknameRemovePhoto": "Remove photo",
+  "@nicknameRemovePhoto": {
+    "description": "Button in the nickname dialog that removes the private picture, going back to the chat's own.",
+    "maxLength": 24
+  },
+  "nicknamePhotoFailed": "That picture couldn’t be read.",
+  "@nicknamePhotoFailed": {
+    "description": "Toast when the picture chosen for a nickname could not be decoded."
+  },
   "contactMedia": "Media",
   "@contactMedia": {
     "description": "Section heading in the chat info screen above a row of thumbnails of the photos and videos shared in this conversation, and the title of the screen showing all of them as a grid. Keep under ~20 chars."

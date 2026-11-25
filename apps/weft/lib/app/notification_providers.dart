@@ -22,6 +22,7 @@ import '../services/notifications/reply_suggester.dart';
 import 'l10n_labels.dart';
 import 'localisation.dart';
 import 'person_memory_providers.dart';
+import 'nickname_providers.dart';
 import 'providers.dart';
 import 'snapshot_providers.dart';
 import 'session_providers.dart';
@@ -223,7 +224,9 @@ final notificationServiceProvider = FutureProvider<WeftNotificationService?>((
   Chat? chatForRoom(String roomId) {
     final chat = repository.chatForRoom(roomId);
     if (chat == null || isStatusBroadcastChat(chat)) return null;
-    return chat;
+    // Titled with the user's own nickname, read per message so a new one
+    // shows on the next notification.
+    return ref.read(chatNicknamesProvider).apply(chat);
   }
 
   final matrixSession = MatrixNotificationSession.forClient(session.client);
