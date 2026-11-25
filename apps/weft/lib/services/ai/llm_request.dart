@@ -27,6 +27,9 @@ enum LlmTask {
   /// tap or after a quick message — never waited on by a message.
   personFacts,
 
+  /// A message translated on the user's tap, with them watching a spinner.
+  translate,
+
   /// The endpoints screen's test button.
   probe,
 }
@@ -83,7 +86,8 @@ Duration llmResponseTimeout(String baseUrl, LlmTask task) {
   final hosted = isHostedLlm(baseUrl);
   return switch (task) {
     LlmTask.quickMessage ||
-    LlmTask.autoReply => hosted ? kHostedReplyTimeout : kSelfHostedReplyTimeout,
+    LlmTask.autoReply ||
+    LlmTask.translate => hosted ? kHostedReplyTimeout : kSelfHostedReplyTimeout,
     LlmTask.todo =>
       hosted ? const Duration(seconds: 20) : kSelfHostedReplyTimeout,
     // Learning reads far more of the chat than anything else — thousands of

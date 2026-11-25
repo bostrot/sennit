@@ -1951,6 +1951,35 @@
   "@messageActionRetranscribe": {
     "description": "Row in the message actions sheet, and a heading over a list of languages: run speech-to-text again in a language the reader picks. The trailing ellipsis means a further choice follows. Keep under ~24 chars."
   },
+  "messageActionTranslate": "Translate",
+  "@messageActionTranslate": {
+    "description": "Row in the message actions sheet: translate this message with the user's own AI model. Keep under ~18 chars.",
+    "maxLength": 36
+  },
+  "translationTitle": "Translation",
+  "@translationTitle": {
+    "description": "Heading of the sheet that shows a message translated by the user's AI model. Short."
+  },
+  "translationLanguage": "Translate into",
+  "@translationLanguage": {
+    "description": "Screen-reader label of the language picker in the translation sheet: the language the message is translated into."
+  },
+  "translationWorking": "Translating…",
+  "@translationWorking": {
+    "description": "Shown next to a spinner while the AI model is translating a message."
+  },
+  "translationTimedOut": "Your AI model took too long to answer.",
+  "@translationTimedOut": {
+    "description": "Error in the translation sheet: the user's AI model did not answer in time."
+  },
+  "translationUnreachable": "Couldn’t reach your AI model.",
+  "@translationUnreachable": {
+    "description": "Error in the translation sheet: the user's AI model could not be reached or refused the request."
+  },
+  "translationEmpty": "Your AI model gave no translation.",
+  "@translationEmpty": {
+    "description": "Error in the translation sheet: the AI model answered, but without a translation."
+  },
   "messageActionDeleteTitle": "Delete this message?",
   "@messageActionDeleteTitle": {
     "description": "Title of the dialog confirming a message redaction."
