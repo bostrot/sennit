@@ -1186,6 +1186,79 @@ void main() {
       expect(editTargetEventId(editContent), r'$original:example.org');
       expect(replyTargetEventId(editContent), isNull);
     });
+
+    group('reaction notices', () {
+      sdk.Event own() => event(
+        type: sdk.EventTypes.Message,
+        eventId: r'$mine:example.org',
+        senderId: '@ada:example.org',
+        content: {'msgtype': 'm.text', 'body': 'See you at eight'},
+      );
+      sdk.Event thumbsUp({String senderId = '@sam:example.org'}) => event(
+        type: sdk.EventTypes.Reaction,
+        eventId: r'$reaction:example.org',
+        senderId: senderId,
+        content: {
+          'm.relates_to': {
+            'rel_type': 'm.annotation',
+            'event_id': r'$mine:example.org',
+            'key': '👍',
+          },
+        },
+      );
+
+      test('a reaction to the user own message carries emoji and text', () {
+        final notice = mapReactionNotice(
+          thumbsUp(),
+          target: own(),
+          network: ChatNetwork.matrix,
+          ownUserId: '@ada:example.org',
+        )!;
+        expect(notice.eventId, r'$reaction:example.org');
+        expect(notice.reactionKey, '👍');
+        expect(notice.isReaction, isTrue);
+        expect(notice.body, 'See you at eight');
+        expect(notice.replyToEventId, r'$mine:example.org');
+        expect(notice.senderId, '@sam:example.org');
+        expect(notice.isOwn, isFalse);
+      });
+
+      test('a reaction to somebody else message is not a notice', () {
+        expect(
+          mapReactionNotice(
+            thumbsUp(),
+            target: own(),
+            network: ChatNetwork.matrix,
+            ownUserId: '@someone_else:example.org',
+          ),
+          isNull,
+        );
+      });
+
+      test('the user own reaction is not a notice', () {
+        expect(
+          mapReactionNotice(
+            thumbsUp(senderId: '@ada:example.org'),
+            target: own(),
+            network: ChatNetwork.matrix,
+            ownUserId: '@ada:example.org',
+          ),
+          isNull,
+        );
+      });
+
+      test('a target that could not be fetched is not a notice', () {
+        expect(
+          mapReactionNotice(
+            thumbsUp(),
+            target: null,
+            network: ChatNetwork.matrix,
+            ownUserId: '@ada:example.org',
+          ),
+          isNull,
+        );
+      });
+    });
   });
 
   group('bridgedLinkPreviewsOf', () {

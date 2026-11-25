@@ -476,6 +476,16 @@ String renderNotificationBody(
   int maxLength = kMaxNotificationBodyLength,
   WeftNotifyStrings words = WeftNotifyStrings.english,
 }) {
+  final reaction = message.reactionKey;
+  if (reaction != null) {
+    // The emoji is what the other person said, so it hides with the preview;
+    // the user's own words it was put on are quoted after it.
+    if (!showPreview) return words.reactionHidden;
+    return _truncate(
+      words.reaction(reaction, _bodyForKind(words, message)),
+      maxLength,
+    );
+  }
   if (!showPreview) return words.hiddenPreview;
   return _truncate(_bodyForKind(words, message), maxLength);
 }

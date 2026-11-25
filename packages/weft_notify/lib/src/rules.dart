@@ -33,6 +33,10 @@ enum NotificationSuppression {
   /// Notifications are off globally.
   globallyDisabled,
 
+  /// A reaction to one of the user's messages, in a kind of chat — direct or
+  /// group — where they switched reaction notifications off.
+  reactionsOff,
+
   /// The message is not newer than the read marker, so it was already read —
   /// almost always on another device, since a push and a read racing on *this*
   /// device is the same fact arriving twice.
@@ -328,6 +332,8 @@ class NotificationPolicy {
     this.mentionsOnly = false,
     this.showPreviews = true,
     this.mentionsBypassMute = true,
+    this.reactionsInDirectChats = true,
+    this.reactionsInGroups = false,
     this.quietHours,
     Set<ChatNetwork> disabledNetworks = const {},
     Set<ChatNetwork> mutedNetworks = const {},
@@ -355,6 +361,19 @@ class NotificationPolicy {
   /// `dont_notify` beats everything. It is a setting because both readings have
   /// users, and because the alternative is arguing about it in a code review.
   final bool mentionsBypassMute;
+
+  /// Whether somebody reacting to the user's message in a one-to-one chat is
+  /// worth a notification. On by default: in a direct chat a reaction is
+  /// usually the whole answer.
+  final bool reactionsInDirectChats;
+
+  /// The same for groups. Off by default, because a lively group hands out
+  /// thumbs-ups far faster than anyone wants to be told about them.
+  final bool reactionsInGroups;
+
+  /// Whether a reaction in [chat] may notify at all.
+  bool reactionsNotifyIn(Chat chat) =>
+      chat.isGroup ? reactionsInGroups : reactionsInDirectChats;
 
   final QuietHours? quietHours;
 
@@ -445,6 +464,8 @@ class NotificationPolicy {
     bool? mentionsOnly,
     bool? showPreviews,
     bool? mentionsBypassMute,
+    bool? reactionsInDirectChats,
+    bool? reactionsInGroups,
     Object? quietHours = _sentinel,
     Set<ChatNetwork>? disabledNetworks,
     Set<ChatNetwork>? mutedNetworks,
@@ -455,6 +476,9 @@ class NotificationPolicy {
       mentionsOnly: mentionsOnly ?? this.mentionsOnly,
       showPreviews: showPreviews ?? this.showPreviews,
       mentionsBypassMute: mentionsBypassMute ?? this.mentionsBypassMute,
+      reactionsInDirectChats:
+          reactionsInDirectChats ?? this.reactionsInDirectChats,
+      reactionsInGroups: reactionsInGroups ?? this.reactionsInGroups,
       quietHours: identical(quietHours, _sentinel)
           ? this.quietHours
           : quietHours as QuietHours?,
@@ -469,6 +493,8 @@ class NotificationPolicy {
     'mentionsOnly': mentionsOnly,
     'showPreviews': showPreviews,
     'mentionsBypassMute': mentionsBypassMute,
+    'reactionsInDirectChats': reactionsInDirectChats,
+    'reactionsInGroups': reactionsInGroups,
     'quietHours': quietHours?.toJson(),
     'disabledNetworks': _networkIds(disabledNetworks),
     'mutedNetworks': _networkIds(mutedNetworks),
@@ -493,6 +519,8 @@ class NotificationPolicy {
       mentionsOnly: _asBool(json['mentionsOnly']) ?? false,
       showPreviews: _asBool(json['showPreviews']) ?? true,
       mentionsBypassMute: _asBool(json['mentionsBypassMute']) ?? true,
+      reactionsInDirectChats: _asBool(json['reactionsInDirectChats']) ?? true,
+      reactionsInGroups: _asBool(json['reactionsInGroups']) ?? false,
       quietHours: QuietHours.fromJson(json['quietHours']),
       disabledNetworks: _networks(json['disabledNetworks']),
       mutedNetworks: _networks(json['mutedNetworks']),
@@ -539,6 +567,8 @@ class NotificationPolicy {
       other.mentionsOnly == mentionsOnly &&
       other.showPreviews == showPreviews &&
       other.mentionsBypassMute == mentionsBypassMute &&
+      other.reactionsInDirectChats == reactionsInDirectChats &&
+      other.reactionsInGroups == reactionsInGroups &&
       other.quietHours == quietHours &&
       _networkSetEquality.equals(other.disabledNetworks, disabledNetworks) &&
       _networkSetEquality.equals(other.mutedNetworks, mutedNetworks) &&
@@ -550,6 +580,8 @@ class NotificationPolicy {
     mentionsOnly,
     showPreviews,
     mentionsBypassMute,
+    reactionsInDirectChats,
+    reactionsInGroups,
     quietHours,
     _networkSetEquality.hash(disabledNetworks),
     _networkSetEquality.hash(mutedNetworks),
@@ -786,6 +818,11 @@ NotificationDecision evaluateNotification({
       NotificationSuppression.globallyDisabled,
     );
   }
+  if (message.isReaction && !policy.reactionsNotifyIn(chat)) {
+    return const NotificationDecision.suppress(
+      NotificationSuppression.reactionsOff,
+    );
+  }
 
   // Read elsewhere. `!isAfter` rather than `isBefore` so a message stamped
   // exactly at the read marker — the message that *was* read — does not
@@ -803,11 +840,15 @@ NotificationDecision evaluateNotification({
     );
   }
 
-  final mentioned = mentionsUser(
-    message,
-    ownUserIds: ownUserIds,
-    ownDisplayNames: ownDisplayNames,
-  );
+  // A reaction notice carries the user's *own* text as its body, so matching
+  // their name in it would turn every reaction into a mention.
+  final mentioned =
+      !message.isReaction &&
+      mentionsUser(
+        message,
+        ownUserIds: ownUserIds,
+        ownDisplayNames: ownDisplayNames,
+      );
   final bypassesMute = mentioned && policy.mentionsBypassMute;
 
   if (!policy.isNetworkEnabled(message.network)) {

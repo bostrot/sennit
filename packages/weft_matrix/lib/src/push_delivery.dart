@@ -501,12 +501,32 @@ class _ClientNotificationSession implements MatrixNotificationSession {
       if (event.type == sdk.EventTypes.Encrypted) continue;
 
       final room = event.room;
-      final message = mapEvent(
+      final message = event.type == sdk.EventTypes.Reaction
+          ? await _reactionNotice(event, room)
+          : mapEvent(
+              event,
+              network: networkForRoom(room),
+              ownUserId: _client.userID,
+            );
+      if (message != null) yield message;
+    }
+  }
+
+  /// A reaction to the user's own message, with the message fetched — from
+  /// the local store when the room has it, the server when not.
+  Future<WeftMessage?> _reactionNotice(sdk.Event event, sdk.Room room) async {
+    final targetId = mapReaction(event)?.targetEventId;
+    if (targetId == null || event.senderId == _client.userID) return null;
+    try {
+      final target = await room.getEventById(targetId);
+      return mapReactionNotice(
         event,
+        target: target,
         network: networkForRoom(room),
         ownUserId: _client.userID,
       );
-      if (message != null) yield message;
+    } on Exception {
+      return null;
     }
   }
 
@@ -524,6 +544,9 @@ class _ClientNotificationSession implements MatrixNotificationSession {
       // this call *is* the message.
       final event = await room.getEventById(eventId);
       if (event == null || event.type == sdk.EventTypes.Encrypted) return null;
+      if (event.type == sdk.EventTypes.Reaction) {
+        return await _reactionNotice(event, room);
+      }
 
       return mapEvent(
         event,

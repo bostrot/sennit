@@ -721,4 +721,34 @@ void main() {
       }
     });
   });
+
+  group('reaction notices', () {
+    test('name the emoji and quote the message it was put on', () {
+      expect(
+        renderNotificationBody(
+          msg(body: 'See you at eight', reactionKey: '❤️'),
+        ),
+        'Reacted ❤️ to “See you at eight”',
+      );
+    });
+
+    test('a photo is quoted the way its own notification would read', () {
+      expect(
+        renderNotificationBody(
+          msg(kind: MessageKind.image, body: 'beach.jpg', reactionKey: '😂'),
+        ),
+        'Reacted 😂 to “Photo · beach.jpg”',
+      );
+    });
+
+    test('hide the emoji along with the text when previews are off', () {
+      expect(
+        renderNotificationBody(
+          msg(body: 'See you at eight', reactionKey: '❤️'),
+          showPreview: false,
+        ),
+        'Reacted to your message',
+      );
+    });
+  });
 }
