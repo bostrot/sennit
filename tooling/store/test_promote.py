@@ -164,6 +164,48 @@ def version(state, string='1.0.16', build=None, vid='v1'):
     return (vid, string, state, build)
 
 
+class PlayCommitTest(unittest.TestCase):
+    base = f'{promote.PLAY}/edits/7'
+
+    def commit(self, outcome, env=None):
+        calls = []
+
+        def call(method, url, token, body=None):
+            calls.append(url)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return {}
+        with mock.patch.object(promote, 'call', call), \
+                mock.patch.dict(os.environ, env or {}, clear=False):
+            return promote.play_commit('token', self.base), calls
+
+    def refusal(self, detail):
+        return promote.ApiError(f'POST {self.base}:commit?changesInReviewBehavior='
+                                f'ERROR_IF_IN_REVIEW -> 400\n{detail}')
+
+    def test_commits_only_if_nothing_is_in_review(self):
+        committed, calls = self.commit({})
+        self.assertTrue(committed)
+        self.assertEqual(calls, [f'{self.base}:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW'])
+
+    def test_keeps_changes_not_sent_for_review(self):
+        _, calls = self.commit({}, {'PLAY_CHANGES_NOT_SENT_FOR_REVIEW': 'true'})
+        self.assertIn('changesInReviewBehavior=ERROR_IF_IN_REVIEW', calls[0])
+        self.assertIn('changesNotSentForReview=true', calls[0])
+
+    def test_changes_in_review_skip_the_night(self):
+        committed, _ = self.commit(self.refusal(
+            '{"error": {"code": 400, "message": "Changes are currently in review and '
+            'cannot be committed.", "status": "FAILED_PRECONDITION"}}'))
+        self.assertFalse(committed)
+
+    def test_any_other_refusal_still_fails(self):
+        # The URL names ERROR_IF_IN_REVIEW; only Play's answer counts.
+        with self.assertRaises(promote.ApiError):
+            self.commit(self.refusal(
+                '{"error": {"code": 403, "message": "The caller does not have permission"}}'))
+
+
 class AppStorePlanTest(unittest.TestCase):
     def kinds(self, decision):
         return [step[0] for step in decision.steps]

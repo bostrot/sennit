@@ -346,6 +346,30 @@ def log(store, message):
     print(f'{store}: {message}', flush=True)
 
 
+IN_REVIEW_SKIP = 'previous release still in review, not replacing'
+# Play's refusal of a commit with ERROR_IF_IN_REVIEW, in the error's text.
+IN_REVIEW = re.compile(r'\b(?:in|under) review\b|being reviewed|IN_REVIEW', re.IGNORECASE)
+
+
+def play_commit(token, base):
+    """Commits the edit `base`, unless changes sent earlier are still in
+    Google's review: a commit then would withdraw them and restart the review
+    with this edit, and a nightly promotion would keep any release from ever
+    getting through. Returns False when Play refused for that reason."""
+    params = {'changesInReviewBehavior': 'ERROR_IF_IN_REVIEW'}
+    if os.environ.get('PLAY_CHANGES_NOT_SENT_FOR_REVIEW') == 'true':
+        params['changesNotSentForReview'] = 'true'
+    try:
+        call('POST', f'{base}:commit?{urllib.parse.urlencode(params)}', token, body={})
+    except ApiError as error:
+        # The first line is the request, whose URL names ERROR_IF_IN_REVIEW
+        # itself; Play's answer follows it.
+        if IN_REVIEW.search(str(error).partition('\n')[2]):
+            return False
+        raise
+    return True
+
+
 def play(apply, audit, now, max_age_hours, rollout, track):
     token = play_token()
     edit = call('POST', f'{PLAY}/edits', token, body={})['id']
@@ -398,14 +422,19 @@ def play(apply, audit, now, max_age_hours, rollout, track):
                 decision.failed = True
                 decision.promote = False
             if decision.promote and apply:
-                params = ''
-                if os.environ.get('PLAY_CHANGES_NOT_SENT_FOR_REVIEW') == 'true':
-                    params = '?changesNotSentForReview=true'
-                call('POST', f'{base}:commit{params}', token, body={})
-                committed = True
-                log('play', f'PROMOTED {release.get("name")} to {track}')
+                if play_commit(token, base):
+                    committed = True
+                    log('play', f'PROMOTED {release.get("name")} to {track}')
+                else:
+                    decision.promote = False
+                    decision.reason = IN_REVIEW_SKIP
+                    log('play', f'{IN_REVIEW_SKIP}: Play still reviews what was sent '
+                                'earlier; committing would withdraw it and restart the '
+                                'review, so Play waits for another night')
             elif decision.promote:
-                log('play', 'dry run: not committed')
+                log('play', 'dry run: not committed. Whether Play still reviews an earlier '
+                            'release it says only at commit; if it does, the real run '
+                            f'logs "{IN_REVIEW_SKIP}" and leaves Play alone')
 
         return decision
     finally:

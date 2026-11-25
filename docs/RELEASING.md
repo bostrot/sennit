@@ -301,6 +301,17 @@ internal tester group until a promotion submits them. Optional variables:
 open testing, `PLAY_PRODUCTION_ROLLOUT` (for example `0.2`) for a staged
 rollout, `PLAY_CHANGES_NOT_SENT_FOR_REVIEW=true` when Play asks for it.
 
+Play, like Apple, gets one release in review at a time. A commit while
+earlier changes are still in Google's review withdraws them and restarts
+the review with the new ones, so a release a night meant none ever got
+through: 1.0.18 to 1.0.24 each went to open testing and were replaced the
+next night before review ended, and open testing stayed on 1.0.9. So the
+promotion commits with `changesInReviewBehavior=ERROR_IF_IN_REVIEW`; when
+Play answers that something is still in review, Play is left alone that
+night (`play: previous release still in review, not replacing`, and the run
+stays green) and the App Store part goes on. The next night takes the newest
+build again. Play says this only at commit, so a dry run cannot tell.
+
 Export compliance is copied from the newest build a person answered (see
 above), so answer one build by hand first and keep the answer the same.
 
