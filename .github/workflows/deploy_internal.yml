@@ -213,7 +213,7 @@ jobs:
         # code and the second is refused, which is the right answer to
         # uploading the same build twice. Needs the full history: see
         # `fetch-depth: 0` above.
-        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)" --dart-define-from-file="$RUNNER_TEMP/build_info.json" --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
+        run: flutter build appbundle --release --build-number="$(git rev-list --count HEAD)" --dart-define-from-file="$RUNNER_TEMP/build_info.json" --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }} --dart-define=SENNIT_STORE=play
         working-directory: apps/weft
 
       - name: Show the bundle's signer

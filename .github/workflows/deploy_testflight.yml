@@ -160,7 +160,8 @@ jobs:
           flutter build ios --release --config-only --no-codesign \
             --build-number="$(git rev-list --count HEAD)" \
             --dart-define-from-file="$RUNNER_TEMP/build_info.json" \
-            --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
+            --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }} \
+            --dart-define=SENNIT_STORE=appstore
         working-directory: apps/weft
 
       - name: Import the distribution certificate

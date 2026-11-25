@@ -54,6 +54,10 @@ env:
   # BRAID_STORE_EDITION repository variable says `store` — which it should
   # only say when the products exist in both consoles.
   STORE_DEFINES: --dart-define=BRAID_EDITION=${{ vars.BRAID_STORE_EDITION || 'community' }}
+  # Which store's rating sheet the build may show (review_prompt.dart); the
+  # release page's builds pass none and never ask.
+  PLAY_DEFINES: --dart-define=SENNIT_STORE=play
+  APP_STORE_DEFINES: --dart-define=SENNIT_STORE=appstore
 
 jobs:
   verify:
@@ -253,7 +257,7 @@ jobs:
         working-directory: apps/weft
       - run: flutter build apk --release ${{ env.DIRECT_DEFINES }}
         working-directory: apps/weft
-      - run: flutter build appbundle --release ${{ env.STORE_DEFINES }}
+      - run: flutter build appbundle --release ${{ env.STORE_DEFINES }} ${{ env.PLAY_DEFINES }}
         working-directory: apps/weft
       - name: Collect artifacts
         run: |
@@ -553,7 +557,7 @@ jobs:
             > ~/Library/MobileDevice/Provisioning\ Profiles/braid.mobileprovision
       - name: Build a signed IPA
         if: env.HAS_SIGNING == 'true'
-        run: flutter build ipa --release ${{ env.STORE_DEFINES }}
+        run: flutter build ipa --release ${{ env.STORE_DEFINES }} ${{ env.APP_STORE_DEFINES }}
         working-directory: apps/weft
       - name: Build an unsigned IPA
         if: env.HAS_SIGNING != 'true'
@@ -562,7 +566,7 @@ jobs:
         # every watchOS-only API. A generic iOS destination lets each target
         # pick its own SDK, exactly as an Xcode archive would.
         run: |
-          (cd apps/weft && flutter build ios --release --config-only --no-codesign ${{ env.STORE_DEFINES }})
+          (cd apps/weft && flutter build ios --release --config-only --no-codesign ${{ env.STORE_DEFINES }} ${{ env.APP_STORE_DEFINES }})
           xcodebuild -workspace apps/weft/ios/Runner.xcworkspace \
             -scheme Runner -configuration Release \
             -destination 'generic/platform=iOS' \

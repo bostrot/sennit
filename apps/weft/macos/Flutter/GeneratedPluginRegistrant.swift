@@ -20,6 +20,7 @@ import flutter_secure_storage_darwin
 import flutter_webrtc
 import geolocator_apple
 import in_app_purchase_storekit
+import in_app_review
 import just_audio
 import package_info_plus
 import patrol
@@ -49,6 +50,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterWebRTCPlugin.register(with: registry.registrar(forPlugin: "FlutterWebRTCPlugin"))
   GeolocatorPlugin.register(with: registry.registrar(forPlugin: "GeolocatorPlugin"))
   InAppPurchasePlugin.register(with: registry.registrar(forPlugin: "InAppPurchasePlugin"))
+  InAppReviewPlugin.register(with: registry.registrar(forPlugin: "InAppReviewPlugin"))
   JustAudioPlugin.register(with: registry.registrar(forPlugin: "JustAudioPlugin"))
   FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
   PatrolPlugin.register(with: registry.registrar(forPlugin: "PatrolPlugin"))

@@ -225,6 +225,23 @@ abstract final class WeftSettings {
   /// an update, cleared the moment the notes are shown, so they show once.
   static const String whatsNewPendingVersion = 'whats_new.pending_version';
 
+  /// The store-rating prompt's local counters — see `ReviewPrompter`. When
+  /// this install was first started, in epoch milliseconds.
+  static const String reviewFirstSeenMs = 'review.first_seen_ms';
+
+  /// How many distinct days the app was used on, and the last one counted
+  /// (`yyyy-mm-dd`, local time).
+  static const String reviewActiveDays = 'review.active_days';
+  static const String reviewLastActiveDay = 'review.last_active_day';
+
+  /// Messages sent from this install.
+  static const String reviewMessagesSent = 'review.messages_sent';
+
+  /// When the store was last asked for its rating sheet, and as which
+  /// version.
+  static const String reviewLastPromptMs = 'review.last_prompt_ms';
+  static const String reviewLastPromptVersion = 'review.last_prompt_version';
+
   /// Whether people are named from the device address book when a phone
   /// number matches, instead of whatever the network calls them. Off by
   /// default: reading contacts is a permission the user grants knowingly.

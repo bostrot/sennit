@@ -4,6 +4,7 @@ import 'package:weft_store/weft_store.dart';
 
 import '../features/whats_new/whats_new.dart' show recordLaunchVersion;
 import '../services/backup/backup_service.dart' show kSennitVersion;
+import '../services/review/review_prompt.dart';
 import 'session_providers.dart';
 
 /// Every store, opened once at startup.
@@ -207,7 +208,15 @@ final storesBootstrapProvider = FutureProvider<WeftStores>((ref) async {
   ref.onDispose(stores.dispose);
   // Before anything is drawn, so a fresh install has recorded its version
   // by the time it reaches the inbox; see [recordLaunchVersion].
-  if (!kNoMatrix) recordLaunchVersion(stores.settings, kSennitVersion);
+  if (!kNoMatrix) {
+    recordLaunchVersion(stores.settings, kSennitVersion);
+    // Today counts as a day Sennit was used, for the rating prompt.
+    ReviewPrompter(
+      stores.settings,
+      store: ReviewStore.current,
+      version: kSennitVersion,
+    ).recordActive();
+  }
   return stores;
 });
 
