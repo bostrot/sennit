@@ -1722,5 +1722,19 @@
   "sennitWebRelayUnreachable": "No se puede contactar con el relay. Reintentando…",
   "sennitWebRelayHowTo": "Cómo configurar un relay",
   "contactPhotoOpen": "Ver foto de perfil",
-  "contactPhotoLabel": "Foto de perfil de {name}"
+  "contactPhotoLabel": "Foto de perfil de {name}",
+  "emojiPickerSearchHint": "Buscar emoji",
+  "emojiPickerNoResults": "No se encontró ningún emoji",
+  "emojiGroupRecent": "Recientes",
+  "emojiGroupSmileys": "Caras y personas",
+  "emojiGroupAnimals": "Animales y naturaleza",
+  "emojiGroupFood": "Comida y bebida",
+  "emojiGroupActivities": "Actividades",
+  "emojiGroupTravel": "Viajes y lugares",
+  "emojiGroupObjects": "Objetos",
+  "emojiGroupSymbols": "Símbolos",
+  "emojiGroupFlags": "Banderas",
+  "emojiSkinTone": "Tono de piel",
+  "emojiSkinToneName": "{tone, select, none{Sin tono de piel} light{Claro} mediumLight{Claro medio} medium{Medio} mediumDark{Oscuro medio} other{Oscuro}}",
+  "reactionRejectedByNetwork": "{network} no aceptó esa reacción. Puede que solo permita algunos emoji."
 }

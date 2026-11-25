@@ -1178,8 +1178,66 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     if (target == null) {
       throw StateError('Cannot react to $eventId: it is not in $chatId');
     }
-    await target.room.sendReaction(eventId, key);
+    final room = target.room;
+    // Only a bridge has anyone to refuse a reaction; a plain Matrix room took
+    // it the moment the homeserver did.
+    final network = _networkOf(room);
+    if (network == ChatNetwork.matrix) {
+      await room.sendReaction(eventId, key);
+      return;
+    }
+
+    // Bridges report what the other side made of an event in a
+    // `com.beeper.message_send_status` that references it. Listening starts
+    // before the send, because a quick bridge answers before `sendReaction`
+    // has returned the id to compare against.
+    String? reactionId;
+    final early = <String, Map<String, Object?>>{};
+    final verdict = Completer<Map<String, Object?>>();
+    final statuses = _session.client.onTimelineEvent.stream
+        .where((e) => e.roomId == room.id && e.type == _sendStatusType)
+        .listen((e) {
+          final relates = e.content['m.relates_to'];
+          final about = relates is Map ? relates['event_id'] : null;
+          if (about is! String || e.content['status'] == 'PENDING') return;
+          if (about == reactionId) {
+            if (!verdict.isCompleted) verdict.complete(e.content);
+          } else {
+            early[about] = e.content;
+          }
+        });
+    try {
+      reactionId = await room.sendReaction(eventId, key);
+      if (reactionId == null) return;
+      final status =
+          early[reactionId] ??
+          await verdict.future.timeout(
+            _bridgeVerdictWindow,
+            // No answer is the usual answer: most bridges only speak up when
+            // something went wrong, and many not even then.
+            onTimeout: () => const {},
+          );
+      final outcome = status['status'];
+      if (outcome != 'FAIL' && outcome != 'RETRIABLE') return;
+      try {
+        await room.redactEvent(reactionId);
+      } on Object catch (error) {
+        debugPrint('weft: could not take back refused reaction: $error');
+      }
+      throw ReactionRejectedException(
+        network,
+        reason: (status['message'] ?? status['reason'])?.toString(),
+      );
+    } finally {
+      await statuses.cancel();
+    }
   }
+
+  static const _sendStatusType = 'com.beeper.message_send_status';
+
+  /// How long a reaction waits for a bridge to object. Long enough for a
+  /// bridge round trip to the other network; nothing on screen waits on it.
+  static const _bridgeVerdictWindow = Duration(seconds: 8);
 
   @override
   Future<void> unreact(String chatId, String reactionEventId) async {

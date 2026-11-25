@@ -466,6 +466,27 @@ class AttachmentRejectedException implements Exception {
   String toString() => 'AttachmentRejectedException: $message';
 }
 
+/// Thrown by [ChatRepository.react] when a bridge said the other network
+/// refused the reaction.
+///
+/// Telegram without Premium, for one, accepts only a fixed set of reactions,
+/// and the bridge learns that only after the annotation is already in the room.
+/// By the time this is thrown the annotation has been taken back, so the chip
+/// does not stay on a message where nobody on the other side will ever see it.
+class ReactionRejectedException implements Exception {
+  const ReactionRejectedException(this.network, {this.reason});
+
+  /// The network that refused it, to name in the message.
+  final ChatNetwork network;
+
+  /// The bridge's own words, for the log. Not user-facing.
+  final String? reason;
+
+  @override
+  String toString() =>
+      'ReactionRejectedException: ${network.label} refused ($reason)';
+}
+
 /// Which of a chat's rooms an outgoing message rides.
 ///
 /// The one resolution both repositories and both send paths share: an explicit

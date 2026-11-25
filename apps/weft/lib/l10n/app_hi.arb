@@ -1722,5 +1722,19 @@
   "sennitWebRelayUnreachable": "रिले तक नहीं पहुँच सके। फिर कोशिश हो रही है…",
   "sennitWebRelayHowTo": "रिले कैसे सेट करें",
   "contactPhotoOpen": "प्रोफ़ाइल फ़ोटो देखें",
-  "contactPhotoLabel": "{name} की प्रोफ़ाइल फ़ोटो"
+  "contactPhotoLabel": "{name} की प्रोफ़ाइल फ़ोटो",
+  "emojiPickerSearchHint": "इमोजी खोजें",
+  "emojiPickerNoResults": "कोई इमोजी नहीं मिला",
+  "emojiGroupRecent": "हाल के",
+  "emojiGroupSmileys": "स्माइली और लोग",
+  "emojiGroupAnimals": "जानवर और प्रकृति",
+  "emojiGroupFood": "खाना-पीना",
+  "emojiGroupActivities": "गतिविधियाँ",
+  "emojiGroupTravel": "यात्रा और जगहें",
+  "emojiGroupObjects": "वस्तुएँ",
+  "emojiGroupSymbols": "चिह्न",
+  "emojiGroupFlags": "झंडे",
+  "emojiSkinTone": "त्वचा का रंग",
+  "emojiSkinToneName": "{tone, select, none{बिना त्वचा रंग} light{हल्का} mediumLight{मध्यम-हल्का} medium{मध्यम} mediumDark{मध्यम-गहरा} other{गहरा}}",
+  "reactionRejectedByNetwork": "{network} ने यह प्रतिक्रिया स्वीकार नहीं की। वहाँ शायद कुछ ही इमोजी चलते हैं।"
 }

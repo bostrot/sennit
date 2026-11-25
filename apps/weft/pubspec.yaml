@@ -81,6 +81,11 @@ dependencies:
   # One-shot position for "share my location". The permission prompt is the
   # OS's own, asked at the moment of sharing and never before.
   geolocator: ^14.0.2
+  # The emoji tables behind the reaction picker: every emoji to Unicode 14 with
+  # keywords in most of our languages, and an Android glyph check so the picker
+  # never offers a box. MIT. The picker UI is ours; only the data and the check
+  # are used.
+  emoji_picker_flutter: ^4.5.4
   intl: any
   matrix: ^10.1.0
   path: ^1.9.1

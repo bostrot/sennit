@@ -6,6 +6,7 @@
 
 #include "generated_plugin_registrant.h"
 
+#include <emoji_picker_flutter/emoji_picker_flutter_plugin_c_api.h>
 #include <fc_native_video_thumbnail/fc_native_video_thumbnail_plugin_c_api.h>
 #include <file_selector_windows/file_selector_windows.h>
 #include <firebase_core/firebase_core_plugin_c_api.h>
@@ -22,6 +23,8 @@
 #include <window_manager/window_manager_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
+  EmojiPickerFlutterPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("EmojiPickerFlutterPluginCApi"));
   FcNativeVideoThumbnailPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FcNativeVideoThumbnailPluginCApi"));
   FileSelectorWindowsRegisterWithRegistrar(

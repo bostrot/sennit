@@ -10002,5 +10002,86 @@
         "example": "Alex"
       }
     }
+  },
+  "emojiPickerSearchHint": "Search emoji",
+  "@emojiPickerSearchHint": {
+    "description": "Hint in the search field at the top of the full emoji picker used for reactions. Searches emoji names and shortcodes.",
+    "maxLength": 40
+  },
+  "emojiPickerNoResults": "No emoji found",
+  "@emojiPickerNoResults": {
+    "description": "Shown in the emoji picker when a search matches no emoji.",
+    "maxLength": 60
+  },
+  "emojiGroupRecent": "Recent",
+  "@emojiGroupRecent": {
+    "description": "Heading and tab label in the emoji picker for the emoji the reader reacted with most recently.",
+    "maxLength": 30
+  },
+  "emojiGroupSmileys": "Smileys & people",
+  "@emojiGroupSmileys": {
+    "description": "Emoji picker category: faces, hands and people. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupAnimals": "Animals & nature",
+  "@emojiGroupAnimals": {
+    "description": "Emoji picker category: animals and plants. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupFood": "Food & drink",
+  "@emojiGroupFood": {
+    "description": "Emoji picker category: food and drink. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupActivities": "Activities",
+  "@emojiGroupActivities": {
+    "description": "Emoji picker category: sports, games, celebrations. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupTravel": "Travel & places",
+  "@emojiGroupTravel": {
+    "description": "Emoji picker category: vehicles, buildings, places, weather. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupObjects": "Objects",
+  "@emojiGroupObjects": {
+    "description": "Emoji picker category: everyday things. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupSymbols": "Symbols",
+  "@emojiGroupSymbols": {
+    "description": "Emoji picker category: hearts, signs, arrows, shapes. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiGroupFlags": "Flags",
+  "@emojiGroupFlags": {
+    "description": "Emoji picker category: country and other flags. Heading and tab tooltip.",
+    "maxLength": 30
+  },
+  "emojiSkinTone": "Skin tone",
+  "@emojiSkinTone": {
+    "description": "Tooltip of the button in the emoji picker that chooses the skin tone applied to people and hand emoji.",
+    "maxLength": 30
+  },
+  "emojiSkinToneName": "{tone, select, none{No skin tone} light{Light} mediumLight{Medium-light} medium{Medium} mediumDark{Medium-dark} other{Dark}}",
+  "@emojiSkinToneName": {
+    "description": "Name of one skin tone option in the emoji picker, read by screen readers and shown as a tooltip. 'none' is the default yellow emoji.",
+    "placeholders": {
+      "tone": {
+        "type": "String",
+        "description": "Which tone: none, light, mediumLight, medium, mediumDark or dark."
+      }
+    }
+  },
+  "reactionRejectedByNetwork": "{network} didn’t accept that reaction. It may only allow some emoji.",
+  "@reactionRejectedByNetwork": {
+    "description": "Toast shown when a bridged chat network (for example Telegram) refused a reaction the reader sent, usually because it only allows a fixed set of reaction emoji.",
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "example": "Telegram",
+        "description": "Name of the chat network."
+      }
+    }
   }
 }

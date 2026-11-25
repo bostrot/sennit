@@ -1722,5 +1722,19 @@
   "sennitWebRelayUnreachable": "تعذّر الوصول إلى المُرحِّل. جارٍ إعادة المحاولة…",
   "sennitWebRelayHowTo": "كيفية إعداد مُرحِّل",
   "contactPhotoOpen": "عرض الصورة الشخصية",
-  "contactPhotoLabel": "الصورة الشخصية لـ{name}"
+  "contactPhotoLabel": "الصورة الشخصية لـ{name}",
+  "emojiPickerSearchHint": "ابحث عن رمز تعبيري",
+  "emojiPickerNoResults": "لم يُعثر على أي رمز تعبيري",
+  "emojiGroupRecent": "المستخدمة مؤخرًا",
+  "emojiGroupSmileys": "الوجوه والأشخاص",
+  "emojiGroupAnimals": "الحيوانات والطبيعة",
+  "emojiGroupFood": "الطعام والشراب",
+  "emojiGroupActivities": "الأنشطة",
+  "emojiGroupTravel": "السفر والأماكن",
+  "emojiGroupObjects": "الأشياء",
+  "emojiGroupSymbols": "الرموز",
+  "emojiGroupFlags": "الأعلام",
+  "emojiSkinTone": "لون البشرة",
+  "emojiSkinToneName": "{tone, select, none{بلا لون بشرة} light{فاتح} mediumLight{فاتح متوسط} medium{متوسط} mediumDark{داكن متوسط} other{داكن}}",
+  "reactionRejectedByNetwork": "لم يقبل {network} هذا التفاعل. ربما لا يسمح إلا ببعض الرموز التعبيرية."
 }

@@ -1723,5 +1723,19 @@
   "sennitWebRelayUnreachable": "无法连接中继，正在重试…",
   "sennitWebRelayHowTo": "如何设置中继",
   "contactPhotoOpen": "查看头像",
-  "contactPhotoLabel": "{name}的头像"
+  "contactPhotoLabel": "{name}的头像",
+  "emojiPickerSearchHint": "搜索表情符号",
+  "emojiPickerNoResults": "未找到表情符号",
+  "emojiGroupRecent": "最近使用",
+  "emojiGroupSmileys": "笑脸和人物",
+  "emojiGroupAnimals": "动物和自然",
+  "emojiGroupFood": "食物和饮料",
+  "emojiGroupActivities": "活动",
+  "emojiGroupTravel": "旅行和地点",
+  "emojiGroupObjects": "物品",
+  "emojiGroupSymbols": "符号",
+  "emojiGroupFlags": "旗帜",
+  "emojiSkinTone": "肤色",
+  "emojiSkinToneName": "{tone, select, none{默认肤色} light{浅肤色} mediumLight{中等偏浅肤色} medium{中等肤色} mediumDark{中等偏深肤色} other{深肤色}}",
+  "reactionRejectedByNetwork": "{network} 未接受该回应，可能只允许部分表情符号。"
 }
