@@ -45,9 +45,11 @@ class NotificationPolicyNotifier extends Notifier<NotificationPolicy> {
       return NotificationPolicy.fromJson(
         ref.read(storesProvider).settings.getJson(WeftSettings.notifyPolicy),
       );
-    } on StateError {
+    } on Object {
       // Stores not bootstrapped — a widget test pumping a screen directly.
       // Defaults are "notify normally", which is the safe direction to fail in.
+      // `Object`, not `StateError`: past the first read the failure arrives
+      // wrapped in a `ProviderException` (see `storesOrNull`).
       return NotificationPolicy();
     }
   }
@@ -63,7 +65,7 @@ class NotificationPolicyNotifier extends Notifier<NotificationPolicy> {
           .settings
           .setJson(WeftSettings.notifyPolicy, policy.toJson());
       ref.read(settingsRevisionProvider.notifier).bump();
-    } on StateError {
+    } on Object {
       // Same as above: in-memory only.
     }
     state = policy;
@@ -74,6 +76,15 @@ class NotificationPolicyNotifier extends Notifier<NotificationPolicy> {
       update(state.muteChat(chatId, until: until));
 
   void unmuteChat(String chatId) => update(state.unmuteChat(chatId));
+
+  /// Shows [chatId]'s notifications without sound or vibration, or puts the
+  /// sound back.
+  void setChatSilent(String chatId, {required bool silent}) => update(
+    state.withChatOverride(
+      chatId,
+      state.overrideFor(chatId).copyWith(silent: silent),
+    ),
+  );
 
   /// Drops timed mutes whose hour is up.
   ///
