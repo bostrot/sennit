@@ -3,6 +3,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:weft_domain/weft_domain.dart';
 
+import 'bridge_buttons.dart';
 import 'links.dart';
 import 'mentions.dart';
 import 'span.dart';
@@ -103,19 +104,51 @@ RichDocument parseFormattedBody(String? formattedBody, String plainBody) {
     trimEdges: true,
   );
   if (spans.isEmpty) return parsePlainBody(plainBody);
-  return parseMentions(RichDocument(spans));
+  return parseMentions(RichDocument(_linkify(spans)));
 }
+
+/// Makes the bare urls, addresses and numbers in a formatted body tappable.
+///
+/// A formatted body is not proof the sender's client made the links: a bridge
+/// turns `*bold*` into `<strong>` and every newline into `<br>`, and leaves a
+/// url sitting in the text beside them. Skipped inside an anchor, whose text
+/// already has a destination, and inside code, which is quoted rather than
+/// shared.
+List<RichSpan> _linkify(List<RichSpan> spans) => [
+  for (final span in spans)
+    ...switch (span) {
+      RichTextRun(:final style) when !style.code => linkifyPlainRun(
+        span.text,
+        style: style,
+      ),
+      RichBlock(:final kind) when kind != RichBlockKind.codeBlock => [
+        RichBlock(
+          kind: kind,
+          children: _linkify(span.children),
+          level: span.level,
+          language: span.language,
+          start: span.start,
+        ),
+      ],
+      _ => [span],
+    },
+];
 
 /// Wraps an unformatted body as a document, preserving its line breaks.
 ///
 /// One paragraph rather than one per line: a plain body's blank lines are the
 /// sender's own spacing, and re-deriving paragraphs from them would make
 /// `\n\n` mean something structural that the sender never said.
+///
+/// Blank lines and spaces at either end are dropped, since they are nobody's
+/// spacing: a bridge that joins an empty title to the text with `\n\n` opens
+/// the bubble with two empty rows. The stored event keeps them.
 RichDocument parsePlainBody(String plainBody) {
-  if (plainBody.trim().isEmpty) return RichDocument.empty;
+  final trimmed = plainBody.trim();
+  if (trimmed.isEmpty) return RichDocument.empty;
 
   final children = <RichSpan>[];
-  final lines = plainBody.split('\n');
+  final lines = trimmed.split('\n');
   for (var i = 0; i < lines.length; i++) {
     if (i > 0) children.add(const RichLineBreak());
     // Linkified, because a bare url is the only kind of link a bridge can
@@ -154,9 +187,13 @@ RichDocument parseMessageDocument({
 /// The projection the search index and notification bodies take, so that a
 /// message written as `<p>meet at <b>six</b></p>` is findable by "six" and
 /// notifies as "meet at six" rather than as its tags. A reply notifies as what
-/// the sender just said, not as the message they said it about.
+/// the sender just said, not as the message they said it about. A bridge's
+/// text stand-in for buttons is left out, as the bubble leaves it out.
 String plainMessageText({required String body, String? formattedBody}) =>
-    parseMessageDocument(body: body, formattedBody: formattedBody).plainText;
+    parseMessageContent(
+      body: body,
+      formattedBody: formattedBody,
+    ).document.plainText;
 
 /// Everything [message] says as plain text: its projected body, plus any
 /// transcript, joined the way [WeftMessage.searchableText] joins them.
@@ -437,6 +474,20 @@ List<RichSpan> _normalise(List<RichSpan> spans, {bool trimEdges = false}) {
       if (before is RichBlock || after is RichBlock) continue;
     }
     out.add(span);
+  }
+
+  if (trimEdges) {
+    // A `<br>` at either end is spacing around nothing: a bridge that joins an
+    // empty title to the text opens the body with two of them.
+    bool blank(RichSpan span) =>
+        span is RichLineBreak ||
+        (span is RichTextRun && span.text.trim().isEmpty);
+    while (out.isNotEmpty && blank(out.first)) {
+      out.removeAt(0);
+    }
+    while (out.isNotEmpty && blank(out.last)) {
+      out.removeLast();
+    }
   }
 
   if (trimEdges && out.isNotEmpty) {

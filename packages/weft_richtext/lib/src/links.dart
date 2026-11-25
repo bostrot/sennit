@@ -66,7 +66,7 @@ List<String> extractLinkUrls(RichDocument document) {
     for (final span in spans) {
       switch (span) {
         case RichLink():
-          if (_underSpoiler(span.children)) break;
+          if (span.inferred || _underSpoiler(span.children)) break;
           add(span.url);
         // Children deliberately not visited: see the doc comment.
         case RichTextRun():
@@ -134,22 +134,131 @@ String? previewableUrl(String? url) {
 /// should be *tappable*, not merely previewable. Uses the same regex and the
 /// same trailing-punctuation rule, so the link the reader taps is exactly the
 /// one the preview card was fetched for.
-List<RichSpan> linkifyPlainRun(String text) {
+///
+/// Three more spellings become links here without being previewed: a domain
+/// written without its scheme (`ups.com/track?n=1`), an e-mail address and a
+/// phone number. Each comes out [RichLink.inferred], with the words the sender
+/// wrote as its text. [style] is carried into every piece, so a bold url stays
+/// bold once it is tappable.
+List<RichSpan> linkifyPlainRun(
+  String text, {
+  RichStyle style = RichStyle.plain,
+}) {
   if (text.isEmpty) return const [];
   final spans = <RichSpan>[];
   var cursor = 0;
-  for (final match in _bareUrl.allMatches(text)) {
-    final url = _trimTrailingPunctuation(match.group(0)!);
-    if (url.isEmpty || previewableUrl(url) == null) continue;
+  for (final match in _linkCandidate.allMatches(text)) {
+    if (match.start < cursor) continue;
+    final found = _linkAt(match);
+    if (found == null) continue;
+    final (written, url, inferred) = found;
     if (match.start > cursor) {
-      spans.add(RichTextRun(text.substring(cursor, match.start)));
+      spans.add(RichTextRun(text.substring(cursor, match.start), style: style));
     }
-    spans.add(RichLink(url: url, children: [RichTextRun(url)]));
-    cursor = match.start + url.length;
+    spans.add(
+      RichLink(
+        url: url,
+        children: [RichTextRun(written, style: style)],
+        inferred: inferred,
+      ),
+    );
+    cursor = match.start + written.length;
   }
-  if (cursor == 0) return [RichTextRun(text)];
-  if (cursor < text.length) spans.add(RichTextRun(text.substring(cursor)));
+  if (cursor == 0) return [RichTextRun(text, style: style)];
+  if (cursor < text.length) {
+    spans.add(RichTextRun(text.substring(cursor), style: style));
+  }
   return spans;
+}
+
+/// Everything [linkifyPlainRun] considers, as one alternation so the leftmost
+/// candidate wins: a url with a scheme, an e-mail address, a domain without a
+/// scheme, a phone number.
+final RegExp _linkCandidate = RegExp(
+  '(?<url>${_bareUrl.pattern})'
+  '|(?<email>$_email)'
+  '|(?<domain>$_domain)'
+  '|(?<phone>$_phone)',
+  caseSensitive: false,
+);
+
+/// `name@host.tld`. Not preceded by a character that would make it the tail of
+/// something else — a Matrix id's `:server`, a url's userinfo.
+const String _email =
+    r"(?<![\w.%+@/:-])[a-z0-9][a-z0-9._%+-]*@(?:[a-z0-9-]+\.)+[a-z]{2,24}"
+    r'(?![\w@-])';
+
+/// A domain written without its scheme: `www.` plus anything, or a name under
+/// one of the top-level domains people actually write in prose. A list rather
+/// than "any two letters after a dot", because `file.txt`, `e.g.` and `v1.0`
+/// are not places, and a sentence that ends `…the plan.Then` is not either.
+const String _domain =
+    r'(?<![\w@./:-])'
+    r'(?:www\.(?:[a-z0-9-]+\.)+[a-z]{2,24}'
+    r'|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+'
+    '(?:$_tlds)'
+    r')(?![\w-])'
+    r'(?::\d{2,5})?'
+    r'(?:[/?#][^\s<>"'
+    "'"
+    r'`\u2000-\u206f]*)?';
+
+const String _tlds =
+    'com|org|net|de|at|ch|eu|io|app|dev|me|info|biz|uk|fr|es|it|nl|be|pl|pt|'
+    'br|in|cn|jp|ru|us|ca|au|co|tv|ly|gl|ai|xyz|online|site|shop|store|tech|'
+    'news|blog|link|page|cloud|email|edu|gov|ar|mx|se|no|dk|fi|ie|cz|sk|hu|'
+    'ro|gr|tr|ae|sa|eg|ma|il|kr|tw|hk|sg|nz|za|ng|ke';
+
+/// A run of digits that reads as a phone number. Narrowed further by
+/// [_phoneUrl], since a regex alone cannot tell `+49 171 2345678` from a
+/// tracking number or a date.
+const String _phone = r'(?<![\w+/.,:-])\+?\(?\d[\d ()/-]{5,22}\d(?![\w/-])';
+
+/// Turns one candidate into `(written, url, inferred)`, or null when it is not
+/// a link after all.
+(String, String, bool)? _linkAt(RegExpMatch match) {
+  if (match.namedGroup('url') case final raw?) {
+    final url = _trimTrailingPunctuation(raw);
+    if (url.isEmpty || previewableUrl(url) == null) return null;
+    return (url, url, false);
+  }
+  if (match.namedGroup('email') case final address?) {
+    final url = sanitizeUrl('mailto:$address');
+    return url == null ? null : (address, url, true);
+  }
+  if (match.namedGroup('domain') case final raw?) {
+    final written = _trimTrailingPunctuation(raw);
+    final url = previewableUrl('https://$written');
+    return url == null ? null : (written, url, true);
+  }
+  if (match.namedGroup('phone') case final raw?) {
+    final written = raw.trimRight();
+    final url = _phoneUrl(written);
+    return url == null ? null : (written, url, true);
+  }
+  return null;
+}
+
+/// `tel:` for [written] when it is a phone number, or null.
+///
+/// It is one when it starts the way a dialled number starts — `+`, a trunk `0`
+/// (bracketed or not) — or has the North American `555-123-4567` shape, and
+/// carries seven to fifteen digits, E.164's ceiling. Dates (`06/12/2026`),
+/// postcodes and the digits of a tracking code do not get through: the first
+/// has a date's shape, the others start with neither.
+String? _phoneUrl(String written) {
+  final digits = written.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  if (RegExp(r'\s{2,}|//|--').hasMatch(written)) return null;
+  if (_countOf(written, '(') != _countOf(written, ')')) return null;
+  if (RegExp(r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$').hasMatch(written)) return null;
+  final international = written.startsWith('+');
+  final trunk = RegExp(r'^\(?0').hasMatch(written);
+  final northAmerican = RegExp(
+    r'^\(?\d{3}\)?[ -]\d{3}-\d{4}$',
+  ).hasMatch(written);
+  if (!international && !trunk && !northAmerican) return null;
+  return 'tel:${international ? '+' : ''}$digits';
 }
 
 /// Drops the punctuation a url picked up from the sentence around it.

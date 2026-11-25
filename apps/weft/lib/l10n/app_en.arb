@@ -10195,5 +10195,64 @@
         "description": "Name of the chat network."
       }
     }
+  },
+  "linkActionOpen": "Open link",
+  "@linkActionOpen": {
+    "description": "Action in the sheet a long-pressed link opens: open the link in the browser. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionCopyLink": "Copy link",
+  "@linkActionCopyLink": {
+    "description": "Action in the link sheet: copy the link to the clipboard. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionCall": "Call",
+  "@linkActionCall": {
+    "description": "Action in the sheet a tapped phone number opens: dial it. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionSendSms": "Send a text",
+  "@linkActionSendSms": {
+    "description": "Action in the phone-number sheet: write a text message (SMS) to the number. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionCopyNumber": "Copy number",
+  "@linkActionCopyNumber": {
+    "description": "Action in the phone-number sheet: copy the number to the clipboard. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionWriteEmail": "Write an email",
+  "@linkActionWriteEmail": {
+    "description": "Action in the sheet a tapped email address opens: write an email to it. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "linkActionCopyAddress": "Copy address",
+  "@linkActionCopyAddress": {
+    "description": "Action in the email-address sheet: copy the address to the clipboard. Keep under ~24 chars.",
+    "maxLength": 24
+  },
+  "bridgeButtonsHint": "Open {network} to answer",
+  "@bridgeButtonsHint": {
+    "description": "Hint under the greyed-out buttons of a bridged business message (for example a parcel service offering delivery options). The buttons can only be answered in the messenger's own app. Keep under ~40 chars.",
+    "maxLength": 40,
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
+  },
+  "bridgeButtonsOpenApp": "Open in {network}",
+  "@bridgeButtonsOpenApp": {
+    "description": "Button under a bridged business message's greyed-out buttons that opens the conversation in the messenger's own app. Keep under ~28 chars.",
+    "maxLength": 28,
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "description": "A messenger's display name, never translated.",
+        "example": "WhatsApp"
+      }
+    }
   }
 }

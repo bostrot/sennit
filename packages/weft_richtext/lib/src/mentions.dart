@@ -100,7 +100,11 @@ List<RichSpan> _resolveSpans(List<RichSpan> spans) {
           );
         } else {
           out.add(
-            RichLink(url: span.url, children: _resolveSpans(span.children)),
+            RichLink(
+              url: span.url,
+              children: _resolveSpans(span.children),
+              inferred: span.inferred,
+            ),
           );
         }
       case RichBlock():

@@ -1756,5 +1756,14 @@
   "emojiGroupFlags": "Banderas",
   "emojiSkinTone": "Tono de piel",
   "emojiSkinToneName": "{tone, select, none{Sin tono de piel} light{Claro} mediumLight{Claro medio} medium{Medio} mediumDark{Oscuro medio} other{Oscuro}}",
-  "reactionRejectedByNetwork": "{network} no aceptó esa reacción. Puede que solo permita algunos emoji."
+  "reactionRejectedByNetwork": "{network} no aceptó esa reacción. Puede que solo permita algunos emoji.",
+  "linkActionOpen": "Abrir enlace",
+  "linkActionCopyLink": "Copiar enlace",
+  "linkActionCall": "Llamar",
+  "linkActionSendSms": "Enviar SMS",
+  "linkActionCopyNumber": "Copiar número",
+  "linkActionWriteEmail": "Escribir un correo",
+  "linkActionCopyAddress": "Copiar dirección",
+  "bridgeButtonsHint": "Responde en {network}",
+  "bridgeButtonsOpenApp": "Abrir en {network}"
 }

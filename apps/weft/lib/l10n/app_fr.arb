@@ -1756,5 +1756,14 @@
   "emojiGroupFlags": "Drapeaux",
   "emojiSkinTone": "Teint",
   "emojiSkinToneName": "{tone, select, none{Sans teint} light{Clair} mediumLight{Moyennement clair} medium{Moyen} mediumDark{Moyennement foncé} other{Foncé}}",
-  "reactionRejectedByNetwork": "{network} n’a pas accepté cette réaction. Seuls certains émojis y sont peut-être autorisés."
+  "reactionRejectedByNetwork": "{network} n’a pas accepté cette réaction. Seuls certains émojis y sont peut-être autorisés.",
+  "linkActionOpen": "Ouvrir le lien",
+  "linkActionCopyLink": "Copier le lien",
+  "linkActionCall": "Appeler",
+  "linkActionSendSms": "Envoyer un SMS",
+  "linkActionCopyNumber": "Copier le numéro",
+  "linkActionWriteEmail": "Écrire un e-mail",
+  "linkActionCopyAddress": "Copier l’adresse",
+  "bridgeButtonsHint": "Répondez dans {network}",
+  "bridgeButtonsOpenApp": "Ouvrir dans {network}"
 }

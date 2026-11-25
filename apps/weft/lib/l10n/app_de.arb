@@ -1756,5 +1756,14 @@
   "emojiGroupFlags": "Flaggen",
   "emojiSkinTone": "Hautfarbe",
   "emojiSkinToneName": "{tone, select, none{Ohne Hautfarbe} light{Hell} mediumLight{Mittelhell} medium{Mittel} mediumDark{Mitteldunkel} other{Dunkel}}",
-  "reactionRejectedByNetwork": "{network} hat diese Reaktion nicht angenommen. Dort sind wohl nur bestimmte Emojis erlaubt."
+  "reactionRejectedByNetwork": "{network} hat diese Reaktion nicht angenommen. Dort sind wohl nur bestimmte Emojis erlaubt.",
+  "linkActionOpen": "Link öffnen",
+  "linkActionCopyLink": "Link kopieren",
+  "linkActionCall": "Anrufen",
+  "linkActionSendSms": "SMS schreiben",
+  "linkActionCopyNumber": "Nummer kopieren",
+  "linkActionWriteEmail": "E-Mail schreiben",
+  "linkActionCopyAddress": "Adresse kopieren",
+  "bridgeButtonsHint": "In {network} antworten",
+  "bridgeButtonsOpenApp": "In {network} öffnen"
 }

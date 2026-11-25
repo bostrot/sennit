@@ -1756,5 +1756,14 @@
   "emojiGroupFlags": "झंडे",
   "emojiSkinTone": "त्वचा का रंग",
   "emojiSkinToneName": "{tone, select, none{बिना त्वचा रंग} light{हल्का} mediumLight{मध्यम-हल्का} medium{मध्यम} mediumDark{मध्यम-गहरा} other{गहरा}}",
-  "reactionRejectedByNetwork": "{network} ने यह प्रतिक्रिया स्वीकार नहीं की। वहाँ शायद कुछ ही इमोजी चलते हैं।"
+  "reactionRejectedByNetwork": "{network} ने यह प्रतिक्रिया स्वीकार नहीं की। वहाँ शायद कुछ ही इमोजी चलते हैं।",
+  "linkActionOpen": "लिंक खोलें",
+  "linkActionCopyLink": "लिंक कॉपी करें",
+  "linkActionCall": "कॉल करें",
+  "linkActionSendSms": "SMS भेजें",
+  "linkActionCopyNumber": "नंबर कॉपी करें",
+  "linkActionWriteEmail": "ईमेल लिखें",
+  "linkActionCopyAddress": "पता कॉपी करें",
+  "bridgeButtonsHint": "जवाब देने के लिए {network} खोलें",
+  "bridgeButtonsOpenApp": "{network} में खोलें"
 }
