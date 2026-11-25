@@ -48,6 +48,7 @@ import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 import 'services/notifications/unified_push.dart';
 import 'services/review/review_prompt.dart' show reviewSessionHadError;
+import 'services/schedule/scheduled_actions.dart';
 import 'services/siri/siri_messaging.dart';
 
 /// Marks the session as one that went wrong at the first framework or
@@ -354,6 +355,21 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       muteChat: ref.read(notificationPolicyProvider.notifier).muteChat,
       dismiss: service.dismissChat,
       stopReplyReminder: ref.read(replyReminderServiceProvider).dismiss,
+      remindLater: (chatId, {required roomId, required at}) {
+        final chats = ref.read(chatsProvider).value ?? const <Chat>[];
+        final chat =
+            chats.where((c) => c.id == chatId).firstOrNull ??
+            ref.read(chatRepositoryProvider).chatForRoom(roomId);
+        return ref
+            .read(reminderListProvider.notifier)
+            .add(
+              chatReminder(
+                chatId: chatId,
+                chatTitle: chat?.title ?? '',
+                at: at,
+              ),
+            );
+      },
     );
     service.onAction = (activation) => unawaited(actions.handle(activation));
     // Reply and mark read from the car, a watch or the lock screen arrive in

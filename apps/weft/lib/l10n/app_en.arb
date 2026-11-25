@@ -7239,6 +7239,26 @@
     "description": "Label of the mute-for-an-hour action on a message notification, drawn by the operating system. Very tight. Keep under ~18 chars.",
     "maxLength": 36
   },
+  "notificationActionLater": "Later",
+  "@notificationActionLater": {
+    "description": "Third action on an Android message notification; opens choices to be reminded later or mute. Drawn by the operating system. Very tight. Keep under ~14 chars.",
+    "maxLength": 28
+  },
+  "notificationRemindInAnHour": "Remind in 1 hour",
+  "@notificationRemindInAnHour": {
+    "description": "Notification action and choice: remind the user about this chat in one hour. Drawn by the operating system. Keep under ~24 chars.",
+    "maxLength": 36
+  },
+  "notificationRemindTonight": "Remind tonight",
+  "@notificationRemindTonight": {
+    "description": "Notification action and choice: remind the user about this chat this evening (19:00). Keep under ~24 chars.",
+    "maxLength": 36
+  },
+  "notificationRemindTomorrowMorning": "Remind tomorrow morning",
+  "@notificationRemindTomorrowMorning": {
+    "description": "Choice under 'Later' on a notification shown after 19:00: remind the user about this chat tomorrow at 9:00. Keep under ~24 chars.",
+    "maxLength": 36
+  },
   "notificationChannelNetwork": "Messages that arrive over {network}.",
   "@notificationChannelNetwork": {
     "description": "Description of one messenger's notification channel, shown in the operating system's own notification settings rather than in the app.",

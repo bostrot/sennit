@@ -39,7 +39,7 @@ it has no decisions.
 | Register | `packages/weft_matrix/lib/src/pusher.dart`, `push_rules.dart` | The pusher, and the server-side rules kept in step with it |
 | Present | `apps/weft/lib/services/notifications/notification_presentation.dart` | `NotificationContent` → `NotificationDetails`, with no device involved |
 | Post | `apps/weft/lib/services/notifications/notification_service.dart` | What is currently on screen, when a summary replaces it, where a tap goes |
-| Act | `apps/weft/lib/services/notifications/notification_actions.dart` | Reply, mark read, mute for an hour |
+| Act | `apps/weft/lib/services/notifications/notification_actions.dart` | Reply, mark read, mute for an hour, remind later |
 
 ```mermaid
 flowchart TD

@@ -72,6 +72,14 @@ abstract final class WeftNotificationActions {
   static const String markRead = 'weft.mark_read';
   static const String muteForAnHour = 'weft.mute_1h';
 
+  /// Android's third button: one action whose input choices are the two
+  /// reminders and the mute, because Android shows three buttons and no more.
+  static const String later = 'weft.later';
+
+  /// iOS and macOS have room for the reminders as actions of their own.
+  static const String remindInAnHour = 'weft.remind_1h';
+  static const String remindTonight = 'weft.remind_tonight';
+
   /// "Stop reminding" on a reply reminder: no more reminders about the message
   /// it is about. The next message from the other side starts over.
   static const String stopReplyReminder = 'weft.reply_reminder.stop';
@@ -93,6 +101,50 @@ abstract final class WeftNotificationActions {
 /// where the body is readable — locally, in `evaluateNotification`.
 const Duration kMuteForAnHour = Duration(hours: 1);
 
+/// What "Later" can mean, picked from its choices or from the iOS actions.
+enum LaterChoice { remindInAnHour, remindTonight, muteForAnHour }
+
+/// When "Remind tonight" reminds: 19:00 today, the time the chat's own
+/// "Remind me" offers. Once that has passed, 9:00 tomorrow — the Android
+/// choice is then labelled "Tomorrow morning"; the iOS action's title is
+/// registered once and cannot follow the clock.
+DateTime remindTonightAt(DateTime now) {
+  final tonight = DateTime(now.year, now.month, now.day, 19);
+  return tonight.isAfter(now)
+      ? tonight
+      : DateTime(now.year, now.month, now.day + 1, 9);
+}
+
+/// The input choices of Android's "Later" action, in order, as of [now].
+List<String> laterChoiceLabels(DateTime now) {
+  final l10n = weftPlatformL10n();
+  return [
+    l10n.notificationRemindInAnHour,
+    remindTonightAt(now).day == now.day
+        ? l10n.notificationRemindTonight
+        : l10n.notificationRemindTomorrowMorning,
+    l10n.notificationActionMuteHour,
+  ];
+}
+
+/// Which choice the text Android hands back is.
+///
+/// A choice comes back as its label, so this matches the label against every
+/// one the action can have carried; null for anything else.
+LaterChoice? laterChoiceFor(String? input) {
+  final l10n = weftPlatformL10n();
+  final text = input?.trim();
+  if (text == l10n.notificationRemindInAnHour) {
+    return LaterChoice.remindInAnHour;
+  }
+  if (text == l10n.notificationRemindTonight ||
+      text == l10n.notificationRemindTomorrowMorning) {
+    return LaterChoice.remindTonight;
+  }
+  if (text == l10n.notificationActionMuteHour) return LaterChoice.muteForAnHour;
+  return null;
+}
+
 /// The three action buttons an Android message notification carries.
 ///
 /// **Reply and Mark read run headless (`showsUserInterface: false`); Mute
@@ -106,9 +158,10 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 /// headless stack background push uses when there is not. The reply text is
 /// collected by `RemoteInput` and travels on the broadcast.
 ///
-/// Mute keeps `showsUserInterface: true`: a timed mute lives in the policy the
-/// UI isolate holds in memory, no car surface offers it, and opening the app
-/// to confirm it costs nothing a driver would see.
+/// The third is "Later": its choices remind in an hour, remind tonight, or
+/// mute for an hour. Headless too, so a reminder is set without opening the
+/// app; the UI isolate does it when alive, and otherwise the headless stack
+/// writes the reminder and the mute where the app reads them back.
 ///
 /// `cancelNotification` is false on all three: [NotificationActionHandler]
 /// dismisses the conversation itself once the work has actually succeeded. A
@@ -116,6 +169,7 @@ const Duration kMuteForAnHour = Duration(hours: 1);
 /// rather than vanishing into a message that never went.
 List<AndroidNotificationAction> weftAndroidMessageActions({
   List<String> aiReplies = const [],
+  DateTime? now,
 }) {
   final l10n = weftPlatformL10n();
   return [
@@ -151,10 +205,16 @@ List<AndroidNotificationAction> weftAndroidMessageActions({
       cancelNotification: false,
     ),
     AndroidNotificationAction(
-      WeftNotificationActions.muteForAnHour,
-      l10n.notificationActionMuteHour,
-      semanticAction: SemanticAction.mute,
-      showsUserInterface: true,
+      WeftNotificationActions.later,
+      l10n.notificationActionLater,
+      inputs: [
+        AndroidNotificationActionInput(
+          label: l10n.notificationActionLater,
+          choices: laterChoiceLabels(now ?? DateTime.now()),
+          allowFreeFormInput: false,
+        ),
+      ],
+      showsUserInterface: false,
       cancelNotification: false,
     ),
   ];
@@ -247,10 +307,11 @@ AndroidNotificationChannelGroup weftMessagesChannelGroup() {
 /// The Darwin categories registered at initialisation.
 ///
 /// [DarwinNotificationAction.text] is iOS's inline reply — the field that opens
-/// under the notification without opening Weft. The two `foreground: false`
-/// actions deliberately do not launch the app: marking read and muting for an
-/// hour are things a user does *instead* of opening a conversation, and an
-/// action that opens the app to do them has failed at the only thing it was for.
+/// under the notification without opening Weft. The plain actions
+/// deliberately do not launch the app: marking read, muting for an hour and
+/// asking to be reminded later are things a user does *instead* of opening a
+/// conversation, and an action that opens the app to do them has failed at
+/// the only thing it was for.
 List<DarwinNotificationCategory> weftDarwinCategories() {
   final l10n = weftPlatformL10n();
   return [
@@ -270,6 +331,14 @@ List<DarwinNotificationCategory> weftDarwinCategories() {
         DarwinNotificationAction.plain(
           WeftNotificationActions.muteForAnHour,
           l10n.notificationActionMuteHour,
+        ),
+        DarwinNotificationAction.plain(
+          WeftNotificationActions.remindInAnHour,
+          l10n.notificationRemindInAnHour,
+        ),
+        DarwinNotificationAction.plain(
+          WeftNotificationActions.remindTonight,
+          l10n.notificationRemindTonight,
         ),
       ],
       options: {

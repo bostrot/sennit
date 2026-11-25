@@ -28,6 +28,7 @@ import 'background_actions.dart';
 import 'notification_actions.dart';
 import 'notification_service.dart';
 import 'reply_suggester.dart';
+import '../schedule/scheduled_actions.dart';
 
 /// The headless half of push.
 ///
@@ -263,6 +264,22 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
         ).muteChat(chatId, until: until).toJson(),
       ),
       dismiss: service.dismissChat,
+      // The reminder list is the UI isolate's too; noted in the store, it is
+      // there when the app next opens.
+      remindLater: (chatId, {required roomId, required at}) async {
+        final reminder = chatReminder(
+          chatId: chatId,
+          chatTitle: repository.chatForRoom(roomId)?.title ?? '',
+          at: at,
+        );
+        await ReminderScheduler().remind(
+          chatId: chatId,
+          title: reminder.title,
+          body: reminder.body,
+          at: at,
+        );
+        ReminderList.record(stores.settings, reminder);
+      },
     );
     _bootedActions = actions;
     NotificationActionServer.serve(actions.handle);
