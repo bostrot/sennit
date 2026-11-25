@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
 import 'package:collection/collection.dart' show MapEquality;
@@ -28,6 +29,10 @@ import 'sms_chat_repository.dart';
 typedef AttachmentBytesLoader =
     Future<Uint8List> Function(AttachmentSource source);
 
+/// Scales a photo down for sending — `shrinkImage`, or a stand-in in tests.
+typedef ImageShrinker =
+    Future<ShrunkImage?> Function(Uint8List bytes, ShrinkPlan plan);
+
 /// Reads the file [AttachmentSource.filename] names.
 ///
 /// The pickers Sennit uses hand over a real path, and Android's share-in copies a
@@ -53,6 +58,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     MatrixAttachmentTransport? transport,
     AttachmentBytesLoader readBytes = readAttachmentFile,
     VideoPosterLoader videoPoster = extractVideoPoster,
+    ImageShrinker imageShrinker = shrinkImage,
     SmsChatRepository? sms,
     void Function(List<UploadTask> tasks)? onUploads,
   }) : _store = store,
@@ -62,6 +68,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
        _transportOverride = transport,
        _readBytes = readBytes,
        _videoPoster = videoPoster,
+       _shrinkImage = imageShrinker,
        _sms = sms,
        _onUploads = onUploads {
     // Rehydrate: stored handles and decisions rebuild the same partition the
@@ -126,6 +133,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   /// One frame of a video being sent, for its preview.
   final VideoPosterLoader _videoPoster;
+
+  final ImageShrinker _shrinkImage;
+
+  /// The bytes of each photo scaled down for sending, held against the source
+  /// that stands for them until the upload — and any retry of it — is over.
+  final Expando<Uint8List> _shrunkBytes = Expando('shrunk photo');
 
   /// SMS, when this device has it and Sennit holds the role. Null everywhere
   /// else, which is the state every path below has to work in anyway.
@@ -1592,6 +1605,12 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
       throw StateError('Sennit cannot send MMS attachments yet');
     }
     final room = _roomFor(target);
+    final maxUploadBytes = await _transport.maxUploadBytes();
+    source = await _shrinkForSending(
+      source,
+      network: target.network,
+      maxUploadBytes: maxUploadBytes,
+    );
 
     // Every branch of the decision belongs to `weft_attachments`; this supplies
     // only the two things it cannot know — whether the destination room is
@@ -1599,7 +1618,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     final decision = planUpload(
       source,
       encrypted: room.encrypted,
-      maxUploadBytes: await _transport.maxUploadBytes(),
+      maxUploadBytes: maxUploadBytes,
       isVoiceNote: isVoiceNote,
       durationMs: durationMs,
       caption: caption,
@@ -1623,10 +1642,54 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // a twenty-photo share through the picker one file at a time.
   }
 
+  /// [source] scaled down to the photo quality the user chose and to what
+  /// [network] and the homeserver take, or [source] itself when it already
+  /// fits, is not a photo, or cannot be made smaller.
+  Future<AttachmentSource> _shrinkForSending(
+    AttachmentSource source, {
+    required ChatNetwork network,
+    required int maxUploadBytes,
+  }) async {
+    final plan = planShrink(
+      source,
+      quality: MediaQuality.fromId(
+        _settings?.getString(WeftSettings.mediaQuality),
+      ),
+      network: network,
+      maxUploadBytes: maxUploadBytes,
+    );
+    if (plan == null) return source;
+    try {
+      final shrunk = await _shrinkImage(await _readBytes(source), plan);
+      if (shrunk == null || shrunk.bytes.length >= source.sizeBytes) {
+        return source;
+      }
+      final name = source.basename;
+      final dot = name.lastIndexOf('.');
+      final stem = dot > 0 ? name.substring(0, dot) : name;
+      final smaller = AttachmentSource(
+        filename: '$stem.${shrunk.mimeType == 'image/png' ? 'png' : 'jpg'}',
+        sizeBytes: shrunk.bytes.length,
+        header: Uint8List.sublistView(
+          shrunk.bytes,
+          0,
+          math.min(shrunk.bytes.length, 64 * 1024),
+        ),
+        declaredMimeType: shrunk.mimeType,
+      );
+      _shrunkBytes[smaller] = shrunk.bytes;
+      return smaller;
+    } on Object catch (error) {
+      // The original still goes, and is refused there if it is too large.
+      debugPrint('weft: ${source.basename} could not be scaled down: $error');
+      return source;
+    }
+  }
+
   /// Reads the file, uploads its preview once, and encrypts what goes on the
   /// wire. Runs per attempt, inside [UploadState.hashing].
   Future<UploadPayload> _loadPayload(UploadPlan plan, String taskId) async {
-    final bytes = await _readBytes(plan.source);
+    final bytes = _shrunkBytes[plan.source] ?? await _readBytes(plan.source);
 
     if (plan.kind == MessageKind.video && !_measured.containsKey(taskId)) {
       _measured[taskId] = (

@@ -144,6 +144,9 @@ abstract final class WeftSettings {
   /// second line into a message nobody meant to send. Off, Return breaks the
   /// line and the platform's send chord — Cmd+Return, Ctrl+Return — sends.
   static const String sendOnEnter = 'composer.send_on_enter';
+
+  /// How large a photo goes out — a `MediaQuality` id. Unset is the original.
+  static const String mediaQuality = 'composer.media_quality';
   static const String seedColor = 'appearance.seed_color';
   static const String density = 'appearance.density';
 

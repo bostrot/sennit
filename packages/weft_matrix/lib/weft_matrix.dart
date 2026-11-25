@@ -30,5 +30,6 @@ export 'src/pusher.dart';
 export 'src/registration.dart';
 export 'src/session.dart';
 export 'src/turn_servers.dart';
+export 'src/shrink.dart';
 export 'src/upload.dart';
 export 'src/verification.dart';
