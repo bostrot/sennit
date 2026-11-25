@@ -32,6 +32,7 @@ import '../../app/notification_providers.dart';
 import '../../app/person_memory_providers.dart';
 import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
+import '../../app/review_providers.dart';
 import '../../app/session_providers.dart' show kRemoteClient;
 import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
@@ -48,6 +49,7 @@ import '../../services/audio/voice_player.dart';
 import '../../services/audio/voice_recorder.dart';
 import '../../services/attachments/clipboard_images.dart';
 import '../../services/notifications/open_chats.dart';
+import '../../services/review/review_prompt.dart' show ReviewPrompter;
 import '../../services/schedule/scheduled_actions.dart';
 import '../settings/endpoints_screen.dart';
 import '../settings/integrations_screen.dart';
@@ -1266,16 +1268,18 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// no — and an unhandled exception out of a tap handler takes the whole
   /// timeline with it. Deliberately [Object]: `react` and friends throw
   /// [StateError], but the transport below them can fail with an Error.
-  Future<void> _run(Future<void> Function() action) async {
+  /// Whether [action] went through.
+  Future<bool> _run(Future<void> Function() action) async {
     final failed = context.l10n.chatActionFailed;
     try {
       await action();
     } on Object catch (error) {
       debugPrint('weft: message action failed: $error');
       _showMessage(failed);
-      return;
+      return false;
     }
     _refresh();
+    return true;
   }
 
   /// The loaded timeline split into room-level messages and the threads under
@@ -2877,6 +2881,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
     final repository = ref.read(chatRepositoryProvider);
     final rootId = widget.threadRootId;
+    final bool sent;
     switch (composing?.mode) {
       case ComposerMode.edit:
         await _run(
@@ -2893,7 +2898,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // the user was looking at, which is not recoverable except by deleting
       // it. The reply target rides along as the quote it was.
       case ComposerMode.reply when rootId != null:
-        await _run(
+        sent = await _run(
           () => repository.sendThreadReply(
             _chatId,
             text,
@@ -2903,7 +2908,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
           ),
         );
       case ComposerMode.reply:
-        await _run(
+        sent = await _run(
           () => repository.sendReply(
             _chatId,
             text,
@@ -2911,7 +2916,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
           ),
         );
       case null when rootId != null:
-        await _run(
+        sent = await _run(
           () => repository.sendThreadReply(
             _chatId,
             text,
@@ -2920,7 +2925,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
           ),
         );
       case null:
-        await _run(() => repository.send(_chatId, text));
+        sent = await _run(() => repository.send(_chatId, text));
     }
     // The message is the retraction: nothing is being typed any more.
     _typingSent = false;
@@ -2928,6 +2933,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       repository.setTyping(_chatId, typing: false).catchError((Object e) {}),
     );
     _noteSend();
+    if (sent) _noteSentForReview();
   }
 
   /// What to call the open thread in the bar.
@@ -3006,6 +3012,19 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// talk in. Not awaited: nothing on screen waits for a launcher.
   void _noteSend() =>
       unawaited(ref.read(shareShortcutServiceProvider).noteSend(_chatId));
+
+  /// A message went out, which is the moment a happy user may be asked for
+  /// a store rating — see [ReviewPrompter].
+  void _noteSentForReview() {
+    final prompter = ref.read(reviewPrompterProvider);
+    if (prompter == null) return;
+    final moment = currentReviewMoment(
+      ref,
+      prompter.settings,
+      composing: _composer.text.trim().isNotEmpty,
+    );
+    unawaited(prompter.noteMessageSent(moment));
+  }
 
   /// Opens [message] full screen, in the company of the rest of the
   /// conversation's media.

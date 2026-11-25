@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +44,24 @@ import 'services/notifications/conversation_clearer.dart';
 import 'services/notifications/notification_actions.dart';
 import 'services/notifications/push_registration.dart';
 import 'services/notifications/unified_push.dart';
+import 'services/review/review_prompt.dart' show reviewSessionHadError;
 import 'services/siri/siri_messaging.dart';
+
+/// Marks the session as one that went wrong at the first framework or
+/// uncaught error, so it never ends in a rating prompt; whatever handled
+/// errors before still does.
+void _noteErrorsForReview() {
+  final flutterHandler = FlutterError.onError;
+  FlutterError.onError = (details) {
+    reviewSessionHadError = true;
+    flutterHandler?.call(details);
+  };
+  final platformHandler = PlatformDispatcher.instance.onError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    reviewSessionHadError = true;
+    return platformHandler?.call(error, stack) ?? false;
+  };
+}
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,6 +84,7 @@ void main(List<String> args) async {
   // one per row. It is embedded data rather than I/O, so this costs a
   // microtask, not a round trip.
   await initializeDateFormatting();
+  _noteErrorsForReview();
   runApp(const ProviderScope(child: WeftApp()));
 }
 
