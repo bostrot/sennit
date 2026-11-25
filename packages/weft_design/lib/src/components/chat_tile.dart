@@ -39,7 +39,15 @@ class ChatTile extends StatefulWidget {
     this.checked,
     this.typing = false,
     this.online = false,
+    this.draft,
   });
+
+  /// What the user typed here and has not sent, or null.
+  ///
+  /// Takes the preview line, behind [WeftDesignStrings.draft], because it is
+  /// the one thing on the row the user still has to do something about.
+  /// Someone typing still wins: that is true only for the next few seconds.
+  final String? draft;
 
   /// Someone in this conversation is writing.
   ///
@@ -216,12 +224,23 @@ class _ChatTileState extends State<ChatTile> {
       // The glyph's meaning, as a clause. A screen reader gets "…, reply, see
       // you at six, …" where a sighted reader gets an arrow in front of the
       // same words — and neither gets the mxid that used to be there instead.
-      if (!widget.typing && _isReply(last)) words.reply,
-      if (widget.typing) words.typing else _preview(words, last),
+      if (!widget.typing && _draft == null && _isReply(last)) words.reply,
+      if (widget.typing)
+        words.typing
+      else if (_draft case final draft?)
+        '${words.draft} $draft'
+      else
+        _preview(words, last),
       if (widget.online) words.online,
       widget.timeLabel,
       if (chat.unreadCount > 0) words.unreadCount(chat.unreadCount),
     ]);
+  }
+
+  /// [ChatTile.draft] on one line, or null when there is none worth showing.
+  String? get _draft {
+    final text = widget.draft?.trim().replaceAll(RegExp(r'\s+'), ' ');
+    return text == null || text.isEmpty ? null : text;
   }
 
   Widget _body(
@@ -234,6 +253,7 @@ class _ChatTileState extends State<ChatTile> {
     final chat = widget.chat;
     final unread = chat.unreadCount > 0;
     final last = chat.lastMessage;
+    final draft = widget.typing ? null : _draft;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,7 +324,10 @@ class _ChatTileState extends State<ChatTile> {
             // node is what names it for a screen reader. A shape that told the
             // two apart on sight would be a change to the mark itself, and
             // that belongs to whoever owns the design, not to a semantics pass.
-            if (last != null && last.isOwn && !widget.typing) ...[
+            if (last != null &&
+                last.isOwn &&
+                !widget.typing &&
+                draft == null) ...[
               Tooltip(
                 message: words.deliveryState(last.deliveryState),
                 child: Icon(
@@ -334,7 +357,7 @@ class _ChatTileState extends State<ChatTile> {
             // instead: the row is one merged node, so a `Semantics` label on
             // this icon would be swallowed by it, and the tooltip is what
             // explains the pictogram to a sighted reader who does not know it.
-            if (_isReply(last) && !widget.typing) ...[
+            if (_isReply(last) && !widget.typing && draft == null) ...[
               Tooltip(
                 message: words.reply,
                 child: ExcludeSemantics(
@@ -361,6 +384,32 @@ class _ChatTileState extends State<ChatTile> {
                                     : context.colors.primary,
                                 fontWeight: FontWeight.w600,
                               ),
+                    )
+                  : draft != null
+                  ? Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${words.draft} ',
+                            style: TextStyle(
+                              // In a selected, accent-filled row the error
+                              // red would fight the fill; the ink holds.
+                              color: ink == context.colors.onPrimary
+                                  ? ink
+                                  : context.colors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          TextSpan(text: draft),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          (mac
+                                  ? context.text.labelSmall
+                                  : context.text.bodySmall)
+                              ?.copyWith(color: quiet),
                     )
                   : Text(
                       _preview(words, last),

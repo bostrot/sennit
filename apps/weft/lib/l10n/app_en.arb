@@ -7167,6 +7167,11 @@
     "description": "One word for a message that answers another one. Used three ways on an inbox row: as the tooltip on the small reply arrow, as the clause naming that arrow in the row's screen-reader sentence, and as the whole preview line for a reply that quoted something and said nothing of its own. A noun where the language has one — this labels a message, it is not a button. Keep under ~14 chars.",
     "maxLength": 24
   },
+  "chatTileDraft": "Draft:",
+  "@chatTileDraft": {
+    "description": "Label in front of unsent text in an inbox row's preview line, e.g. \"Draft: see you at\". Include the punctuation your language puts after a label. Keep under ~12 chars.",
+    "maxLength": 16
+  },
   "searchResultInChat": "In {chat}",
   "@searchResultInChat": {
     "description": "Screen-reader-only clause opening a search result's sentence, naming which conversation it came from. Dropped when the conversation's name is the same word as the sender, which for a direct message it usually is.",

@@ -93,6 +93,34 @@ void main() {
     expect(phone.identity.loadDecisions().single.verdict, 'rejected');
   });
 
+  test('a draft follows to the other device, and so does sending it', () async {
+    var draftsReloaded = 0;
+    DeviceSync draftSync(WeftStores stores, String id) => DeviceSync(
+      channel: _Channel(server),
+      local: StoreSyncLocal(
+        stores,
+        onSettingsChanged: () {},
+        onMergesChanged: () {},
+        onDraftsChanged: () => draftsReloaded++,
+      ),
+      deviceId: id,
+    );
+    final phoneSync = draftSync(phone, 'phone');
+    final deskSync = draftSync(desk, 'desk');
+
+    phone.settings.setString('draft.!room:x', 'see you at');
+    await phoneSync.run();
+    await deskSync.run();
+    expect(desk.settings.getString('draft.!room:x'), 'see you at');
+    expect(draftsReloaded, 1);
+
+    // Sent from the desktop: the draft is gone there, then everywhere.
+    desk.settings.remove('draft.!room:x');
+    await deskSync.run();
+    await phoneSync.run();
+    expect(phone.settings.getString('draft.!room:x'), isNull);
+  });
+
   test('device-local settings and the sync switch stay put', () async {
     phone.settings
       ..setString(WeftSettings.notifyPushKey, 'token')

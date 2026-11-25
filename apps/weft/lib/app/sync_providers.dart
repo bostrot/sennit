@@ -8,6 +8,7 @@ import 'package:weft_sync/weft_sync.dart';
 import '../data/matrix_chat_repository.dart';
 import '../services/sync/matrix_sync_channel.dart';
 import '../services/sync/store_sync_local.dart';
+import 'draft_providers.dart';
 import 'providers.dart';
 import 'session_providers.dart';
 import 'stores.dart';
@@ -35,8 +36,9 @@ final deviceSyncStatusProvider =
     );
 
 /// Runs device sync while it is on: once at start, when another device
-/// replaces the shared document, shortly after a setting changes here, and
-/// once a minute for the edits no setting announces — a merge, a send network.
+/// replaces the shared document, shortly after a setting or a draft changes
+/// here, and once a minute for the edits nothing announces — a merge, a send
+/// network.
 ///
 /// Null while sync is off. `main` holds a listener on this once the session is
 /// ready, which is what keeps it — and its timers — alive.
@@ -54,6 +56,7 @@ final deviceSyncRunnerProvider = Provider<DeviceSyncRunner?>((ref) {
         repository.reloadSyncedPreferences();
       }
     },
+    onDraftsChanged: () => ref.read(draftsProvider.notifier).reload(),
   );
   final runner = DeviceSyncRunner(
     DeviceSync(
@@ -68,6 +71,8 @@ final deviceSyncRunnerProvider = Provider<DeviceSyncRunner?>((ref) {
   // A setting written here — including by sync itself, which is harmless: the
   // round finds nothing new — is shared a few seconds later.
   ref.listen(settingsRevisionProvider, (_, _) => runner.soon());
+  // So is a draft, once the chat it was typed in is left.
+  ref.listen(draftsProvider, (_, _) => runner.soon());
   ref.onDispose(runner.dispose);
   return runner;
 });

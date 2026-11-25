@@ -1227,6 +1227,7 @@
   "chatTileUnread": "{count, plural, =1{واحدة غير مقروءة} other{{count} غير مقروءة}}",
   "chatTileNoMessages": "لا رسائل بعد",
   "chatTileReply": "رد",
+  "chatTileDraft": "مسودة:",
   "searchResultInChat": "في {chat}",
   "searchResultMatchedMeaning": "طابق بالمعنى، لا بهذه الكلمات",
   "searchResultMatchedBoth": "طابق بالكلمات وبالمعنى",

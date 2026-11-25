@@ -44,6 +44,7 @@ class WeftDesignStrings {
     required this.messageDeleted,
     required this.messageKind,
     required this.reply,
+    this.draft = 'Draft:',
   });
 
   /// Screen-reader hint for the long-press that starts multi-select.
@@ -94,6 +95,10 @@ class WeftDesignStrings {
   /// own — a bridged quote-and-nothing-else, which would otherwise render as a
   /// blank line indistinguishable from an empty conversation.
   final String reply;
+
+  /// The label in front of unsent text in the preview line, punctuation
+  /// included — "Draft:" — so a language that spaces its colon can.
+  final String draft;
 
   /// Readable English, for a component with no scope above it.
   static const WeftDesignStrings english = WeftDesignStrings(

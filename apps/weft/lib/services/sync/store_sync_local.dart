@@ -5,7 +5,8 @@ import 'package:weft_sync/weft_sync.dart';
 import '../../app/stores.dart';
 
 /// Device sync's view of this device: the settings table, the merge verdicts,
-/// the per-chat send network and — while their switch is on — the keychain.
+/// the per-chat send network, unsent drafts and — while their switch is on —
+/// the keychain.
 ///
 /// Reads everything and lets `reconcile` find what changed by comparison, so
 /// no screen that writes a setting has to know sync exists.
@@ -14,6 +15,7 @@ class StoreSyncLocal implements SyncLocal {
     this._stores, {
     required this.onSettingsChanged,
     required this.onMergesChanged,
+    this.onDraftsChanged,
   });
 
   final WeftStores _stores;
@@ -23,6 +25,12 @@ class StoreSyncLocal implements SyncLocal {
 
   /// Tells the repository to rebuild its identity graph from the store.
   final void Function() onMergesChanged;
+
+  /// Tells the inbox to re-read the drafts.
+  final void Function()? onDraftsChanged;
+
+  /// Where a draft sits in the settings table — see `DraftsNotifier`.
+  static const String draftPrefix = 'draft.';
 
   /// The keychain values that travel with [WeftSettings.syncSecrets] on. The
   /// MCP tunnel token is missing on purpose: it opens this one device.
@@ -63,6 +71,9 @@ class StoreSyncLocal implements SyncLocal {
     final out = <String, String>{};
     for (final MapEntry(:key, :value) in _stores.settings.all().entries) {
       if (SyncPolicy.syncsSetting(key)) out[SyncKeys.setting + key] = value;
+      if (key.startsWith(draftPrefix)) {
+        out[SyncKeys.draft + key.substring(draftPrefix.length)] = value;
+      }
     }
     for (final d in _stores.identity.loadDecisions()) {
       out[SyncKeys.merge + d.pair] = '${d.verdict}|${d.source}';
@@ -120,6 +131,7 @@ class StoreSyncLocal implements SyncLocal {
   Future<void> apply(Map<String, String?> changes) async {
     var settings = false;
     var merges = false;
+    var drafts = false;
     for (final MapEntry(:key, :value) in changes.entries) {
       if (key.startsWith(SyncKeys.setting)) {
         final name = key.substring(SyncKeys.setting.length);
@@ -146,6 +158,14 @@ class StoreSyncLocal implements SyncLocal {
           value == null ? null : ChatNetwork.fromId(value),
         );
         merges = true;
+      } else if (key.startsWith(SyncKeys.draft)) {
+        final name = draftPrefix + key.substring(SyncKeys.draft.length);
+        if (value == null) {
+          _stores.settings.remove(name);
+        } else {
+          _stores.settings.setString(name, value);
+        }
+        drafts = true;
       } else if (key.startsWith(SyncKeys.secret)) {
         final name = key.substring(SyncKeys.secret.length);
         if (secretNames.contains(name)) await _writeSecret(name, value);
@@ -154,5 +174,6 @@ class StoreSyncLocal implements SyncLocal {
     }
     if (settings) onSettingsChanged();
     if (merges) onMergesChanged();
+    if (drafts) onDraftsChanged?.call();
   }
 }
