@@ -417,6 +417,8 @@
   "chatSearchNoResults": "Sin resultados",
   "chatSearchNotLoaded": "No se pudo cargar ese mensaje. Puede que esté demasiado atrás en el historial.",
   "chatMessagesFromDate": "Mensajes del {date}",
+  "chatJumpToDate": "Ir a una fecha",
+  "chatJumpToDateNearest": "No hay mensajes ese día. Se muestra el {date}.",
   "chatQuickReact": "Reaccionar",
   "chatShowActionsHint": "mostrar las acciones",
   "chatMessageDeleted": "Mensaje eliminado",

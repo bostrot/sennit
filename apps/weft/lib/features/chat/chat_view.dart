@@ -81,6 +81,7 @@ import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
 import 'emoji_picker_sheet.dart';
 import 'bridge_buttons_bar.dart';
+import 'jump_to_date.dart';
 import 'jump_to_latest_button.dart';
 import 'link_actions_sheet.dart';
 import 'link_preview_card.dart';
@@ -937,6 +938,51 @@ class _ChatViewState extends ConsumerState<ChatView> {
     return mounted &&
         identical(timeline, _timeline) &&
         _view.messages.any((m) => m.eventId == eventId);
+  }
+
+  /// Asks for a day and scrolls to the first message sent on it.
+  ///
+  /// History is backfilled until it reaches back past that day, bounded like
+  /// [_loadUntil]: a day before the conversation began lands on its oldest
+  /// message instead of paging for ever. A day nobody wrote on lands on the
+  /// next one that has messages, and says so — a jump that quietly arrives
+  /// somewhere else reads as a wrong one.
+  Future<void> _jumpToDate(DateTime shown, {int maxRounds = 200}) async {
+    final l10n = context.l10n;
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: shown.isAfter(now) ? now : shown,
+      firstDate: DateTime(2000),
+      lastDate: now,
+      helpText: l10n.chatJumpToDate,
+    );
+    final timeline = _timeline;
+    if (picked == null || timeline == null || !mounted) return;
+
+    var rounds = 0;
+    while (!reachesBefore(_view.messages, picked) &&
+        timeline.hasMoreHistory &&
+        rounds++ < maxRounds) {
+      final next = await timeline.loadMoreUntilVisibleGrowth();
+      if (!mounted || !identical(timeline, _timeline)) return;
+      setState(() => _view = next);
+      _indexNewMessages(next.messages);
+    }
+    // [_drawn] is what the list shows — thread replies folded away — and is
+    // only current once the backfilled rows have been through a build.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !identical(timeline, _timeline)) return;
+    final target = firstMessageOnOrAfter(_drawn, picked);
+    if (target == null) return;
+    if (!DateUtils.isSameDay(target.timestamp.toLocal(), picked)) {
+      _showMessage(
+        l10n.chatJumpToDateNearest(
+          DateFormat.yMMMd().format(target.timestamp.toLocal()),
+        ),
+      );
+    }
+    _showEvent(target.eventId);
   }
 
   /// Scrolls a loaded [eventId] into view and highlights it — briefly, or for
@@ -2510,7 +2556,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                   ),
                                   children: [
                                     if (_needsDayDivider(message, older))
-                                      _DayDivider(date: message.timestamp),
+                                      _DayDivider(
+                                        date: message.timestamp,
+                                        onTap: () =>
+                                            _jumpToDate(message.timestamp),
+                                      ),
                                     _SwipeToReply(
                                       enabled:
                                           !widget.preview && !message.redacted,
@@ -4164,38 +4214,53 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _DayDivider extends StatelessWidget {
-  const _DayDivider({required this.date});
+  const _DayDivider({required this.date, this.onTap});
 
   final DateTime date;
 
+  /// Opens the jump-to-date picker. The divider itself is the control: the
+  /// date is where someone looking for "what did we say in March" is already
+  /// looking, and the whole row is a target a thumb finds.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
+    final onTap = this.onTap;
     // A heading, which is what it is: the two rules either side are the visual
     // form of "a new section starts here", and marking it as a header is what
     // lets a reader jump between days instead of scrolling through them.
+    Widget divider = Padding(
+      padding: const EdgeInsets.symmetric(vertical: WeftSpace.lg),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: context.palette.divider)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: WeftSpace.md),
+            child: Text(
+              DateFormat.MMMd().format(date),
+              style: context.text.labelSmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: context.palette.divider)),
+        ],
+      ),
+    );
+    if (onTap != null) {
+      divider = Tooltip(
+        message: context.l10n.chatJumpToDate,
+        child: InkWell(onTap: onTap, child: divider),
+      );
+    }
     return Semantics(
       header: true,
       container: true,
       excludeSemantics: true,
       label: context.l10n.chatMessagesFromDate(DateFormat.MMMd().format(date)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: WeftSpace.lg),
-        child: Row(
-          children: [
-            Expanded(child: Divider(color: context.palette.divider)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: WeftSpace.md),
-              child: Text(
-                DateFormat.MMMd().format(date),
-                style: context.text.labelSmall?.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: context.palette.divider)),
-          ],
-        ),
-      ),
+      hint: onTap == null ? null : context.l10n.chatJumpToDate,
+      onTap: onTap,
+      child: divider,
     );
   }
 }
