@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Promotes the newest tested build to Google Play open testing and the App Store.
+"""Promotes the newest tested build to Google Play and the App Store.
 
     promote.py [play|appstore|all] [--apply] [--audit]
-               [--schedule CRON] [--max-age-hours N] [--play-track TRACK]
+               [--schedule CRON] [--max-age-hours N] [--play-tracks TRACKS]
 
 Run every night by promote_to_stores.yml; see
 docs/decisions/adr-005-daily-store-promotion.md for why it decides what it
@@ -10,7 +10,7 @@ decides. Per store, it takes the newest build on the test track — Play's
 internal track, TestFlight — and promotes it when all of these hold:
 
 1. it is newer, by build number, than anything the target already has —
-   Play's target track, the App Store or App Review — which is what makes a
+   the Play track, the App Store or App Review — which is what makes a
    second run a no-op;
 2. it landed on the test track within the last N hours (default 26: one
    night's window, plus GitHub's habit of starting scheduled runs late);
@@ -25,10 +25,26 @@ Without `--apply` it reads, prints exactly what it would do, and changes
 nothing. Play's would-be release is still checked by Play itself, in an
 edit that is validated and then deleted, never committed.
 
-On Play the target is the open testing track, `beta`; production stays a
-step taken in the Console for now. `--play-track production` (or the
-PLAY_PROMOTION_TRACK variable, in the workflow) points the same steps at
-production instead.
+On Play the build goes to two tracks, in one edit that is committed once,
+so the night sends Google one set of changes to review:
+
+- open testing, `beta`, to everyone at once;
+- `production`, as a staged rollout to PLAY_PRODUCTION_ROLLOUT of users
+  (default 0.2), next to the last completed release, which everyone else
+  keeps.
+
+Before that, a staged production rollout that has been out a night is
+completed: when its build landed on the internal track 24 hours ago or more
+(Play does not say when a rollout started; the nightly run that started it
+came after the landing, and the one now running is the next), it goes to
+100 % and becomes the completed release. If a newer build goes out the same
+night, it is staged next to that one. A staged release not yet out a night
+(only after a promotion by hand) is replaced by the newer one, as Play does:
+the release it replaces is dropped, the users who got it keep it until the
+new one reaches them, and the completed release stays everyone else's. A
+halted rollout stops production until someone resumes or replaces it in the
+Console. `--play-tracks` (PLAY_PROMOTION_TRACKS in the workflow, comma
+separated) picks the tracks; `beta` alone takes production out.
 `--audit` adds the list of what each store still wants before the first
 public release, as far as the APIs can tell.
 
@@ -63,8 +79,13 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BERLIN = ZoneInfo('Europe/Berlin')
 PROMOTION_HOUR = 3
 DEFAULT_MAX_AGE_HOURS = 26
-# Open testing. Production later, through --play-track.
-DEFAULT_PLAY_TRACK = 'beta'
+# Open testing to everyone, production staged.
+DEFAULT_PLAY_TRACKS = ('beta', 'production')
+STAGED_TRACK = 'production'
+DEFAULT_PRODUCTION_ROLLOUT = 0.2
+# How long a staged production rollout runs before the nightly run
+# completes it.
+STAGED_HOURS = 24
 
 PLAY_LIMIT = 500
 
@@ -194,6 +215,82 @@ def play_track_releases(release, target, rollout):
         r for r in (target or {}).get('releases', []) if r.get('status') == 'completed'
     ]
     return [new] + kept[:1]
+
+
+def play_label(release):
+    codes = ', '.join(str(c) for c in release.get('versionCodes', []))
+    return f'{release.get("name")} ({codes})'
+
+
+def percent(fraction):
+    return f'{fraction * 100:g} %'
+
+
+def play_plan(track, target, release, decision, rollout, staged_landed, now):
+    """What tonight does to one Play track: (Decision, the releases the
+    track should list afterwards, or None to leave it as it is).
+
+    `decision` is decide()'s verdict on the candidate `release` for this
+    track; `rollout` the fraction a new release starts at; `staged_landed`
+    when the build of the track's staged release landed on the internal
+    track, or None when that is unknown or there is none. The steps are
+    ('complete', release) and ('promote', release, fraction)."""
+    releases = (target or {}).get('releases', [])
+    halted = next((r for r in releases if r.get('status') == 'halted'), None)
+    if halted:
+        return Decision(False, f'{play_label(halted)} is halted on {track}: nothing goes '
+                               f'to {track} until someone resumes or replaces it in the '
+                               'Console'), None
+    completed = [r for r in releases if r.get('status') == 'completed']
+    staged = next((r for r in releases if r.get('status') == 'inProgress'), None)
+    steps = []
+    reasons = []
+    failed = decision.failed
+
+    if staged:
+        label = f'{play_label(staged)} at {percent(staged.get("userFraction", 0))}'
+        if staged_landed is None:
+            reasons.append(f'{label}: cannot tell when it landed, so it is not completed; '
+                           'complete it in the Console')
+            failed = True
+        elif now - staged_landed >= datetime.timedelta(hours=STAGED_HOURS):
+            done = {k: v for k, v in staged.items() if k != 'userFraction'}
+            done['status'] = 'completed'
+            steps.append(('complete', staged))
+            reasons.append(f'{label} has been out a night: completing it, to 100 %')
+            completed, staged = [done], None
+        else:
+            hours = int((now - staged_landed).total_seconds() // 3600)
+            reasons.append(f'{label} landed {hours} h ago, under {STAGED_HOURS} h: '
+                           'it stays staged')
+
+    reasons.append(decision.reason)
+    fraction = rollout if track == STAGED_TRACK else 1
+    if decision.promote and fraction < 1 and not completed:
+        # Play: "The first release on a track cannot be staged". The first
+        # one to everyone is a person's call, not the night's.
+        reasons.append(f'but Play cannot stage the first release on {track}: release one '
+                       'to everyone first, in the Console or with PLAY_PRODUCTION_ROLLOUT=1')
+        return Decision(False, '; '.join(reasons)), None
+    after = None
+    if decision.promote:
+        after = play_track_releases(release, {'releases': completed}, fraction)
+        steps.append(('promote', release, fraction))
+        if fraction < 1 and staged:
+            reasons.append(f'it replaces the staged {play_label(staged)}; whoever got that '
+                           'keeps it until the new one reaches them')
+    elif steps:
+        after = completed
+    return Decision(bool(steps), '; '.join(reasons), failed=failed, steps=steps), after
+
+
+def describe_play(track, step):
+    if step[0] == 'complete':
+        return (f'complete the staged {play_label(step[1])} on {track}: '
+                f'{percent(step[1].get("userFraction", 0))} -> 100 %')
+    _, release, fraction = step
+    how = 'to everyone' if fraction >= 1 else f'staged to {percent(fraction)}'
+    return f'promote {play_label(release)} to {track}, {how}'
 
 
 def appstore_state(version):
@@ -371,14 +468,13 @@ def play_commit(token, base):
     return True
 
 
-def play(apply, audit, now, max_age_hours, rollout, track):
+def play(apply, audit, now, max_age_hours, rollout, tracks):
     token = play_token()
     edit = call('POST', f'{PLAY}/edits', token, body={})['id']
     committed = False
     try:
         base = f'{PLAY}/edits/{edit}'
         internal = call('GET', f'{base}/tracks/internal', token)
-        target = call('GET', f'{base}/tracks/{track}', token)
         release = play_candidate_release(internal)
         candidate = None
         if release:
@@ -386,70 +482,111 @@ def play(apply, audit, now, max_age_hours, rollout, track):
             candidate = Candidate(release.get('name') or '?', code)
             log('play', f'internal track: {release.get("name")} ({code})')
             check_commit(candidate, 'play')
-        if audit:
-            # Before the release below is put into the edit, so the tracks
-            # it lists are what Play has.
-            play_audit(token, base, track)
-        current = play_current(target)
-        log('play', f'{track}: {"build " + str(current) if current else "nothing yet"}')
-        decision = decide(candidate, current, now, max_age_hours)
-        if candidate is not None:
             log('play', f'commit {candidate.sha or "?"}, CI '
                         f'{"green" if candidate.ci_green else "not green"}, deploy '
                         f'{"succeeded" if candidate.deployed else "not found"}, landed '
                         f'{candidate.landed.isoformat() if candidate.landed else "?"}')
-        log('play', decision.reason)
-
-        if decision.promote:
             if not release.get('releaseNotes') and candidate.sha:
                 release['releaseNotes'] = release_notes(candidate.sha, candidate.version,
                                                         '--play-dir')
-            releases = play_track_releases(release, target, rollout)
-            body = {'track': track, 'releases': releases}
-            log('play', f'{track} track would become:')
-            for r in releases:
-                text = ' / '.join(n.get('text', '').replace('\n', ' ⏎ ')[:120] + '…'
-                                  for n in r.get('releaseNotes', []))
-                log('play', f'  {r["name"]} {r["versionCodes"]} {r["status"]}'
-                            f'{" " + str(r["userFraction"]) if "userFraction" in r else ""}'
-                            f' notes: {text or "none"}')
-            call('PUT', f'{base}/tracks/{track}', token, body=body)
-            # Play's own verdict on the release, without publishing it.
+        if audit:
+            play_audit(token, base, tracks)
+
+        failed = False
+        planned = []
+        for track in tracks:
+            decision = play_track(token, base, track, release, candidate, now,
+                                  max_age_hours, rollout)
+            failed |= decision.failed
+            if decision.promote:
+                planned += [describe_play(track, step) for step in decision.steps]
+
+        if planned:
+            # Play's own verdict on the releases, without publishing them.
             try:
                 call('POST', f'{base}:validate', token, body={})
-                log('play', f'Play validated the {track} release')
+                log('play', 'Play validated the releases')
             except ApiError as error:
-                log('play', f'Play refuses the {track} release:\n{error}')
-                decision.failed = True
-                decision.promote = False
-            if decision.promote and apply:
-                if play_commit(token, base):
-                    committed = True
-                    log('play', f'PROMOTED {release.get("name")} to {track}')
-                else:
-                    decision.promote = False
-                    decision.reason = IN_REVIEW_SKIP
-                    log('play', f'{IN_REVIEW_SKIP}: Play still reviews what was sent '
-                                'earlier; committing would withdraw it and restart the '
-                                'review, so Play waits for another night')
-            elif decision.promote:
-                log('play', 'dry run: not committed. Whether Play still reviews an earlier '
-                            'release it says only at commit; if it does, the real run '
-                            f'logs "{IN_REVIEW_SKIP}" and leaves Play alone')
-
-        return decision
+                log('play', f'Play refuses the releases:\n{error}')
+                failed = True
+                planned = []
+        if planned and apply:
+            if play_commit(token, base):
+                committed = True
+                log('play', f'DONE: {"; ".join(planned)}')
+            else:
+                log('play', f'{IN_REVIEW_SKIP}: Play still reviews what was sent '
+                            'earlier; committing would withdraw it and restart the '
+                            'review, so Play (beta and production alike) waits for '
+                            'another night')
+                planned = []
+        elif planned:
+            log('play', 'dry run: not committed. Whether Play still reviews an earlier '
+                        'release it says only at commit; if it does, the real run '
+                        f'logs "{IN_REVIEW_SKIP}" and leaves Play alone')
+        log('play', f'--- tonight on Play{"" if apply else " (dry run)"}: '
+                    f'{"; ".join(planned) or "nothing"} ---')
+        return Decision(bool(planned), 'play', failed=failed)
     finally:
         if not committed:
-            # An edit that is never committed changes nothing; deleting it
-            # keeps it from blocking the next one.
-            try:
-                call('DELETE', f'{PLAY}/edits/{edit}', token)
-            except ApiError:
-                pass
+            delete_edit(token, edit)
 
 
-def play_audit(token, base, track):
-    print(f'play: --- what Play wants for a release on {track} ---')
+def delete_edit(token, edit):
+    # An edit that is never committed changes nothing; deleting it keeps it
+    # from blocking the next one.
+    try:
+        call('DELETE', f'{PLAY}/edits/{edit}', token)
+    except ApiError:
+        pass
+
+
+def staged_since(target):
+    """When the build of a track's staged release landed on the internal
+    track, which is as close as Play lets anyone get to when its rollout
+    started: None when there is no staged release or the landing is not
+    found."""
+    staged = next((r for r in (target or {}).get('releases', [])
+                   if r.get('status') == 'inProgress' and r.get('versionCodes')), None)
+    if staged is None:
+        return None
+    build = Candidate(staged.get('name') or '?', max(int(c) for c in staged['versionCodes']))
+    check_commit(build, 'play')
+    return build.landed
+
+
+def play_track(token, base, track, release, candidate, now, max_age_hours, rollout):
+    """Plans one Play track and puts the result in the edit `base`, which
+    play() validates and commits once for all tracks."""
+    log('play', f'--- {track} ---')
+    target = call('GET', f'{base}/tracks/{track}', token)
+    log('play', f'{track} now: ' + (', '.join(
+        f'{play_label(r)} {r.get("status")}'
+        f'{" " + percent(r["userFraction"]) if "userFraction" in r else ""}'
+        for r in (target or {}).get('releases', [])) or 'nothing'))
+    decision, releases = play_plan(
+        track, target, release,
+        decide(candidate, play_current(target), now, max_age_hours),
+        rollout, staged_since(target), now)
+    log('play', decision.reason)
+    if releases is None:
+        return decision
+
+    for step in decision.steps:
+        log('play', f'plan: {describe_play(track, step)}')
+    log('play', f'{track} would become:')
+    for r in releases:
+        text = ' / '.join(n.get('text', '').replace('\n', ' ⏎ ')[:120] + '…'
+                          for n in r.get('releaseNotes', []))
+        log('play', f'  {play_label(r)} {r["status"]}'
+                    f'{" " + percent(r["userFraction"]) if "userFraction" in r else ""}'
+                    f' notes: {text or "none"}')
+    call('PUT', f'{base}/tracks/{track}', token, body={'track': track, 'releases': releases})
+    return decision
+
+
+def play_audit(token, base, tracks):
+    print(f'play: --- what Play wants for a release on {", ".join(tracks)} ---')
     details = call('GET', f'{base}/details', token) or {}
     for key in ('defaultLanguage', 'contactEmail', 'contactWebsite'):
         print(f'play: [{"x" if details.get(key) else " "}] details.{key}')
@@ -467,13 +604,13 @@ def play_audit(token, base, track):
             mark = 'x' if len(images) >= needed else ' '
             print(f'play: [{mark}] listing {language} {kind}: {len(images)}'
                   f'{f" (needs {needed})" if needed else " (optional)"}')
-    countries = call('GET', f'{base}/countryAvailability/{track}', token) or {}
-    regions = [c.get('countryCode') for c in countries.get('countries', [])]
-    print(f'play: [{"x" if regions else " "}] {track} countries: {len(regions)}'
-          f'{" (" + ", ".join(sorted(regions)[:12]) + "…)" if regions else ""}'
-          f'{" restOfWorld" if countries.get("restOfWorld") else ""}')
-    tracks = (call('GET', f'{base}/tracks', token) or {}).get('tracks', [])
-    for t in tracks:
+    for track in tracks:
+        countries = call('GET', f'{base}/countryAvailability/{track}', token) or {}
+        regions = [c.get('countryCode') for c in countries.get('countries', [])]
+        print(f'play: [{"x" if regions else " "}] {track} countries: {len(regions)}'
+              f'{" (" + ", ".join(sorted(regions)[:12]) + "…)" if regions else ""}'
+              f'{" restOfWorld" if countries.get("restOfWorld") else ""}')
+    for t in (call('GET', f'{base}/tracks', token) or {}).get('tracks', []):
         print(f'play: track {t["track"]}: ' + (', '.join(
             f'{r.get("name")} {r.get("versionCodes")} {r.get("status")}'
             f'{" " + str(r["userFraction"]) if "userFraction" in r else ""}'
@@ -854,7 +991,7 @@ def main(argv):
     audit = '--audit' in args
     schedule = None
     max_age_hours = DEFAULT_MAX_AGE_HOURS
-    play_track = DEFAULT_PLAY_TRACK
+    play_tracks = list(DEFAULT_PLAY_TRACKS)
     targets = []
     while args:
         arg = args.pop(0)
@@ -862,8 +999,9 @@ def main(argv):
             continue
         if arg == '--schedule' and args:
             schedule = args.pop(0) or None
-        elif arg == '--play-track' and args:
-            play_track = args.pop(0) or DEFAULT_PLAY_TRACK
+        elif arg == '--play-tracks' and args:
+            play_tracks = [t.strip() for t in args.pop(0).split(',') if t.strip()] or list(
+                DEFAULT_PLAY_TRACKS)
         elif arg == '--max-age-hours' and args:
             max_age_hours = int(args.pop(0) or DEFAULT_MAX_AGE_HOURS)
         elif arg in ('play', 'appstore', 'all'):
@@ -877,16 +1015,20 @@ def main(argv):
         print(f'the {schedule!r} slot is not {PROMOTION_HOUR}:00 in Berlin today; '
               'the other scheduled run is the one')
         return
-    rollout = float(os.environ.get('PLAY_PRODUCTION_ROLLOUT') or 1)
+    rollout = float(os.environ.get('PLAY_PRODUCTION_ROLLOUT') or DEFAULT_PRODUCTION_ROLLOUT)
+    if not 0 < rollout <= 1:
+        sys.exit(f'PLAY_PRODUCTION_ROLLOUT must be above 0 and at most 1, not {rollout}')
     print(f'{"APPLY" if apply else "DRY RUN"} at {now.astimezone(BERLIN):%Y-%m-%d %H:%M %Z}, '
-          f'window {max_age_hours or "unlimited"} h, Play track {play_track}, '
-          f'rollout {rollout:.0%}')
+          f'window {max_age_hours or "unlimited"} h, Play tracks '
+          + ', '.join(f'{t} {percent(rollout if t == STAGED_TRACK else 1)}'
+                      for t in play_tracks)
+          + f', staged rollouts completed after {STAGED_HOURS} h')
 
     failed = False
     for name in chosen:
         try:
             if name == 'play':
-                decision = play(apply, audit, now, max_age_hours, rollout, play_track)
+                decision = play(apply, audit, now, max_age_hours, rollout, play_tracks)
             else:
                 decision = appstore(apply, audit, now, max_age_hours)
             failed |= decision.failed

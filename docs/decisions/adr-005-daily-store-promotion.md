@@ -41,16 +41,25 @@ public, provided something new did reach them that day.
 
 ### Where it goes
 
-- **Google Play: the open testing track (`beta`).** Production stays a step
-  someone takes in the Console for now. The track is one setting, the
-  repository variable `PLAY_PROMOTION_TRACK` (`--play-track`), so pointing
-  the same promotion at production later changes nothing else. The release on
-  the target track gets the internal release's version codes and its "What's
-  new", and replaces what is there at 100 %. `PLAY_PRODUCTION_ROLLOUT` set
-  below 1 makes it a staged rollout instead, which keeps the previous
-  completed release next to it, as Play requires. Not by default: with a new
-  release every day a staged rollout is still rolling out when the next one
-  replaces it. `changesNotSentForReview` is not sent unless
+- **Google Play: open testing (`beta`) and production, staged.** Since
+  2026-11-25 (owner decision: "nightly to production, staged 20 % first")
+  the build goes to `beta` for everyone and to `production` as a staged
+  rollout to `PLAY_PRODUCTION_ROLLOUT` (default 0.2), both tracks in one
+  edit committed once: Play reviews one set of changes at a time, so a
+  second commit the same night would land on the first one's review. Before that, a
+  staged production release whose build landed on internal 24 hours ago or
+  more (Play has no rollout start time; the nightly run that started it came
+  after the landing) is completed to 100 %, and the new one is staged next
+  to it. With a release every day, each build gets one night at 20 % and
+  then everyone. A staged release less than a night old is replaced, as
+  Play replaces it; a halted one stops production until someone acts in the
+  Console. Play cannot stage a track's first release, so production is left
+  alone until a person releases its first one to everyone. Crash and ANR rates are not read before completing (the Play
+  Developer Reporting API needs another scope and access); that is a
+  follow-up. `PLAY_PROMOTION_TRACKS` (`--play-tracks`) narrows the tracks.
+  Until then, production was a step taken in the Console and only `beta`
+  was promoted. The release gets the internal release's version codes and
+  its "What's new". `changesNotSentForReview` is not sent unless
   `PLAY_CHANGES_NOT_SENT_FOR_REVIEW` is `true`. Play needs it only when the
   Console has changes waiting that must not go to review with the release.
   Managed publishing, when it is on, still holds the release until someone

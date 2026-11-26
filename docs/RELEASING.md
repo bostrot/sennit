@@ -58,7 +58,7 @@ same everywhere and no workflow waits for another:
 | `release.yml` (version bump on `main`, or tag `v*`) | the release body (`--github`); the app asset, into every platform build |
 | `deploy_internal.yml` (version bump on `main`) | Play's `whatsnew-<language>`, from the short Play text; the app asset |
 | `deploy_testflight.yml` (version bump on `main`) | the app asset; after the upload, "What to Test" and "What's New" through `tooling/store/build_notes.py` |
-| `promote_to_stores.yml` (nightly, 03:00 Berlin) | nothing new: Play open testing gets the internal release's "What's new"; the App Store version gets "What's New" from the script, run on the build's commit |
+| `promote_to_stores.yml` (nightly, 03:00 Berlin) | nothing new: Play open testing and production get the internal release's "What's new"; the App Store version gets "What's New" from the script, run on the build's commit |
 
 ### Play's short text
 
@@ -74,13 +74,14 @@ TestFlight and the app.
 `release.sh` refuses to cut a release without both files, and CI
 (`release_notes.py --check`, in the store tooling job) fails when the
 pubspec version, or any version with notes since 1.0.25, lacks one or goes
-over 500. The 03:00 promotion copies the internal release's notes, so the
-open testing track gets the same short text.
+over 500. The 03:00 promotion copies the internal release's notes, so open
+testing and production get the same short text.
 
 A release already on a track with the wrong text: fix the files on `main`,
 then run the **Play release notes** workflow (`play_release_notes.yml`) with
 the version and track — dry run first. It changes only the notes of that
-release; fixing `internal` before 03:00 fixes the beta it is promoted to.
+release; fixing `internal` before 03:00 fixes the beta and production
+releases it is promoted to.
 
 The app asset is `apps/weft/assets/release_notes.json`. The committed copy is
 empty, so a local build or a fork shows no sheet; CI overwrites it before
@@ -275,12 +276,72 @@ encryption beyond what is exempt, which is not the answer above.
 
 `promote_to_stores.yml` runs at 03:00 Berlin time and takes the newest build
 testers have to the public: Play's internal-track release to the **open
-testing** track, and the newest eligible TestFlight build to **App Review**,
-released automatically once approved. A build goes only when it is newer than
-what the store has, reached testers within the last 26 hours, and CI and its
+testing** track (everyone) and to **production** as a staged rollout (20 %),
+and the newest eligible TestFlight build to **App Review**, released
+automatically once approved. A build goes only when it is newer than what the
+track or store has, reached testers within the last 26 hours, and CI and its
 deploy passed on its commit. Apple reviews one version at a time, so a build
 that finds another in review waits for the next night. The rules, and why:
 [[adr-005-daily-store-promotion]].
+
+#### Play production's staged rollout
+
+Each night, before anything new goes to production:
+
+1. A staged production release that has been out a night is **completed**
+   (100 %) and becomes the release everyone has. Play does not say when a
+   rollout started, so "a night" is: its build landed on the internal track
+   24 hours ago or more. A nightly run only promotes builds that landed
+   before it, so the next night's run always finds it old enough. A build
+   promoted by hand long after it landed (`max_age_hours=0`) is completed
+   by the next nightly run, however soon that is.
+2. The new build, if there is one, goes out **staged** to
+   `PLAY_PRODUCTION_ROLLOUT` (default `0.2`) next to the release just
+   completed, which stays everyone else's and the fallback.
+
+So a build reaches 20 % of production the night after it reached testers,
+and 100 % the night after that, unless a newer build has replaced it at
+20 % in the meantime: with a release every day, production is always one
+completed build plus the newest at 20 %. A staged release less than a night
+old (only after a promotion by hand) is **replaced** by a newer one, as
+Play does it: users who already got it keep it until the newer one reaches
+them, everyone else keeps the completed release. A **halted** rollout stops
+the production line, beta goes on: resume it, or release something else,
+in the Console. To stop a bad build from going to 100 %, halt it in the
+Console before 03:00.
+
+Play cannot stage the first release on a track, so while production has
+none the nightly run leaves it alone (beta goes on) and says so. Release the
+first one to everyone by hand: in the Console, or once with
+`PLAY_PRODUCTION_ROLLOUT=1` and a manual run with `dry_run` off.
+
+The nightly run does not read Play vitals (crash and ANR rates) before
+completing: the Play Developer Reporting API needs its own scope and the
+service account's access to it. Watch Android vitals for the staged build
+during its night, and halt it if they spike.
+
+Both tracks, and the completion, go into one edit that Play validates and
+the run commits once. Play reviews one set of changes at a time, so a
+second commit the same night would land on the first one's review; one
+commit sends beta and production to review together. A refusal by Play's
+validation therefore holds back both tracks that night, and fails the run.
+While earlier changes are still in Google's review (see below), the commit
+is refused and the whole night waits: no beta, no completion, no new staged
+release. The next night that commits completes a staged release that is by
+then more than 24 hours old and stages the newest build, so a slow review
+stretches a build's time at 20 % but never skips its completion.
+
+The run's log says per track what is there, what happens and why, for
+example:
+
+```text
+play: --- production ---
+play: production now: 1.0.25 (461) inProgress 20 %, 1.0.24 (439) completed
+play: 1.0.25 (461) at 20 % has been out a night: completing it, to 100 %; 1.0.26 (470) goes out
+play: plan: complete the staged 1.0.25 (461) on production: 20 % -> 100 %
+play: plan: promote 1.0.26 (470) to production, staged to 20 %
+play: --- tonight on Play (dry run): promote 1.0.26 (470) to beta, to everyone; complete the staged 1.0.25 (461) on production: 20 % -> 100 %; promote 1.0.26 (470) to production, staged to 20 % ---
+```
 
 It is **off** until the repository variable `STORE_PROMOTION_ENABLED` is
 `true`. Until then the schedule does nothing, and a manual run is a dry run
@@ -297,9 +358,10 @@ gh variable delete STORE_PROMOTION_ENABLED                # off
 With the switch on, `deploy_testflight.yml` uploads builds that may go to
 the App Store rather than internal-only ones; they still reach only the
 internal tester group until a promotion submits them. Optional variables:
-`PLAY_PROMOTION_TRACK=production` to promote to Play production instead of
-open testing, `PLAY_PRODUCTION_ROLLOUT` (for example `0.2`) for a staged
-rollout, `PLAY_CHANGES_NOT_SENT_FOR_REVIEW=true` when Play asks for it.
+`PLAY_PRODUCTION_ROLLOUT` (default `0.2`; `1` releases production to
+everyone at once), `PLAY_PROMOTION_TRACKS` (default `beta,production`;
+`beta` takes production out of the nightly run),
+`PLAY_CHANGES_NOT_SENT_FOR_REVIEW=true` when Play asks for it.
 
 Play, like Apple, gets one release in review at a time. A commit while
 earlier changes are still in Google's review withdraws them and restarts

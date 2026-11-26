@@ -13,8 +13,8 @@ from unittest import mock
 
 import promote
 from promote import (
-    Candidate, appstore_plan, decide, play_candidate_release, play_current,
-    play_track_releases, promotion_slot,
+    Candidate, Decision, appstore_plan, decide, play_candidate_release, play_current,
+    play_plan, play_track_releases, promotion_slot,
 )
 
 UTC = datetime.timezone.utc
@@ -160,8 +160,176 @@ class PlayTest(unittest.TestCase):
         self.assertEqual(kept['versionCodes'], ['300'])
 
 
+def rel(code, status, fraction=None, name=None):
+    release = {'name': name or f'1.0.{code}', 'versionCodes': [str(code)], 'status': status,
+               'releaseNotes': [{'language': 'en-US', 'text': f'• {code}'}]}
+    if fraction is not None:
+        release['userFraction'] = fraction
+    return release
+
+
+class PlayPlanTest(unittest.TestCase):
+    """Nightly: beta gets the build at 100 %, production gets it staged, and
+    a staged production rollout that has been out a night is completed."""
+
+    new = rel(420, 'completed')
+
+    def plan(self, track, releases, promote=True, landed_hours_ago=None, rollout=0.2):
+        decision = Decision(promote, 'new build' if promote else 'nothing new')
+        landed = (NOW - datetime.timedelta(hours=landed_hours_ago)
+                  if landed_hours_ago is not None else None)
+        return play_plan(track, {'releases': releases}, self.new, decision, rollout,
+                         landed, NOW)
+
+    def kinds(self, decision):
+        return [step[0] for step in decision.steps]
+
+    def test_beta_gets_the_build_at_full_rollout(self):
+        decision, after = self.plan('beta', [rel(400, 'completed')])
+        self.assertEqual(after, [{**self.new, 'status': 'completed'}])
+        self.assertEqual(decision.steps, [('promote', self.new, 1)])
+
+    def test_production_gets_it_staged_beside_the_completed_one(self):
+        decision, after = self.plan('production', [rel(400, 'completed')])
+        self.assertEqual([(r['versionCodes'], r['status'], r.get('userFraction'))
+                          for r in after],
+                         [(['420'], 'inProgress', 0.2), (['400'], 'completed', None)])
+        self.assertEqual(decision.steps, [('promote', self.new, 0.2)])
+
+    def test_a_rollout_out_a_night_is_completed_before_the_new_one(self):
+        decision, after = self.plan('production', [
+            rel(410, 'inProgress', 0.2), rel(400, 'completed')], landed_hours_ago=30)
+        self.assertEqual(self.kinds(decision), ['complete', 'promote'])
+        self.assertTrue(decision.promote)
+        self.assertEqual([(r['versionCodes'], r['status'], r.get('userFraction'))
+                          for r in after],
+                         [(['420'], 'inProgress', 0.2), (['410'], 'completed', None)])
+        # The completed release keeps its "What's new".
+        self.assertEqual(after[1]['releaseNotes'], [{'language': 'en-US', 'text': '• 410'}])
+        self.assertNotIn('userFraction', after[1])
+
+    def test_a_night_without_a_new_build_still_completes(self):
+        decision, after = self.plan('production', [
+            rel(410, 'inProgress', 0.2), rel(400, 'completed')],
+            promote=False, landed_hours_ago=24)
+        self.assertEqual(self.kinds(decision), ['complete'])
+        self.assertTrue(decision.promote)
+        self.assertEqual([(r['versionCodes'], r['status']) for r in after],
+                         [(['410'], 'completed')])
+
+    def test_a_rollout_under_a_day_old_stays_staged(self):
+        decision, after = self.plan('production', [
+            rel(410, 'inProgress', 0.2), rel(400, 'completed')],
+            promote=False, landed_hours_ago=10)
+        self.assertFalse(decision.promote)
+        self.assertIsNone(after)
+        self.assertIn('stays staged', decision.reason)
+
+    def test_a_newer_build_replaces_a_rollout_under_a_day_old(self):
+        decision, after = self.plan('production', [
+            rel(410, 'inProgress', 0.2), rel(400, 'completed')], landed_hours_ago=10)
+        self.assertEqual(self.kinds(decision), ['promote'])
+        self.assertEqual([(r['versionCodes'], r['status']) for r in after],
+                         [(['420'], 'inProgress'), (['400'], 'completed')])
+        self.assertIn('replaces', decision.reason)
+
+    def test_a_halted_rollout_stops_the_track(self):
+        decision, after = self.plan('production', [
+            rel(410, 'halted', 0.2), rel(400, 'completed')], landed_hours_ago=48)
+        self.assertFalse(decision.promote)
+        self.assertFalse(decision.failed)
+        self.assertIsNone(after)
+        self.assertIn('halted', decision.reason)
+
+    def test_an_unknown_landing_is_not_completed_and_fails_the_run(self):
+        decision, after = self.plan('production', [
+            rel(410, 'inProgress', 0.2), rel(400, 'completed')], promote=False)
+        self.assertFalse(decision.promote)
+        self.assertTrue(decision.failed)
+        self.assertIsNone(after)
+
+    def test_the_first_production_release_is_not_staged(self):
+        # Play: "The first release on a track cannot be staged".
+        decision, after = self.plan('production', [])
+        self.assertFalse(decision.promote)
+        self.assertFalse(decision.failed)
+        self.assertIsNone(after)
+        self.assertIn('first release', decision.reason)
+
+    def test_the_first_production_release_can_go_to_everyone(self):
+        decision, after = self.plan('production', [], rollout=1)
+        self.assertEqual([r['status'] for r in after], ['completed'])
+
+    def test_a_full_rollout_setting_releases_production_at_once(self):
+        decision, after = self.plan('production', [rel(400, 'completed')], rollout=1)
+        self.assertEqual([r['status'] for r in after], ['completed'])
+
+    def test_nothing_to_do(self):
+        decision, after = self.plan('production', [rel(400, 'completed')], promote=False)
+        self.assertFalse(decision.promote)
+        self.assertIsNone(after)
+        self.assertEqual(decision.steps, [])
+
+
 def version(state, string='1.0.16', build=None, vid='v1'):
     return (vid, string, state, build)
+
+
+class PlayNightTest(unittest.TestCase):
+    """play() end to end against a mocked Play: one edit for both tracks,
+    committed once, or not at all while Play still reviews earlier changes."""
+
+    def night(self, refuse_commit=False):
+        tracks = {
+            'internal': {'releases': [{'name': '1.0.17', 'versionCodes': ['420'],
+                                       'status': 'completed', 'releaseNotes': []}]},
+            'beta': {'releases': [{'name': '1.0.16', 'versionCodes': ['412'],
+                                   'status': 'completed'}]},
+            'production': {'releases': [
+                {'name': '1.0.16', 'versionCodes': ['412'], 'status': 'inProgress',
+                 'userFraction': 0.2},
+                {'name': '1.0.15', 'versionCodes': ['400'], 'status': 'completed'}]},
+        }
+        calls = []
+
+        def call(method, url, token, body=None):
+            calls.append((method, url.rsplit('/', 1)[-1]))
+            if method == 'POST' and url.endswith('/edits'):
+                return {'id': '7'}
+            if method == 'GET':
+                return tracks[url.rsplit('/', 1)[-1]]
+            if ':commit' in url and refuse_commit:
+                raise promote.ApiError(f'POST {url} -> 400\n{{"error": {{"message": '
+                                       '"Changes are currently in review"}}')
+            return {}
+
+        def check(candidate, store):
+            candidate.sha = 'abc'
+            candidate.ci_green = candidate.deployed = True
+            candidate.landed = NOW - datetime.timedelta(hours=30 if candidate.build == 412 else 5)
+
+        with mock.patch.object(promote, 'call', call), \
+                mock.patch.object(promote, 'play_token', lambda: 'token'), \
+                mock.patch.object(promote, 'check_commit', check), \
+                mock.patch.object(promote, 'release_notes', lambda *a: []), \
+                mock.patch('builtins.print'):
+            decision = promote.play(True, False, NOW, 26, 0.2, ['beta', 'production'])
+        return decision, calls
+
+    def test_both_tracks_and_the_completion_in_one_commit(self):
+        decision, calls = self.night()
+        self.assertTrue(decision.promote)
+        self.assertEqual([c for c in calls if c[0] == 'POST' and c[1] == 'edits'],
+                         [('POST', 'edits')])
+        self.assertEqual([c[1] for c in calls if c[0] == 'PUT'], ['beta', 'production'])
+        self.assertEqual(len([c for c in calls if ':commit' in c[1]]), 1)
+        self.assertNotIn('DELETE', [c[0] for c in calls])
+
+    def test_changes_in_review_hold_back_the_whole_night(self):
+        decision, calls = self.night(refuse_commit=True)
+        self.assertFalse(decision.promote)
+        self.assertFalse(decision.failed)
+        self.assertIn('DELETE', [c[0] for c in calls])
 
 
 class PlayCommitTest(unittest.TestCase):
