@@ -26,6 +26,7 @@ import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../services/attachments/attachment_byte_cache.dart';
+import '../../services/attachments/local_media_storage.dart';
 import '../../services/attachments/video_preview.dart';
 import '../../services/attachments/video_surface.dart';
 import '../../services/audio/voice_player.dart';
@@ -317,6 +318,10 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
   /// "loading" rather than "nothing to show".
   bool _videoPending = false;
 
+  /// Automatic download is off and nothing has been fetched yet: the box
+  /// waits for a tap instead of a download.
+  bool _onDemand = false;
+
   String get _cacheKey =>
       AttachmentByteCache.keyFor(widget.message.roomId, widget.message.eventId);
 
@@ -338,9 +343,19 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
           setState(() => _videoPending = false);
         });
       }
+    } else if (widget.message.kind != MessageKind.sticker &&
+        !ref.read(mediaAutoDownloadProvider)) {
+      // A sticker is a few kilobytes and meaningless as a grey box; everything
+      // else waits to be asked for.
+      _onDemand = true;
     } else {
       _loadWhenSettled(_load);
     }
+  }
+
+  void _loadOnDemand() {
+    setState(() => _onDemand = false);
+    unawaited(_load());
   }
 
   /// Starts the download once the list has stopped flinging past this row.
@@ -427,7 +442,8 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     // client's courtesy, not the video. Bridged videos never have one, and
     // gating the tap on it left every WhatsApp video in the timeline unplayable.
     // A photo with no bytes has nothing to open.
-    final openable = widget.onOpen != null && (_bytes != null || isVideo);
+    final openable =
+        !_onDemand && widget.onOpen != null && (_bytes != null || isVideo);
 
     // One node for the whole picture: what it is, what the sender wrote under
     // it, and whether there is anything there yet. A photo previously announced
@@ -435,12 +451,14 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
     // no semantics of its own — and the caption was a second, unattached node.
     return WeftFocusable(
       image: true,
-      button: openable,
-      onTap: openable ? widget.onOpen : null,
+      button: openable || _onDemand,
+      onTap: _onDemand ? _loadOnDemand : (openable ? widget.onOpen : null),
       label: semanticsSentence([
         context.l10n.messageKind(widget.message.kind),
         caption,
-        if (_failed && !_videoPending)
+        if (_onDemand)
+          context.l10n.attachmentTapToLoad
+        else if (_failed && !_videoPending)
           context.l10n.attachmentCouldNotLoad
         else if (_bytes == null)
           context.l10n.attachmentLoading,
@@ -511,7 +529,7 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
                   // still at a glance, which is the one thing the badge exists to
                   // prevent. A GIF that is already moving needs no badge to say
                   // so, and every bridge flags it `hide_controls` besides.
-                  if (isVideo && !loops) const PlayBadge(),
+                  if (isVideo && !loops && !_onDemand) const PlayBadge(),
                 ],
               ),
             ),
@@ -578,6 +596,9 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
           : context.colors.surfaceContainerHighest,
       alignment: Alignment.center,
       child: switch ((broken, missingByDesign, isVideo)) {
+        _ when _onDemand => _DownloadPrompt(
+          sizeBytes: widget.message.mediaSizeBytes,
+        ),
         // Nothing at all: the caller draws a play control over this, dead
         // centre, and a film glyph behind it is two symbols stacked on the
         // same pixels saying the same thing.
@@ -599,6 +620,32 @@ class _MediaAttachmentState extends ConsumerState<MediaAttachment> {
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
       },
+    );
+  }
+}
+
+/// What a picture shows while it waits for a tap: a download glyph and, when
+/// the sender said, how big the download is.
+class _DownloadPrompt extends StatelessWidget {
+  const _DownloadPrompt({required this.sizeBytes});
+
+  final int? sizeBytes;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = sizeBytes;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.download_rounded, color: context.colors.onSurfaceVariant),
+        if (size != null && size > 0)
+          Text(
+            formatAttachmentSize(size),
+            style: context.text.labelSmall?.copyWith(
+              color: context.colors.onSurfaceVariant,
+            ),
+          ),
+      ],
     );
   }
 }

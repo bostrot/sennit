@@ -43,5 +43,5 @@ Marked with `// l10n-ignore:` at the call site. Not outstanding work: each is a 
 | `apps/weft/lib/features/chat/thread_indicator.dart` | 176 | `'$count'` | a bare number, not a sentence. |
 | `apps/weft/lib/features/settings/mcp_screen.dart` | 304 | `'$entry'` | a machine-readable audit line; its screen-reader label is translated. |
 | `apps/weft/lib/features/settings/pro_screen.dart` | 291 | `'BRAID-XXXXX-XXXXX-XXXXX-XXXXX'` | the shape of a licence key, not prose. |
-| `apps/weft/lib/main.dart` | 706 | `'Sennit'` | the app's own name, never translated. |
+| `apps/weft/lib/main.dart` | 709 | `'Sennit'` | the app's own name, never translated. |
 | `apps/weft/lib/services/backup/backup_service.dart` | 71 | `'Sennit backup'` | the name of Sennit's own file format, as the system file dialog lists it. |

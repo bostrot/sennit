@@ -41,6 +41,7 @@ import 'features/notifications/push_explanation_screen.dart';
 import 'features/settings/notifications_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
+import 'services/attachments/local_media_storage.dart';
 import 'services/notifications/background_actions.dart';
 import 'services/notifications/background_push.dart';
 import 'services/notifications/conversation_clearer.dart';
@@ -655,6 +656,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           // itself must not quietly stop doing so because this device does not
           // do notifications.
           ref.read(retentionSweeperProvider)?.start();
+          // Downloads past the size limit go, oldest first, once per session.
+          unawaited(trimLocalMedia(ref));
           // Counts what arrives from the start of the session, and learns
           // only while personal memory and automatic learning are on.
           ref.read(memoryLearnerProvider)?.start();

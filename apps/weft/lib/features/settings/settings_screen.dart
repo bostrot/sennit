@@ -40,6 +40,7 @@ import 'security_screen.dart';
 import 'sennit_web_screen.dart';
 import 'shortcuts_sheet.dart';
 import 'sms_screen.dart';
+import 'storage_screen.dart';
 import 'surfaces_screen.dart';
 
 /// The one place every setting lives.
@@ -146,6 +147,13 @@ class SettingsScreen extends ConsumerWidget {
                 title: l10n.settingsSmsTitle,
                 subtitle: l10n.settingsSmsSubtitle,
                 onTap: () => push(const SmsScreen()),
+              ),
+            if (!kRemoteClient)
+              tile(
+                icon: Icons.sd_storage_outlined,
+                title: l10n.settingsStorageTitle,
+                subtitle: l10n.settingsStorageSubtitle,
+                onTap: () => push(const StorageScreen()),
               ),
 
             if (!kRemoteClient) const _StatusRingsToggle(),

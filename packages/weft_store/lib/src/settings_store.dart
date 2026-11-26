@@ -198,6 +198,15 @@ abstract final class WeftSettings {
   /// but the other side sees no blue-tick equivalent.
   static const String sendReadReceipts = 'privacy.read_receipts';
 
+  /// Whether the timeline fetches pictures by itself. Off, each one waits for
+  /// a tap. Per device, like the limit below: a phone on mobile data and a
+  /// desktop on fibre want different answers.
+  static const String mediaAutoDownload = 'media.auto_download';
+
+  /// How many megabytes of downloaded attachments this device keeps before
+  /// the oldest go; 0 is no limit.
+  static const String mediaLimitMb = 'media.limit_mb';
+
   /// Whether messages are scanned for appointments to offer "add to
   /// calendar". Fully on-device — rules plus, when installed, the local
   /// embedding model — which is why it may default on.
