@@ -9,7 +9,7 @@ PRIVÉ PAR CONCEPTION
 • Chiffrement de bout en bout via Matrix, avec vérification des appareils, signature croisée et sauvegarde des clés
 • Messages éphémères, réglables par conversation
 • Accusés de lecture, indicateur de saisie et statut en ligne, chacun avec son propre interrupteur
-• Aucune analyse, aucun pistage, aucune publicité
+• Aucun pistage, aucune publicité ; statistiques d’usage anonymes seulement si vous les acceptez
 • Open source sous licence AGPL-3.0 : chaque ligne est publique
 
 VOTRE PROPRE IA (SENNIT PRO)

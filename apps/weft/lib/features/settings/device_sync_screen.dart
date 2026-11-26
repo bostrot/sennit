@@ -9,6 +9,7 @@ import 'package:weft_sync/weft_sync.dart';
 import '../../app/localisation.dart';
 import '../../app/stores.dart';
 import '../../app/sync_providers.dart';
+import '../../app/usage_stats_providers.dart';
 import 'settings_section.dart';
 
 /// Device sync: the switch for this device, the shared switch for secrets,
@@ -43,7 +44,10 @@ class DeviceSyncScreen extends ConsumerWidget {
               title: Text(l10n.deviceSyncEnableTitle),
               subtitle: Text(l10n.deviceSyncEnableSubtitle),
               value: enabled,
-              onChanged: (v) => write(WeftSettings.syncEnabled, value: v),
+              onChanged: (v) {
+                write(WeftSettings.syncEnabled, value: v);
+                if (v) ref.read(usageStatsProvider).deviceSyncOn();
+              },
               contentPadding: EdgeInsets.zero,
             ),
             if (enabled) ...[

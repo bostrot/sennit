@@ -90,6 +90,14 @@ dependencies:
   matrix: ^10.1.0
   path: ^1.9.1
   path_provider: ^2.1.6
+  # Anonymous usage statistics for those who opt in, to Sennit's own Plausible
+  # server; see `lib/services/analytics/usage_stats.dart`. Pinned to a commit
+  # until 0.5.0, the first release that can send from the browser build, is
+  # on pub.dev.
+  plausible_analytics:
+    git:
+      url: https://github.com/bostrot/flutter_plausible_analytics.git
+      ref: 6c55c89d1e57f3f0aebcdf9cccb7103fb8ec8da2
   qr_flutter: ^4.1.0
   scrollable_positioned_list: ^0.3.8
   riverpod_annotation: ^4.0.3

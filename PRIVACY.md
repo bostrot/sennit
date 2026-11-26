@@ -1,21 +1,50 @@
 # Sennit Privacy Policy
 
-*Published at <https://erictrenkel.com/apps/braid/privacy.html> — that
+*Published at <https://erictrenkel.com/apps/sennit/privacy.html> — that
 hosted copy is the one the app stores link to.*
 
-*Effective: 16 November 2026*
+*Effective: 26 November 2026*
 
 Sennit is a self-hosted messenger. It is designed so that the developer of
 Sennit **cannot** see your data — there is no Sennit cloud, no account with us,
-and no telemetry.
+and no telemetry unless you opt in to anonymous usage statistics.
 
 ## What Sennit collects
 
-Nothing. The app contains no analytics, no crash reporting service, no
-advertising SDKs, and no tracking of any kind. The developer operates no
-server that your messages or contacts ever reach. The one exception, licence
-checks in builds downloaded outside the app stores, is described under
-*Sennit Pro* below.
+Nothing, unless you opt in to anonymous usage statistics (below). The app
+contains no crash reporting service, no advertising SDKs, and no tracking of
+any kind. The developer operates no server that your messages or contacts
+ever reach. The other exception, licence checks in builds downloaded outside
+the app stores, is described under *Sennit Pro* below.
+
+## Anonymous usage statistics (opt-in)
+
+Sennit uses **Plausible Analytics**, a privacy-friendly, cookie-free analytics
+tool, **only if you opt in**. It is off until you say yes: Sennit asks once,
+after sign-in, and nothing is sent before you answer.
+
+- **What is sent:** the screens you open, named after the screen (for
+  example `/settings` or `/chat`, never which chat), and a few feature
+  events: a messenger connected (which network), an AI feature used
+  (translate, quick message or transcription), device sync switched on, and
+  Sennit Pro bought (store or licence key). Every event carries the app
+  version, the platform and the screen width. Plausible derives the country
+  from the connection and the device type from the screen width, and does
+  not store the IP address.
+- **What is never sent:** personal data, message content, contacts, names,
+  Matrix IDs, room IDs or anything you type. There are no cookies and no
+  identifier that follows you across apps, sites or devices.
+- **Where it goes:** Plausible Community Edition, self-hosted by us at
+  `analytics.bostrot.com`, on our own server in Germany, reached through
+  Cloudflare. It is not shared with anyone and not used for advertising.
+- **Legal basis:** your consent, Art. 6(1)(a) GDPR.
+- **Withdrawing:** switch off Settings → Privacy & security → *Share
+  anonymous usage statistics* at any time; it takes effect immediately. The
+  setting syncs to your other devices if you use device sync. In Sennit Web,
+  a browser set to send "Do Not Track" or Global Privacy Control sends
+  nothing, whatever the setting says.
+- **Retention:** Plausible keeps only aggregated counts, with no record of
+  you, for as long as the statistics are useful to us.
 
 ## Sennit Pro
 

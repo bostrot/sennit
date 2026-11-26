@@ -45,12 +45,14 @@ import '../../app/shortcuts.dart';
 import '../../app/stores.dart';
 import '../../app/text_size.dart';
 import '../../app/transcription_service.dart';
+import '../../app/usage_stats_providers.dart';
 import '../../data/chat_repository.dart';
 import '../../services/ai/event_title.dart'
     show messageWords, recentConversationTranscript;
 import '../../services/ai/translate_message.dart';
 import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/quick_messages.dart';
+import '../../services/analytics/usage_stats.dart' show AiUsage;
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/billing/entitlements.dart';
 import '../../services/attachments/send_attachments.dart';
@@ -1741,13 +1743,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
           defaultTranslationLanguage(
             Localizations.localeOf(context).languageCode,
           ),
-      translate: (language) => translateMessage(
-        baseUrl: endpoint.baseUrl,
-        model: endpoint.model,
-        apiKey: endpoint.apiKey,
-        text: text,
-        language: language,
-      ),
+      translate: (language) {
+        ref.read(usageStatsProvider).aiUsed(AiUsage.translate);
+        return translateMessage(
+          baseUrl: endpoint.baseUrl,
+          model: endpoint.model,
+          apiKey: endpoint.apiKey,
+          text: text,
+          language: language,
+        );
+      },
       onLanguage: (language) {
         settings.setString(WeftSettings.translateLanguage, language);
         revision.bump();
@@ -3121,6 +3126,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     announce(context, context.l10n.attachmentTranscribing);
 
     final service = ref.read(transcriptionServiceProvider);
+    ref.read(usageStatsProvider).aiUsed(AiUsage.transcribe);
     try {
       final transcript = await service.transcribe(
         message,
@@ -3741,6 +3747,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       maxMessages: room.maxMessages,
       maxChars: room.transcriptChars,
     );
+    ref.read(usageStatsProvider).aiUsed(AiUsage.quickMessage);
     final draft = await composeQuickMessage(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,

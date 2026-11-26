@@ -1905,5 +1905,13 @@
   "appLockWrongPin": "गलत PIN",
   "appLockWait": "बहुत ज़्यादा कोशिशें। {seconds} सेकंड रुकें।",
   "appLockUseBiometrics": "बायोमेट्रिक इस्तेमाल करें",
-  "appLockBiometricReason": "Sennit अनलॉक करें"
+  "appLockBiometricReason": "Sennit अनलॉक करें",
+  "settingsUsageStatsTitle": "गुमनाम उपयोग आँकड़े साझा करें",
+  "settingsUsageStatsSubtitle": "खोली गई स्क्रीन और इस्तेमाल की गई कुछ सुविधाएँ, Plausible के ज़रिए। कोई निजी डेटा नहीं, कोई संदेश सामग्री नहीं।",
+  "usageStatsConsentTitle": "Sennit को बेहतर बनाने में मदद करें?",
+  "usageStatsConsentBody": "Sennit हमारे अपने सर्वर पर चल रहे Plausible Analytics को गुमनाम उपयोग आँकड़े भेज सकता है: कौन-सी स्क्रीन खोली गईं, इस्तेमाल की गई कुछ सुविधाएँ (जैसे कोई मैसेंजर जोड़ना या AI इस्तेमाल करना), ऐप का संस्करण और प्लैटफ़ॉर्म। Plausible कनेक्शन से देश का अनुमान लगाता है और IP पता सहेजता नहीं है। कोई कुकी नहीं।",
+  "usageStatsConsentNever": "कभी नहीं भेजा जाता: निजी डेटा, संदेश सामग्री, संपर्क या Matrix ID। आप इसे कभी भी सेटिंग्स → प्राइवेसी और सुरक्षा में बदल सकते हैं।",
+  "usageStatsConsentPolicy": "गोपनीयता नीति",
+  "usageStatsConsentAllow": "अनुमति दें",
+  "usageStatsConsentDecline": "नहीं, धन्यवाद"
 }

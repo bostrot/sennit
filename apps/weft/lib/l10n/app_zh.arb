@@ -1906,5 +1906,13 @@
   "appLockWrongPin": "PIN 码错误",
   "appLockWait": "尝试次数过多，请等待 {seconds} 秒。",
   "appLockUseBiometrics": "使用生物识别",
-  "appLockBiometricReason": "解锁 Sennit"
+  "appLockBiometricReason": "解锁 Sennit",
+  "settingsUsageStatsTitle": "分享匿名使用统计",
+  "settingsUsageStatsSubtitle": "打开的页面和少数使用的功能，通过 Plausible 统计。不含个人数据，不含消息内容。",
+  "usageStatsConsentTitle": "帮助改进 Sennit？",
+  "usageStatsConsentBody": "Sennit 可以向我们自有服务器上的 Plausible Analytics 发送匿名使用统计：打开了哪些页面、使用了少数哪些功能（例如连接聊天应用或使用 AI）、应用版本和平台。Plausible 根据连接推断国家/地区，不会保存 IP 地址。不使用 Cookie。",
+  "usageStatsConsentNever": "绝不发送：个人数据、消息内容、联系人或 Matrix ID。你可以随时在“设置 → 隐私与安全”中更改。",
+  "usageStatsConsentPolicy": "隐私政策",
+  "usageStatsConsentAllow": "允许",
+  "usageStatsConsentDecline": "不用了"
 }

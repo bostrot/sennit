@@ -1905,5 +1905,13 @@
   "appLockWrongPin": "رمز PIN خاطئ",
   "appLockWait": "محاولات كثيرة. انتظر {seconds} ثانية.",
   "appLockUseBiometrics": "استخدام القياسات الحيوية",
-  "appLockBiometricReason": "فتح قفل Sennit"
+  "appLockBiometricReason": "فتح قفل Sennit",
+  "settingsUsageStatsTitle": "مشاركة إحصاءات استخدام مجهولة",
+  "settingsUsageStatsSubtitle": "الشاشات المفتوحة وبعض الميزات المستخدمة، عبر Plausible. لا بيانات شخصية ولا محتوى رسائل.",
+  "usageStatsConsentTitle": "هل تساعد في تحسين Sennit؟",
+  "usageStatsConsentBody": "يمكن لـ Sennit إرسال إحصاءات استخدام مجهولة إلى Plausible Analytics على خادمنا الخاص: الشاشات التي تُفتح، وبعض الميزات المستخدمة (مثل ربط تطبيق مراسلة أو استخدام الذكاء الاصطناعي)، وإصدار التطبيق والمنصة. يستنتج Plausible البلد من الاتصال ولا يحفظ عنوان IP. بلا ملفات تعريف ارتباط.",
+  "usageStatsConsentNever": "لا يُرسَل أبدًا: البيانات الشخصية أو محتوى الرسائل أو جهات الاتصال أو معرّفات Matrix. يمكنك تغيير ذلك في أي وقت من الإعدادات ← الخصوصية والأمان.",
+  "usageStatsConsentPolicy": "سياسة الخصوصية",
+  "usageStatsConsentAllow": "السماح",
+  "usageStatsConsentDecline": "لا، شكرًا"
 }
