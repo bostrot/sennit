@@ -94,9 +94,8 @@ void main() {
     }
 
     await openGroup(tester, 'Personal memory');
-    for (final label in ['This chat', 'About Anna Maven']) {
-      await expectReachable(tester, label);
-    }
+    // One memory per person: in a direct chat, the person's.
+    await expectReachable(tester, 'About Anna Maven');
 
     await openGroup(tester, 'Technical details');
     for (final label in ['Matrix user', 'Conversations in this chat']) {
