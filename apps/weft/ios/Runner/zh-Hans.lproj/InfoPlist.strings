@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "Sennit 会显示你通讯录中的名字，而不是消息网络分配的名字。匹配只在本设备上进行，绝不会上传。";
 "NSMicrophoneUsageDescription" = "Sennit 需要使用麦克风，以便你在语音或视频通话中讲话。";
 "NSSiriUsageDescription" = "Siri 可以朗读你的新消息，并发送你口述的回复，在手机和 CarPlay 上均可。关闭消息预览后，Siri 只会说出是谁发来的。";
+"SennitPushNewMessage" = "新消息";

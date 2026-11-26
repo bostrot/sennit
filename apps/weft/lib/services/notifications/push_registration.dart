@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:weft_matrix/weft_matrix.dart';
 
 import '../../app/localisation.dart';
+import 'background_push.dart' show runFirebaseBackgroundPush;
 
 /// Which platforms this build can do what on.
 ///
@@ -57,6 +59,57 @@ abstract final class NotificationPlatform {
 const String kAndroidPushAppId = 'com.bostrot.weft.android';
 const String kIosPushAppId = 'com.bostrot.weft.ios';
 
+/// The app id of an iOS build signed for development (an Xcode run). Its APNs
+/// tokens are sandbox tokens, which production APNs refuses, so Sennit's
+/// gateway serves them under an id of their own.
+const String kIosSandboxPushAppId = 'com.bostrot.weft.ios.dev';
+
+/// Sennit's own push gateway: a sygnal holding the FCM and APNs credentials
+/// that only the published builds can use. It receives what the homeserver
+/// sends for an `event_id_only` pusher and nothing more — see
+/// docs/ops/push-gateway.md.
+const String kSennitPushGateway =
+    'https://push.bostrot.com/_matrix/push/v1/notify';
+
+/// Which gateway wakes this device.
+enum PushGatewayMode {
+  /// [kSennitPushGateway].
+  sennit,
+
+  /// The URL the user typed — their own sygnal, or any other.
+  custom,
+
+  /// No pusher. The built-in connection or UnifiedPush may still deliver.
+  off;
+
+  static PushGatewayMode? parse(String? value) =>
+      PushGatewayMode.values.asNameMap()[value];
+}
+
+/// The mode in force, from what is stored.
+///
+/// Null means the user has not been asked yet, which only a build that offers
+/// Sennit's gateway ([offerSennit]) can be in: it registers nothing until the
+/// explanation has been answered. An install from before the choice existed
+/// that already had a URL keeps using it.
+PushGatewayMode? effectivePushMode({
+  required String? stored,
+  required String? customUrl,
+  required bool offerSennit,
+}) {
+  final parsed = PushGatewayMode.parse(stored);
+  if (parsed != null) return parsed;
+  if ((customUrl ?? '').trim().isNotEmpty) return PushGatewayMode.custom;
+  return offerSennit ? null : PushGatewayMode.custom;
+}
+
+/// The gateway a [mode] registers with, or null for none.
+Uri? gatewayForMode(PushGatewayMode? mode, String? customUrl) => switch (mode) {
+  PushGatewayMode.sennit => Uri.parse(kSennitPushGateway),
+  PushGatewayMode.custom => resolvePushGateway(customUrl),
+  PushGatewayMode.off || null => null,
+};
+
 /// The `default_payload` handed to the gateway for an iOS pusher.
 ///
 /// `mutable-content: 1` is the only thing that gives the notification service
@@ -106,6 +159,13 @@ abstract interface class PushTransport {
   /// shapes these arrive in, and a second parse here would be a second answer
   /// to the same question.
   Stream<Map<String, Object?>> get pushes;
+
+  /// The app id the gateway knows this kind of token under.
+  String get appId;
+
+  /// Gives the token back, so the push service forgets this device. Called
+  /// when the user turns push off.
+  Future<void> release();
 }
 
 /// [PushTransport] over `firebase_messaging`.
@@ -124,9 +184,13 @@ class FirebasePushTransport implements PushTransport {
   /// still notifies from sync. Treating an absent Firebase configuration as a
   /// startup failure would make the desktop app refuse to launch.
   static Future<FirebasePushTransport?> initialize() async {
-    if (!NotificationPlatform.supportsPush) return null;
+    if (!NotificationPlatform.isAndroid) return null;
     try {
       await Firebase.initializeApp();
+      // A poke that arrives while no UI is in front. Registered on every
+      // launch; the plugin keeps the handle, so it also serves the cold starts
+      // after this one.
+      FirebaseMessaging.onBackgroundMessage(runFirebaseBackgroundPush);
       return FirebasePushTransport._();
     } on Object catch (error) {
       // `FirebaseException` for a missing default app, `MissingPluginException`
@@ -146,14 +210,6 @@ class FirebasePushTransport implements PushTransport {
   @override
   Future<String?> token() async {
     try {
-      if (NotificationPlatform.isIOS) {
-        // The *APNs* token, not the FCM one. sygnal's `apns` pushkin addresses
-        // devices by their raw APNs token, and it is null until iOS has
-        // answered the registration — which is after permission is granted and
-        // can be a second or two later. A null here is "not yet", and the
-        // token-refresh stream is what eventually supplies it.
-        return await FirebaseMessaging.instance.getAPNSToken();
-      }
       return await FirebaseMessaging.instance.getToken();
     } on Object catch (error) {
       debugPrint('weft: could not resolve a push token: $error');
@@ -164,7 +220,85 @@ class FirebasePushTransport implements PushTransport {
   @override
   Stream<String> get tokenRefreshes =>
       FirebaseMessaging.instance.onTokenRefresh;
+
+  @override
+  String get appId => kAndroidPushAppId;
+
+  @override
+  Future<void> release() async {
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } on Object catch (error) {
+      debugPrint('weft: could not delete the push token: $error');
+    }
+  }
 }
+
+/// [PushTransport] over APNs directly, with no Firebase on iOS.
+///
+/// The token comes from `AppDelegate.swift` over `com.bostrot.weft/apns`, as
+/// the hex string sygnal's `apns` pushkin addresses a device by. iOS shows the
+/// pokes itself, through the notification service extension, so there is no
+/// stream of them here: a running app is notified from sync.
+class ApnsPushTransport implements PushTransport {
+  ApnsPushTransport._(this._channel) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'tokenChanged' && call.arguments is String) {
+        _refreshes.add(call.arguments as String);
+      }
+    });
+  }
+
+  final MethodChannel _channel;
+  final _refreshes = StreamController<String>.broadcast();
+  bool _sandbox = false;
+
+  static Future<ApnsPushTransport?> initialize({
+    MethodChannel channel = const MethodChannel('com.bostrot.weft/apns'),
+  }) async {
+    if (!NotificationPlatform.isIOS) return null;
+    final transport = ApnsPushTransport._(channel);
+    try {
+      transport._sandbox =
+          await channel.invokeMethod<String>('environment') == 'development';
+    } on Object catch (error) {
+      debugPrint('weft: APNs unavailable: $error');
+      return null;
+    }
+    return transport;
+  }
+
+  @override
+  Future<String?> token() async {
+    try {
+      // Null until iOS has answered the registration, which needs the
+      // notification permission settled first; [tokenRefreshes] brings it.
+      return await _channel.invokeMethod<String>('token');
+    } on Object catch (error) {
+      debugPrint('weft: could not resolve an APNs token: $error');
+      return null;
+    }
+  }
+
+  @override
+  Stream<String> get tokenRefreshes => _refreshes.stream;
+
+  @override
+  Stream<Map<String, Object?>> get pushes => const Stream.empty();
+
+  @override
+  String get appId => _sandbox ? kIosSandboxPushAppId : kIosPushAppId;
+
+  // Nothing to give back: an APNs token reaches nobody but Apple until a
+  // pusher names it, and unregistering from APNs would also silence calls.
+  @override
+  Future<void> release() async {}
+}
+
+/// The transport this platform pushes over, or null.
+Future<PushTransport?> initializePushTransport() async =>
+    await FirebasePushTransport.initialize() ??
+    await ApnsPushTransport.initialize();
 
 /// What happened when Weft last tried to register for push.
 ///
@@ -180,9 +314,14 @@ enum PushRegistrationStatus {
   /// Desktop. There is no push here and none is wanted; sync does the work.
   unsupportedPlatform,
 
-  /// No push gateway is configured. The user has to supply one — Weft hosts
-  /// nothing, including this.
+  /// No push gateway is configured. The user has to supply one.
   notConfigured,
+
+  /// The user turned push off.
+  off,
+
+  /// Sennit's gateway has not been explained yet, so nothing is registered.
+  undecided,
 
   /// The platform would not give a token yet. Ordinary on iOS immediately
   /// after launch; the refresh stream retries.
@@ -224,15 +363,18 @@ class WeftPushRegistration {
     required PushKeyStore keyStore,
     required PushTransport? tokens,
     required Uri? gatewayUrl,
+    PushGatewayMode? mode = PushGatewayMode.custom,
   }) : _registry = registry,
        _keyStore = keyStore,
        _tokens = tokens,
-       _gatewayUrl = gatewayUrl;
+       _gatewayUrl = gatewayUrl,
+       _mode = mode;
 
   final MatrixPusherRegistry _registry;
   final PushKeyStore _keyStore;
   final PushTransport? _tokens;
   final Uri? _gatewayUrl;
+  final PushGatewayMode? _mode;
 
   StreamSubscription<String>? _refreshSub;
 
@@ -248,6 +390,17 @@ class WeftPushRegistration {
       return const PushRegistrationOutcome(
         PushRegistrationStatus.unsupportedPlatform,
       );
+    }
+
+    if (_mode == null) {
+      return const PushRegistrationOutcome(PushRegistrationStatus.undecided);
+    }
+    if (_mode == PushGatewayMode.off) {
+      // Off means off on the homeserver too: a pusher left behind would keep
+      // the gateway poking this device.
+      await unregister();
+      await tokens.release();
+      return const PushRegistrationOutcome(PushRegistrationStatus.off);
     }
 
     final gateway = _gatewayUrl;
@@ -274,7 +427,11 @@ class WeftPushRegistration {
       unawaited(ensureRegistered());
     });
 
-    final pusher = pusherFor(token: token, gatewayUrl: gateway);
+    final pusher = pusherFor(
+      token: token,
+      gatewayUrl: gateway,
+      appId: tokens.appId,
+    );
     try {
       final wrote = await _registry.ensureRegistered(
         pusher,
@@ -303,7 +460,10 @@ class WeftPushRegistration {
     final key = _keyStore.readPushKey();
     if (key == null || key.isEmpty) return;
     try {
-      await _registry.unregister(appId: currentPushAppId, pushKey: key);
+      await _registry.unregister(
+        appId: _tokens?.appId ?? currentPushAppId,
+        pushKey: key,
+      );
     } on PusherRegistrationException catch (error) {
       debugPrint(
         'weft: could not remove this device\'s pusher: ${error.message}',
@@ -326,10 +486,11 @@ class WeftPushRegistration {
     required String token,
     required Uri gatewayUrl,
     String? deviceName,
+    String? appId,
   }) {
     final ios = NotificationPlatform.isIOS;
     return WeftPusher(
-      appId: ios ? kIosPushAppId : kAndroidPushAppId,
+      appId: appId ?? (ios ? kIosPushAppId : kAndroidPushAppId),
       pushKey: token,
       gatewayUrl: gatewayUrl,
       deviceDisplayName: deviceName ?? 'Sennit',

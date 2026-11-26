@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "Sennit मैसेजिंग नेटवर्क के दिए नामों की जगह आपकी एड्रेस बुक के नाम दिखाता है। मिलान इसी डिवाइस पर होता है और कभी अपलोड नहीं होता।";
 "NSMicrophoneUsageDescription" = "वॉइस या वीडियो कॉल में बोलने के लिए Sennit को माइक्रोफ़ोन चाहिए।";
 "NSSiriUsageDescription" = "Siri आपके नए मैसेज पढ़कर सुना सकता है और आपके बोले जवाब भेज सकता है, iPhone और CarPlay पर। मैसेज प्रीव्यू बंद हों तो Siri सिर्फ़ बताता है कि किसने लिखा।";
+"SennitPushNewMessage" = "नया संदेश";

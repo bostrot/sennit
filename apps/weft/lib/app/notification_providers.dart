@@ -160,19 +160,42 @@ final conversationClearerProvider = Provider<ConversationClearer>((ref) {
 /// notification stack to say it had opened.
 final openChatsProvider = Provider<OpenChats>((ref) => OpenChats());
 
-/// The push gateway the user configured, or null.
-final pushGatewayProvider = Provider<Uri?>((ref) {
+/// Whether this build offers Sennit's own gateway by default: the store
+/// builds, whose FCM and APNs credentials it holds.
+final offerSennitPushProvider = Provider<bool>(
+  (ref) => SennitEdition.current == SennitEdition.store,
+);
+
+/// Which gateway wakes this device, or null while a store build has not
+/// explained Sennit's yet.
+final pushModeProvider = Provider<PushGatewayMode?>((ref) {
   ref.watch(settingsRevisionProvider);
+  final offer = ref.watch(offerSennitPushProvider);
   try {
-    return resolvePushGateway(
-      ref
-          .read(storesProvider)
-          .settings
-          .getString(WeftSettings.notifyPushGateway),
+    final settings = ref.read(storesProvider).settings;
+    return effectivePushMode(
+      stored: settings.getString(WeftSettings.notifyPushMode),
+      customUrl: settings.getString(WeftSettings.notifyPushGateway),
+      offerSennit: offer,
     );
   } on StateError {
-    return resolvePushGateway(null);
+    return effectivePushMode(stored: null, customUrl: null, offerSennit: offer);
   }
+});
+
+/// The push gateway in force, or null.
+final pushGatewayProvider = Provider<Uri?>((ref) {
+  ref.watch(settingsRevisionProvider);
+  String? custom;
+  try {
+    custom = ref
+        .read(storesProvider)
+        .settings
+        .getString(WeftSettings.notifyPushGateway);
+  } on StateError {
+    custom = null;
+  }
+  return gatewayForMode(ref.watch(pushModeProvider), custom);
 });
 
 /// [PushKeyStore] over the settings table.
@@ -197,12 +220,12 @@ class SettingsPushKeyStore implements PushKeyStore {
 /// The push transport, once Firebase has had its chance to initialise.
 ///
 /// Null on desktop, and null in a build with no Firebase configuration — see
-/// [FirebasePushTransport.initialize]. Neither is an error: both mean "this
+/// [initializePushTransport]. Neither is an error: both mean "this
 /// device is notified from sync while Sennit is running", which is the whole of
 /// what desktop Weft has ever done.
 final pushTransportProvider = FutureProvider<PushTransport?>((ref) async {
   if (kNoMatrix) return null;
-  return FirebasePushTransport.initialize();
+  return initializePushTransport();
 });
 
 /// Everything the notification path needs, assembled.
@@ -312,6 +335,7 @@ final pushRegistrationProvider = FutureProvider<PushRegistrationOutcome>((
     keyStore: SettingsPushKeyStore(ref.watch(storesProvider).settings),
     tokens: await ref.watch(pushTransportProvider.future),
     gatewayUrl: ref.watch(pushGatewayProvider),
+    mode: ref.watch(pushModeProvider),
   );
   ref.onDispose(() => unawaited(registration.dispose()));
   return registration.ensureRegistered();

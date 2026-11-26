@@ -490,12 +490,13 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="weft.messages.matrix" />
-        <!-- Data-only messages must not be shown by the system at all: an
-             `event_id_only` push carries no text, so a system-rendered
-             notification would say nothing. Dart fetches, decrypts and posts. -->
+        <!-- No FCM token until the user has chosen a gateway: `getToken()`
+             is called only for Sennit's gateway or their own, and turning push
+             off deletes the token again. Without this, Firebase would register
+             with Google on the first launch, before the explanation screen. -->
         <meta-data
             android:name="com.google.firebase.messaging.auto_init_enabled"
-            android:value="true" />
+            android:value="false" />
 
         <!-- Android Auto. Declares Sennit a messaging app, which in the car
              means notifications and nothing else: the head unit reads the

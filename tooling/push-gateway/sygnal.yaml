@@ -1,0 +1,78 @@
+# Sennit push gateway (sygnal 0.17.0) — deployed to push-01 as
+# /etc/sygnal/sygnal.yaml. Not secret: the credentials it names live only on
+# the gateway host, under /etc/sygnal/secrets (a mount excluded from backups).
+# See docs/ops/push-gateway.md.
+
+log:
+  setup:
+    version: 1
+    formatters:
+      normal:
+        format: "%(levelname)s %(name)s %(message)s"
+    handlers:
+      stderr:
+        class: logging.StreamHandler
+        formatter: normal
+        stream: ext://sys.stderr
+    loggers:
+      # Access lines carry the source address of every homeserver; the INFO
+      # lines of both pushkins carry push key, room id and event id together.
+      # Neither is ever written: the gateway keeps no record that joins a
+      # device to a conversation.
+      sygnal.access:
+        propagate: false
+        handlers: []
+        level: CRITICAL
+      sygnal:
+        propagate: false
+        handlers: [stderr]
+        level: WARNING
+    root:
+      handlers: [stderr]
+      level: WARNING
+    disable_existing_loggers: false
+  access:
+    x_forwarded_for: false
+
+http:
+  bind_addresses: ["0.0.0.0"]
+  port: 5000
+
+metrics:
+  prometheus:
+    enabled: true
+    address: "0.0.0.0"
+    port: 8000
+
+apps:
+  # Android, FCM HTTP v1. The service account holds only the
+  # "Firebase Cloud Messaging API Admin" role in project sennit-push.
+  com.bostrot.weft.android:
+    type: gcm
+    api_version: v1
+    project_id: sennit-push
+    service_account_file: /etc/sygnal/secrets/fcm-service-account.json
+    inflight_request_limit: 128
+    max_connections: 20
+
+  # iOS, APNs with a token (.p8) key. TestFlight and App Store builds use
+  # production APNs.
+  com.bostrot.weft.ios:
+    type: apns
+    keyfile: /etc/sygnal/secrets/apns-authkey.p8
+    key_id: QUAY8B6RYW
+    team_id: D4U2L824A5
+    topic: com.bostrot.weft
+    platform: production
+    inflight_request_limit: 128
+
+  # iOS builds signed with a development profile (Xcode runs) get sandbox
+  # tokens, which production APNs rejects. The app picks this id itself.
+  com.bostrot.weft.ios.dev:
+    type: apns
+    keyfile: /etc/sygnal/secrets/apns-authkey.p8
+    key_id: QUAY8B6RYW
+    team_id: D4U2L824A5
+    topic: com.bostrot.weft
+    platform: sandbox
+    inflight_request_limit: 32

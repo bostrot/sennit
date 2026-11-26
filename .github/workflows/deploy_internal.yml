@@ -166,6 +166,14 @@ jobs:
         # download stops at an unaccepted license.
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
+      - name: Write the Firebase config
+        # FCM for Sennit's push gateway; see docs/ops/push-gateway.md. No secret,
+        # no FCM: the build still works and notifies without it.
+        if: steps.check_version.outputs.changed == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: python3 tooling/scripts/firebase_android_config.py -
+
       - name: Install the release keystore
         if: steps.check_version.outputs.changed == 'true'
         run: |

@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "Sennit affiche les noms de votre carnet d’adresses plutôt que ceux que les réseaux de messagerie attribuent. La correspondance se fait sur cet appareil et n’est jamais téléversée.";
 "NSMicrophoneUsageDescription" = "Sennit a besoin du micro pour que vous puissiez parler pendant un appel audio ou vidéo.";
 "NSSiriUsageDescription" = "Siri peut vous lire vos nouveaux messages à voix haute et envoyer les réponses que vous dictez, sur votre téléphone et dans CarPlay. Si les aperçus des messages sont désactivés, Siri indique seulement qui a écrit.";
+"SennitPushNewMessage" = "Nouveau message";

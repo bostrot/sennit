@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 
-import 'dart:ui' show DartPluginRegistrant;
+import 'dart:ui' show DartPluginRegistrant, IsolateNameServer;
+
+import 'package:firebase_messaging/firebase_messaging.dart' show RemoteMessage;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +15,7 @@ import 'package:weft_domain/weft_domain.dart' show Chat;
 import 'package:weft_matrix/weft_matrix.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
+
 import '../../app/billing_providers.dart' show kProOwnershipSetting;
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
@@ -53,6 +57,74 @@ Future<void> runBackgroundPush() async {
     onUnregistered: (_) async {},
     onMessage: _onMessage,
   );
+}
+
+/// An FCM poke that arrived with no UI in front — Sennit's gateway, on a
+/// store build.
+///
+/// The plugin runs this in an isolate of its own whether or not the app's
+/// process is alive. When it is (the app is in the background, or the daemon
+/// runs) the poke is handed to the isolate holding the client, exactly as a
+/// notification action is; only a cold start boots the headless stack, the
+/// same one UnifiedPush uses.
+@pragma('vm:entry-point')
+Future<void> runFirebaseBackgroundPush(RemoteMessage message) async {
+  final data = Map<String, Object?>.from(message.data);
+  if (data.isEmpty) return;
+  if (await forwardPush(data)) return;
+
+  final service = await _service();
+  if (service == null) return;
+  await service.handlePush(data);
+  await Future<void>.delayed(const Duration(seconds: 3));
+  await service.chipsSettled();
+}
+
+/// The name an isolate with a live client takes pokes under; see
+/// [kNotificationActionPortName] for why a second client must never open.
+const String kPushPortName = 'weft.push';
+
+/// Takes pokes forwarded by [forwardPush] and hands them to [handle].
+ReceivePort servePushes(
+  Future<void> Function(Map<String, Object?> data) handle, {
+  String name = kPushPortName,
+}) {
+  final port = ReceivePort();
+  IsolateNameServer.removePortNameMapping(name);
+  IsolateNameServer.registerPortWithName(port.sendPort, name);
+  port.listen((message) {
+    if (message is! List || message.length != 2) return;
+    final reply = message[1];
+    if (reply is SendPort) reply.send(true);
+    final decoded = message[0] is String
+        ? jsonDecode(message[0] as String)
+        : null;
+    if (decoded is! Map) return;
+    unawaited(
+      handle(decoded.cast<String, Object?>()).catchError(
+        (Object error) => debugPrint('weft: a forwarded push failed: $error'),
+      ),
+    );
+  });
+  return port;
+}
+
+/// Hands [data] to the isolate serving [name]; false when nobody took it.
+Future<bool> forwardPush(
+  Map<String, Object?> data, {
+  String name = kPushPortName,
+  Duration acceptWithin = const Duration(seconds: 2),
+}) async {
+  final target = IsolateNameServer.lookupPortByName(name);
+  if (target == null) return false;
+  final replies = ReceivePort();
+  try {
+    target.send([jsonEncode(data), replies.sendPort]);
+    return await replies.first.timeout(acceptWithin, onTimeout: () => false) ==
+        true;
+  } finally {
+    replies.close();
+  }
 }
 
 /// The daemon: the same headless stack, kept alive on purpose.
@@ -194,6 +266,7 @@ Future<WeftNotificationService?> _service() => _boot ??= () async {
     );
     _bootedActions = actions;
     NotificationActionServer.serve(actions.handle);
+    servePushes(service.handlePush);
     await service.start();
     return service;
   } on Object catch (error) {

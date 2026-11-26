@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "Sennit muestra los nombres de tu agenda en lugar de los que les asignan las redes de mensajería. Los contactos se comparan en este dispositivo y nunca se suben.";
 "NSMicrophoneUsageDescription" = "Sennit necesita el micrófono para que puedas hablar en una llamada de voz o de vídeo.";
 "NSSiriUsageDescription" = "Siri puede leerte en voz alta los mensajes nuevos y enviar las respuestas que dictes, en el teléfono y en CarPlay. Si las vistas previas de mensajes están desactivadas, Siri solo dice quién escribió.";
+"SennitPushNewMessage" = "Nuevo mensaje";

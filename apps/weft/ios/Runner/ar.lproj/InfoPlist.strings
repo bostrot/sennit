@@ -17,3 +17,4 @@
 "NSContactsUsageDescription" = "يعرض Sennit الأسماء من دفتر عناوينك بدل الأسماء التي تضعها شبكات المراسلة. تتم المطابقة على هذا الجهاز ولا تُرفع أبدًا.";
 "NSMicrophoneUsageDescription" = "يحتاج Sennit إلى الميكروفون لتتحدث في مكالمة صوتية أو مكالمة فيديو.";
 "NSSiriUsageDescription" = "يمكن لـ Siri أن يقرأ لك رسائلك الجديدة ويرسل ردودك المملاة، على iPhone وفي CarPlay. إن كانت معاينات الرسائل متوقفة، يقول Siri فقط من كتب.";
+"SennitPushNewMessage" = "رسالة جديدة";
