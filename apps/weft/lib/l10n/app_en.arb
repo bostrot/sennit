@@ -10855,5 +10855,105 @@
         "example": "8"
       }
     }
+  },
+  "settingsAppLockTitle": "App lock",
+  "@settingsAppLockTitle": {
+    "description": "Title of the settings row and screen for locking the app with a PIN or biometrics. Keep under ~25 chars."
+  },
+  "settingsAppLockSubtitle": "PIN or biometrics to open Sennit",
+  "@settingsAppLockSubtitle": {
+    "description": "One-line subtitle under 'App lock' in settings. 'Biometrics' = fingerprint or face unlock. Keep under ~50 chars."
+  },
+  "appLockSwitchTitle": "Lock Sennit",
+  "@appLockSwitchTitle": {
+    "description": "Title of the switch that turns the app lock on. Keep under ~30 chars."
+  },
+  "appLockSwitchSubtitle": "Ask for a PIN on opening and hide chats in recent apps",
+  "@appLockSwitchSubtitle": {
+    "description": "Subtitle under the 'Lock Sennit' switch: with it on, the app asks for a PIN when opened and its content is hidden in the system's recent-apps / app-switcher preview."
+  },
+  "appLockBiometricsTitle": "Unlock with biometrics",
+  "@appLockBiometricsTitle": {
+    "description": "Title of a switch: unlock the app with fingerprint or face instead of typing the PIN. Keep under ~30 chars."
+  },
+  "appLockBiometricsSubtitle": "Fingerprint or face. The PIN always works too.",
+  "@appLockBiometricsSubtitle": {
+    "description": "Subtitle under 'Unlock with biometrics'. Says the PIN can always be used as well."
+  },
+  "appLockChangePin": "Change PIN",
+  "@appLockChangePin": {
+    "description": "Row that lets the user pick a new PIN for the app lock. Keep under ~25 chars."
+  },
+  "appLockAfterTitle": "Lock after",
+  "@appLockAfterTitle": {
+    "description": "Label above choices for how long the app may be in the background before it locks again ('At once', '1 min', '5 min', '15 min'). Keep short."
+  },
+  "appLockAfterNow": "At once",
+  "@appLockAfterNow": {
+    "description": "Choice chip under 'Lock after': lock as soon as the app leaves the screen. Keep under ~12 chars."
+  },
+  "appLockAfterMinutes": "{minutes, plural, =1{1 min} other{{minutes} min}}",
+  "@appLockAfterMinutes": {
+    "description": "Choice chip under 'Lock after': lock after this many minutes in the background. Abbreviate 'minutes' if the language usually does. Keep under ~10 chars.",
+    "placeholders": {
+      "minutes": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
+  "appLockChoosePin": "Choose a PIN",
+  "@appLockChoosePin": {
+    "description": "Label of the field where the user types a new PIN for the app lock."
+  },
+  "appLockRepeatPin": "Enter the PIN again",
+  "@appLockRepeatPin": {
+    "description": "Label of the field where the user types the new PIN a second time to confirm it."
+  },
+  "appLockPinHint": "4 to 8 digits",
+  "@appLockPinHint": {
+    "description": "Helper text under the PIN field: the PIN must have 4 to 8 digits."
+  },
+  "appLockPinMismatch": "The PINs differ. Choose one again.",
+  "@appLockPinMismatch": {
+    "description": "Error when the second PIN entry differs from the first; the user starts over."
+  },
+  "appLockNext": "Next",
+  "@appLockNext": {
+    "description": "Button that moves from choosing the PIN to confirming it. Keep under ~12 chars."
+  },
+  "appLockLocked": "Sennit is locked",
+  "@appLockLocked": {
+    "description": "Heading on the lock screen shown while the app is locked."
+  },
+  "appLockEnterPin": "Enter your PIN",
+  "@appLockEnterPin": {
+    "description": "Label of the PIN field on the lock screen."
+  },
+  "appLockUnlock": "Unlock",
+  "@appLockUnlock": {
+    "description": "Button on the lock screen that checks the PIN. Keep under ~15 chars."
+  },
+  "appLockWrongPin": "Wrong PIN",
+  "@appLockWrongPin": {
+    "description": "Error under the PIN field when the PIN is wrong."
+  },
+  "appLockWait": "Too many tries. Wait {seconds} seconds.",
+  "@appLockWait": {
+    "description": "Error after five wrong PINs in a row; the field is disabled for this many seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int",
+        "example": "30"
+      }
+    }
+  },
+  "appLockUseBiometrics": "Use biometrics",
+  "@appLockUseBiometrics": {
+    "description": "Button on the lock screen that shows the system fingerprint or face prompt again."
+  },
+  "appLockBiometricReason": "Unlock Sennit",
+  "@appLockBiometricReason": {
+    "description": "Reason shown in the system's fingerprint / Face ID / Windows Hello prompt. Short imperative."
   }
 }

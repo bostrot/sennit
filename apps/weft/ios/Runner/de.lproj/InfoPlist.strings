@@ -14,6 +14,7 @@
 "NSLocationWhenInUseUsageDescription" = "Sennit teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Sennit teilt deinen Standort nur, wenn du in einem Chat auf „Standort teilen“ tippst. Im Hintergrund verfolgt Sennit ihn nie.";
 "NSCalendarsUsageDescription" = "Sennit trägt einen Termin nur dann in deinen Kalender ein, wenn du es für ein Datum aus einem Chat verlangst.";
+"NSFaceIDUsageDescription" = "Sennit entsperrt die App mit Face ID, wenn du die App-Sperre einschaltest.";
 "NSContactsUsageDescription" = "Sennit zeigt die Namen aus deinem Adressbuch statt der Namen, die Messaging-Netzwerke vergeben. Der Abgleich passiert auf diesem Gerät und wird nie hochgeladen.";
 "NSMicrophoneUsageDescription" = "Sennit braucht das Mikrofon, damit du in einem Sprach- oder Videoanruf sprechen kannst.";
 "NSSiriUsageDescription" = "Siri kann dir neue Nachrichten vorlesen und deine diktierten Antworten senden, auf dem iPhone und in CarPlay. Sind Nachrichtenvorschauen aus, liest Siri nur vor, wer geschrieben hat.";

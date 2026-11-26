@@ -39,6 +39,7 @@ import 'features/call/call_overlay.dart';
 import 'data/chat_repository.dart';
 import 'features/chat/chat_view.dart';
 import 'features/chat/room_link.dart';
+import 'features/lock/lock_screen.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/notifications/push_explanation_screen.dart';
 import 'features/settings/notifications_screen.dart';
@@ -791,13 +792,16 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         return AppTextScale(
           child: WeftDesignStringsScope(
             strings: weftDesignStringsFrom(context.l10n),
-            child: WeftMenuBar(
-              navigatorKey: _navigatorKey,
-              child: WeftShortcuts(
+            // Outermost, so nothing below it shows or takes a key while locked.
+            child: AppLockGate(
+              child: WeftMenuBar(
                 navigatorKey: _navigatorKey,
-                child: CallOverlay(
+                child: WeftShortcuts(
                   navigatorKey: _navigatorKey,
-                  child: child ?? const SizedBox.shrink(),
+                  child: CallOverlay(
+                    navigatorKey: _navigatorKey,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),
