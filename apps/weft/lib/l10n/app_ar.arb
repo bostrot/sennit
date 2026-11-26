@@ -1225,6 +1225,7 @@
   "nicknameChoosePhoto": "اختيار صورة",
   "nicknameRemovePhoto": "إزالة الصورة",
   "nicknamePhotoFailed": "تعذّرت قراءة هذه الصورة.",
+  "contactOpenInApp": "فتح في {network}",
   "contactMedia": "الوسائط",
   "contactLinks": "الروابط",
   "contactSeeAll": "عرض الكل",

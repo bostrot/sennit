@@ -1226,6 +1226,7 @@
   "nicknameChoosePhoto": "选择照片",
   "nicknameRemovePhoto": "移除照片",
   "nicknamePhotoFailed": "无法读取该图片。",
+  "contactOpenInApp": "在 {network} 中打开",
   "contactMedia": "媒体",
   "contactLinks": "链接",
   "contactSeeAll": "查看全部",

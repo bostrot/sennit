@@ -14,6 +14,7 @@ import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
 import 'avatar_viewer.dart';
 import 'nickname_dialog.dart';
+import 'native_app_link.dart';
 import 'person_memory_screen.dart';
 import 'shared_media.dart';
 
@@ -116,23 +117,7 @@ class ContactProfileScreen extends ConsumerWidget {
             ChatMemorySections(chat: chat, header: _SectionHeader.new),
             if (handles.isNotEmpty) ...[
               _SectionHeader(context.l10n.contactOnTheseNetworks),
-              for (final handle in handles)
-                ListTile(
-                  leading: Icon(
-                    Icons.circle,
-                    size: 14,
-                    color: context.palette.networkColor(handle.network),
-                  ),
-                  title: Text(handle.displayName ?? handle.remoteId),
-                  subtitle: Text(
-                    handle.remoteId == (handle.displayName ?? '')
-                        ? handle.network.label
-                        : context.l10n.handleOnNetwork(
-                            handle.network.label,
-                            handle.remoteId,
-                          ),
-                  ),
-                ),
+              for (final handle in handles) _HandleTile(handle: handle),
             ],
             _SectionHeader(context.l10n.contactConversationsIn),
             for (final source in chat.sources)
@@ -283,6 +268,45 @@ class _NicknameTile extends ConsumerWidget {
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => showNicknameDialog(context, chat: chat, original: original),
+    );
+  }
+}
+
+/// One of the person's accounts, and the way into it in the network's own
+/// app when there is one.
+class _HandleTile extends StatelessWidget {
+  const _HandleTile({required this.handle});
+
+  final NetworkHandle handle;
+
+  @override
+  Widget build(BuildContext context) {
+    final link = nativeAppLink(handle);
+    final openIn = context.l10n.contactOpenInApp(handle.network.label);
+    void open() => openSharedLink(context, link.toString());
+    return ListTile(
+      leading: Icon(
+        Icons.circle,
+        size: 14,
+        color: context.palette.networkColor(handle.network),
+      ),
+      title: Text(handle.displayName ?? handle.remoteId),
+      subtitle: Text(
+        handle.remoteId == (handle.displayName ?? '')
+            ? handle.network.label
+            : context.l10n.handleOnNetwork(
+                handle.network.label,
+                handle.remoteId,
+              ),
+      ),
+      onTap: link == null ? null : open,
+      trailing: link == null
+          ? null
+          : IconButton(
+              tooltip: openIn,
+              icon: const Icon(Icons.open_in_new_rounded),
+              onPressed: open,
+            ),
     );
   }
 }

@@ -1225,6 +1225,7 @@
   "nicknameChoosePhoto": "फ़ोटो चुनें",
   "nicknameRemovePhoto": "फ़ोटो हटाएँ",
   "nicknamePhotoFailed": "यह तस्वीर पढ़ी नहीं जा सकी।",
+  "contactOpenInApp": "{network} में खोलें",
   "contactMedia": "मीडिया",
   "contactLinks": "लिंक",
   "contactSeeAll": "सभी देखें",
