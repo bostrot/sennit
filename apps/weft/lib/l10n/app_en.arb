@@ -3136,6 +3136,46 @@
   "@appearanceHideDeletedSubtitle": {
     "description": "One-line subtitle under the hide-deleted-messages toggle. The quoted text is the placeholder shown where a deleted message was; use the same words as chatMessageDeleted. Keep under ~46 chars."
   },
+  "appearanceTextSize": "Text size",
+  "@appearanceTextSize": {
+    "description": "Heading of the slider in the appearance sheet that makes all text in the app bigger or smaller, on top of the phone's own text size. Keep under ~20 chars.",
+    "maxLength": 24
+  },
+  "appearanceMessageTextSize": "Message text",
+  "@appearanceMessageTextSize": {
+    "description": "Heading of a second slider in the appearance sheet that sizes only the words of messages in chat bubbles. Keep under ~20 chars.",
+    "maxLength": 24
+  },
+  "appearanceTextSizePercent": "{percent}%",
+  "@appearanceTextSizePercent": {
+    "description": "The value of a text size slider, as a percentage of the normal size. Use your language's own spacing before the percent sign.",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "120"
+      }
+    }
+  },
+  "appearanceTextSizeHint": "100% follows your device’s text size.",
+  "@appearanceTextSizeHint": {
+    "description": "One line under the two text size sliders: at 100 % Sennit uses the phone's own text size setting, other values make it bigger or smaller than that. Keep under ~50 chars.",
+    "maxLength": 64
+  },
+  "appearanceTextSizePreviewChat": "Family",
+  "@appearanceTextSizePreviewChat": {
+    "description": "Name of a made-up group chat shown in the text size preview in the appearance sheet. Keep it short.",
+    "maxLength": 20
+  },
+  "appearanceTextSizePreviewIncoming": "Lunch on Sunday?",
+  "@appearanceTextSizePreviewIncoming": {
+    "description": "A made-up incoming message in the text size preview: someone asks whether you are coming to lunch on Sunday. Keep it short and casual.",
+    "maxLength": 40
+  },
+  "appearanceTextSizePreviewOutgoing": "Yes! I’ll bring dessert.",
+  "@appearanceTextSizePreviewOutgoing": {
+    "description": "The made-up reply in the text size preview, from the user. Keep it short and casual.",
+    "maxLength": 40
+  },
   "appearanceAccentSwatch": "{name} accent",
   "@appearanceAccentSwatch": {
     "description": "Screen-reader-only label for one colour swatch in the appearance sheet. 'Accent' is the app's highlight colour; the name is the swatch's own and is not translated here.",

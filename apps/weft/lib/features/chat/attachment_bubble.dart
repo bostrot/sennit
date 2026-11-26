@@ -25,6 +25,7 @@ import '../../app/a11y.dart';
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
+import '../../app/text_size.dart';
 import '../../services/attachments/attachment_byte_cache.dart';
 import '../../services/attachments/local_media_storage.dart';
 import '../../services/attachments/video_preview.dart';
@@ -694,17 +695,19 @@ class AttachmentCaption extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: WeftSpace.xs),
       child: ExcludeSemantics(
-        child: RichTextView.message(
-          message: message,
-          baseStyle:
-              context.text.bodyMedium?.copyWith(color: onBubble) ??
-              TextStyle(color: onBubble),
-          // Same rule as the text bubble: an own-bubble link takes the bubble's
-          // own ink, because the accent it is derived from is invisible against
-          // the primary fill.
-          accent: own ? onBubble : (accent ?? onBubble),
-          onTapLink: onTapLink,
-          onTapMention: onTapMention,
+        child: MessageTextScale(
+          child: RichTextView.message(
+            message: message,
+            baseStyle:
+                context.text.bodyMedium?.copyWith(color: onBubble) ??
+                TextStyle(color: onBubble),
+            // Same rule as the text bubble: an own-bubble link takes the
+            // bubble's own ink, because the accent it is derived from is
+            // invisible against the primary fill.
+            accent: own ? onBubble : (accent ?? onBubble),
+            onTapLink: onTapLink,
+            onTapMention: onTapMention,
+          ),
         ),
       ),
     );

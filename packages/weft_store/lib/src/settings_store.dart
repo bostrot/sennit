@@ -164,6 +164,15 @@ abstract final class WeftSettings {
   static const String seedColor = 'appearance.seed_color';
   static const String density = 'appearance.density';
 
+  /// Sennit's own text size, multiplied into the system's: 1.0 (the default)
+  /// follows the phone, 1.4 is the phone's size and 40 % more. Synced, because
+  /// the reader who needs bigger text on the phone needs it on the laptop too.
+  static const String textScale = 'appearance.text_scale';
+
+  /// Message text only, on top of [textScale]: the words people sent, not the
+  /// chrome around them.
+  static const String messageTextScale = 'appearance.message_text_scale';
+
   static const String autoMergeOnIdentitySignal = 'merge.auto_on_identity';
   static const String mergeSuggestThreshold = 'merge.suggest_threshold';
   static const String defaultCountryCode = 'merge.default_country_code';

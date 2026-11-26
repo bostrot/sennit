@@ -30,6 +30,7 @@ import 'app/shortcuts.dart';
 import 'app/snapshot_providers.dart';
 import 'app/stores.dart';
 import 'app/sync_providers.dart';
+import 'app/text_size.dart';
 import 'app/todo_providers.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
@@ -782,15 +783,22 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
         // And the first place `weft_design` can be handed the app's words:
         // a `ChatTile` draws a preview line and an unread count, and the
         // package has no ARB files of its own to get them from.
-        return WeftDesignStringsScope(
-          strings: weftDesignStringsFrom(context.l10n),
-          child: WeftMenuBar(
-            navigatorKey: _navigatorKey,
-            child: WeftShortcuts(
+        //
+        // Text size is the system's times Sennit's own, applied here — under
+        // `MediaQuery.fromView`, which would rebuild its data from the view
+        // and drop a scaler set above it — so every route, sheet and dialog
+        // gets it without asking.
+        return AppTextScale(
+          child: WeftDesignStringsScope(
+            strings: weftDesignStringsFrom(context.l10n),
+            child: WeftMenuBar(
               navigatorKey: _navigatorKey,
-              child: CallOverlay(
+              child: WeftShortcuts(
                 navigatorKey: _navigatorKey,
-                child: child ?? const SizedBox.shrink(),
+                child: CallOverlay(
+                  navigatorKey: _navigatorKey,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
