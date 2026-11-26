@@ -196,6 +196,10 @@ List<SettingsSearchEntry> nestedSettingsEntries(
           l10n.replyRemindersQuietHoursTitle,
           l10n.replyRemindersQuietHoursSubtitle,
         ),
+        (
+          l10n.replyRemindersReactionsTitle,
+          l10n.replyRemindersReactionsSubtitle,
+        ),
       ],
     ),
     ...under(

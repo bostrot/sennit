@@ -1598,6 +1598,8 @@
   "replyRemindersIncludeMutedSubtitle": "म्यूट की गई चैट की भी याद दिलाएँ",
   "replyRemindersQuietHoursTitle": "शांत समय का ध्यान रखें",
   "replyRemindersQuietHoursSubtitle": "सूचनाओं का शांत समय खत्म होने तक रिमाइंडर रोकें",
+  "replyRemindersReactionsTitle": "रिएक्शन को जवाब मानें",
+  "replyRemindersReactionsSubtitle": "उनके आखिरी मैसेज या उसके बाद वाले पर रिएक्शन देने से चैट जवाब दी हुई मानी जाती है",
   "replyRemindersExcludedTitle": "इनकी कभी याद न दिलाएँ",
   "replyRemindersExcludedSubtitle": "जिन चैट के लिए आपने रिमाइंडर बंद किए, यहाँ या चैट प्रोफ़ाइल में।",
   "replyRemindersNoneExcluded": "कोई चैट बाहर नहीं।",

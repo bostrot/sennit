@@ -1598,6 +1598,8 @@
   "replyRemindersIncludeMutedSubtitle": "Me rappeler aussi les discussions en sourdine",
   "replyRemindersQuietHoursTitle": "Respecter les heures calmes",
   "replyRemindersQuietHoursSubtitle": "Retenir les rappels jusqu’à la fin de tes heures calmes",
+  "replyRemindersReactionsTitle": "Compter les réactions comme réponse",
+  "replyRemindersReactionsSubtitle": "Réagir à son dernier message, ou à un suivant, marque la discussion comme répondue",
   "replyRemindersExcludedTitle": "Ne jamais me rappeler",
   "replyRemindersExcludedSubtitle": "Les discussions pour lesquelles tu as désactivé les rappels, ici ou dans leur profil.",
   "replyRemindersNoneExcluded": "Aucune discussion exclue.",

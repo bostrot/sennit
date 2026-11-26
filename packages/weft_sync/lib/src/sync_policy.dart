@@ -67,6 +67,9 @@ abstract final class SyncPolicy {
     // Bookkeeping for reminders this device scheduled with its OS.
     'notify.reply_reminder_ledger',
     'notify.reply_reminders_queued',
+    // What this device saw of the user's own reactions; the reactions
+    // themselves sync through Matrix.
+    'notify.own_reactions',
   };
 
   /// Whether the `settings` row [key] is shared between devices.

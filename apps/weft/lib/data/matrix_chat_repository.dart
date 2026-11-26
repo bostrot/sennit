@@ -17,6 +17,7 @@ import '../services/attachments/video_poster.dart';
 import 'auto_reply_transport.dart';
 import 'room_joiner.dart';
 import 'chat_repository.dart';
+import 'own_reactions.dart';
 import 'profile_lookups.dart';
 import 'send_queue_source.dart';
 import 'sms_chat_repository.dart';
@@ -95,9 +96,15 @@ class MatrixChatRepository
     if (accepted is List) {
       _acceptedRequests.addAll(accepted.whereType<String>());
     }
+    _ownReactions = OwnReactionLog.fromJson(
+      _settings?.getJson(WeftSettings.notifyOwnReactions),
+    );
     _resolveMediaSupport();
     _rebuild();
     _syncSub = _session.client.onSync.stream.listen((_) => _scheduleRebuild());
+    _ownReactionSub = _session.client.onTimelineEvent.stream.listen(
+      (event) => unawaited(_noteOwnReaction(event)),
+    );
     _syncStatusSub = _session.client.onSyncStatus.stream.listen(_onSyncStatus);
 
     final sms = _sms;
@@ -154,6 +161,12 @@ class MatrixChatRepository
 
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
+  StreamSubscription<sdk.Event>? _ownReactionSub;
+
+  /// The user's own reactions, for [Chat.reactedUpTo]. Persisted, because sync
+  /// hands each one over once and a restart must not forget the chats it
+  /// answered.
+  late OwnReactionLog _ownReactions;
   StreamSubscription<sdk.SyncStatusUpdate>? _syncStatusSub;
   StreamSubscription<void>? _smsSub;
 
@@ -509,6 +522,51 @@ class MatrixChatRepository
   /// one of their reactions from the tally.
   String _identityOf(String senderId) =>
       _graph.contactIdForUser(senderId) ?? senderId;
+
+  /// Keeps [_ownReactions] up to date with one timeline event from sync: a
+  /// reaction of the user's is recorded, a redaction of one forgets it.
+  ///
+  /// The user's own means the same as in the reaction bar — their account, or
+  /// a handle merged into it — which covers what a double-puppeting bridge
+  /// relays from the phone.
+  Future<void> _noteOwnReaction(sdk.Event event) async {
+    final roomId = event.roomId;
+    if (roomId == null) return;
+    if (event.type == sdk.EventTypes.Redaction) {
+      final redacts = event.redacts ?? event.content['redacts'];
+      if (redacts is String && _ownReactions.redact(roomId, redacts)) {
+        _ownReactionsChanged();
+      }
+      return;
+    }
+    final own = _client.userID;
+    if (own == null) return;
+    final target = ownReactionTarget(
+      type: event.type,
+      eventId: event.eventId,
+      senderId: event.senderId,
+      content: event.content,
+      isOwn: (sender) =>
+          sender == own || _identityOf(sender) == _identityOf(own),
+    );
+    if (target == null) return;
+    final room = event.room;
+    final last = room.lastEvent;
+    final targetAt = last?.eventId == target
+        ? last!.originServerTs
+        : (await _client.database.getEventById(target, room))?.originServerTs;
+    // A message this device never stored is older than anything a reaction
+    // could still answer.
+    if (targetAt == null) return;
+    if (_ownReactions.record(roomId, event.eventId, targetAt)) {
+      _ownReactionsChanged();
+    }
+  }
+
+  void _ownReactionsChanged() {
+    _settings?.setJson(WeftSettings.notifyOwnReactions, _ownReactions.toJson());
+    _scheduleRebuild();
+  }
 
   /// Releases an open chat's timelines when the user navigates away.
   void closeTimeline(String chatId) {
@@ -2260,6 +2318,7 @@ class MatrixChatRepository
 
   Future<void> dispose() async {
     await _syncSub?.cancel();
+    await _ownReactionSub?.cancel();
     await _syncStatusSub?.cancel();
     await _sendFailureChanges.close();
     await _smsSub?.cancel();
@@ -2936,6 +2995,7 @@ class MatrixChatRepository
       muted: _isMuted(room),
       request: _requestStateOf(room),
       participantCount: _peerCountOf(room),
+      reactedUpTo: _ownReactions.reactedUpTo(room.id),
       preferredSendNetwork: _sendNetworks[room.id],
     );
   }
@@ -3114,6 +3174,15 @@ class MatrixChatRepository
           unreadCount: legs.fold(0, (sum, leg) => sum + leg.unreadCount),
           pinned: legs.any((leg) => leg.pinned),
           muted: legs.every((leg) => leg.muted),
+          // A reaction on any leg answers the person.
+          reactedUpTo: legs
+              .map((leg) => leg.reactedUpTo)
+              .nonNulls
+              .fold<DateTime?>(
+                null,
+                (newest, at) =>
+                    newest == null || at.isAfter(newest) ? at : newest,
+              ),
           preferredSendNetwork: _sendNetworks[mergedId],
         ),
       );

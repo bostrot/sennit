@@ -9325,6 +9325,14 @@
   "@replyRemindersQuietHoursSubtitle": {
     "description": "Subtitle of the quiet hours switch."
   },
+  "replyRemindersReactionsTitle": "Count reactions as a reply",
+  "@replyRemindersReactionsTitle": {
+    "description": "Switch: the user's own emoji reaction on the last incoming message counts as answering the chat, for reply reminders and the Needs reply inbox filter."
+  },
+  "replyRemindersReactionsSubtitle": "Reacting to their latest message, or a later one, marks the chat as answered",
+  "@replyRemindersReactionsSubtitle": {
+    "description": "Subtitle of the reactions-count-as-reply switch. 'Their' is the other person in the chat."
+  },
   "replyRemindersExcludedTitle": "Never remind me about",
   "@replyRemindersExcludedTitle": {
     "description": "Section header above the list of chats excluded from reply reminders."

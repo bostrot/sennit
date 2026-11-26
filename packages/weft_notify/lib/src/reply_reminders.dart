@@ -63,6 +63,7 @@ class ReplyReminderSettings {
     this.includeGroups = false,
     this.includeMuted = false,
     this.respectQuietHours = true,
+    this.reactionsCountAsReply = true,
     Set<String> excludedChats = const {},
   }) : excludedChats = Set.unmodifiable(excludedChats);
 
@@ -82,6 +83,14 @@ class ReplyReminderSettings {
 
   /// A reminder due inside the notification quiet hours waits until they end.
   final bool respectQuietHours;
+
+  /// The user's own reaction on the last thing said — or on anything said
+  /// after it — answers a chat as a sent message does. On by default: a thumbs
+  /// up on "see you at 8" *is* the answer for most people, and being reminded
+  /// to answer a message already answered that way is the nagging this
+  /// feature exists to avoid. Also what the inbox's "needs reply" filter goes
+  /// by, so the two never disagree about whether a chat is answered.
+  final bool reactionsCountAsReply;
 
   /// Chats the user switched reminders off for, keyed by [Chat.id].
   final Set<String> excludedChats;
@@ -104,6 +113,7 @@ class ReplyReminderSettings {
     bool? includeGroups,
     bool? includeMuted,
     bool? respectQuietHours,
+    bool? reactionsCountAsReply,
     Set<String>? excludedChats,
   }) {
     return ReplyReminderSettings(
@@ -112,6 +122,8 @@ class ReplyReminderSettings {
       includeGroups: includeGroups ?? this.includeGroups,
       includeMuted: includeMuted ?? this.includeMuted,
       respectQuietHours: respectQuietHours ?? this.respectQuietHours,
+      reactionsCountAsReply:
+          reactionsCountAsReply ?? this.reactionsCountAsReply,
       excludedChats: excludedChats ?? this.excludedChats,
     );
   }
@@ -122,6 +134,7 @@ class ReplyReminderSettings {
     'includeGroups': includeGroups,
     'includeMuted': includeMuted,
     'respectQuietHours': respectQuietHours,
+    'reactionsCountAsReply': reactionsCountAsReply,
     // Sorted so two equal settings serialise byte-identically.
     'excludedChats': excludedChats.toList()..sort(),
   };
@@ -144,6 +157,8 @@ class ReplyReminderSettings {
       includeGroups: json['includeGroups'] == true,
       includeMuted: json['includeMuted'] == true,
       respectQuietHours: json['respectQuietHours'] != false,
+      // Missing in a blob from before the setting existed; the default holds.
+      reactionsCountAsReply: json['reactionsCountAsReply'] != false,
       excludedChats: excluded is List
           ? excluded.whereType<String>().toSet()
           : const {},
@@ -160,6 +175,7 @@ class ReplyReminderSettings {
       other.includeGroups == includeGroups &&
       other.includeMuted == includeMuted &&
       other.respectQuietHours == respectQuietHours &&
+      other.reactionsCountAsReply == reactionsCountAsReply &&
       _setEquality.equals(other.excludedChats, excludedChats);
 
   @override
@@ -169,6 +185,7 @@ class ReplyReminderSettings {
     includeGroups,
     includeMuted,
     respectQuietHours,
+    reactionsCountAsReply,
     _setEquality.hash(excludedChats),
   );
 
@@ -187,7 +204,9 @@ enum ReplyReminderSkip {
   /// Nothing has been said in the chat yet.
   empty,
 
-  /// The user spoke last. Replying is exactly what ends a reminder.
+  /// The user spoke last, or reacted to the last thing said while
+  /// [ReplyReminderSettings.reactionsCountAsReply] is on. Replying is exactly
+  /// what ends a reminder.
   answered,
 
   /// The last message has not been read. That is what message notifications
@@ -229,20 +248,50 @@ enum ReplyReminderSkip {
   dismissed,
 }
 
+/// Whether someone else said the last thing in [chat] and the user has not
+/// answered it, read or not.
+///
+/// The one rule both reply reminders and the inbox's "needs reply" filter go
+/// by. A chat whose last event is not a message — a membership change, a
+/// redaction, a bridge notice — is not waiting on anyone, whatever came before
+/// it. With [reactionsCount], the user's own reaction on that message or a
+/// later one answers it too; see [answeredByReaction].
+bool isUnanswered(Chat chat, {bool reactionsCount = true}) =>
+    _unansweredSkip(chat, reactionsCount: reactionsCount) == null;
+
+/// Whether the user reacted to the last thing said in [chat], or to something
+/// said after it — the reaction answers it. A reaction taken back is gone from
+/// [Chat.reactedUpTo], so the chat is unanswered again unless something else
+/// answered it.
+bool answeredByReaction(Chat chat) {
+  final last = chat.lastMessage;
+  final reacted = chat.reactedUpTo;
+  return last != null && reacted != null && !reacted.isBefore(last.timestamp);
+}
+
 /// Whether the user has read the last thing said in [chat] and not answered.
 ///
-/// Read means unread count zero, the same fact the inbox draws. A chat whose
-/// last event is not a message — a membership change, a redaction, a bridge
-/// notice — is not waiting on anyone, whatever came before it.
-bool isAwaitingReply(Chat chat) => _awaitingSkip(chat) == null;
+/// [isUnanswered], and read: unread count zero, the same fact the inbox
+/// draws.
+bool isAwaitingReply(Chat chat, {bool reactionsCount = true}) =>
+    _awaitingSkip(chat, reactionsCount: reactionsCount) == null;
 
-ReplyReminderSkip? _awaitingSkip(Chat chat) {
+ReplyReminderSkip? _unansweredSkip(Chat chat, {required bool reactionsCount}) {
   final last = chat.lastMessage;
   if (last == null) return ReplyReminderSkip.empty;
   if (last.isOwn) return ReplyReminderSkip.answered;
   if (last.kind == MessageKind.event || last.redacted || last.isBridgeNotice) {
     return ReplyReminderSkip.notAMessage;
   }
+  if (reactionsCount && answeredByReaction(chat)) {
+    return ReplyReminderSkip.answered;
+  }
+  return null;
+}
+
+ReplyReminderSkip? _awaitingSkip(Chat chat, {required bool reactionsCount}) {
+  final unanswered = _unansweredSkip(chat, reactionsCount: reactionsCount);
+  if (unanswered != null) return unanswered;
   if (chat.unreadCount > 0) return ReplyReminderSkip.unread;
   return null;
 }
@@ -270,7 +319,10 @@ ReplyReminderSkip? replyReminderSkipFor(
   if (!settings.enabled || policy?.enabled == false) {
     return ReplyReminderSkip.disabled;
   }
-  final awaiting = _awaitingSkip(chat);
+  final awaiting = _awaitingSkip(
+    chat,
+    reactionsCount: settings.reactionsCountAsReply,
+  );
   if (awaiting != null) return awaiting;
   final last = chat.lastMessage!;
   // Measured when the reminders started, not now: one that started keeps
@@ -536,8 +588,9 @@ DateTime _afterQuietHours(DateTime at, QuietHours quiet) {
 ///
 /// * A chat awaiting a reply with no entry, or whose entry names an older
 ///   message, gets a fresh entry read at [now].
-/// * A chat that is not awaiting a reply — the user answered, or something new
-///   arrived unread — loses its entry, which is what stops its reminders.
+/// * A chat that is not awaiting a reply — the user answered (or reacted, see
+///   [ReplyReminderSettings.reactionsCountAsReply]), or something new arrived
+///   unread — loses its entry, which is what stops its reminders.
 /// * A chat that no longer exists loses its entry too.
 /// * Every awaiting chat that [replyReminderSkipFor] lets through gets up to
 ///   [perChat] reminders from [replyReminderTimes]; across all chats the
@@ -569,7 +622,12 @@ ReplyReminderPlan planReplyReminders({
   final quiet = settings.respectQuietHours ? policy?.quietHours : null;
 
   for (final chat in chats) {
-    if (!isAwaitingReply(chat)) continue;
+    if (!isAwaitingReply(
+      chat,
+      reactionsCount: settings.reactionsCountAsReply,
+    )) {
+      continue;
+    }
     final last = chat.lastMessage!;
     final previous = ledger[chat.id];
     final entry = previous != null && previous.eventId == last.eventId

@@ -1599,6 +1599,8 @@
   "replyRemindersIncludeMutedSubtitle": "Lembrar também das conversas silenciadas",
   "replyRemindersQuietHoursTitle": "Respeitar o horário de silêncio",
   "replyRemindersQuietHoursSubtitle": "Segurar os lembretes até o fim do seu horário de silêncio",
+  "replyRemindersReactionsTitle": "Contar reações como resposta",
+  "replyRemindersReactionsSubtitle": "Reagir à última mensagem da pessoa, ou a uma posterior, marca a conversa como respondida",
   "replyRemindersExcludedTitle": "Nunca me lembrar de",
   "replyRemindersExcludedSubtitle": "Conversas em que você desativou os lembretes, aqui ou no perfil da conversa.",
   "replyRemindersNoneExcluded": "Nenhuma conversa deixada de fora.",

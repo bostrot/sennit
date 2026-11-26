@@ -1598,6 +1598,8 @@
   "replyRemindersIncludeMutedSubtitle": "Auch an stummgeschaltete Chats erinnern",
   "replyRemindersQuietHoursTitle": "Ruhezeiten beachten",
   "replyRemindersQuietHoursSubtitle": "Erinnerungen bis zum Ende deiner Ruhezeiten zurückhalten",
+  "replyRemindersReactionsTitle": "Reaktionen zählen als Antwort",
+  "replyRemindersReactionsSubtitle": "Eine Reaktion auf ihre letzte Nachricht oder eine spätere gilt als Antwort",
   "replyRemindersExcludedTitle": "Nie erinnern an",
   "replyRemindersExcludedSubtitle": "Chats, für die du Erinnerungen ausgeschaltet hast – hier oder im Profil des Chats.",
   "replyRemindersNoneExcluded": "Keine Chats ausgenommen.",
