@@ -170,4 +170,27 @@ void main() {
     expect(os.scheduled.last, reminder().at(moved).id);
     expect(container.read(reminderListProvider).single.dueAt, moved);
   });
+
+  test('a reminder set with no app running shows up in the list', () {
+    final stores = WeftStores.inMemory();
+    addTearDown(stores.dispose);
+    ReminderList.record(stores.settings, reminder());
+    final fromNotification = chatReminder(
+      chatId: '!a:x',
+      chatTitle: 'Alice',
+      at: soon,
+    );
+    ReminderList.record(stores.settings, fromNotification);
+    // The same reminder twice is one entry.
+    ReminderList.record(stores.settings, fromNotification);
+
+    final container = ProviderContainer(
+      overrides: [storesProvider.overrideWithValue(stores)],
+    );
+    addTearDown(container.dispose);
+
+    final list = container.read(reminderListProvider);
+    expect(list.map((r) => r.chatTitle), ['Bob', 'Alice']);
+    expect(list.last.title, 'Reminder: Alice');
+  });
 }

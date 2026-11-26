@@ -30,6 +30,17 @@ typedef NotificationDismisser = Future<void> Function(String chatId);
 typedef ReplyReminderStopper =
     Future<void> Function(String chatId, {String? eventId});
 
+/// Sets a reminder about one chat at [at].
+///
+/// `ReminderList.add` in the app, a direct write with no UI; [roomId] is the
+/// room that buzzed, for finding the chat's name where only rooms are known.
+typedef ChatReminderSetter =
+    Future<void> Function(
+      String chatId, {
+      required String roomId,
+      required DateTime at,
+    });
+
 /// What became of an action.
 ///
 /// An enum rather than a bool because "nothing to do" and "it failed" lead
@@ -48,6 +59,9 @@ enum NotificationActionResult {
 
   /// Reply reminders for the chat's current message were stopped.
   remindersStopped,
+
+  /// A reminder about the chat was set and the notification cleared.
+  reminderSet,
 
   /// A tap, an action id from a newer build, or an empty reply. Nothing was
   /// attempted and nothing is wrong.
@@ -92,17 +106,20 @@ class NotificationActionHandler {
     required ChatMuteWriter muteChat,
     required NotificationDismisser dismiss,
     ReplyReminderStopper? stopReplyReminder,
+    ChatReminderSetter? remindLater,
     Duration muteDuration = kMuteForAnHour,
   }) : _repository = repository,
        _muteChat = muteChat,
        _dismiss = dismiss,
        _stopReplyReminder = stopReplyReminder,
+       _remindLater = remindLater,
        _muteDuration = muteDuration;
 
   final ChatRepository _repository;
   final ChatMuteWriter _muteChat;
   final NotificationDismisser _dismiss;
   final ReplyReminderStopper? _stopReplyReminder;
+  final ChatReminderSetter? _remindLater;
   final Duration _muteDuration;
 
   /// Handles one activation, or declines to.
@@ -144,6 +161,14 @@ class NotificationActionHandler {
         return _mute(chatId);
       case WeftNotificationActions.stopReplyReminder:
         return _stopReminders(chatId, activation.payload.eventId);
+      case WeftNotificationActions.remindInAnHour:
+        return _later(chatId, activation, LaterChoice.remindInAnHour);
+      case WeftNotificationActions.remindTonight:
+        return _later(chatId, activation, LaterChoice.remindTonight);
+      case WeftNotificationActions.later:
+        final choice = laterChoiceFor(activation.input);
+        if (choice == null) return NotificationActionResult.ignored;
+        return _later(chatId, activation, choice);
       default:
         // An action id this build does not know. Ignored rather than guessed
         // at: an iOS category registered by a *newer* build survives on
@@ -244,6 +269,33 @@ class NotificationActionHandler {
       return NotificationActionResult.failed;
     }
     return NotificationActionResult.remindersStopped;
+  }
+
+  /// "Later": a reminder about the chat, or the hour's mute it sits beside.
+  Future<NotificationActionResult> _later(
+    String chatId,
+    NotificationActivation activation,
+    LaterChoice choice,
+  ) async {
+    final now = clock.now();
+    final at = switch (choice) {
+      LaterChoice.muteForAnHour => null,
+      LaterChoice.remindInAnHour => now.add(const Duration(hours: 1)),
+      LaterChoice.remindTonight => remindTonightAt(now),
+    };
+    if (at == null) return _mute(chatId);
+
+    final remind = _remindLater;
+    if (remind == null) return NotificationActionResult.ignored;
+    try {
+      await remind(chatId, roomId: activation.payload.roomId, at: at);
+    } on Object catch (error) {
+      debugPrint('weft: a reminder for $chatId could not be set: $error');
+      return NotificationActionResult.failed;
+    }
+    // The reminder brings it back; until then it is out of the way.
+    await _dismissQuietly(chatId);
+    return NotificationActionResult.reminderSet;
   }
 
   Future<void> _markReadQuietly(String chatId) async {

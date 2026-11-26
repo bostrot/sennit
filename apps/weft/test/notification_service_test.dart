@@ -1104,7 +1104,7 @@ void main() {
       expect(channels[kBackgroundChannelId]!.showBadge, isFalse);
     });
 
-    test('the iOS category carries the three actions a message has', () {
+    test('the iOS category carries the actions a message has', () {
       final category = weftDarwinCategories().first;
 
       expect(category.identifier, kMessageCategoryId);
@@ -1112,7 +1112,17 @@ void main() {
         WeftNotificationActions.reply,
         WeftNotificationActions.markRead,
         WeftNotificationActions.muteForAnHour,
+        WeftNotificationActions.remindInAnHour,
+        WeftNotificationActions.remindTonight,
       ]);
+      // None of them opens the app: each is done instead of opening it.
+      for (final action in category.actions) {
+        expect(
+          action.options,
+          isNot(contains(DarwinNotificationActionOption.foreground)),
+          reason: action.identifier,
+        );
+      }
       // Reply is a text field, or it is not a reply. `buttonTitle` is only ever
       // set by `DarwinNotificationAction.text`, so it is the assertion the
       // package's exported surface allows.
@@ -1120,23 +1130,54 @@ void main() {
       expect(category.actions.first.placeholder, 'Message');
     });
 
-    test('Android carries the same three actions under the same ids', () {
+    test('Android folds mute and the reminders into Later', () {
       final android = weftAndroidMessageActions();
 
-      // The ids are what the handler switches on, and iOS and Android must
-      // agree on them or one platform's buttons quietly do nothing.
-      expect(
-        android.map((a) => a.id),
-        weftDarwinCategories().first.actions.map((a) => a.identifier),
-      );
+      // Three buttons is all Android shows.
       expect(android.map((a) => a.id), [
         WeftNotificationActions.reply,
         WeftNotificationActions.markRead,
-        WeftNotificationActions.muteForAnHour,
+        WeftNotificationActions.later,
       ]);
+      final later = android.last.inputs.single;
+      expect(later.allowFreeFormInput, isFalse);
+      expect(
+        later.choices.map(laterChoiceFor),
+        LaterChoice.values,
+        reason: 'every choice must read back as the choice it offers',
+      );
     });
 
-    test('reply is the only Android action with an input field', () {
+    test('after 19:00, Later offers tomorrow morning instead of tonight', () {
+      final evening = weftAndroidMessageActions(
+        now: DateTime(2026, 11, 25, 20),
+      ).last.inputs.single.choices;
+      final afternoon = weftAndroidMessageActions(
+        now: DateTime(2026, 11, 25, 15),
+      ).last.inputs.single.choices;
+
+      expect(afternoon[1], 'Remind tonight');
+      expect(evening[1], 'Remind tomorrow morning');
+      expect(laterChoiceFor(evening[1]), LaterChoice.remindTonight);
+      expect(
+        remindTonightAt(DateTime(2026, 11, 25, 20)),
+        DateTime(2026, 11, 26, 9),
+      );
+      expect(
+        remindTonightAt(DateTime(2026, 11, 25, 15)),
+        DateTime(2026, 11, 25, 19),
+      );
+    });
+
+    test('AI reply chips stay on the reply action', () {
+      final actions = weftAndroidMessageActions(aiReplies: ['Sure!', 'Later']);
+
+      expect(actions.first.id, WeftNotificationActions.reply);
+      expect(actions.first.inputs.single.choices, ['Sure!', 'Later']);
+      expect(actions.first.inputs.single.allowFreeFormInput, isTrue);
+    });
+
+    test('reply is the only Android action with a free-text field', () {
       final actions = {for (final a in weftAndroidMessageActions()) a.id: a};
 
       expect(actions[WeftNotificationActions.reply]!.inputs, hasLength(1));
@@ -1149,14 +1190,14 @@ void main() {
         SemanticAction.reply,
       );
       expect(actions[WeftNotificationActions.markRead]!.inputs, isEmpty);
-      expect(actions[WeftNotificationActions.muteForAnHour]!.inputs, isEmpty);
     });
 
     test('reply and mark read run headless, as Android Auto requires', () {
       // Android Auto and Wear only offer an action that does not open the
       // phone's UI, and find it by its semantic action. A broadcast action is
       // delivered to `runBackgroundNotificationAction`, which hands it to a
-      // live client or boots the headless stack. Mute still opens Sennit.
+      // live client or boots the headless stack. Later is headless too: a
+      // reminder set from the shade should not open the app.
       final actions = {for (final a in weftAndroidMessageActions()) a.id: a};
 
       final reply = actions[WeftNotificationActions.reply]!;
@@ -1168,10 +1209,10 @@ void main() {
       expect(markRead.showsUserInterface, isFalse);
       expect(markRead.semanticAction, SemanticAction.markAsRead);
 
-      expect(
-        actions[WeftNotificationActions.muteForAnHour]!.showsUserInterface,
-        isTrue,
-      );
+      final later = actions[WeftNotificationActions.later]!;
+      expect(later.showsUserInterface, isFalse);
+      // Not a reply or mark-read to Android Auto, which offers only those.
+      expect(later.semanticAction, SemanticAction.none);
       for (final action in actions.values) {
         // Dismissal is the handler's, and only after the work succeeded.
         expect(action.cancelNotification, isFalse, reason: action.id);
@@ -1425,6 +1466,115 @@ void main() {
         ),
         NotificationActionResult.ignored,
       );
+    });
+
+    group('later', () {
+      late List<(String, String, DateTime)> reminders;
+      late NotificationActionHandler withLater;
+
+      setUp(() {
+        reminders = [];
+        withLater = NotificationActionHandler(
+          repository: repository,
+          muteChat: (chatId, {DateTime? until}) =>
+              policy = policy.muteChat(chatId, until: until),
+          dismiss: (chatId) async => dismissed.add(chatId),
+          remindLater: (chatId, {required roomId, required at}) async =>
+              reminders.add((chatId, roomId, at)),
+        );
+      });
+
+      Future<NotificationActionResult> at(
+        DateTime now,
+        String action, {
+        String? input,
+      }) => withClock(
+        Clock.fixed(now),
+        () => withLater.handle(_activation(action, input: input)),
+      );
+
+      test('remind in an hour reminds about the chat and clears it', () async {
+        final now = DateTime(2026, 11, 25, 15);
+        final result = await at(now, WeftNotificationActions.remindInAnHour);
+
+        expect(result, NotificationActionResult.reminderSet);
+        expect(reminders.single.$1, 'merged:contact_1');
+        expect(reminders.single.$2, isNotEmpty);
+        expect(reminders.single.$3, DateTime(2026, 11, 25, 16));
+        expect(dismissed, ['merged:contact_1']);
+        // Nothing is sent or read on the user's behalf.
+        expect(repository.sent, isEmpty);
+        expect(repository.markedRead, isEmpty);
+      });
+
+      test('remind tonight is 19:00, or 9:00 once that has passed', () async {
+        await at(
+          DateTime(2026, 11, 25, 15),
+          WeftNotificationActions.remindTonight,
+        );
+        await at(
+          DateTime(2026, 11, 25, 21),
+          WeftNotificationActions.remindTonight,
+        );
+
+        expect(reminders.map((r) => r.$3), [
+          DateTime(2026, 11, 25, 19),
+          DateTime(2026, 11, 26, 9),
+        ]);
+      });
+
+      test("Android's Later acts on the choice picked", () async {
+        final now = DateTime(2026, 11, 25, 15);
+        final choices = weftAndroidMessageActions(
+          now: now,
+        ).last.inputs.single.choices;
+
+        await at(now, WeftNotificationActions.later, input: choices[0]);
+        await at(now, WeftNotificationActions.later, input: choices[1]);
+        expect(reminders.map((r) => r.$3), [
+          DateTime(2026, 11, 25, 16),
+          DateTime(2026, 11, 25, 19),
+        ]);
+
+        expect(
+          await at(now, WeftNotificationActions.later, input: choices[2]),
+          NotificationActionResult.muted,
+        );
+        expect(
+          policy.overrideFor('merged:contact_1').mutedUntil?.toLocal(),
+          DateTime(2026, 11, 25, 16),
+        );
+      });
+
+      test('Later with text it never offered does nothing', () async {
+        final result = await at(
+          DateTime(2026, 11, 25, 15),
+          WeftNotificationActions.later,
+          input: 'whenever',
+        );
+
+        expect(result, NotificationActionResult.ignored);
+        expect(reminders, isEmpty);
+        expect(dismissed, isEmpty);
+      });
+
+      test('a reminder that cannot be set leaves the notification', () async {
+        final failing = NotificationActionHandler(
+          repository: repository,
+          muteChat: (chatId, {DateTime? until}) {},
+          dismiss: (chatId) async => dismissed.add(chatId),
+          remindLater: (chatId, {required roomId, required at}) =>
+              throw StateError('no notification permission'),
+        );
+
+        expect(
+          await failing.handle(
+            _activation(WeftNotificationActions.remindInAnHour),
+          ),
+          NotificationActionResult.failed,
+        );
+        expect(dismissed, isEmpty);
+      });
     });
 
     test('an action id from a newer build is ignored', () async {

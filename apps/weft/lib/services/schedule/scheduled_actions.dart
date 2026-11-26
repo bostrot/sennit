@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_store/weft_store.dart';
 
+import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/stores.dart';
 
@@ -306,6 +308,20 @@ class PendingReminder {
   }
 }
 
+/// A reminder about a whole chat rather than one message — what a
+/// notification's "Remind me" sets.
+PendingReminder chatReminder({
+  required String chatId,
+  required String chatTitle,
+  required DateTime at,
+}) => PendingReminder(
+  chatId: chatId,
+  chatTitle: chatTitle,
+  title: weftPlatformL10n().chatReminderTitle(chatTitle),
+  body: '',
+  dueAtMs: at.millisecondsSinceEpoch,
+);
+
 /// The reminders still to come, so they can be listed, moved and taken back.
 ///
 /// The OS holds the reminder itself and fires it with the app closed; this is
@@ -345,6 +361,24 @@ class ReminderList extends Notifier<List<PendingReminder>> {
       reminder,
     ];
     _persist();
+  }
+
+  /// Notes [reminder] with no app running — a notification's "Remind me" acted
+  /// on headless. The OS reminder is the caller's; this is the note the list
+  /// reads back when the app next starts.
+  static void record(SettingsStore settings, PendingReminder reminder) {
+    final list = settings.getJson(_key)?['pending'];
+    final now = DateTime.now();
+    settings.setJson(_key, {
+      'pending': [
+        if (list is List)
+          for (final entry in list)
+            if (PendingReminder.fromJson(entry) case final r?
+                when r.dueAt.isAfter(now) && r.id != reminder.id)
+              r.toJson(),
+        reminder.toJson(),
+      ],
+    });
   }
 
   /// Moves [reminder] to [when].

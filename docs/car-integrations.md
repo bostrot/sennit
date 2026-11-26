@@ -43,8 +43,10 @@ offers them, which is the intent: a reminder is Sennit talking, not a person,
 and the car is the wrong place for a nudge to answer someone. On iOS their
 category has no `allowInCarPlay` for the same reason.
 
-**Mute for an hour** still opens Sennit. The timed mute lives in the UI
-isolate's policy, and no car surface offers mute.
+**Later** (Android's third button: remind in an hour, remind tonight, or
+mute for an hour) runs headless like Reply, but carries no semantic action,
+so no car surface offers it. On iOS the two reminders are actions of their
+own beside Mute.
 
 ### Testing it with the Desktop Head Unit
 
