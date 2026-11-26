@@ -14,6 +14,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 'scripts'))
 import release_notes  # noqa: E402
+from build_notes import store_text
 from play_notes import with_notes
 from promote import play_notes_from
 
@@ -99,6 +100,19 @@ class WithNotesTest(unittest.TestCase):
 
     def test_none_without_that_release(self):
         self.assertIsNone(with_notes([{'name': '1.0.24'}], '1.0.25', self.NOTES))
+
+
+class StoreTextTest(unittest.TestCase):
+    """App Store Connect refuses emoji in "What to Test" and "What's New"."""
+
+    def test_drops_emoji_and_keeps_the_rest(self):
+        self.assertEqual(
+            store_text('• Type :thumbs and pick 👍 from the list\n  • 1.5× → ❤️ 👍🏽 done'),
+            '• Type :thumbs and pick from the list\n  • 1.5× → done')
+
+    def test_leaves_plain_text_alone(self):
+        text = '• Umfragen: „Antwort offen“ – 2,4 MB\n• 中文 हिन्दी العربية'
+        self.assertEqual(store_text(text), text)
 
 
 if __name__ == '__main__':

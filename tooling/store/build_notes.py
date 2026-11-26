@@ -17,6 +17,7 @@ Credentials as for iap_products.py: APP_STORE_CONNECT_KEY_ID,
 APP_STORE_CONNECT_ISSUER_ID and APP_STORE_CONNECT_KEY_P8_BASE64.
 """
 
+import re
 import sys
 import time
 import urllib.parse
@@ -33,6 +34,19 @@ EDITABLE = {
     'PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED',
     'METADATA_REJECTED', 'INVALID_BINARY',
 }
+
+
+# What App Store Connect refuses in "What to Test" and "What's New": emoji,
+# with their joiners, variation selectors and keycaps. It answers 409
+# INVALID_TEXT for the whole text over a single one.
+EMOJI = re.compile(
+    '[\U00010000-\U0010FFFF\u2600-\u27BF\u2B00-\u2BFF\u200D\uFE0E\uFE0F\u20E3]')
+
+
+def store_text(notes):
+    """[notes] without the characters App Store Connect refuses."""
+    text = EMOJI.sub('', notes)
+    return re.sub(r'(?<=\S)[ \t]{2,}', ' ', re.sub(r'[ \t]+$', '', text, flags=re.M))
 
 
 def query(params):
@@ -114,7 +128,7 @@ def main(argv):
         sys.exit(__doc__)
     version, build, path = argv
     with open(path, encoding='utf-8') as f:
-        notes = f.read().strip()
+        notes = store_text(f.read()).strip()
     if not notes:
         print('no notes; nothing to set')
         return

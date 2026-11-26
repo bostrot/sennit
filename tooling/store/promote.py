@@ -78,6 +78,7 @@ from iap_products import (
     ASC, PACKAGE, PLAY, PRODUCT_ID, ApiError, asc_all, asc_token, call,
     play_token,
 )
+from build_notes import store_text
 from listings import LOCALES, whats_new
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -867,7 +868,7 @@ def appstore_apply(token, app, best, candidate, steps):
                     language, locale, candidate.version)
                 call('PATCH', f'{ASC}/v1/appStoreVersionLocalizations/{loc["id"]}', token,
                      body={'data': {'type': 'appStoreVersionLocalizations', 'id': loc['id'],
-                                    'attributes': {'whatsNew': text}}})
+                                    'attributes': {'whatsNew': store_text(text)}}})
         elif kind == 'export_compliance' and best['encryption'] is None:
             source, answer, declaration = compliance_source(token, app)
             if source is None:
