@@ -4,6 +4,8 @@ import 'package:matrix/matrix.dart' as sdk;
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
+import 'polls.dart';
+
 /// State event types bridges use to announce themselves.
 const List<String> bridgeStateEventTypes = ['m.bridge', 'uk.half-shot.bridge'];
 
@@ -205,10 +207,21 @@ WeftMessage? mapEvent(
   // MSC3381 polls, both the unstable prefix every bridge sends today and the
   // stable one they will. The start event is the bubble; responses and the
   // end event are folded in from its reference relations, so the tally is
-  // wherever the timeline has aggregated it to.
-  if (event.type == _pollStartUnstable || event.type == _pollStartStable) {
-    final poll = _pollFrom(event, timeline: timeline, ownUserId: ownUserId);
-    if (poll == null) return null;
+  // wherever the timeline has aggregated it to. WhatsApp and Signal deliver
+  // theirs as an m.room.message carrying the poll block, so the content
+  // decides, not only the type — and such a message whose block is unusable
+  // still has its text to show.
+  final pollType =
+      event.type == kPollStartUnstable || event.type == kPollStartStable;
+  final pollMessage =
+      event.type == sdk.EventTypes.Message &&
+      !event.redacted &&
+      event.content[kPollStartUnstable] is Map;
+  final poll = pollType || pollMessage
+      ? _pollFrom(event, timeline: timeline, ownUserId: ownUserId)
+      : null;
+  if (pollType && poll == null) return null;
+  if (poll != null) {
     return WeftMessage(
       eventId: event.eventId,
       roomId: event.roomId ?? '',
@@ -817,111 +830,38 @@ const Map<String, String> _callEventBodies = {
   sdk.EventTypes.CallReject: '📞 Call declined',
 };
 
-const String _pollStartUnstable = 'org.matrix.msc3381.poll.start';
-const String _pollStartStable = 'm.poll.start';
-const String _pollResponseUnstable = 'org.matrix.msc3381.poll.response';
-const String _pollResponseStable = 'm.poll.response';
-const String _pollEndUnstable = 'org.matrix.msc3381.poll.end';
-const String _pollEndStable = 'm.poll.end';
-
-/// MSC1767 text: `{'org.matrix.msc1767.text': '…'}` or `{'m.text': …}`.
-String? _extensibleText(Object? block) {
-  if (block is! Map) return null;
-  final unstable = block['org.matrix.msc1767.text'];
-  if (unstable is String) return unstable;
-  final stable = block['m.text'];
-  if (stable is String) return stable;
-  // m.text may itself be a list of representations.
-  if (stable is List) {
-    for (final rep in stable) {
-      if (rep is Map && rep['body'] is String) return rep['body'] as String;
-    }
-  }
-  return null;
-}
-
 /// Parses the start event and folds in whatever responses the timeline holds.
+///
+/// The definition comes from the newest version of the event: Messenger
+/// adds answers to a running poll, which mautrix bridges as an edit.
 PollData? _pollFrom(
   sdk.Event event, {
   sdk.Timeline? timeline,
   String? ownUserId,
 }) {
+  final display = timeline == null ? event : event.getDisplayEvent(timeline);
   final start =
-      event.content[_pollStartUnstable] ?? event.content[_pollStartStable];
-  if (start is! Map) return null;
-
-  final question = _extensibleText(start['question']) ?? '';
-  final rawAnswers = start['answers'];
-  if (question.isEmpty || rawAnswers is! List) return null;
-
-  final options = <PollOption>[
-    for (final answer in rawAnswers)
-      if (answer is Map && answer['id'] is String)
-        PollOption(
-          id: answer['id'] as String,
-          text: _extensibleText(answer) ?? '',
-        ),
-  ];
-  if (options.isEmpty) return null;
-
-  final maxSelections = switch (start['max_selections']) {
-    final int n when n > 0 => n,
-    _ => 1,
-  };
-
-  var ended = false;
-  // Latest response per voter wins — MSC3381's rule.
-  final latest = <String, sdk.Event>{};
-  if (timeline != null) {
-    for (final related in event.aggregatedEvents(
-      timeline,
-      sdk.RelationshipTypes.reference,
-    )) {
-      if (related.type == _pollEndUnstable || related.type == _pollEndStable) {
-        ended = true;
-        continue;
-      }
-      if (related.type != _pollResponseUnstable &&
-          related.type != _pollResponseStable) {
-        continue;
-      }
-      final previous = latest[related.senderId];
-      if (previous == null ||
-          related.originServerTs.isAfter(previous.originServerTs)) {
-        latest[related.senderId] = related;
-      }
-    }
-  }
-
-  final validIds = {for (final option in options) option.id};
-  final votes = <String, int>{};
-  final ownVotes = <String>{};
-  for (final entry in latest.entries) {
-    final block =
-        entry.value.content[_pollResponseUnstable] ??
-        entry.value.content[_pollResponseStable];
-    if (block is! Map) continue;
-    final answers = block['answers'];
-    if (answers is! List) continue;
-    // Spec: more selections than allowed invalidates the whole response.
-    final chosen = answers
-        .whereType<String>()
-        .where(validIds.contains)
-        .take(maxSelections)
-        .toList();
-    for (final id in chosen) {
-      votes[id] = (votes[id] ?? 0) + 1;
-      if (entry.key == ownUserId) ownVotes.add(id);
-    }
-  }
-
-  return PollData(
-    question: question,
-    options: options,
-    votes: votes,
-    ownVotes: ownVotes,
-    ended: ended,
-    maxSelections: maxSelections,
+      pollStartBlock(display.content) ?? pollStartBlock(event.content);
+  if (start == null) return null;
+  return foldPoll(
+    start,
+    creatorId: event.senderId,
+    ownUserId: ownUserId,
+    related: [
+      if (timeline != null)
+        for (final related in event.aggregatedEvents(
+          timeline,
+          sdk.RelationshipTypes.reference,
+        ))
+          if (isPollResponseType(related.type) || isPollEndType(related.type))
+            PollRelatedEvent(
+              type: related.type,
+              senderId: related.senderId,
+              senderName: related.senderFromMemoryOrFallback.calcDisplayname(),
+              timestamp: related.originServerTs,
+              content: related.content,
+            ),
+    ],
   );
 }
 

@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'database.dart';
 import 'homeserver.dart';
 import 'login_methods.dart';
+import 'polls.dart';
 import 'registration.dart';
 
 /// Where the session is in its lifecycle, flattened for the UI.
@@ -102,7 +103,16 @@ class WeftMatrixSession {
       },
       // Weft needs bridge state to know which network a room belongs to, so it
       // must survive lazy-loading rather than being fetched per room later.
-      importantStateEvents: {'m.bridge', 'uk.half-shot.bridge'},
+      // The room features too: they say whether the bridge carries polls,
+      // which the composer needs to know before the room is ever opened.
+      importantStateEvents: {
+        'm.bridge',
+        'uk.half-shot.bridge',
+        roomFeaturesStateType,
+      },
+      // A poll a Matrix user started is a chat's latest message as much as a
+      // text is; without this the inbox kept showing whatever came before.
+      roomPreviewLastEvents: {kPollStartUnstable, kPollStartStable},
       logLevel: kDebugMode ? sdk.Level.warning : sdk.Level.error,
       // The most common cause of a soft logout is an expired token, and the
       // SDK can recover from that by itself.
@@ -710,6 +720,7 @@ class _WeftClient extends sdk.Client {
     required super.database,
     super.verificationMethods,
     super.importantStateEvents,
+    super.roomPreviewLastEvents,
     super.logLevel,
     super.onSoftLogout,
     super.supportedLoginTypes,

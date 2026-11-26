@@ -19,12 +19,17 @@ import '../settings/pro_screen.dart' show ProBadge;
 /// Pro is not unlocked, so a paid feature never looks like a free one; the
 /// chat view sends a tap on it to the Pro screen.
 ///
+/// [pollUnavailableReason], when set, greys out the poll row and says why:
+/// the chat's bridge would accept a poll the other side never sees. Shown
+/// rather than hidden, so "where did polls go?" has its answer in place.
+///
 /// Returns null when the user dismissed it.
 Future<AttachmentPickSource?> showAttachmentSourceSheet(
   BuildContext context,
   AttachmentPicker picker, {
   bool paperless = false,
   bool quickMessageLocked = false,
+  String? pollUnavailableReason,
   BuildContext? anchorContext,
 }) {
   final l10n = context.l10n;
@@ -109,6 +114,14 @@ Future<AttachmentPickSource?> showAttachmentSourceSheet(
                 ListTile(
                   leading: Icon(row.icon),
                   title: Text(row.label),
+                  subtitle:
+                      row.source == AttachmentPickSource.poll &&
+                          pollUnavailableReason != null
+                      ? Text(pollUnavailableReason)
+                      : null,
+                  enabled:
+                      row.source != AttachmentPickSource.poll ||
+                      pollUnavailableReason == null,
                   trailing:
                       row.source == AttachmentPickSource.quickMessage &&
                           quickMessageLocked

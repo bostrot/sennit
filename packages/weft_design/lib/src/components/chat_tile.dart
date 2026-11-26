@@ -528,10 +528,19 @@ class _ChatTileState extends State<ChatTile> {
       MessageKind.file => kind('📎'),
       MessageKind.location => kind('📍'),
       MessageKind.sticker => words.messageKind(last.kind),
-      MessageKind.poll => kind('📊'),
+      MessageKind.poll => _pollPreview(words, last),
       MessageKind.event => _ownWords(words, last),
       MessageKind.text => _ownWords(words, last),
     };
+  }
+
+  /// "📊 Lunch where?": the question, which is what a poll is about; the
+  /// word "Poll" only when there is no question to show.
+  static String _pollPreview(WeftDesignStrings words, WeftMessage last) {
+    final question = (last.poll?.question ?? last.body).trim();
+    return question.isEmpty
+        ? '📊 ${words.messageKind(last.kind)}'
+        : '📊 $question';
   }
 
   /// [last]'s own text, with any quoted context removed.

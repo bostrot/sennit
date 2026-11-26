@@ -344,12 +344,25 @@ class RemoteChatHost {
           question: s(p, 'question'),
           options: [for (final o in p['options']! as List) o as String],
           via: via(p),
+          multipleChoice: p['multi'] == true,
+          undisclosed: p['undisclosed'] == true,
         ),
       ),
       RemoteMethods.votePoll: act(
         (p) => _repo.votePoll(s(p, 'room'), s(p, 'event'), {
           for (final a in p['answers']! as List) a as String,
         }),
+      ),
+      RemoteMethods.endPoll: act(
+        (p) => _repo.endPoll(
+          s(p, 'room'),
+          s(p, 'event'),
+          fallback: os(p, 'fallback') ?? '',
+        ),
+      ),
+      RemoteMethods.pollSupport: (p) => _guard(
+        () async =>
+            DomainCodec.pollSupport(await _repo.pollSupport(s(p, 'room'))),
       ),
       RemoteMethods.react: act(
         (p) => _repo.react(s(p, 'chat'), s(p, 'event'), s(p, 'key')),
