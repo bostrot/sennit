@@ -125,6 +125,11 @@ void main() {
     }
 
     Future<void> openDialog(WidgetTester tester) async {
+      // In the profile's Chat settings group, closed until opened.
+      final group = find.text('Chat settings');
+      await tester.scrollUntilVisible(group, 200);
+      await tester.tap(group);
+      await tester.pumpAndSettle();
       final tile = find.text('Nickname and photo');
       await tester.scrollUntilVisible(tile, 200);
       await tester.tap(tile);

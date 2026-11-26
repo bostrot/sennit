@@ -7117,6 +7117,56 @@
   "@contactManageMergesSubtitle": {
     "description": "One-line subtitle under 'Manage merges'. Keep under ~46 chars."
   },
+  "contactActionMessage": "Message",
+  "@contactActionMessage": {
+    "description": "Quick action under a contact's name on the contact profile: goes back to the conversation to write. One short word; sits under a round icon.",
+    "maxLength": 14
+  },
+  "contactActionCall": "Call",
+  "@contactActionCall": {
+    "description": "Quick action under a contact's name on the contact profile: calls this person. One short word; sits under a round icon.",
+    "maxLength": 14
+  },
+  "contactActionSearch": "Search",
+  "@contactActionSearch": {
+    "description": "Quick action under a contact's name on the contact profile: searches the messages in this conversation. One short word; sits under a round icon.",
+    "maxLength": 14
+  },
+  "contactGroupChat": "Chat settings",
+  "@contactGroupChat": {
+    "description": "Title of a collapsible group on the contact profile holding nickname, labels, send network and disappearing messages.",
+    "maxLength": 32
+  },
+  "contactGroupChatSubtitle": "Nickname, labels, send network, disappearing messages",
+  "@contactGroupChatSubtitle": {
+    "description": "Subtitle of the 'Chat settings' group on the contact profile: lists what is inside so it can be found without opening it.",
+    "maxLength": 80
+  },
+  "contactGroupNotifications": "Notifications",
+  "@contactGroupNotifications": {
+    "description": "Title of a collapsible group on the contact profile holding this chat's notification sound and reply reminders.",
+    "maxLength": 32
+  },
+  "contactGroupNotificationsSubtitle": "Sound and reply reminders",
+  "@contactGroupNotificationsSubtitle": {
+    "description": "Subtitle of the 'Notifications' group on the contact profile: lists what is inside.",
+    "maxLength": 60
+  },
+  "contactGroupMemorySubtitle": "What Sennit remembers about this chat and its people",
+  "@contactGroupMemorySubtitle": {
+    "description": "Subtitle of the 'Personal memory' group on the contact profile, which holds the notes Sennit's AI keeps about this chat and each person in it.",
+    "maxLength": 80
+  },
+  "contactGroupTechnical": "Technical details",
+  "@contactGroupTechnical": {
+    "description": "Title of a collapsible group on the contact profile holding Matrix user IDs and room addresses, closed by default.",
+    "maxLength": 32
+  },
+  "contactGroupTechnicalSubtitle": "Matrix IDs and rooms",
+  "@contactGroupTechnicalSubtitle": {
+    "description": "Subtitle of the 'Technical details' group on the contact profile: lists what is inside.",
+    "maxLength": 60
+  },
   "searchHint": "Search messages…",
   "@searchHint": {
     "description": "Placeholder in the search screen's field. Keep under ~24 chars."
@@ -7337,10 +7387,6 @@
   "contactConversationsIn": "Conversations in this chat",
   "@contactConversationsIn": {
     "description": "Section heading in the contact profile, above the individual rooms a merged conversation is stitched from. Keep under ~34 chars."
-  },
-  "contactForThisContact": "For this contact",
-  "@contactForThisContact": {
-    "description": "Section heading in the contact profile, above the settings that apply to this person only. Keep under ~28 chars."
   },
   "nicknameTitle": "Nickname and photo",
   "@nicknameTitle": {
