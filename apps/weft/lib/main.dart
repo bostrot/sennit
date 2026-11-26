@@ -19,7 +19,8 @@ import 'app/l10n_labels.dart';
 import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
-import 'app/person_memory_providers.dart' show memoryLearnerProvider;
+import 'app/person_memory_providers.dart'
+    show memoryHousekeeperProvider, memoryLearnerProvider;
 import 'app/providers.dart';
 import 'app/reply_reminder_providers.dart';
 import 'app/retention_providers.dart';
@@ -703,6 +704,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           // Counts what arrives from the start of the session, and learns
           // only while personal memory and automatic learning are on.
           ref.read(memoryLearnerProvider)?.start();
+          // One memory per direct chat, and temporary facts gone when their
+          // day has passed — on the device, whatever learning is set to.
+          ref.read(memoryHousekeeperProvider)?.start();
           // Held, not read once: a listener is what makes the backfill rebuild
           // — and so start — the moment a model or an endpoint is switched on,
           // rather than the next time something happens to ask for it.

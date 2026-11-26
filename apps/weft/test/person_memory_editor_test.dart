@@ -31,6 +31,15 @@ const _anna = Chat(
 );
 const _keys = ['room:!dm:example.org'];
 const MemoryPerson _person = (name: 'Anna', keys: ['dm:!dm:example.org']);
+const _family = Chat(
+  id: '!family:example.org',
+  title: 'Family',
+  isGroup: true,
+  sources: [
+    ChatSource(roomId: '!family:example.org', network: ChatNetwork.whatsapp),
+  ],
+);
+const _familyKeys = ['room:!family:example.org'];
 
 void main() {
   final en = lookupAppL10n(const Locale('en'));
@@ -39,12 +48,13 @@ void main() {
   Future<WeftStores> pumpEditor(
     WidgetTester tester, {
     MemoryBook book = MemoryBook.empty,
+    Chat chat = _anna,
   }) async {
     final stores = WeftStores.inMemory()..personMemory = book.encode();
     await pumpWeft(
       tester,
       MemoryEditor.chat(
-        chat: _anna,
+        chat: chat,
         people: const [_person],
         loadMessages: (_) async => const [],
       ),
@@ -65,17 +75,39 @@ void main() {
   ) async {
     await pumpEditor(
       tester,
-      book: MemoryBook.empty.withNote(_keys, 'Calls me Ricky'),
+      book: MemoryBook.empty.withNote(_person.keys, 'Calls me Ricky'),
     );
-    expect(find.text(en.chatMemoryScreenTitle('Anna')), findsOneWidget);
+    expect(find.text(en.personMemoryScreenTitle('Anna')), findsOneWidget);
     expect(find.text('Calls me Ricky'), findsOneWidget);
     expect(find.text(en.personMemoryOffNotice), findsOneWidget);
 
     await tester.enterText(noteField(), 'Calls me Ricky\n- Du, never Sie');
     // Saved a moment after typing stops, not on every key.
-    expect(bookOf(tester).noteFor(_keys), 'Calls me Ricky');
+    expect(bookOf(tester).noteFor(_person.keys), 'Calls me Ricky');
     await tester.pump(const Duration(seconds: 1));
-    expect(bookOf(tester).noteFor(_keys), 'Calls me Ricky\n- Du, never Sie');
+    expect(
+      bookOf(tester).noteFor(_person.keys),
+      'Calls me Ricky\n- Du, never Sie',
+    );
+  });
+
+  testWidgets('a direct chat shows one memory: the chat\'s and the person\'s', (
+    tester,
+  ) async {
+    await pumpEditor(
+      tester,
+      book: MemoryBook.empty
+          .withNote(_keys, '- Lisbon trip in May\n- Calls me Ricky')
+          .withNote(_person.keys, '- My sister\n- Calls me Ricky'),
+    );
+    await tester.pump();
+    expect(find.text(en.personMemoryScreenTitle('Anna')), findsOneWidget);
+    expect(find.text(en.groupMemoryTitle), findsNothing);
+    const joined = '- My sister\n- Calls me Ricky\n\n- Lisbon trip in May';
+    expect(tester.widget<TextField>(noteField()).controller!.text, joined);
+    // Folded in once open: nothing left under the chat's rooms.
+    expect(bookOf(tester).noteFor(_person.keys), joined);
+    expect(bookOf(tester).noteFor(_keys), isEmpty);
   });
 
   testWidgets('an empty note offers the suggested headings', (tester) async {
@@ -84,7 +116,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(
       tester.widget<TextField>(noteField()).controller!.text,
-      en.chatMemoryHint,
+      en.directMemoryHint,
     );
     expect(find.text(en.personMemoryUseTemplate), findsNothing);
   });
@@ -108,7 +140,7 @@ void main() {
     await tester.tap(find.byTooltip(en.personMemoryAccept).first);
     await tester.pump();
     expect(
-      bookOf(tester).noteFor(_keys),
+      bookOf(tester).noteFor(_person.keys),
       'Calls me Ricky\nDu\n- Daughter Mia, born 12 March',
     );
     expect(
@@ -118,23 +150,28 @@ void main() {
 
     await tester.tap(find.byTooltip(en.personMemoryDismiss));
     await tester.pump();
+    expect(bookOf(tester).suggestionsFor(_person.keys), isEmpty);
     expect(bookOf(tester).suggestionsFor(_keys), isEmpty);
-    expect(bookOf(tester).noteFor(_keys), isNot(contains('jazz')));
+    expect(bookOf(tester).noteFor(_person.keys), isNot(contains('jazz')));
     expect(find.text(en.personMemorySuggestionsTitle), findsNothing);
   });
 
-  testWidgets('"Add to profile" puts a fact in the person\'s memory', (
+  testWidgets('"Add to profile" puts a group\'s fact in a person\'s memory', (
     tester,
   ) async {
     await pumpEditor(
       tester,
-      book: MemoryBook.empty.withProposals(_keys, const ['Calls me Ricky']),
+      chat: _family,
+      book: MemoryBook.empty.withProposals(_familyKeys, const [
+        'Calls me Ricky',
+      ]),
     );
+    expect(find.text(en.groupMemoryTitle), findsWidgets);
     await tester.tap(find.byTooltip(en.personMemoryPromote));
     await tester.pump();
     expect(bookOf(tester).noteFor(_person.keys), '- Calls me Ricky');
-    expect(bookOf(tester).noteFor(_keys), isEmpty);
-    expect(bookOf(tester).suggestionsFor(_keys), isEmpty);
+    expect(bookOf(tester).noteFor(_familyKeys), isEmpty);
+    expect(bookOf(tester).suggestionsFor(_familyKeys), isEmpty);
   });
 
   testWidgets('a person\'s memory counts toward a few lines', (tester) async {
@@ -205,7 +242,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('memory-learn')));
     await tester.pumpAndSettle();
     expect(find.text(en.personMemoryLearnOff), findsOneWidget);
-    expect(bookOf(tester).suggestionsFor(_keys), isEmpty);
+    expect(bookOf(tester).suggestionsFor(_person.keys), isEmpty);
   });
 
   group('settings', () {
