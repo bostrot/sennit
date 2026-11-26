@@ -25,8 +25,9 @@ bool isOnDeviceLlm(String? baseUrl) =>
 ///
 /// Android and iOS, the point of the feature, and macOS on Apple silicon,
 /// where the same llama.cpp runtime comes for free with Metal. Windows and
-/// Linux bundle no runtime (see `hooks.user_defines` in the workspace
-/// pubspec) and keep the server providers only; so does the web. On iOS the
+/// Linux carry only llama.cpp's CPU module, because the build hook insists
+/// on one (see `hooks.user_defines` in the workspace pubspec), untried there:
+/// they keep the server providers only, as the web does. On iOS the
 /// runtime is built for 16.4 and later, newer than the app's own floor, so
 /// an older iPhone keeps the server too.
 bool get onDeviceLlmSupported {
