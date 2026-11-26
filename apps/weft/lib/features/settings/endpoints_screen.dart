@@ -144,6 +144,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
   @override
   void initState() {
     super.initState();
+    _controllers;
     // Nothing detected for the configured model yet: ask now, so the numbers
     // shown are the server's and not the fallback.
     if (_llmLimits.detectedFrom == null &&
@@ -155,24 +156,32 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     }
   }
 
+  /// Every controller, for [initState] to create and [dispose] to free.
+  ///
+  /// Created up front: they are `late`, and one the screen never showed —
+  /// a section switched off, the provider not picked — would otherwise first
+  /// be built in [dispose], reading a settings store that may be closed by
+  /// then.
+  List<TextEditingController> get _controllers => [
+    _embeddingUrl,
+    _embeddingModel,
+    _embeddingDims,
+    _embeddingKey,
+    _sttUrl,
+    _sttModel,
+    _sttKey,
+    _llmUrl,
+    _llmModel,
+    _llmKey,
+    _llmSuggestionModel,
+    _llmContext,
+    _llmAnswer,
+    _onDeviceContext,
+  ];
+
   @override
   void dispose() {
-    for (final c in [
-      _embeddingUrl,
-      _embeddingModel,
-      _embeddingDims,
-      _embeddingKey,
-      _sttUrl,
-      _sttModel,
-      _sttKey,
-      _llmUrl,
-      _llmModel,
-      _llmKey,
-      _llmSuggestionModel,
-      _llmContext,
-      _llmAnswer,
-      _onDeviceContext,
-    ]) {
+    for (final c in _controllers) {
       c.dispose();
     }
     super.dispose();
