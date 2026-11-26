@@ -64,6 +64,7 @@ void main() {
     ResolvedShare resolved = const ResolvedShare(),
     ShareShortcutService? shortcuts,
     Locale? locale,
+    bool compose = false,
   }) async {
     final repository = _RecordingRepository();
 
@@ -90,7 +91,9 @@ void main() {
             builder: (context) => Scaffold(
               body: Center(
                 child: ElevatedButton(
-                  onPressed: () => showShareTargetSheet(context, payload),
+                  onPressed: () => compose
+                      ? showSendToManySheet(context)
+                      : showShareTargetSheet(context, payload),
                   child: const Text('open'),
                 ),
               ),
@@ -449,6 +452,42 @@ void main() {
         lastMessageAt: shareAgo(const Duration(minutes: 3)),
       ),
     ];
+
+    testWidgets('a message to several chats is written after picking them', (
+      tester,
+    ) async {
+      await withClock(Clock.fixed(shareNow), () async {
+        final repository = await pumpSheet(
+          tester,
+          chats: three(),
+          payload: const SharedPayload(),
+          compose: true,
+        );
+        expect(find.text('Message several chats'), findsOneWidget);
+
+        // A plain tap ticks: the point is several, so one tap must not
+        // jump straight to sending.
+        await tapRow(tester, find.text('Ada Lovelace'));
+        await tapRow(tester, find.text('Grace Hopper'));
+        expect(find.text('2 chats selected'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+        await tester.pumpAndSettle();
+
+        final send = find.widgetWithText(FilledButton, 'Send to 2 chats');
+        expect(tester.widget<FilledButton>(send).onPressed, isNull);
+
+        await tester.enterText(find.byType(TextField), 'Dinner at eight?');
+        await tester.pump();
+        await tester.tap(send);
+        await tester.pumpAndSettle();
+
+        expect(repository.sent, [
+          'a/matrix: Dinner at eight?',
+          'b/matrix: Dinner at eight?',
+        ]);
+        expect(find.text('Sent to 2 chats'), findsOneWidget);
+      });
+    });
 
     testWidgets('two ticked conversations both get the share', (tester) async {
       await withClock(Clock.fixed(shareNow), () async {

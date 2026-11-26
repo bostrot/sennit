@@ -870,6 +870,20 @@
     "description": "Row on the new-chat screen, and the title of the dialog it opens: create a group conversation. Keep under ~16 chars.",
     "maxLength": 32
   },
+  "sendToManyTitle": "Message several chats",
+  "@sendToManyTitle": {
+    "description": "Row on the new-chat screen, and the title of the sheet it opens: write one message and send it to several conversations at once, each getting its own copy. Keep short.",
+    "maxLength": 32
+  },
+  "sendToManySubtitle": "Write once, sent to each separately",
+  "@sendToManySubtitle": {
+    "description": "Subtitle of the 'Message several chats' row: the message is written once and each chosen conversation gets its own separate copy (no group is made).",
+    "maxLength": 48
+  },
+  "sendToManyHint": "Pick the chats, then write the message. Each gets its own copy.",
+  "@sendToManyHint": {
+    "description": "Line under the title of the 'Message several chats' sheet while the user picks conversations: what to do, and that nobody sees who else got it."
+  },
   "newChatYourConversations": "Your conversations",
   "@newChatYourConversations": {
     "description": "Section heading on the new-chat screen, above the people the user already has a one-to-one conversation with. Keep under ~26 chars."
