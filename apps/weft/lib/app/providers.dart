@@ -7,7 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_matrix/weft_matrix.dart';
-import 'package:weft_notify/weft_notify.dart' show kReplyReminderMaxGroupPeers;
+import 'package:weft_notify/weft_notify.dart'
+    show isUnanswered, kReplyReminderMaxGroupPeers;
 import 'package:weft_sms/weft_sms.dart';
 
 import '../data/chat_repository.dart';
@@ -23,6 +24,7 @@ import '../services/status/status_feed.dart';
 import 'draft_providers.dart';
 import 'labels.dart';
 import 'nickname_providers.dart';
+import 'reply_reminder_providers.dart' show replyReminderSettingsProvider;
 import 'session_providers.dart';
 import 'stores.dart';
 
@@ -549,15 +551,13 @@ enum InboxQuickFilter { unread, groups, people, needsReply, drafts }
 
 /// Whether someone in [chat] spoke last and is waiting on the user.
 ///
-/// Read or not: an unread message needs an answer as much as a read one. Only
-/// people and small groups, by the same measure reply reminders use — in a
-/// big group the last word is rarely addressed to anyone.
-bool needsReply(Chat chat) {
-  final last = chat.lastMessage;
-  if (last == null || last.isOwn || last.redacted || last.isBridgeNotice) {
-    return false;
-  }
-  if (last.kind == MessageKind.event) return false;
+/// [isUnanswered], the rule reply reminders use too, so a reaction answers a
+/// chat here exactly when it stops its reminders. Read or not: an unread
+/// message needs an answer as much as a read one. Only people and small
+/// groups, by the same measure reply reminders use — in a big group the last
+/// word is rarely addressed to anyone.
+bool needsReply(Chat chat, {bool reactionsCount = true}) {
+  if (!isUnanswered(chat, reactionsCount: reactionsCount)) return false;
   if (!chat.isGroup) return true;
   final peers = chat.participantCount;
   return peers != null && peers <= kReplyReminderMaxGroupPeers;
@@ -596,6 +596,11 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
       ? null
       : ref.watch(statusChatProvider)?.id;
   final quick = ref.watch(inboxQuickFilterProvider);
+  final reactionsCount =
+      quick == InboxQuickFilter.needsReply &&
+      ref.watch(
+        replyReminderSettingsProvider.select((s) => s.reactionsCountAsReply),
+      );
   final drafts = quick == InboxQuickFilter.drafts
       ? ref.watch(draftsProvider)
       : const <String, String>{};
@@ -628,7 +633,10 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
                 InboxQuickFilter.unread => c.unreadCount > 0,
                 InboxQuickFilter.groups => c.isGroup,
                 InboxQuickFilter.people => !c.isGroup,
-                InboxQuickFilter.needsReply => needsReply(c),
+                InboxQuickFilter.needsReply => needsReply(
+                  c,
+                  reactionsCount: reactionsCount,
+                ),
                 // Kept per room as well as per merged chat; any will do.
                 InboxQuickFilter.drafts =>
                   drafts.containsKey(c.id) || c.roomIds.any(drafts.containsKey),

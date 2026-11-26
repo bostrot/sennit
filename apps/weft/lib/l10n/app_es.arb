@@ -1598,6 +1598,8 @@
   "replyRemindersIncludeMutedSubtitle": "Recordarme también los chats silenciados",
   "replyRemindersQuietHoursTitle": "Respetar las horas de silencio",
   "replyRemindersQuietHoursSubtitle": "Retener los recordatorios hasta que terminen tus horas de silencio",
+  "replyRemindersReactionsTitle": "Contar las reacciones como respuesta",
+  "replyRemindersReactionsSubtitle": "Reaccionar a su último mensaje, o a uno posterior, marca el chat como respondido",
   "replyRemindersExcludedTitle": "No recordarme nunca",
   "replyRemindersExcludedSubtitle": "Chats en los que desactivaste los recordatorios, aquí o en el perfil del chat.",
   "replyRemindersNoneExcluded": "Ningún chat excluido.",

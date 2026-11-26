@@ -25,6 +25,7 @@ abstract final class DomainCodec {
     if (c.muted) 'muted': true,
     'request': ?c.request?.name,
     'participants': ?c.participantCount,
+    'reactedUpTo': ?c.reactedUpTo?.millisecondsSinceEpoch,
     'via': ?c.preferredSendNetwork?.id,
   };
 
@@ -42,6 +43,7 @@ abstract final class DomainCodec {
     muted: j['muted'] == true,
     request: _enum(ChatRequestState.values, j['request']),
     participantCount: j['participants'] as int?,
+    reactedUpTo: _time(j['reactedUpTo']),
     preferredSendNetwork: _network(j['via']),
   );
 

@@ -1599,6 +1599,8 @@
   "replyRemindersIncludeMutedSubtitle": "也提醒已静音的聊天",
   "replyRemindersQuietHoursTitle": "遵守免打扰时段",
   "replyRemindersQuietHoursSubtitle": "在免打扰时段结束前暂不提醒",
+  "replyRemindersReactionsTitle": "把回应算作回复",
+  "replyRemindersReactionsSubtitle": "对其最新消息或之后的消息做出回应，即视为已回复",
   "replyRemindersExcludedTitle": "从不提醒",
   "replyRemindersExcludedSubtitle": "你在此处或聊天资料中关闭了提醒的聊天。",
   "replyRemindersNoneExcluded": "没有排除的聊天。",

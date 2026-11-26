@@ -1598,6 +1598,8 @@
   "replyRemindersIncludeMutedSubtitle": "ذكّرني بالمحادثات التي كتمتها أيضًا",
   "replyRemindersQuietHoursTitle": "احترام ساعات الهدوء",
   "replyRemindersQuietHoursSubtitle": "أجّل التذكيرات حتى تنتهي ساعات هدوء الإشعارات",
+  "replyRemindersReactionsTitle": "احتساب التفاعلات ردًا",
+  "replyRemindersReactionsSubtitle": "التفاعل مع آخر رسالة منهم، أو رسالة بعدها، يجعل المحادثة مُجابة",
   "replyRemindersExcludedTitle": "لا تذكّرني أبدًا بـ",
   "replyRemindersExcludedSubtitle": "المحادثات التي أوقفت تذكيراتها، هنا أو في ملف المحادثة.",
   "replyRemindersNoneExcluded": "لا محادثات مستثناة.",

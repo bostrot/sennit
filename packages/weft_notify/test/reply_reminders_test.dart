@@ -19,6 +19,7 @@ Chat waiting({
   ChatRequestState? request,
   MessageKind kind = MessageKind.text,
   bool isBridgeNotice = false,
+  DateTime? reactedUpTo,
 }) {
   return Chat(
     id: id,
@@ -38,6 +39,7 @@ Chat waiting({
     archived: archived,
     muted: muted,
     request: request,
+    reactedUpTo: reactedUpTo,
   );
 }
 
@@ -108,6 +110,97 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('a reaction as a reply', () {
+    // The message [waiting] builds arrived an hour ago.
+    final sentAt = now.subtract(const Duration(hours: 1));
+
+    test('my reaction on the last message answers the chat', () {
+      final chat = waiting(reactedUpTo: sentAt);
+      expect(answeredByReaction(chat), isTrue);
+      expect(isUnanswered(chat), isFalse);
+      expect(isAwaitingReply(chat), isFalse);
+      expect(skipFor(chat), ReplyReminderSkip.answered);
+    });
+
+    test('a reaction on a message after the one waiting answers it', () {
+      final chat = waiting(reactedUpTo: sentAt.add(const Duration(minutes: 5)));
+      expect(skipFor(chat), ReplyReminderSkip.answered);
+    });
+
+    test('a reaction on an older message does not', () {
+      final chat = waiting(
+        reactedUpTo: sentAt.subtract(const Duration(minutes: 1)),
+      );
+      expect(answeredByReaction(chat), isFalse);
+      expect(isUnanswered(chat), isTrue);
+      expect(skipFor(chat), isNull);
+    });
+
+    test('a reaction taken back leaves the chat unanswered again', () {
+      // A redaction drops the reaction from the chat's reactedUpTo.
+      expect(skipFor(waiting()), isNull);
+      expect(isUnanswered(waiting()), isTrue);
+    });
+
+    test('with the setting off a reaction answers nothing', () {
+      final off = on.copyWith(reactionsCountAsReply: false);
+      final chat = waiting(reactedUpTo: sentAt);
+      expect(isUnanswered(chat, reactionsCount: false), isTrue);
+      expect(isAwaitingReply(chat, reactionsCount: false), isTrue);
+      expect(skipFor(chat, settings: off), isNull);
+    });
+
+    test('answered by reaction even while unread', () {
+      // Reacting from the notification or another device answers it; the
+      // unread count is beside the point once it is answered.
+      final chat = waiting(unread: 1, reactedUpTo: sentAt);
+      expect(skipFor(chat), ReplyReminderSkip.answered);
+    });
+
+    test('a reaction stops the reminders and a redaction restarts them', () {
+      final first = planReplyReminders(
+        chats: [waiting()],
+        settings: on,
+        ledger: ReplyReminderLedger.empty,
+        now: now,
+      );
+      expect(first.reminders, isNotEmpty);
+      final reacted = planReplyReminders(
+        chats: [waiting(reactedUpTo: sentAt)],
+        settings: on,
+        ledger: first.ledger,
+        now: now,
+      );
+      expect(reacted.reminders, isEmpty);
+      expect(reacted.ledger.entries, isEmpty);
+      final takenBack = planReplyReminders(
+        chats: [waiting()],
+        settings: on,
+        ledger: reacted.ledger,
+        now: now,
+      );
+      expect(takenBack.reminders, isNotEmpty);
+      final off = planReplyReminders(
+        chats: [waiting(reactedUpTo: sentAt)],
+        settings: on.copyWith(reactionsCountAsReply: false),
+        ledger: ReplyReminderLedger.empty,
+        now: now,
+      );
+      expect(off.reminders, isNotEmpty);
+    });
+
+    test('is on by default, also for settings saved before it existed', () {
+      expect(ReplyReminderSettings().reactionsCountAsReply, isTrue);
+      expect(
+        ReplyReminderSettings.fromJson({'enabled': true}).reactionsCountAsReply,
+        isTrue,
+      );
+      final off = ReplyReminderSettings(reactionsCountAsReply: false);
+      expect(ReplyReminderSettings.fromJson(off.toJson()), off);
+      expect(off, isNot(ReplyReminderSettings()));
     });
   });
 

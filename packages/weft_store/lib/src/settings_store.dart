@@ -500,6 +500,12 @@ abstract final class WeftSettings {
   static const String notifyReplyReminderLedger =
       'notify.reply_reminder_ledger';
 
+  /// The user's own reactions this device has seen, per room (see
+  /// `OwnReactionLog`), so a chat answered with a reaction stays answered
+  /// across a restart. Bookkeeping of this device: the reactions themselves
+  /// reach the others through Matrix.
+  static const String notifyOwnReactions = 'notify.own_reactions';
+
   /// The reply reminders currently queued with the OS, as a list of plan keys
   /// under `keys`, so the next plan can cancel exactly what it replaces.
   static const String notifyReplyRemindersQueued =
