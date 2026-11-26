@@ -368,6 +368,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// The repository's merge composition when the timeline was opened.
   int _timelineEpoch = 0;
 
+  /// The repository the timeline was opened from. Sennit Web gets a new one
+  /// each time the link to the phone comes back, and a timeline from the old
+  /// one never moves again: a message sent just before the link dropped kept
+  /// its clock while the phone showed it sent.
+  ChatRepository? _timelineRepository;
+
   /// Held rather than read back in [dispose], where `ref` is already unsafe:
   /// a `ConsumerState` is unmounted before its `dispose` runs, and reading a
   /// provider through a dead `BuildContext` throws.
@@ -530,15 +536,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// Cheap fingerprint rather than deep equality: recomputing the merged view
   /// is O(loaded) and fine, but rebuilding the tree on every sync of every
   /// unrelated room is a scroll hitch the reader can feel. Reactions and edits
-  /// are folded in so a remote edit updates the open bubble too.
+  /// are folded in so a remote edit updates the open bubble too, and so is
+  /// where each of the user's own messages stands: a send that is not the
+  /// newest message changes neither the count nor the newest id when its
+  /// clock turns into a tick.
   int _viewFingerprint(MergedTimelineView view) {
     var reactions = 0;
     var edited = 0;
     var redacted = 0;
+    var own = 0;
     for (final m in view.messages) {
       reactions += m.reactions.length;
       if (m.isEdited) edited++;
       if (m.redacted) redacted++;
+      if (m.isOwn) own = Object.hash(own, m.eventId, m.deliveryState);
     }
     return Object.hash(
       view.messages.length,
@@ -546,6 +557,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       reactions,
       edited,
       redacted,
+      own,
     );
   }
 
@@ -558,7 +570,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final repository = ref.read(chatRepositoryProvider);
     if (_timelineChatId != null &&
         (_timelineChatId != _chatId ||
-            _timelineEpoch != repository.timelineEpoch)) {
+            _timelineEpoch != repository.timelineEpoch ||
+            !identical(_timelineRepository, repository))) {
       _open();
       return;
     }
@@ -707,6 +720,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _announcedEventId = null;
     final chatId = _chatId;
     _timelineChatId = chatId;
+    final repository = ref.read(chatRepositoryProvider);
+    _timelineRepository = repository;
     _reportOnScreen(chatId);
     try {
       // Before the timeline is built, not after: a self-deleting chat that
@@ -715,10 +730,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // immediately for a chat with no policy, which is nearly every chat.
       await ref.read(retentionSweeperProvider)?.sweepChat(chatId);
       if (overtaken()) return;
-      _timelineEpoch = ref.read(chatRepositoryProvider).timelineEpoch;
-      final timeline = await ref
-          .read(chatRepositoryProvider)
-          .timelineFor(chatId);
+      _timelineEpoch = repository.timelineEpoch;
+      final timeline = await repository.timelineFor(chatId);
       if (overtaken()) return;
       setState(() {
         _timeline = timeline;
