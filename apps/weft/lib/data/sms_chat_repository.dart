@@ -227,12 +227,7 @@ class SmsChatRepository {
               avatarUrl: _contactFor(entry.value)?.photoUrl,
             ),
     ];
-    out.sort((a, b) {
-      final at = a.lastMessage?.timestamp;
-      final bt = b.lastMessage?.timestamp;
-      if (at == null || bt == null) return 0;
-      return bt.compareTo(at);
-    });
+    out.sort(Chat.byActivity);
     return out;
   }
 

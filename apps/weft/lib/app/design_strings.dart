@@ -20,7 +20,6 @@ WeftDesignStrings weftDesignStringsFrom(AppL10n l10n) => WeftDesignStrings(
   muted: l10n.chatTileMuted,
   typing: l10n.chatTileTyping,
   online: l10n.chatTileOnline,
-  merged: l10n.chatTileMerged,
   mergedAcross: l10n.chatTileMergedAcross,
   unreadCount: l10n.chatTileUnread,
   deliveryState: l10n.deliveryState,
@@ -28,5 +27,8 @@ WeftDesignStrings weftDesignStringsFrom(AppL10n l10n) => WeftDesignStrings(
   messageDeleted: l10n.chatMessageDeleted,
   messageKind: l10n.messageKind,
   reply: l10n.chatTileReply,
+  reacted: ({required own, required emoji, message}) => message == null
+      ? l10n.chatTileReacted(own ? 'own' : 'other', emoji)
+      : l10n.chatTileReactedTo(own ? 'own' : 'other', emoji, message),
   draft: l10n.chatTileDraft,
 );

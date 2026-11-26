@@ -654,14 +654,12 @@ final visibleChatsProvider = Provider<List<Chat>>((ref) {
     filter,
   );
 
-  // Pinned first, then most recent activity.
+  // Pinned first, then most recent activity — a message or a reaction, never
+  // a profile picture or a room rename; see [Chat.lastActivityAt].
   final sorted = [...filtered]
     ..sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-      final at = a.lastMessage?.timestamp;
-      final bt = b.lastMessage?.timestamp;
-      if (at == null || bt == null) return 0;
-      return bt.compareTo(at);
+      return Chat.byActivity(a, b);
     });
   // The same list object when nothing in it moved, so the inbox is rebuilt by
   // a sync that changed a row and not by every sync there is.
@@ -689,12 +687,7 @@ final pendingRequestsProvider = Provider<List<Chat>>((ref) {
         (c) => c.isPendingRequest && !c.archived && !service.contains(c.id),
       )
       .toList();
-  requests.sort((a, b) {
-    final at = a.lastMessage?.timestamp;
-    final bt = b.lastMessage?.timestamp;
-    if (at == null || bt == null) return 0;
-    return bt.compareTo(at);
-  });
+  requests.sort(Chat.byActivity);
   return ref.read(_pendingRequestsMemo)(List.unmodifiable(requests));
 });
 

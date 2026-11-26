@@ -8,19 +8,20 @@ import '../strings.dart';
 import '../surface.dart';
 import '../theme.dart';
 import '../tokens.dart';
-import 'network_glyph.dart';
 import 'unread_badge.dart';
 import 'weft_avatar.dart';
 
 /// One conversation in the inbox.
 ///
-/// A merged chat is signalled three ways so it never depends on colour alone:
-/// the avatar's gradient ring, a row of network glyphs, and the "Merged" label
-/// in its accessibility description.
+/// A merged chat is signalled so it never depends on colour alone: the avatar's
+/// gradient ring and network badge, and the networks named in its
+/// accessibility description. No pill on the row itself — a third line on
+/// every merged conversation cost the inbox a row in five for a fact the
+/// avatar already shows.
 ///
 /// The row has two builds, chosen by [WeftSurface] and differing only in
-/// metrics and in how selection is drawn. A phone gets a 46pt avatar, a tinted
-/// selection and room for the merged strip on its own line; a Mac gets the
+/// metrics and in how selection is drawn. A phone gets a 46pt avatar and a
+/// tinted selection; a Mac gets the
 /// system's list row — 32pt avatar, 13pt title, 11pt preview, and selection as
 /// a filled accent capsule with its ink flipped, which is the one thing that
 /// makes a list look like it belongs on the platform. Everything else — the
@@ -208,7 +209,7 @@ class _ChatTileState extends State<ChatTile> {
   /// never said which three.
   String _semanticsLabel(WeftDesignStrings words) {
     final chat = widget.chat;
-    final last = chat.lastMessage;
+    final last = chat.lastActivity;
     return semanticsSentence([
       chat.title,
       if (chat.isMerged)
@@ -220,7 +221,7 @@ class _ChatTileState extends State<ChatTile> {
         chat.networks.firstOrNull?.label,
       if (chat.pinned) words.pinned,
       if (chat.muted) words.muted,
-      if (last != null && last.isOwn) words.deliveryState(last.deliveryState),
+      if (_showsDelivery(last)) words.deliveryState(last!.deliveryState),
       // The glyph's meaning, as a clause. A screen reader gets "…, reply, see
       // you at six, …" where a sighted reader gets an arrow in front of the
       // same words — and neither gets the mxid that used to be there instead.
@@ -252,7 +253,7 @@ class _ChatTileState extends State<ChatTile> {
   }) {
     final chat = widget.chat;
     final unread = chat.unreadCount > 0;
-    final last = chat.lastMessage;
+    final last = chat.lastActivity;
     final draft = widget.typing ? null : _draft;
 
     return Column(
@@ -324,12 +325,9 @@ class _ChatTileState extends State<ChatTile> {
             // node is what names it for a screen reader. A shape that told the
             // two apart on sight would be a change to the mark itself, and
             // that belongs to whoever owns the design, not to a semantics pass.
-            if (last != null &&
-                last.isOwn &&
-                !widget.typing &&
-                draft == null) ...[
+            if (_showsDelivery(last) && !widget.typing && draft == null) ...[
               Tooltip(
-                message: words.deliveryState(last.deliveryState),
+                message: words.deliveryState(last!.deliveryState),
                 child: Icon(
                   _deliveryIcon(last.deliveryState),
                   size: 14,
@@ -431,22 +429,8 @@ class _ChatTileState extends State<ChatTile> {
                               ),
                     ),
             ),
-            // The merged marks ride the preview's line on a Mac. A third line
-            // would put the row at 60pt, which is a phone's row height in a
-            // window that has to show twenty of them.
-            if (mac && chat.isMerged) ...[
-              const SizedBox(width: WeftSpace.xs),
-              for (final n in chat.networks) ...[
-                NetworkGlyph(network: n, size: 11),
-                const SizedBox(width: 2),
-              ],
-            ],
           ],
         ),
-        if (!mac && chat.isMerged) ...[
-          const SizedBox(height: WeftSpace.sm),
-          _MergedStrip(networks: chat.networks),
-        ],
       ],
     );
   }
@@ -515,8 +499,26 @@ class _ChatTileState extends State<ChatTile> {
   /// An edit needs no special handling and gets none: `applyEdits` has already
   /// replaced [WeftMessage.body] with the replacement's, and a replacement
   /// carries its own fallback in the same shape.
+  ///
+  /// A reaction names its emoji and what it was put on, in the words that
+  /// message's own preview would use — "📷 Photo", "see you at six" — or the
+  /// emoji alone when that message is not at hand.
   static String _preview(WeftDesignStrings words, WeftMessage? last) {
     if (last == null) return words.noMessagesYet;
+    if (last.reactionKey case final emoji?) {
+      final target = last.body.isEmpty && last.kind == MessageKind.text
+          ? null
+          : _messagePreview(words, last);
+      return words.reacted(
+        own: last.isOwn,
+        emoji: emoji,
+        message: target == null || target.isEmpty ? null : target,
+      );
+    }
+    return _messagePreview(words, last);
+  }
+
+  static String _messagePreview(WeftDesignStrings words, WeftMessage last) {
     if (last.redacted) return words.messageDeleted;
     String kind(String emoji) => '$emoji ${words.messageKind(last.kind)}';
     return switch (last.kind) {
@@ -562,7 +564,16 @@ class _ChatTileState extends State<ChatTile> {
   /// strip and is still a reply, and a message that merely opens with a
   /// quotation is not one. `m.in_reply_to` is the only thing that knows.
   static bool _isReply(WeftMessage? last) =>
-      last != null && !last.redacted && last.replyToEventId != null;
+      last != null &&
+      !last.redacted &&
+      last.reactionKey == null &&
+      last.replyToEventId != null;
+
+  /// Whether the row carries the ticks: the user's own message. Not their own
+  /// reaction, whose delivery nobody tracks and whose ticks would read as the
+  /// message's.
+  static bool _showsDelivery(WeftMessage? last) =>
+      last != null && last.isOwn && last.reactionKey == null;
 
   /// One tick sent, two ticks arrived, two blue ticks read.
   static IconData _deliveryIcon(DeliveryState? state) => switch (state) {
@@ -571,59 +582,4 @@ class _ChatTileState extends State<ChatTile> {
     DeliveryState.read || DeliveryState.delivered => Icons.done_all_rounded,
     _ => Icons.done_rounded,
   };
-}
-
-/// The row of network marks under a merged chat's preview.
-class _MergedStrip extends StatelessWidget {
-  const _MergedStrip({required this.networks});
-
-  final List<ChatNetwork> networks;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: palette.mergedAccent.withValues(alpha: 0.16),
-            borderRadius: WeftRadius.pill,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.merge_rounded, size: 11, color: palette.mergedAccent),
-              const SizedBox(width: WeftSpace.xxs),
-              Text(
-                WeftDesignStringsScope.of(context).merged,
-                style: context.text.labelSmall?.copyWith(
-                  color: palette.mergedAccent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: WeftSpace.sm),
-        // Wrapped and flexible, because the row above it is not fixed: the
-        // trailing column holds a timestamp, and a conversation last spoken in
-        // last month is "8/15/2026" where one from this morning is "09:05".
-        // The wider label squeezes this strip, and a plain `Row` answers that
-        // by overflowing — three and a half pixels of yellow-and-black stripe
-        // on a real inbox, which the demo fixtures' short labels never
-        // provoked.
-        Expanded(
-          child: Wrap(
-            spacing: 3,
-            runSpacing: 3,
-            children: [
-              for (final n in networks) NetworkGlyph(network: n, size: 14),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
