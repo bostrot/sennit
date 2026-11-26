@@ -6,6 +6,7 @@ import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_remote/weft_remote.dart';
 
 import '../../data/chat_repository.dart';
+import '../../data/send_queue_source.dart';
 import 'remote_protocol.dart';
 
 /// The phone's side of Sennit Web: serves one browser from the real
@@ -27,6 +28,9 @@ class RemoteChatHost {
       _lastChats = chats;
       _schedulePush();
     });
+    if (_repo case final SendQueueSource queue) {
+      _failures = queue.sendFailureChanges.listen((_) => _schedulePush());
+    }
     unawaited(_peer.done.then((_) => dispose()));
   }
 
@@ -35,12 +39,14 @@ class RemoteChatHost {
   final Map<String, String> _sentSettings = {};
   late final RpcPeer _peer;
   late final StreamSubscription<List<Chat>> _chats;
+  StreamSubscription<Object?>? _failures;
 
   final Map<String, String> _sentChats = {};
   List<String> _sentOrder = const [];
   String? _sentNetworks;
   String? _sentService;
   String? _sentIdentity;
+  String? _sentFailures;
   int? _sentEpoch;
   final Map<int, _OpenTimeline> _timelines = {};
   int _nextTimeline = 1;
@@ -56,6 +62,7 @@ class RemoteChatHost {
     if (_disposed) return;
     _disposed = true;
     unawaited(_chats.cancel());
+    unawaited(_failures?.cancel());
     unawaited(_peer.close());
   }
 
@@ -111,6 +118,19 @@ class RemoteChatHost {
     if (epoch != _sentEpoch) {
       frame['epoch'] = epoch;
       _sentEpoch = epoch;
+    }
+    // Why each failed send did not leave, so the browser's bubble says what
+    // the phone's does — and offers a retry only where the phone would not
+    // send it again by itself.
+    if (_repo case final SendQueueSource queue) {
+      final failures = jsonEncode({
+        for (final MapEntry(:key, :value) in queue.sendFailures.entries)
+          key: value.name,
+      });
+      if (failures != _sentFailures) {
+        frame['failures'] = jsonDecode(failures);
+        _sentFailures = failures;
+      }
     }
     final identity = jsonEncode(_identity(_repo.identityGraph));
     if (identity != _sentIdentity) {
@@ -226,7 +246,7 @@ class RemoteChatHost {
         // A browser reconnecting starts from nothing; so does this.
         _sentChats.clear();
         _sentOrder = const [];
-        _sentNetworks = _sentService = _sentIdentity = null;
+        _sentNetworks = _sentService = _sentIdentity = _sentFailures = null;
         _sentEpoch = null;
         _sentSettings.clear();
         _schedulePush();

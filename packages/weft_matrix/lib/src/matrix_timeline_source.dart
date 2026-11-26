@@ -60,21 +60,35 @@ class MatrixTimelineSource extends TimelineSource {
 
   /// Mapping every event on each access would be O(n) per rebuild, and the
   /// timeline is read on every frame while scrolling. The cache is keyed on the
-  /// timeline's own length and newest event, which together change whenever the
-  /// SDK mutates it — including for relations, since a reaction, an edit and
-  /// the redaction of either are all themselves timeline events.
+  /// timeline's own length and on a cheap hash of each event's id, status and
+  /// type. A reaction, an edit and the redaction of either are all timeline
+  /// events of their own, so the length moves for those; the hash is for what
+  /// the SDK changes in place. A send replaces its local echo where it stands:
+  /// the transaction id becomes the event id, then `sent` becomes `synced` with
+  /// the id unchanged, and a late key turns an undecryptable event into a
+  /// message. Keyed on the newest event alone, each of those waited for the
+  /// next event in the room: a send behind a reply that landed first kept its
+  /// clock, and a settled send stayed at `sent`.
   List<WeftMessage>? _cache;
   int _cacheLength = -1;
-  String? _cacheNewestId;
+  int _cacheSignature = 0;
+
+  static int _signatureOf(List<sdk.Event> events) {
+    var hash = 0;
+    for (final event in events) {
+      hash = Object.hash(hash, event.eventId, event.status, event.type);
+    }
+    return hash;
+  }
 
   @override
   List<WeftMessage> get loaded {
     final events = _timeline.events;
-    final newestId = events.isEmpty ? null : events.first.eventId;
+    final signature = _signatureOf(events);
 
     if (_cache != null &&
         _cacheLength == events.length &&
-        _cacheNewestId == newestId) {
+        _cacheSignature == signature) {
       return _cache!;
     }
 
@@ -93,7 +107,7 @@ class MatrixTimelineSource extends TimelineSource {
 
     _cache = List.unmodifiable(_withReplyPreviews(mapped));
     _cacheLength = events.length;
-    _cacheNewestId = newestId;
+    _cacheSignature = signature;
     return _cache!;
   }
 
