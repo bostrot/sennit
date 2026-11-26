@@ -21,6 +21,8 @@ and what was noticed but not done.
 
 - 2026-11-25 · Feature · Tapping a contact's profile picture opens it full screen, uncropped and zoomable, fetched larger from the homeserver's thumbnail API · https://github.com/bostrot/sennit/pull/48
 
+- 2026-11-26 · Localization · File sizes use the reader's decimal mark ("2,4 MB" in German, Spanish, French and Portuguese) in file bubbles, upload progress, the attach preview, the media viewer, the share sheet, the backup screen and the "too large" error · https://github.com/bostrot/sennit/pull/82
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -66,6 +68,12 @@ and what was noticed but not done.
   `git checkout main` fails in a run's worktree: branch from `origin/main`
   instead. The image hook `weftAvatarImageOverride` (there for Sennit Web) is
   also the cleanest way to serve avatars from memory in a widget test.
+
+- 2026-11-26 · #48 merged with no review comments; nothing closed
+  unmerged, no issues open. A widget test that sets `MaterialApp.locale`
+  also needs `supportedLocales: AppL10n.supportedLocales`, or the app
+  quietly falls back to English and a localisation test passes or fails
+  for the wrong reason.
 
 ## Ideas backlog
 
@@ -134,7 +142,10 @@ and what was noticed but not done.
 - ~~**Share sheet leftovers.**~~ Done 2026-11-23. Was: `share_target_sheet.dart`
   still builds "Nothing to send", "{n} files" and the network list joined with
   " and " by hand.
-- **File sizes ignore the language's decimal mark.** `formatAttachmentSize`
+- ~~**File sizes ignore the language's decimal mark.**~~ Done 2026-11-26
+  (`AppL10n.fileSize`). Left out: the unit names — French writes "Mo"/"ko",
+  Arabic and Hindi have their own — which would want one ARB key per unit.
+  Was: `formatAttachmentSize`
   (`packages/weft_attachments/lib/src/format.dart`) writes "2.4 MB" in every
   language; German and French expect "2,4 MB". It is pure Dart with no locale,
   so the fix is either a locale-aware twin in the app using `NumberFormat`, or
@@ -178,3 +189,10 @@ and what was noticed but not done.
   Needs the words passed in (a `semanticsDetail` parameter, or a small
   strings object the app fills from `context.l10n`) by every caller: the
   inbox tile, the Mac sidebar, the profile.
+- **Share problems are still English sentences.** `ResolvedShare.problems`
+  in `apps/weft/lib/app/intents.dart` is a list of finished English strings
+  ("{name} is 30 MB, which is too large to share — the limit is …",
+  "{name} could not be read."), built below the widget tree and shown as-is
+  by `share_target_sheet.dart`. Turning them into a small value (name,
+  reason, size, limit) that the sheet words through `context.l10n` — the way
+  `UploadRejection` already works — would localise them and their sizes.

@@ -873,7 +873,7 @@ class _FileAttachment extends StatelessWidget {
     final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
     final bubble = own ? palette.ownBubble : palette.peerBubble;
     final bytes = message.mediaSizeBytes;
-    final size = bytes == null ? null : formatAttachmentSize(bytes);
+    final size = bytes == null ? null : context.l10n.fileSize(bytes);
     final name = attachmentFilename(message);
     final caption = attachmentCaption(message);
 
@@ -1342,7 +1342,7 @@ class UploadProgressBubble extends StatelessWidget {
   /// during which "0%" would look like a stall.
   static String _statusLine(BuildContext context, UploadTask task) {
     final l10n = context.l10n;
-    final size = formatAttachmentSize(task.plan.sizeBytes);
+    final size = l10n.fileSize(task.plan.sizeBytes);
     return switch (task.state) {
       UploadState.queued => l10n.uploadWaiting(size),
       UploadState.hashing => l10n.uploadPreparing(size),

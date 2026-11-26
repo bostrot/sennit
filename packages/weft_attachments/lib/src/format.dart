@@ -10,7 +10,11 @@
 /// sheet, the file bubble, and the sentence a share intent gets when its video
 /// is too large to stage. The last of those is decided below the UI layer
 /// entirely, which is what pulled the formatter down here with it.
-String formatAttachmentSize(int bytes) {
+///
+/// [decimalSeparator] is the reader's decimal mark: German, French, Spanish
+/// and Portuguese write "2,4 MB". This package has no locale to ask, so the
+/// app passes the mark in (`AppL10n.fileSize`); the point is the default.
+String formatAttachmentSize(int bytes, {String decimalSeparator = '.'}) {
   if (bytes < 1024) return '$bytes B';
   const units = ['kB', 'MB', 'GB', 'TB'];
   var value = bytes / 1024;
@@ -20,5 +24,8 @@ String formatAttachmentSize(int bytes) {
     unit++;
   }
   final digits = value < 10 ? 1 : 0;
-  return '${value.toStringAsFixed(digits)} ${units[unit]}';
+  final number = value
+      .toStringAsFixed(digits)
+      .replaceFirst('.', decimalSeparator);
+  return '$number ${units[unit]}';
 }
