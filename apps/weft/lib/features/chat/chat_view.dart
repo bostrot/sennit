@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 // `SelectionArea` reports what it holds as a `SelectedContent`, which lives in
 // the rendering layer and is not re-exported by `material.dart`.
@@ -5897,7 +5898,9 @@ class _Composer extends StatelessWidget {
                       // `performAction` for both, so a five-line composer had no
                       // reachable line two.
                       child: Shortcuts(
-                        shortcuts: composerShortcuts,
+                        shortcuts: kIsWeb
+                            ? browserComposerShortcuts
+                            : composerShortcuts,
                         child: Actions(
                           actions: <Type, Action<Intent>>{
                             SendComposerIntent:
