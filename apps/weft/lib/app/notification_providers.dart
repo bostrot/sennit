@@ -172,9 +172,14 @@ final conversationClearerProvider = Provider<ConversationClearer>((ref) {
 final openChatsProvider = Provider<OpenChats>((ref) => OpenChats());
 
 /// Whether this build offers Sennit's own gateway by default: the store
-/// builds, whose FCM and APNs credentials it holds.
+/// builds, whose FCM and APNs credentials it holds — once the gateway is public
+/// and the privacy texts cover it. Until then it is off unless built with
+/// `--dart-define=SENNIT_PUSH_DEFAULT=true`; people can still pick it in the
+/// notification settings.
 final offerSennitPushProvider = Provider<bool>(
-  (ref) => SennitEdition.current == SennitEdition.store,
+  (ref) =>
+      const bool.fromEnvironment('SENNIT_PUSH_DEFAULT') &&
+      SennitEdition.current == SennitEdition.store,
 );
 
 /// Which gateway wakes this device, or null while a store build has not
