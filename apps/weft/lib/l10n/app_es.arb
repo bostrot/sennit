@@ -376,6 +376,8 @@
   "savedMessagesEmpty": "Aún no hay nada guardado. Mantén pulsado un mensaje y elige Guardar.",
   "savedMessagesNoMatch": "Ningún mensaje guardado coincide.",
   "savedMessagesCount": "{count, plural, =1{1 mensaje} other{{count} mensajes}}",
+  "messageActionMarkUnreadFrom": "No leído desde aquí",
+  "chatMarkedUnreadFrom": "Marcado como no leído desde este mensaje.",
   "messageActionSendToHomeAssistant": "Enviar a Home Assistant",
   "messageActionRetranscribe": "Volver a transcribir en…",
   "messageActionTranslate": "Traducir",

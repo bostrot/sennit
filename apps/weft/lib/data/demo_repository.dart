@@ -41,6 +41,15 @@ class DemoChatRepository implements ChatRepository {
   Future<void> markUnread(String chatId) async {}
 
   @override
+  Future<void> markUnreadFrom(
+    String chatId,
+    String roomId,
+    String eventId, {
+    String? before,
+    int count = 1,
+  }) async {}
+
+  @override
   Future<String?> createDirectChat(String matrixUserId) async => null;
 
   @override

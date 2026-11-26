@@ -96,6 +96,7 @@ import 'send_network_chip.dart';
 import 'thread_indicator.dart';
 import 'room_link.dart';
 import 'translation_sheet.dart';
+import 'unread_from.dart';
 import 'voice_recording_bar.dart';
 import 'sms_composer_bar.dart';
 import 'unverified_devices_banner.dart';
@@ -1682,6 +1683,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
         if (mounted) await showEditHistorySheet(context, message: message);
       case MessageAction.remind:
         await _remindLater(message);
+      case MessageAction.markUnreadFrom:
+        await _markUnreadFrom(message);
       case MessageAction.sendToHomeAssistant:
         await _sendToHomeAssistant(message);
     }
@@ -1786,6 +1789,30 @@ class _ChatViewState extends ConsumerState<ChatView> {
         },
       ),
     );
+  }
+
+  /// Flags the conversation unread from [message] on, the way it would be if
+  /// the user had stopped reading there. Staying in the chat does not undo
+  /// it: only opening the conversation again marks it read.
+  Future<void> _markUnreadFrom(WeftMessage message) async {
+    final l10n = context.l10n;
+    final plan = unreadFromPlan(_view.messages, message);
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .markUnreadFrom(
+            _chatId,
+            message.roomId,
+            message.eventId,
+            before: plan.before,
+            count: plan.count,
+          );
+    } on Object catch (error) {
+      debugPrint('weft: mark unread from a message failed: $error');
+      if (mounted) _showMessage(l10n.chatActionFailed);
+      return;
+    }
+    if (mounted) _showMessage(l10n.chatMarkedUnreadFrom);
   }
 
   /// "Remind me": a handful of natural offsets, then the OS carries it.

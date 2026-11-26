@@ -377,6 +377,8 @@
   "savedMessagesEmpty": "还没有收藏。长按一条消息并选择“收藏”。",
   "savedMessagesNoMatch": "没有匹配的收藏消息。",
   "savedMessagesCount": "{count, plural, other{{count} 条消息}}",
+  "messageActionMarkUnreadFrom": "从这里标为未读",
+  "chatMarkedUnreadFrom": "已从这条消息起标为未读。",
   "messageActionSendToHomeAssistant": "发送到 Home Assistant",
   "messageActionRetranscribe": "以其他语言重新转写…",
   "messageActionTranslate": "翻译",

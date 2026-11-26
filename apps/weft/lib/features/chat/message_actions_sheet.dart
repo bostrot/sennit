@@ -40,6 +40,9 @@ enum MessageAction {
   /// Schedule a local notification pointing back at this message.
   remind,
 
+  /// Flag the conversation unread again, counting from this message.
+  markUnreadFrom,
+
   /// Re-attempt a send that failed.
   retrySend,
 
@@ -331,6 +334,12 @@ class _MessageActionsSheet extends StatelessWidget {
                   title: Text(context.l10n.messageActionRemind),
                   onTap: () => choose(MessageAction.remind),
                 ),
+                if (!message.isOwn)
+                  ListTile(
+                    leading: const Icon(Icons.mark_chat_unread_outlined),
+                    title: Text(context.l10n.messageActionMarkUnreadFrom),
+                    onTap: () => choose(MessageAction.markUnreadFrom),
+                  ),
                 if (homeAssistant)
                   ListTile(
                     leading: const Icon(Icons.home_outlined),
@@ -498,6 +507,12 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
           Icons.alarm_add_rounded,
           l10n.messageActionRemind,
         ),
+        if (!message.isOwn)
+          item(
+            MessageAction.markUnreadFrom,
+            Icons.mark_chat_unread_outlined,
+            l10n.messageActionMarkUnreadFrom,
+          ),
         if (homeAssistant)
           item(
             MessageAction.sendToHomeAssistant,

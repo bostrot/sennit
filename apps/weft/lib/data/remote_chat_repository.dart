@@ -412,6 +412,21 @@ class RemoteChatRepository implements ChatRepository {
       _act(RemoteMethods.markUnread, {'chat': chatId});
 
   @override
+  Future<void> markUnreadFrom(
+    String chatId,
+    String roomId,
+    String eventId, {
+    String? before,
+    int count = 1,
+  }) => _act(RemoteMethods.markUnreadFrom, {
+    'chat': chatId,
+    'room': roomId,
+    'event': eventId,
+    'before': ?before,
+    'count': count,
+  });
+
+  @override
   Future<void> retryFailedSend(String roomId, String eventId) =>
       _act(RemoteMethods.retryFailedSend, {'room': roomId, 'event': eventId});
 

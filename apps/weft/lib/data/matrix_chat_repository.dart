@@ -219,6 +219,11 @@ class MatrixChatRepository
   /// receipted reads as zero, whatever the server still says.
   final Map<String, String> _readUpTo = {};
 
+  /// How many messages a room marked unread from one of them has waiting,
+  /// by room id — the badge [markUnreadFrom] asked for. Read only while the
+  /// room's unread flag stands, and dropped when the room is read.
+  final Map<String, int> _unreadFrom = {};
+
   /// Profiles fetched for DM partners whose member event was never loaded.
   final Map<String, sdk.Profile> _profiles = {};
   final Set<String> _profilesInFlight = {};
@@ -2121,11 +2126,45 @@ class MatrixChatRepository
       if (room == null) continue;
       // The optimistic receipt would zero the badge right back out.
       _readUpTo.remove(room.id);
+      _unreadFrom.remove(room.id);
       try {
         await room.markUnread(true);
       } on Object catch (error) {
         debugPrint('weft: ${source.roomId} could not be marked unread: $error');
       }
+    }
+    _scheduleRebuild();
+  }
+
+  /// The fully-read marker goes back to [before] — never the public receipt,
+  /// which servers only move forward and bridges relay as read ticks — so
+  /// another client draws its "new messages" line where the user asked. The
+  /// unread flag is what this app and the inbox go by; [count] is its badge.
+  @override
+  Future<void> markUnreadFrom(
+    String chatId,
+    String roomId,
+    String eventId, {
+    String? before,
+    int count = 1,
+  }) async {
+    final chat = _chatById[chatId];
+    if (chat == null || !chat.sources.any((s) => s.roomId == roomId)) return;
+    final room = _client.getRoomById(roomId);
+    if (room == null) return;
+    _readUpTo.remove(room.id);
+    _unreadFrom[room.id] = count < 1 ? 1 : count;
+    if (before != null) {
+      try {
+        await room.setReadMarker(before);
+      } on Object catch (error) {
+        debugPrint('weft: read marker for $roomId not moved back: $error');
+      }
+    }
+    try {
+      await room.markUnread(true);
+    } on Object catch (error) {
+      debugPrint('weft: $roomId could not be marked unread: $error');
     }
     _scheduleRebuild();
   }
@@ -2187,6 +2226,7 @@ class MatrixChatRepository
       // and a merged chat summing three legs' stale server counts read as
       // "7 unread" for one new message until every receipt landed.
       _readUpTo[room.id] = lastEvent.eventId;
+      _unreadFrom.remove(room.id);
       // Opening is the one thing that clears a deliberate unread flag.
       if (room.markedUnread) {
         try {
@@ -2817,6 +2857,7 @@ class MatrixChatRepository
   /// — the rail reads the first and the inbox row the second.
   int _unreadCountFor(sdk.Room room, sdk.Event? lastEvent) => roomUnreadCount(
     markedUnread: room.markedUnread,
+    markedCount: _unreadFrom[room.id],
     notificationCount: room.notificationCount,
     readLocally: _isReadLocally(room, lastEvent),
   );
@@ -3141,10 +3182,15 @@ String handleFingerprint(NetworkHandle handle) => jsonEncode([
 /// only thing known is "not finished with this".
 int roomUnreadCount({
   required bool markedUnread,
+  int? markedCount,
   required int notificationCount,
   required bool readLocally,
 }) {
-  if (markedUnread) return notificationCount > 0 ? notificationCount : 1;
+  if (markedUnread) {
+    // Marked unread from a message: that many, whatever the server counted.
+    if (markedCount != null && markedCount > 0) return markedCount;
+    return notificationCount > 0 ? notificationCount : 1;
+  }
   return readLocally ? 0 : notificationCount;
 }
 

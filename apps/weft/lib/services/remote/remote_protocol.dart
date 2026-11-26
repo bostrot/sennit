@@ -37,6 +37,7 @@ abstract final class RemoteMethods {
   static const String setSendNetwork = 'setSendNetwork';
   static const String markRead = 'markRead';
   static const String markUnread = 'markUnread';
+  static const String markUnreadFrom = 'markUnreadFrom';
   static const String retryFailedSend = 'retryFailedSend';
   static const String discardFailedSend = 'discardFailedSend';
   static const String forgetLocally = 'forgetLocally';

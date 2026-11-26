@@ -376,6 +376,8 @@
   "savedMessagesEmpty": "Noch nichts gespeichert. Halte eine Nachricht gedrückt und wähle Speichern.",
   "savedMessagesNoMatch": "Keine gespeicherte Nachricht passt.",
   "savedMessagesCount": "{count, plural, =1{1 Nachricht} other{{count} Nachrichten}}",
+  "messageActionMarkUnreadFrom": "Ab hier ungelesen",
+  "chatMarkedUnreadFrom": "Ab dieser Nachricht als ungelesen markiert.",
   "messageActionSendToHomeAssistant": "An Home Assistant senden",
   "messageActionRetranscribe": "Erneut transkribieren in…",
   "messageActionTranslate": "Übersetzen",
