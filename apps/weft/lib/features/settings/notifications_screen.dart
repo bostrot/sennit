@@ -12,6 +12,7 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/a11y.dart';
+import '../../app/llm_settings.dart';
 import '../../app/localisation.dart';
 import '../../app/notification_providers.dart';
 import '../../app/providers.dart';
@@ -877,11 +878,11 @@ class _SmartRepliesTile extends ConsumerWidget {
       found = null;
     }
     final settings = found;
+    final endpoint = settings == null ? null : llmEndpointOf(settings);
     final configured =
-        (settings?.getString(WeftSettings.llmBaseUrl) ?? '')
-            .trim()
-            .isNotEmpty &&
-        (settings?.getString(WeftSettings.llmModel) ?? '').trim().isNotEmpty;
+        endpoint != null &&
+        endpoint.baseUrl.isNotEmpty &&
+        endpoint.model.isNotEmpty;
     final enabled =
         settings?.getBool(WeftSettings.notifySmartReplies, fallback: true) ??
         false;

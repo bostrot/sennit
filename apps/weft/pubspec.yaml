@@ -112,6 +112,15 @@ dependencies:
   web: ^1.1.1
 
   whisper_ggml: ^2.6.0
+  # llama.cpp for the AI features' "On this phone" provider: runs a GGUF
+  # model the user downloads (Bonsai's 1-bit Q1_0 among them) in a worker
+  # isolate. Its build hook fetches the prebuilt llama.cpp libraries, so no
+  # C++ toolchain is needed; which ones is trimmed in the workspace pubspec's
+  # `hooks.user_defines`. MIT.
+  llamadart: ^0.21.0
+  # The `hw.memsize` sysctl, for the on-device model's memory check on Apple
+  # platforms. Already in the lock through llamadart and path_provider.
+  ffi: ^2.1.0
   # ONNX Runtime bindings for every platform Weft builds on. Runs the local
   # embedding model, so semantic search can work with no endpoint at all.
   flutter_onnxruntime: ^1.8.3

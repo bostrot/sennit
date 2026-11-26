@@ -1928,5 +1928,22 @@
   "usageStatsConsentNever": "Nunca enviados: dados pessoais, conteúdo de mensagens, contatos ou IDs Matrix. Você pode mudar isso a qualquer momento em Configurações → Privacidade e segurança.",
   "usageStatsConsentPolicy": "Política de privacidade",
   "usageStatsConsentAllow": "Permitir",
-  "usageStatsConsentDecline": "Não, obrigado"
+  "usageStatsConsentDecline": "Não, obrigado",
+  "endpointsLlmProvider": "Onde a IA é executada",
+  "endpointsLlmProviderServer": "Servidor",
+  "endpointsLlmProviderOnDevice": "Neste aparelho",
+  "endpointsOnDeviceIntro": "Os recursos de IA rodam neste aparelho com um modelo que você baixa uma vez. Nada do que você escreve sai dele. As respostas demoram mais que num servidor e gastam bateria enquanto são escritas.",
+  "endpointsOnDeviceMemory": "Este aparelho tem {gb} GB de memória.",
+  "endpointsOnDeviceLargeModel": "As melhores respostas. Precisa de cerca de 2 GB de memória livre; ideal em aparelhos com 8 GB ou mais.",
+  "endpointsOnDeviceSmallModel": "Menor e cerca de três vezes mais rápido, com respostas mais simples. Para aparelhos com menos memória.",
+  "endpointsOnDeviceRamTight": "Este aparelho tem pouca memória sobrando para este modelo. Ele pode ficar lento, e o sistema pode fechar o Sennit enquanto roda.",
+  "endpointsOnDeviceRamTooLittle": "Este aparelho provavelmente tem pouca memória para este modelo; o sistema pode fechar o Sennit enquanto roda. Experimente o menor.",
+  "endpointsOnDeviceMobileDataTitle": "Baixar com dados móveis",
+  "endpointsOnDeviceMobileDataSubtitle": "Desligado, o download espera o Wi-Fi.",
+  "endpointsOnDeviceWaitsForWifi": "Aguardando Wi-Fi",
+  "endpointsOnDeviceContextHelper": "Até {max} tokens cabem na memória deste aparelho. Uma janela maior lê mais da conversa e é mais lenta.",
+  "endpointsOnDeviceTest": "Testar velocidade",
+  "endpointsOnDeviceTestResult": "{speed} tokens por segundo; primeira palavra após {seconds} s",
+  "endpointsOnDeviceTestFailed": "O modelo não pôde rodar: {error}",
+  "endpointsOnDeviceNotDownloaded": "Baixe o modelo para usá-lo."
 }

@@ -336,6 +336,17 @@ abstract final class WeftSettings {
   /// model (`LlmModelSettings.keyFor`), so switching models keeps each one's.
   static const String llmModelLimits = 'ai.llm_model_limits';
 
+  /// The downloaded model the AI features use instead of [llmBaseUrl], when
+  /// the user picked "On this phone"; empty or absent means the server.
+  ///
+  /// Kept per device, like every downloaded model: the laptop that synced
+  /// this phone's settings has no copy of the model, and keeps its server.
+  static const String onDeviceLlmModel = 'ai.on_device_model';
+
+  /// Whether the on-device model may download over mobile data. Off unless
+  /// set: it is a gigabyte. Per device.
+  static const String onDeviceLlmMobileData = 'ai.on_device_mobile_data';
+
   /// Every auto-reply rule, as one JSON blob under a `rules` key.
   ///
   /// One key rather than a row per rule, for the reasons [notifyPolicy] gives:

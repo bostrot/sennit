@@ -6,7 +6,33 @@ import 'package:weft_store/weft_store.dart';
 
 import '../services/ai/llm_budget.dart';
 import '../services/ai/llm_limits.dart';
+import '../services/ai/on_device/on_device_models.dart';
 import 'stores.dart';
+
+/// The endpoint every AI feature asks: the model on the phone when the user
+/// picked one and this build can run it, otherwise the configured server.
+///
+/// Either may be empty — nothing configured — which every feature reads as
+/// "stay dormant".
+({String baseUrl, String model}) llmEndpointOf(SettingsStore settings) {
+  final onDevice = onDeviceLlmModelOf(settings);
+  if (onDevice != null) {
+    return (baseUrl: kOnDeviceLlmBaseUrl, model: onDevice.id);
+  }
+  return (
+    baseUrl: (settings.getString(WeftSettings.llmBaseUrl) ?? '').trim(),
+    model: (settings.getString(WeftSettings.llmModel) ?? '').trim(),
+  );
+}
+
+/// The on-device model the AI features use, or null when they use the
+/// server — none picked, or not one this build can run.
+OnDeviceLlmSpec? onDeviceLlmModelOf(SettingsStore settings) {
+  if (!onDeviceLlmSupported) return null;
+  return OnDeviceLlmSpec.byId(
+    settings.getString(WeftSettings.onDeviceLlmModel),
+  );
+}
 
 /// What is stored for [model] at [baseUrl]: the user's numbers and what the
 /// server reported.

@@ -11090,5 +11090,99 @@
   "@usageStatsConsentDecline": {
     "description": "Button in the usage-statistics dialog: no, do not send statistics. Same visual weight as the allow button. Keep under ~14 chars.",
     "maxLength": 20
+  },
+  "endpointsLlmProvider": "Where the AI runs",
+  "@endpointsLlmProvider": {
+    "description": "Accessibility label of the switch between running the AI on a server or on this device. About 30 chars."
+  },
+  "endpointsLlmProviderServer": "Server",
+  "@endpointsLlmProviderServer": {
+    "description": "Segment label: the AI features use a server (an OpenAI-compatible endpoint). One short word; the segmented button is narrow. Keep under ~12 chars."
+  },
+  "endpointsLlmProviderOnDevice": "On this device",
+  "@endpointsLlmProviderOnDevice": {
+    "description": "Segment label: the AI features use a model downloaded to this phone or Mac. Keep under ~18 chars."
+  },
+  "endpointsOnDeviceIntro": "The AI features run on this device with a model you download once. Nothing you write leaves it. Answers take longer than a server’s and use battery while they are written.",
+  "@endpointsOnDeviceIntro": {
+    "description": "Explains the on-device AI provider under the server/device switch. About 200 chars."
+  },
+  "endpointsOnDeviceMemory": "This device has {gb} GB of memory.",
+  "@endpointsOnDeviceMemory": {
+    "description": "The device's total memory, under the intro. {gb} is a decimal number such as 7.6.",
+    "placeholders": {
+      "gb": {
+        "type": "String",
+        "example": "7.6"
+      }
+    }
+  },
+  "endpointsOnDeviceLargeModel": "The best answers. Needs about 2 GB of free memory; best on devices with 8 GB or more.",
+  "@endpointsOnDeviceLargeModel": {
+    "description": "Description of the larger on-device model, Bonsai 8B. About 110 chars."
+  },
+  "endpointsOnDeviceSmallModel": "Smaller and about three times as fast, with plainer answers. For devices with less memory.",
+  "@endpointsOnDeviceSmallModel": {
+    "description": "Description of the smaller on-device model, Ternary Bonsai 2 2B. About 100 chars."
+  },
+  "endpointsOnDeviceRamTight": "This device has little memory to spare for this model. It may be slow, and the system may close Sennit while it runs.",
+  "@endpointsOnDeviceRamTight": {
+    "description": "Warning under a model when the device has enough memory to run it but little to spare. About 120 chars."
+  },
+  "endpointsOnDeviceRamTooLittle": "This device probably has too little memory for this model; the system may close Sennit while it runs. Try the smaller one.",
+  "@endpointsOnDeviceRamTooLittle": {
+    "description": "Louder warning under a model when the device probably has too little memory for it. About 120 chars."
+  },
+  "endpointsOnDeviceMobileDataTitle": "Download over mobile data",
+  "@endpointsOnDeviceMobileDataTitle": {
+    "description": "Switch title: allow the model download over mobile data. Keep under ~36 chars."
+  },
+  "endpointsOnDeviceMobileDataSubtitle": "When off, the download waits for Wi-Fi.",
+  "@endpointsOnDeviceMobileDataSubtitle": {
+    "description": "Subtitle of the mobile-data switch: when off, the download waits for Wi-Fi. About 60 chars."
+  },
+  "endpointsOnDeviceWaitsForWifi": "Waiting for Wi-Fi",
+  "@endpointsOnDeviceWaitsForWifi": {
+    "description": "Under a model download that has not started because the phone is not on Wi-Fi. Keep under ~30 chars."
+  },
+  "endpointsOnDeviceContextHelper": "Up to {max} tokens fit this device’s memory. A bigger window reads more of a chat, and is slower.",
+  "@endpointsOnDeviceContextHelper": {
+    "description": "Helper under the context window field for the on-device model. {max} is the largest window that fits the device's memory, such as 8192. About 110 chars.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "endpointsOnDeviceTest": "Test speed",
+  "@endpointsOnDeviceTest": {
+    "description": "Button that runs a short test generation with the on-device model and shows its speed. Keep under ~20 chars."
+  },
+  "endpointsOnDeviceTestResult": "{speed} tokens a second; first word after {seconds} s",
+  "@endpointsOnDeviceTestResult": {
+    "description": "Result of the speed test. {speed} is tokens per second such as 12.4; {seconds} is the wait for the first word such as 3.1. About 60 chars.",
+    "placeholders": {
+      "speed": {
+        "type": "String",
+        "example": "12.4"
+      },
+      "seconds": {
+        "type": "String",
+        "example": "3.1"
+      }
+    }
+  },
+  "endpointsOnDeviceTestFailed": "The model could not run: {error}",
+  "@endpointsOnDeviceTestFailed": {
+    "description": "Shown when the speed test could not run the model. {error} is the technical reason, in English.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "endpointsOnDeviceNotDownloaded": "Download the model to use it.",
+  "@endpointsOnDeviceNotDownloaded": {
+    "description": "Shown when the speed test or a feature needs the on-device model but it is not downloaded yet. About 40 chars."
   }
 }

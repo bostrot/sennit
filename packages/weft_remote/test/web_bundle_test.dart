@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive.dart' hide Sha256;
 import 'package:cryptography/cryptography.dart';
 import 'package:test/test.dart';
 import 'package:weft_remote/weft_remote.dart';
@@ -12,6 +12,25 @@ Uint8List _zip(Map<String, String> files) {
     archive.addFile(ArchiveFile.bytes(key, utf8.encode(value)));
   }
   return ZipEncoder().encodeBytes(archive);
+}
+
+/// [_zip] with an entry named [raw], which the encoder would not write as it
+/// is: it turns backslashes into slashes since archive 4.4. A placeholder of
+/// the same length is encoded and swapped for [raw] in the bytes — names are
+/// outside the CRC, so the archive stays valid.
+Uint8List _zipNamed(String raw) {
+  final placeholder = raw.replaceAll(r'\', '|');
+  final bytes = _zip({'index.html': '', placeholder: 'x'});
+  final from = utf8.encode(placeholder);
+  final to = utf8.encode(raw);
+  for (var i = 0; i + from.length <= bytes.length; i++) {
+    var match = true;
+    for (var j = 0; j < from.length && match; j++) {
+      match = bytes[i + j] == from[j];
+    }
+    if (match) bytes.setRange(i, i + to.length, to);
+  }
+  return bytes;
 }
 
 void main() {
@@ -112,7 +131,7 @@ void main() {
   test('paths that leave the bundle directory are refused', () {
     for (final name in ['../x', '/etc/x', r'a\b', 'a/../../b', 'c:/x']) {
       expect(
-        () => unpackWebBundle(_zip({'index.html': '', name: 'x'})),
+        () => unpackWebBundle(_zipNamed(name)),
         fails(WebBundleFailure.archive),
         reason: name,
       );

@@ -17,7 +17,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive.dart' hide Sha256;
 import 'package:cryptography/cryptography.dart';
 
 Future<void> main(List<String> args) async {

@@ -59,6 +59,8 @@ abstract final class SyncPolicy {
     // A downloaded model is a file on this device.
     'transcribe.local_model',
     'search.local_model',
+    'ai.on_device_model',
+    'ai.on_device_mobile_data',
     // The OS gives each install one permission prompt, and each device
     // registers its own pusher.
     'notify.permission_asked',

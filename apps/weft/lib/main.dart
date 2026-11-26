@@ -19,6 +19,7 @@ import 'app/l10n_labels.dart';
 import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
+import 'app/on_device_llm_providers.dart';
 import 'app/person_memory_providers.dart'
     show memoryHousekeeperProvider, memoryLearnerProvider;
 import 'app/providers.dart';
@@ -147,6 +148,15 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // UnifiedPush handlers must exist before its distributor delivers —
     // including a delivery that cold-started this process. No-op off Android.
     unawaited(ref.read(unifiedPushServiceProvider).initialize());
+    // Only this isolate answers requests for the model on the phone; see
+    // [OnDeviceLlm].
+    ref.read(onDeviceLlmProvider);
+  }
+
+  /// A gigabyte of model is the first thing to give back when the system asks.
+  @override
+  void didHaveMemoryPressure() {
+    unawaited(ref.read(onDeviceLlmProvider)?.unload());
   }
 
   @override

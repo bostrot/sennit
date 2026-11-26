@@ -44,3 +44,29 @@ dev_dependencies:
   # Both already in the lock through the matrix SDK.
   archive: ^4.0.9
   cryptography: ^2.9.0
+
+# Native libraries llamadart's build hook bundles, read from the workspace
+# root as every hook's user-defines are. Only llama.cpp (GGUF), never
+# LiteRT-LM, and only its CPU module: Vulkan is experimental on Android, the
+# 1-bit kernels Bonsai needs are NEON ones there anyway, and the CUDA and HIP
+# modules alone would add 300 MB to a Linux build. Windows and Linux do not
+# offer the on-device model yet, but the hook refuses a platform with no
+# runtime, so they get the small CPU one (about 15 MB).
+hooks:
+  user_defines:
+    llamadart:
+      llamadart_native_runtimes: [llama_cpp]
+      llamadart_native_backends:
+        platforms:
+          android-arm64:
+            backends: [cpu]
+          android-x64:
+            backends: [cpu]
+          linux-x64:
+            backends: [cpu]
+          linux-arm64:
+            backends: [cpu]
+          windows-x64:
+            backends: [cpu]
+          windows-arm64:
+            backends: [cpu]

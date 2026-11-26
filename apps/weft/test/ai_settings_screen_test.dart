@@ -10,13 +10,16 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:weft/app/llm_settings.dart';
 import 'package:weft/app/localisation.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/features/settings/ai_screen.dart';
 import 'package:weft/features/settings/auto_reply_screen.dart';
 import 'package:weft/features/settings/endpoints_screen.dart';
 import 'package:weft/features/settings/models_screen.dart';
+import 'package:weft/features/settings/on_device_model_panel.dart';
 import 'package:weft/features/settings/settings_screen.dart';
+import 'package:weft/services/ai/on_device/on_device_models.dart';
 import 'package:weft_store/weft_store.dart';
 
 import 'support/golden_harness.dart';
@@ -187,6 +190,106 @@ void main() {
       expect(
         find.widgetWithText(MenuItemButton, en.endpointsTranscriptionTitle),
         findsOneWidget,
+      );
+    });
+  });
+
+  group('on-device provider', () {
+    Future<WeftStores> pumpWith(
+      WidgetTester tester,
+      void Function(SettingsStore settings) setUp,
+    ) async {
+      final stores = WeftStores.inMemory();
+      stores.settings
+        ..setString(WeftSettings.llmBaseUrl, 'http://nas.local:11434/v1')
+        ..setString(WeftSettings.llmModel, 'llama3.2');
+      setUp(stores.settings);
+      await pumpWeft(
+        tester,
+        const EndpointsScreen(),
+        size: tall,
+        stores: stores,
+      );
+      return stores;
+    }
+
+    Finder segment(String label) => find.descendant(
+      of: find.byKey(const ValueKey('llm-provider')),
+      matching: find.text(label),
+    );
+
+    testWidgets('the server fields until "On this device" is picked', (
+      tester,
+    ) async {
+      await pumpWith(tester, (_) {});
+      expect(find.byType(OnDeviceModelPanel), findsNothing);
+      expect(find.text('http://nas.local:11434/v1'), findsOneWidget);
+
+      await tester.tap(segment(en.endpointsLlmProviderOnDevice));
+      await tester.pump();
+
+      expect(find.byType(OnDeviceModelPanel), findsOneWidget);
+      expect(find.text('Bonsai 8B'), findsOneWidget);
+      expect(find.text('Ternary Bonsai 2 2B'), findsOneWidget);
+      expect(find.text(en.endpointsOnDeviceMobileDataTitle), findsOneWidget);
+      // The server's address is out of the way, not forgotten.
+      expect(find.text('http://nas.local:11434/v1'), findsNothing);
+    });
+
+    testWidgets('saving keeps the server and stores the device model', (
+      tester,
+    ) async {
+      final stores = await pumpWith(tester, (_) {});
+      await tester.tap(segment(en.endpointsLlmProviderOnDevice));
+      await tester.pump();
+      await tester.tap(find.text('Ternary Bonsai 2 2B'));
+      await tester.enterText(
+        find.byKey(const ValueKey('on-device-context')),
+        '2048',
+      );
+      await tester.tap(find.text(en.commonSave));
+      await tester.pump();
+
+      final settings = stores.settings;
+      expect(
+        settings.getString(WeftSettings.onDeviceLlmModel),
+        'ternary-bonsai-2-2b-q2',
+      );
+      expect(settings.getBool(WeftSettings.onDeviceLlmMobileData), isFalse);
+      expect(
+        settings.getString(WeftSettings.llmBaseUrl),
+        'http://nas.local:11434/v1',
+      );
+      final limits = llmModelSettingsOf(
+        settings,
+        baseUrl: kOnDeviceLlmBaseUrl,
+        model: 'ternary-bonsai-2-2b-q2',
+      );
+      expect(limits.contextTokens, 2048);
+      expect(limits.detectedFrom, 'on-device');
+      expect(limits.detectedContextTokens, greaterThanOrEqualTo(1024));
+      expect(llmEndpointOf(settings).baseUrl, kOnDeviceLlmBaseUrl);
+    });
+
+    testWidgets('opens on the device model, and Server switches back', (
+      tester,
+    ) async {
+      final stores = await pumpWith(
+        tester,
+        (s) => s.setString(WeftSettings.onDeviceLlmModel, 'bonsai-8b-q1'),
+      );
+      expect(find.byType(OnDeviceModelPanel), findsOneWidget);
+
+      await tester.tap(segment(en.endpointsLlmProviderServer));
+      await tester.pump();
+      expect(find.text('http://nas.local:11434/v1'), findsOneWidget);
+      await tester.tap(find.text(en.commonSave));
+      await tester.pump();
+
+      expect(stores.settings.getString(WeftSettings.onDeviceLlmModel), '');
+      expect(
+        llmEndpointOf(stores.settings).baseUrl,
+        'http://nas.local:11434/v1',
       );
     });
   });

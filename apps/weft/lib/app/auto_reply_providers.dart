@@ -132,9 +132,7 @@ final autoReplyEndpointProvider = Provider<AutoReplyEndpoint?>((ref) {
   } on Object {
     return null;
   }
-  final baseUrl = (stores.settings.getString(WeftSettings.llmBaseUrl) ?? '')
-      .trim();
-  final model = (stores.settings.getString(WeftSettings.llmModel) ?? '').trim();
+  final (:baseUrl, :model) = llmEndpointOf(stores.settings);
   if (baseUrl.isEmpty || model.isEmpty) return null;
   final limits = llmModelSettingsOf(
     stores.settings,

@@ -1927,5 +1927,22 @@
   "usageStatsConsentNever": "Jamais envoyés : données personnelles, contenu des messages, contacts ou identifiants Matrix. Vous pouvez changer d’avis à tout moment dans Réglages → Confidentialité et sécurité.",
   "usageStatsConsentPolicy": "Politique de confidentialité",
   "usageStatsConsentAllow": "Autoriser",
-  "usageStatsConsentDecline": "Non merci"
+  "usageStatsConsentDecline": "Non merci",
+  "endpointsLlmProvider": "Où l’IA s’exécute",
+  "endpointsLlmProviderServer": "Serveur",
+  "endpointsLlmProviderOnDevice": "Sur cet appareil",
+  "endpointsOnDeviceIntro": "Les fonctions d’IA tournent sur cet appareil avec un modèle téléchargé une fois. Rien de ce que tu écris ne le quitte. Les réponses sont plus lentes qu’avec un serveur et consomment de la batterie pendant leur rédaction.",
+  "endpointsOnDeviceMemory": "Cet appareil a {gb} Go de mémoire.",
+  "endpointsOnDeviceLargeModel": "Les meilleures réponses. Demande environ 2 Go de mémoire libre ; idéal sur les appareils de 8 Go ou plus.",
+  "endpointsOnDeviceSmallModel": "Plus petit et environ trois fois plus rapide, avec des réponses plus simples. Pour les appareils avec moins de mémoire.",
+  "endpointsOnDeviceRamTight": "Cet appareil a peu de mémoire disponible pour ce modèle. Il peut être lent, et le système peut fermer Sennit pendant qu’il tourne.",
+  "endpointsOnDeviceRamTooLittle": "Cet appareil a sans doute trop peu de mémoire pour ce modèle ; le système peut fermer Sennit pendant qu’il tourne. Essaie le plus petit.",
+  "endpointsOnDeviceMobileDataTitle": "Télécharger via les données mobiles",
+  "endpointsOnDeviceMobileDataSubtitle": "Désactivé, le téléchargement attend le Wi-Fi.",
+  "endpointsOnDeviceWaitsForWifi": "En attente du Wi-Fi",
+  "endpointsOnDeviceContextHelper": "Jusqu’à {max} jetons tiennent dans la mémoire de cet appareil. Une fenêtre plus grande lit plus de la discussion, mais plus lentement.",
+  "endpointsOnDeviceTest": "Tester la vitesse",
+  "endpointsOnDeviceTestResult": "{speed} jetons par seconde ; premier mot après {seconds} s",
+  "endpointsOnDeviceTestFailed": "Le modèle n’a pas pu tourner : {error}",
+  "endpointsOnDeviceNotDownloaded": "Télécharge le modèle pour l’utiliser."
 }

@@ -7,6 +7,9 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
+import 'on_device/on_device_client.dart';
+import 'on_device/on_device_models.dart' show kOnDeviceLlmBaseUrl;
+
 /// What a chat completion is being asked for, which decides how long it may
 /// take.
 enum LlmTask {
@@ -139,8 +142,12 @@ const Duration kSelfHostedReplyTimeout = Duration(minutes: 10);
 const Duration kLlmConnectTimeout = Duration(seconds: 15);
 
 /// The client an AI request makes for itself when none is given.
-http.Client llmHttpClient() =>
-    IOClient(HttpClient()..connectionTimeout = kLlmConnectTimeout);
+///
+/// Requests to [kOnDeviceLlmBaseUrl] never reach the network: this client
+/// answers them from the model on the phone (see [OnDeviceLlmClient]).
+http.Client llmHttpClient() => OnDeviceLlmClient(
+  IOClient(HttpClient()..connectionTimeout = kLlmConnectTimeout),
+);
 
 /// POSTs [body] to [url], giving up after [timeout] and when [cancel]
 /// completes.

@@ -1927,5 +1927,22 @@
   "usageStatsConsentNever": "Nunca se envían datos personales, contenido de mensajes, contactos ni ID de Matrix. Puedes cambiarlo cuando quieras en Ajustes → Privacidad y seguridad.",
   "usageStatsConsentPolicy": "Política de privacidad",
   "usageStatsConsentAllow": "Permitir",
-  "usageStatsConsentDecline": "No, gracias"
+  "usageStatsConsentDecline": "No, gracias",
+  "endpointsLlmProvider": "Dónde se ejecuta la IA",
+  "endpointsLlmProviderServer": "Servidor",
+  "endpointsLlmProviderOnDevice": "En este equipo",
+  "endpointsOnDeviceIntro": "Las funciones de IA se ejecutan en este equipo con un modelo que descargas una vez. Nada de lo que escribes sale de él. Las respuestas tardan más que con un servidor y gastan batería mientras se escriben.",
+  "endpointsOnDeviceMemory": "Este equipo tiene {gb} GB de memoria.",
+  "endpointsOnDeviceLargeModel": "Las mejores respuestas. Necesita unos 2 GB de memoria libre; ideal en equipos con 8 GB o más.",
+  "endpointsOnDeviceSmallModel": "Más pequeño y unas tres veces más rápido, con respuestas más sencillas. Para equipos con menos memoria.",
+  "endpointsOnDeviceRamTight": "Este equipo tiene poca memoria libre para este modelo. Puede ir lento y el sistema podría cerrar Sennit mientras funciona.",
+  "endpointsOnDeviceRamTooLittle": "Probablemente este equipo tiene poca memoria para este modelo; el sistema podría cerrar Sennit mientras funciona. Prueba el más pequeño.",
+  "endpointsOnDeviceMobileDataTitle": "Descargar con datos móviles",
+  "endpointsOnDeviceMobileDataSubtitle": "Si está desactivado, la descarga espera al Wi-Fi.",
+  "endpointsOnDeviceWaitsForWifi": "Esperando al Wi-Fi",
+  "endpointsOnDeviceContextHelper": "Caben hasta {max} tokens en la memoria de este equipo. Una ventana mayor lee más del chat y es más lenta.",
+  "endpointsOnDeviceTest": "Probar velocidad",
+  "endpointsOnDeviceTestResult": "{speed} tokens por segundo; primera palabra a los {seconds} s",
+  "endpointsOnDeviceTestFailed": "El modelo no pudo ejecutarse: {error}",
+  "endpointsOnDeviceNotDownloaded": "Descarga el modelo para usarlo."
 }

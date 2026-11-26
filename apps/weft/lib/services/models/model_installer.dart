@@ -58,7 +58,7 @@ class ModelInstaller {
 
   /// Checks the disk and settles each model's state. Call once at screen open.
   Future<void> refresh() async {
-    for (final spec in ModelCatalog.all) {
+    for (final spec in [...ModelCatalog.all, ...ModelCatalog.chat]) {
       if (stateOf(spec).phase == ModelPhase.downloading) continue;
       _set(
         spec.id,
@@ -91,7 +91,11 @@ class ModelInstaller {
     return true;
   }
 
-  Future<void> install(ModelSpec spec) async {
+  /// Downloads [spec], resuming what is already on disk.
+  ///
+  /// With [wifiOnly] the operating system holds the download until the phone
+  /// is on Wi-Fi; desktop downloads run on whatever network there is.
+  Future<void> install(ModelSpec spec, {bool wifiOnly = false}) async {
     if (stateOf(spec).phase == ModelPhase.downloading) return;
     _cancelRequested.remove(spec.id);
     _set(spec.id, const ModelState(phase: ModelPhase.downloading));
@@ -129,6 +133,7 @@ class ModelInstaller {
             ),
           ),
           shouldContinue: () async => !_cancelRequested.contains(spec.id),
+          requiresWiFi: wifiOnly,
         );
         completedBytes = base + file.sizeBytes;
       }

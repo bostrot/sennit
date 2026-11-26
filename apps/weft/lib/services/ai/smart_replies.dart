@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'llm_budget.dart';
 import 'llm_request.dart';
+import 'on_device/on_device_models.dart' show isOnDeviceLlm;
 import 'person_memory.dart' show AiMemory, memoryPromptBlock;
 
 /// Asks the configured LLM for one or two short answers to a conversation.
@@ -132,8 +133,13 @@ Future<List<String>> suggestSmartReplies({
 /// adding. A hosted API that has not answered two short lines in ten seconds
 /// is not going to; a self-hosted model gets the time a cold start or a busy
 /// GPU takes, while the notification is likely still being read.
+///
+/// The model on the phone gets a minute: the first chips after a while load
+/// it from storage, and a phone reads a prompt slower than any server.
 Duration smartReplyTimeout(String baseUrl) => isHostedLlm(baseUrl)
     ? const Duration(seconds: 10)
+    : isOnDeviceLlm(baseUrl)
+    ? const Duration(seconds: 60)
     : const Duration(seconds: 25);
 
 /// The calendar paragraph both AI prompts end their system message with, or
