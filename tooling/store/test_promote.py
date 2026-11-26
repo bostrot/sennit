@@ -13,7 +13,7 @@ from unittest import mock
 
 import promote
 from promote import (
-    Candidate, Decision, appstore_plan, decide, play_candidate_release, play_current,
+    Candidate, Decision, appstore_choice, appstore_plan, decide, play_candidate_release, play_current,
     play_plan, play_track_releases, promotion_slot,
 )
 
@@ -434,6 +434,77 @@ class AppStorePlanTest(unittest.TestCase):
                                  NOW, 26)
         self.assertFalse(decision.promote)
         self.assertFalse(decision.failed)
+
+
+class AppStoreChoiceTest(unittest.TestCase):
+    """Which TestFlight build goes out when the newest one's commit has no
+    green CI."""
+
+    def build(self, number, version='1.0.26', hours_ago=5):
+        return {'id': f'b{number}', 'build': number, 'version': version,
+                'uploaded': NOW - datetime.timedelta(hours=hours_ago)}
+
+    def choose(self, builds, green, versions=(), max_age_hours=26):
+        checked = []
+
+        def check(candidate):
+            checked.append(candidate.build)
+            candidate.sha = f'{candidate.build:040d}'
+            candidate.ci_green = candidate.deployed = candidate.build in green
+
+        result = appstore_choice(builds, list(versions), NOW, max_age_hours, check)
+        return result, checked
+
+    def test_a_cancelled_ci_falls_back_to_the_older_green_build(self):
+        (best, candidate, decision, skipped), checked = self.choose(
+            [self.build(469, hours_ago=20), self.build(487)], green={469},
+            versions=[version('READY_FOR_SALE', '1.0.25', 440)])
+        self.assertTrue(decision.promote, decision.reason)
+        self.assertEqual(best['build'], 469)
+        self.assertEqual(candidate.build, 469)
+        self.assertEqual(checked, [487, 469])
+        self.assertEqual(len(skipped), 1)
+        self.assertIn('CI did not pass', skipped[0])
+        self.assertIn(('attach_build', 469), decision.steps)
+
+    def test_the_newest_green_build_wins_and_older_ones_are_not_checked(self):
+        (best, _, decision, skipped), checked = self.choose(
+            [self.build(469), self.build(487)], green={469, 487})
+        self.assertTrue(decision.promote)
+        self.assertEqual(best['build'], 487)
+        self.assertEqual(checked, [487])
+        self.assertEqual(skipped, [])
+
+    def test_no_green_build_fails_the_run(self):
+        (best, _, decision, skipped), _ = self.choose(
+            [self.build(469), self.build(487)], green=set())
+        self.assertIsNone(best)
+        self.assertFalse(decision.promote)
+        self.assertTrue(decision.failed)
+        self.assertEqual(len(skipped), 2)
+
+    def test_a_green_build_outside_the_window_still_fails_for_the_red_one(self):
+        (_, _, decision, skipped), checked = self.choose(
+            [self.build(469, hours_ago=40), self.build(487)], green={469})
+        self.assertFalse(decision.promote)
+        self.assertTrue(decision.failed)
+        self.assertIn('window', decision.reason)
+        self.assertIn('CI did not pass', decision.reason)
+
+    def test_an_older_build_the_store_has_is_a_quiet_night_without_skips(self):
+        (_, _, decision, skipped), checked = self.choose(
+            [self.build(469)], green={469},
+            versions=[version('WAITING_FOR_REVIEW', '1.0.26', 469)])
+        self.assertFalse(decision.promote)
+        self.assertFalse(decision.failed)
+        self.assertEqual(skipped, [])
+
+    def test_nothing_eligible(self):
+        (best, _, decision, _), checked = self.choose([], green=set())
+        self.assertIsNone(best)
+        self.assertFalse(decision.promote)
+        self.assertFalse(decision.failed)
+        self.assertEqual(checked, [])
 
 
 class ShaForBuildTest(unittest.TestCase):

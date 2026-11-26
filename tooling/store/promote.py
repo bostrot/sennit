@@ -17,6 +17,11 @@ internal track, TestFlight — and promotes it when all of these hold:
 3. CI passed on the commit it was built from, and the deploy workflow that
    uploaded it succeeded on that commit.
 
+On the App Store, a build that fails only the third rule — say its CI was
+cancelled because a later push superseded it — is skipped, and the next
+older App Store eligible build on TestFlight is tried under the same rules.
+The run fails only when no build qualifies and one was skipped.
+
 The build number is the commit count of main (`git rev-list --count`), so
 the commit is found again from the number, on the first-parent line of
 origin/main; the checkout needs the full history.
@@ -349,6 +354,41 @@ def appstore_plan(candidate, versions, now, max_age_hours):
     return Decision(True, decision.reason, steps=steps)
 
 
+def commit_refused(candidate):
+    """Whether the commit behind `candidate` is what keeps it back: no
+    commit, CI not green or no successful deploy."""
+    return candidate.sha is None or not candidate.ci_green or not candidate.deployed
+
+
+def appstore_choice(builds, versions, now, max_age_hours, check):
+    """Walks the App Store eligible `builds` newest first and returns
+    (build, candidate, decision, skipped): the first build the plan
+    promotes, or the refusal that holds for the older ones too. A build kept
+    back only by its commit — CI cancelled by a later push, say — is
+    skipped, with why, in `skipped`, and the next older one is tried.
+    `check` fills in a Candidate's commit, as check_commit does."""
+    skipped = []
+    for build in sorted(builds, key=lambda b: b['build'], reverse=True):
+        candidate = Candidate(build['version'], build['build'], landed=build['uploaded'])
+        check(candidate)
+        decision = appstore_plan(candidate, versions, now, max_age_hours)
+        if decision.promote:
+            return build, candidate, decision, skipped
+        if decision.failed and commit_refused(candidate):
+            skipped.append(decision.reason)
+            continue
+        if skipped:
+            # The older builds are out too; what kept the newer ones back
+            # still needs a look.
+            decision = Decision(False, f'{decision.reason}; and {"; ".join(skipped)}',
+                                failed=True)
+        return build, candidate, decision, skipped
+    if skipped:
+        return None, None, Decision(False, 'no build qualifies: ' + '; '.join(skipped),
+                                    failed=True), skipped
+    return None, None, decide(None, None, now, max_age_hours), skipped
+
+
 # --- Git and GitHub -----------------------------------------------------------
 
 def git(*args):
@@ -638,33 +678,36 @@ def appstore(apply, audit, now, max_age_hours):
     usable = [b for b in builds if b['state'] == 'VALID' and not b['expired']]
     newest = max(builds, key=lambda b: b['build'], default=None)
     eligible = [b for b in usable if b['audience'] != 'INTERNAL_ONLY']
-    best = max(eligible, key=lambda b: b['build'], default=None)
+    newest_eligible = max(eligible, key=lambda b: b['build'], default=None)
     if newest:
         log('appstore', f'newest TestFlight build: {newest["version"]} ({newest["build"]}), '
                         f'{newest["state"]}, {newest["audience"]}, uploaded {newest["uploaded"]}')
-    if newest and (best is None or newest['build'] > best['build']):
+    if newest and (newest_eligible is None or newest['build'] > newest_eligible['build']):
         log('appstore', 'the newest build is internal-only or not processed; only an App '
                         'Store eligible build can be attached to a version (deploy_testflight.yml '
                         'uploads those while STORE_PROMOTION_ENABLED is true)')
-    candidate = None
-    if best:
-        candidate = Candidate(best['version'], best['build'], landed=best['uploaded'])
-        check_commit(candidate, 'appstore')
-        log('appstore', f'candidate {best["version"]} ({best["build"]}), commit '
-                        f'{candidate.sha or "?"}, CI {"green" if candidate.ci_green else "not green"}, '
-                        f'deploy {"succeeded" if candidate.deployed else "not found"}')
 
     versions = appstore_versions(token, app)
     for vid, string, state, build in versions:
         log('appstore', f'App Store version {string}: {state}, build {build}')
-    if newest and best is not newest and newest['state'] == 'VALID':
+
+    def check(candidate):
+        check_commit(candidate, 'appstore')
+        log('appstore', f'candidate {candidate.version} ({candidate.build}), commit '
+                        f'{candidate.sha or "?"}, CI {"green" if candidate.ci_green else "not green"}, '
+                        f'deploy {"succeeded" if candidate.deployed else "not found"}')
+
+    best, candidate, decision, skipped = appstore_choice(eligible, versions, now,
+                                                         max_age_hours, check)
+    for reason in skipped:
+        log('appstore', f'skipped: {reason}')
+    if newest and newest is not newest_eligible and newest['state'] == 'VALID':
         # What tonight would have done, had the newest build been eligible.
         what_if = Candidate(newest['version'], newest['build'], landed=newest['uploaded'])
         check_commit(what_if, 'appstore')
         plan = appstore_plan(what_if, versions, now, max_age_hours)
         log('appstore', f'were {newest["version"]} ({newest["build"]}) eligible: {plan.reason}'
                         + ''.join(f'; {describe(step)}' for step in plan.steps))
-    decision = appstore_plan(candidate, versions, now, max_age_hours)
     log('appstore', decision.reason)
     if decision.promote:
         for step in decision.steps:
