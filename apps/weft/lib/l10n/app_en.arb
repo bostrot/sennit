@@ -728,6 +728,21 @@
     "description": "Filter chip above the inbox, and the matching Mac sidebar row: only one-to-one conversations. Very tight — keep under ~12 chars.",
     "maxLength": 24
   },
+  "inboxFilterNeedsReply": "Needs reply",
+  "@inboxFilterNeedsReply": {
+    "description": "Filter chip above the inbox, and the matching Mac sidebar row: only conversations where someone else spoke last and is waiting for the user's answer. Very tight — keep under ~14 chars.",
+    "maxLength": 24
+  },
+  "inboxFilterDrafts": "Drafts",
+  "@inboxFilterDrafts": {
+    "description": "Filter chip above the inbox, and the matching Mac sidebar row: only conversations with an unsent message the user started typing. Very tight — keep under ~12 chars.",
+    "maxLength": 24
+  },
+  "inboxFilterArchived": "Archived",
+  "@inboxFilterArchived": {
+    "description": "Filter chip above the inbox: shows the archived conversations instead, still narrowed by the networks picked above. Very tight — keep under ~12 chars.",
+    "maxLength": 24
+  },
   "inboxClearNetworkFilter": "Clear network filter",
   "@inboxClearNetworkFilter": {
     "description": "Chip that removes the network filter set from the rail, so every conversation is listed again. Keep under ~24 chars.",

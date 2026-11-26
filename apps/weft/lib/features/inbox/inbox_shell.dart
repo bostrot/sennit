@@ -990,6 +990,7 @@ class _FilterRows extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final quick = ref.watch(inboxQuickFilterProvider);
+    final archived = ref.watch(showArchivedProvider);
 
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -1009,6 +1010,11 @@ class _FilterRows extends ConsumerWidget {
                   (InboxQuickFilter.unread, context.l10n.inboxFilterUnread),
                   (InboxQuickFilter.groups, context.l10n.inboxFilterGroups),
                   (InboxQuickFilter.people, context.l10n.inboxFilterPeople),
+                  (
+                    InboxQuickFilter.needsReply,
+                    context.l10n.inboxFilterNeedsReply,
+                  ),
+                  (InboxQuickFilter.drafts, context.l10n.inboxFilterDrafts),
                 ]) ...[
                   FilterChip(
                     label: Text(label),
@@ -1020,6 +1026,17 @@ class _FilterRows extends ConsumerWidget {
                   ),
                   const SizedBox(width: WeftSpace.sm),
                 ],
+                // Composes with the networks picked in the header, so the
+                // archive of one network is two taps away.
+                FilterChip(
+                  avatar: const Icon(Icons.archive_outlined, size: 16),
+                  label: Text(context.l10n.inboxFilterArchived),
+                  selected: archived,
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (_) =>
+                      ref.read(showArchivedProvider.notifier).toggle(),
+                ),
+                const SizedBox(width: WeftSpace.sm),
                 if (activeFilter.isNotEmpty)
                   ActionChip(
                     avatar: const Icon(Icons.close_rounded, size: 16),
