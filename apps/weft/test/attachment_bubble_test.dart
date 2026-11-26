@@ -149,8 +149,7 @@ void main() {
 
     test('a size is written with the reader\'s decimal mark', () {
       const bytes = 2516582; // 2.4 MB
-      String sizeIn(String code) =>
-          lookupAppL10n(Locale(code)).fileSize(bytes);
+      String sizeIn(String code) => lookupAppL10n(Locale(code)).fileSize(bytes);
 
       for (final code in ['de', 'es', 'fr', 'pt']) {
         expect(sizeIn(code), '2,4 MB', reason: code);
