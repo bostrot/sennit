@@ -7,7 +7,7 @@
 library;
 
 /// What a model is for.
-enum ModelCapability { embedding, speechToText }
+enum ModelCapability { embedding, speechToText, chat }
 
 /// One file belonging to a model.
 class ModelFile {
@@ -123,10 +123,62 @@ abstract final class ModelCatalog {
     ],
   );
 
+  /// PrismML's 1-bit Bonsai 8B, for the AI features' "On this phone"
+  /// provider.
+  ///
+  /// A Qwen3-8B whose every weight is one bit plus a scale per 128 — GGUF
+  /// `Q1_0`, which stock llama.cpp runs on the CPU (NEON) and on Metal. The
+  /// best answers the phone can write, at 1.16 GB. Apache-2.0, ungated; the
+  /// URL is pinned to a revision, so the size below stays true.
+  static const ModelSpec bonsai8b = ModelSpec(
+    id: 'bonsai-8b-q1',
+    displayName: 'Bonsai 8B',
+    description: 'Writes the AI features\' answers on this phone.',
+    capability: ModelCapability.chat,
+    licence: 'Apache-2.0',
+    files: [
+      ModelFile(
+        name: 'Bonsai-8B-Q1_0.gguf',
+        url:
+            'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/'
+            '48516770dd04643643e9f9019a2a349cf26c5dbd/Bonsai-8B-Q1_0.gguf',
+        sizeBytes: 1158654496,
+      ),
+    ],
+  );
+
+  /// Ternary Bonsai 2 2B, the smaller choice for phones with less memory.
+  ///
+  /// A Qwen3.5-2B with weights of -1, 0 or +1 — GGUF `Q2_0`, the ternary
+  /// format stock llama.cpp runs (the smaller `PTQ1_0` file needs PrismML's
+  /// fork). Half the download and a fraction of the memory of [bonsai8b],
+  /// and three times as fast; plainer answers.
+  static const ModelSpec ternaryBonsai2b = ModelSpec(
+    id: 'ternary-bonsai-2-2b-q2',
+    displayName: 'Ternary Bonsai 2 2B',
+    description: 'A smaller, faster model for phones with less memory.',
+    capability: ModelCapability.chat,
+    licence: 'Apache-2.0',
+    files: [
+      ModelFile(
+        name: 'Ternary-Bonsai-2-2B-Q2_0.gguf',
+        url:
+            'https://huggingface.co/prism-ml/Ternary-Bonsai-2-2B-gguf/resolve/'
+            'a6032a5089ac27e96be3a80c7b42d1ad0bd89887/'
+            'Ternary-Bonsai-2-2B-Q2_0.gguf',
+        sizeBytes: 546689504,
+      ),
+    ],
+  );
+
+  /// The models the models screen offers: search and voice.
   static const List<ModelSpec> all = [miniLm, whisperBase, whisperSmall];
 
+  /// The models the AI settings offer "On this phone", best first.
+  static const List<ModelSpec> chat = [bonsai8b, ternaryBonsai2b];
+
   static ModelSpec? byId(String id) {
-    for (final spec in all) {
+    for (final spec in [...all, ...chat]) {
       if (spec.id == id) return spec;
     }
     return null;

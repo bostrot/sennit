@@ -89,7 +89,9 @@ final localWhisperPathProvider = FutureProvider<String?>((ref) async {
   if (id == null || id.isEmpty) return null;
 
   final spec = ModelCatalog.byId(id);
-  if (spec == null) return null;
+  if (spec == null || spec.capability != ModelCapability.speechToText) {
+    return null;
+  }
 
   final installer = ref.watch(modelInstallerProvider);
   if (!await installer.isInstalled(spec)) return null;

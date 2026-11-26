@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'llm_request.dart';
+import 'on_device/on_device_models.dart';
 
 /// The AI features that ask the model something, as far as how much they may
 /// send and how long the answer may be.
@@ -243,21 +244,34 @@ class LlmBudget {
     LlmModelSettings settings = LlmModelSettings.none,
   ]) {
     final hosted = isHostedLlm(baseUrl);
-    final context =
+    // The model on the phone runs with the context its memory allows, which
+    // is what was detected: the window the user typed is a wish within it.
+    final onDevice = isOnDeviceLlm(baseUrl);
+    var context =
         settings.contextTokens ??
         settings.detectedContextTokens ??
-        kLlmFallbackContextTokens;
+        (onDevice ? kOnDeviceDefaultContextTokens : kLlmFallbackContextTokens);
+    final detectedContext = settings.detectedContextTokens;
+    if (onDevice && detectedContext != null) {
+      context = math.min(context, detectedContext);
+    }
     final detectedOutput = settings.detectedOutputTokens;
     var answer =
         settings.answerTokens ??
-        (hosted ? kLlmHostedAnswerTokens : kLlmLocalAnswerTokens);
+        (hosted
+            ? kLlmHostedAnswerTokens
+            : onDevice
+            ? kOnDeviceAnswerTokens
+            : kLlmLocalAnswerTokens);
     if (settings.answerTokens == null && detectedOutput != null) {
       answer = math.min(answer, detectedOutput);
     }
     return LlmBudget(
       contextTokens: context,
       answerTokens: answer,
-      thinking: settings.thinking ?? !hosted,
+      // Never thinking on the phone: it would spend seconds a phone does not
+      // have, and its template is told not to (see `wantsThinking`).
+      thinking: onDevice ? false : settings.thinking ?? !hosted,
       hosted: hosted,
       contextDetected:
           settings.contextTokens == null &&

@@ -1928,5 +1928,22 @@
   "usageStatsConsentNever": "绝不发送：个人数据、消息内容、联系人或 Matrix ID。你可以随时在“设置 → 隐私与安全”中更改。",
   "usageStatsConsentPolicy": "隐私政策",
   "usageStatsConsentAllow": "允许",
-  "usageStatsConsentDecline": "不用了"
+  "usageStatsConsentDecline": "不用了",
+  "endpointsLlmProvider": "AI 在哪里运行",
+  "endpointsLlmProviderServer": "服务器",
+  "endpointsLlmProviderOnDevice": "在本设备上",
+  "endpointsOnDeviceIntro": "AI 功能在本设备上运行，只需下载一次模型。你写的内容不会离开设备。回答比服务器慢，生成时会耗电。",
+  "endpointsOnDeviceMemory": "本设备有 {gb} GB 内存。",
+  "endpointsOnDeviceLargeModel": "回答质量最好。需要约 2 GB 空闲内存；最适合 8 GB 及以上内存的设备。",
+  "endpointsOnDeviceSmallModel": "更小，速度约快三倍，回答更简单。适合内存较少的设备。",
+  "endpointsOnDeviceRamTight": "本设备运行此模型时内存余量不多。可能会较慢，系统也可能在运行时关闭 Sennit。",
+  "endpointsOnDeviceRamTooLittle": "本设备的内存可能不足以运行此模型，系统可能在运行时关闭 Sennit。请试试较小的模型。",
+  "endpointsOnDeviceMobileDataTitle": "使用移动数据下载",
+  "endpointsOnDeviceMobileDataSubtitle": "关闭时，下载会等待 Wi-Fi。",
+  "endpointsOnDeviceWaitsForWifi": "正在等待 Wi-Fi",
+  "endpointsOnDeviceContextHelper": "本设备内存最多可容纳 {max} 个 token。窗口越大，读取的聊天越多，速度也越慢。",
+  "endpointsOnDeviceTest": "测试速度",
+  "endpointsOnDeviceTestResult": "每秒 {speed} 个 token；{seconds} 秒后出现第一个词",
+  "endpointsOnDeviceTestFailed": "模型无法运行：{error}",
+  "endpointsOnDeviceNotDownloaded": "请先下载模型再使用。"
 }

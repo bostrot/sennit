@@ -15,9 +15,12 @@ import '../../app/stores.dart';
 import '../../services/ai/llm_budget.dart';
 import '../../services/ai/llm_limits.dart';
 import '../../services/ai/llm_request.dart' show isHostedLlm;
+import '../../services/ai/on_device/device_memory.dart';
+import '../../services/ai/on_device/on_device_models.dart';
 import '../../services/ai/smart_replies.dart' show probeLlm;
 import '../../services/transcription/transcription_languages.dart';
 import 'models_screen.dart';
+import 'on_device_model_panel.dart';
 import 'settings_section.dart';
 
 /// The three endpoints this screen configures, as "copy from" names them.
@@ -75,6 +78,35 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
   /// Empty for "detect it": the dropdown needs a non-null value to select.
   late String _sttLanguage =
       _settings.getString(WeftSettings.transcriptionLanguage) ?? '';
+
+  /// Whether the AI features run on this device rather than on the server.
+  late bool _onDevice = onDeviceLlmModelOf(_settings) != null;
+
+  /// The on-device model picked; the larger one unless this device has too
+  /// little memory for it.
+  late OnDeviceLlmSpec _onDeviceModel =
+      onDeviceLlmModelOf(_settings) ??
+      (ramFitFor(OnDeviceLlmSpec.bonsai8b, deviceMemoryBytes()) ==
+              OnDeviceRamFit.tooLittle
+          ? OnDeviceLlmSpec.ternaryBonsai2b
+          : OnDeviceLlmSpec.bonsai8b);
+
+  late bool _onDeviceMobileData = _settings.getBool(
+    WeftSettings.onDeviceLlmMobileData,
+  );
+
+  /// The context the user set for each on-device model, edited in one field.
+  late final _onDeviceContext = TextEditingController(
+    text: _onDeviceContextFor(_onDeviceModel),
+  );
+
+  String _onDeviceContextFor(OnDeviceLlmSpec spec) =>
+      llmModelSettingsOf(
+        _settings,
+        baseUrl: kOnDeviceLlmBaseUrl,
+        model: spec.id,
+      ).contextTokens?.toString() ??
+      '';
 
   late final _llmUrl = TextEditingController(
     text: _settings.getString(WeftSettings.llmBaseUrl) ?? '',
@@ -139,6 +171,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       _llmSuggestionModel,
       _llmContext,
       _llmAnswer,
+      _onDeviceContext,
     ]) {
       c.dispose();
     }
@@ -447,12 +480,44 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
       WeftSettings.llmSuggestionModel,
       _llmSuggestionModel.text.trim(),
     );
-    if (_llmUrl.text.trim().isNotEmpty && _llmModel.text.trim().isNotEmpty) {
-      int? tokens(TextEditingController c) {
-        final n = int.tryParse(c.text.replaceAll(RegExp(r'[^0-9]'), ''));
-        return n != null && n > 0 ? n : null;
-      }
+    int? tokens(TextEditingController c) {
+      final n = int.tryParse(c.text.replaceAll(RegExp(r'[^0-9]'), ''));
+      return n != null && n > 0 ? n : null;
+    }
 
+    // The server's settings stay as they are while the device's model is in
+    // use, so switching back finds them where they were.
+    if (onDeviceLlmSupported) {
+      _settings.setString(
+        WeftSettings.onDeviceLlmModel,
+        _onDevice ? _onDeviceModel.id : '',
+      );
+      _settings.setBool(
+        WeftSettings.onDeviceLlmMobileData,
+        value: _onDeviceMobileData,
+      );
+      if (_onDevice) {
+        // The window the user asked for, and the most this device's memory
+        // holds as the detected one: the budgets take the smaller.
+        storeLlmModelSettings(
+          _settings,
+          baseUrl: kOnDeviceLlmBaseUrl,
+          model: _onDeviceModel.id,
+          value:
+              llmModelSettingsOf(
+                _settings,
+                baseUrl: kOnDeviceLlmBaseUrl,
+                model: _onDeviceModel.id,
+              ).copyWith(
+                contextTokens: () => tokens(_onDeviceContext),
+                detectedContextTokens: () =>
+                    onDeviceContextCap(_onDeviceModel, deviceMemoryBytes()),
+                detectedFrom: () => 'on-device',
+              ),
+        );
+      }
+    }
+    if (_llmUrl.text.trim().isNotEmpty && _llmModel.text.trim().isNotEmpty) {
       storeLlmModelSettings(
         _settings,
         baseUrl: _llmUrl.text,
@@ -626,27 +691,71 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
               title: context.l10n.endpointsLlmTitle,
               subtitle: context.l10n.endpointsLlmSubtitle,
             ),
-            _field(
-              _llmUrl,
-              context.l10n.settingsBaseUrlField,
-              hint: 'http://localhost:11434/v1',
-            ),
-            _field(
-              _llmModel,
-              context.l10n.settingsModelField,
-              hint: 'llama3.2',
-            ),
-            _field(
-              _llmKey,
-              context.l10n.settingsApiKeyField,
-              secret: true,
-              hint: context.l10n.settingsKeepCurrentKeyHint,
-            ),
-            _copyRow(_Endpoint.llm),
-            _testRow(_Endpoint.llm.testKey, _probeLlmEndpoint),
-            ..._limitsSection(),
+            if (onDeviceLlmSupported) ...[
+              _providerPicker(),
+              const SizedBox(height: WeftSpace.md),
+            ],
+            if (onDeviceLlmSupported && _onDevice)
+              OnDeviceModelPanel(
+                selected: _onDeviceModel,
+                onSelect: (spec) => setState(() {
+                  _onDeviceModel = spec;
+                  _onDeviceContext.text = _onDeviceContextFor(spec);
+                }),
+                mobileData: _onDeviceMobileData,
+                onMobileData: (v) => setState(() => _onDeviceMobileData = v),
+                contextField: _onDeviceContext,
+              )
+            else ...[
+              _field(
+                _llmUrl,
+                context.l10n.settingsBaseUrlField,
+                hint: 'http://localhost:11434/v1',
+              ),
+              _field(
+                _llmModel,
+                context.l10n.settingsModelField,
+                hint: 'llama3.2',
+              ),
+              _field(
+                _llmKey,
+                context.l10n.settingsApiKeyField,
+                secret: true,
+                hint: context.l10n.settingsKeepCurrentKeyHint,
+              ),
+              _copyRow(_Endpoint.llm),
+              _testRow(_Endpoint.llm.testKey, _probeLlmEndpoint),
+              ..._limitsSection(),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// Server or this device: where every AI feature's answers are written.
+  Widget _providerPicker() {
+    final l10n = context.l10n;
+    return Semantics(
+      label: l10n.endpointsLlmProvider,
+      container: true,
+      child: SegmentedButton<bool>(
+        key: const ValueKey('llm-provider'),
+        segments: [
+          ButtonSegment(
+            value: false,
+            icon: const Icon(Icons.dns_outlined),
+            label: Text(l10n.endpointsLlmProviderServer),
+          ),
+          ButtonSegment(
+            value: true,
+            icon: const Icon(Icons.smartphone_rounded),
+            label: Text(l10n.endpointsLlmProviderOnDevice),
+          ),
+        ],
+        selected: {_onDevice},
+        onSelectionChanged: (choice) =>
+            setState(() => _onDevice = choice.first),
       ),
     );
   }

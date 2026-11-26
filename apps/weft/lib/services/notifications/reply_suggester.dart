@@ -7,6 +7,7 @@ import 'package:weft_store/weft_store.dart';
 import '../../app/llm_settings.dart';
 import '../ai/conversation_context.dart';
 import '../ai/llm_budget.dart';
+import '../ai/on_device/on_device_models.dart' show isOnDeviceLlm;
 import '../ai/person_memory.dart' show AiMemory;
 import '../ai/smart_replies.dart';
 
@@ -18,12 +19,15 @@ typedef ReplySuggester =
     );
 
 /// The model the reply chips ask: the one set for them, or the AI model.
+///
+/// The model on the phone has no second model beside it: the chips use it
+/// too.
 String smartReplyModel(SettingsStore settings) {
+  final endpoint = llmEndpointOf(settings);
+  if (isOnDeviceLlm(endpoint.baseUrl)) return endpoint.model;
   final own = (settings.getString(WeftSettings.llmSuggestionModel) ?? '')
       .trim();
-  return own.isNotEmpty
-      ? own
-      : (settings.getString(WeftSettings.llmModel) ?? '').trim();
+  return own.isNotEmpty ? own : endpoint.model;
 }
 
 /// The AI answer chips for message notifications, for every engine that
@@ -65,7 +69,7 @@ ReplySuggester notificationReplySuggester({
     // them as choices, and no other platform's notification has a place for
     // them. Anywhere else the completion would be spent on nothing.
     if (defaultTargetPlatform != TargetPlatform.android) return const [];
-    final baseUrl = store.getString(WeftSettings.llmBaseUrl) ?? '';
+    final baseUrl = llmEndpointOf(store).baseUrl;
     final model = smartReplyModel(store);
     if (baseUrl.trim().isEmpty || model.isEmpty) {
       debugPrint('weft: smart replies: no LLM endpoint is configured');

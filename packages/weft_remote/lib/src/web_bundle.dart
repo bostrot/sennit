@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive.dart' hide Sha256;
 import 'package:cryptography/cryptography.dart';
 
 /// The Ed25519 key release builds sign Sennit Web bundles with. Its private

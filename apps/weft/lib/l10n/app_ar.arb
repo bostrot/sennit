@@ -1927,5 +1927,22 @@
   "usageStatsConsentNever": "لا يُرسَل أبدًا: البيانات الشخصية أو محتوى الرسائل أو جهات الاتصال أو معرّفات Matrix. يمكنك تغيير ذلك في أي وقت من الإعدادات ← الخصوصية والأمان.",
   "usageStatsConsentPolicy": "سياسة الخصوصية",
   "usageStatsConsentAllow": "السماح",
-  "usageStatsConsentDecline": "لا، شكرًا"
+  "usageStatsConsentDecline": "لا، شكرًا",
+  "endpointsLlmProvider": "أين يعمل الذكاء الاصطناعي",
+  "endpointsLlmProviderServer": "خادم",
+  "endpointsLlmProviderOnDevice": "على هذا الجهاز",
+  "endpointsOnDeviceIntro": "تعمل ميزات الذكاء الاصطناعي على هذا الجهاز بنموذج تنزّله مرة واحدة. لا يغادره شيء مما تكتبه. تستغرق الإجابات وقتًا أطول من الخادم وتستهلك البطارية أثناء كتابتها.",
+  "endpointsOnDeviceMemory": "في هذا الجهاز ذاكرة بحجم {gb} غيغابايت.",
+  "endpointsOnDeviceLargeModel": "أفضل الإجابات. يحتاج نحو 2 غيغابايت من الذاكرة الحرة، والأفضل على أجهزة بذاكرة 8 غيغابايت أو أكثر.",
+  "endpointsOnDeviceSmallModel": "أصغر وأسرع بنحو ثلاث مرات، بإجابات أبسط. للأجهزة ذات الذاكرة الأقل.",
+  "endpointsOnDeviceRamTight": "ذاكرة هذا الجهاز المتبقية قليلة لهذا النموذج. قد يكون بطيئًا، وقد يغلق النظام Sennit أثناء تشغيله.",
+  "endpointsOnDeviceRamTooLittle": "على الأرجح ذاكرة هذا الجهاز غير كافية لهذا النموذج، وقد يغلق النظام Sennit أثناء تشغيله. جرّب النموذج الأصغر.",
+  "endpointsOnDeviceMobileDataTitle": "التنزيل عبر بيانات الجوال",
+  "endpointsOnDeviceMobileDataSubtitle": "عند إيقافه، ينتظر التنزيل شبكة Wi-Fi.",
+  "endpointsOnDeviceWaitsForWifi": "بانتظار Wi-Fi",
+  "endpointsOnDeviceContextHelper": "تتسع ذاكرة هذا الجهاز لما يصل إلى {max} رمز. النافذة الأكبر تقرأ مزيدًا من المحادثة وتكون أبطأ.",
+  "endpointsOnDeviceTest": "اختبار السرعة",
+  "endpointsOnDeviceTestResult": "{speed} رمز في الثانية؛ أول كلمة بعد {seconds} ث",
+  "endpointsOnDeviceTestFailed": "تعذّر تشغيل النموذج: {error}",
+  "endpointsOnDeviceNotDownloaded": "نزّل النموذج لاستخدامه."
 }

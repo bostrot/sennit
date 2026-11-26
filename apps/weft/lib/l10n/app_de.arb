@@ -1927,5 +1927,22 @@
   "usageStatsConsentNever": "Nie gesendet: persönliche Daten, Nachrichteninhalte, Kontakte oder Matrix-IDs. Du kannst das jederzeit unter Einstellungen → Datenschutz & Sicherheit ändern.",
   "usageStatsConsentPolicy": "Datenschutzerklärung",
   "usageStatsConsentAllow": "Erlauben",
-  "usageStatsConsentDecline": "Nein, danke"
+  "usageStatsConsentDecline": "Nein, danke",
+  "endpointsLlmProvider": "Wo die KI läuft",
+  "endpointsLlmProviderServer": "Server",
+  "endpointsLlmProviderOnDevice": "Auf dem Gerät",
+  "endpointsOnDeviceIntro": "Die KI-Funktionen laufen auf diesem Gerät, mit einem Modell, das du einmal herunterlädst. Nichts, was du schreibst, verlässt es. Antworten dauern länger als mit einem Server und kosten beim Schreiben Akku.",
+  "endpointsOnDeviceMemory": "Dieses Gerät hat {gb} GB Arbeitsspeicher.",
+  "endpointsOnDeviceLargeModel": "Die besten Antworten. Braucht etwa 2 GB freien Speicher; am besten auf Geräten mit 8 GB oder mehr.",
+  "endpointsOnDeviceSmallModel": "Kleiner und etwa dreimal so schnell, mit schlichteren Antworten. Für Geräte mit weniger Speicher.",
+  "endpointsOnDeviceRamTight": "Dieses Gerät hat für dieses Modell wenig Speicher übrig. Es kann langsam sein, und das System kann Sennit währenddessen schließen.",
+  "endpointsOnDeviceRamTooLittle": "Dieses Gerät hat für dieses Modell wahrscheinlich zu wenig Speicher; das System kann Sennit währenddessen schließen. Nimm das kleinere.",
+  "endpointsOnDeviceMobileDataTitle": "Über mobile Daten laden",
+  "endpointsOnDeviceMobileDataSubtitle": "Aus: Der Download wartet auf WLAN.",
+  "endpointsOnDeviceWaitsForWifi": "Wartet auf WLAN",
+  "endpointsOnDeviceContextHelper": "Bis zu {max} Tokens passen in den Speicher dieses Geräts. Ein größeres Fenster liest mehr vom Chat und ist langsamer.",
+  "endpointsOnDeviceTest": "Tempo testen",
+  "endpointsOnDeviceTestResult": "{speed} Tokens pro Sekunde; erstes Wort nach {seconds} s",
+  "endpointsOnDeviceTestFailed": "Das Modell konnte nicht laufen: {error}",
+  "endpointsOnDeviceNotDownloaded": "Lade das Modell herunter, um es zu nutzen."
 }

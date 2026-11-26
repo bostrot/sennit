@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive.dart' hide Sha256;
 import 'package:cryptography/cryptography.dart';
 
 import 'sync_document.dart';

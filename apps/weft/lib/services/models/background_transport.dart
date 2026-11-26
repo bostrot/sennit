@@ -74,6 +74,7 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
     Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
+    bool requiresWiFi = false,
   }) async {
     if (!isSupportedHere) {
       return _fallback.download(
@@ -112,6 +113,8 @@ class BackgroundModelDownloadTransport implements ModelDownloadTransport {
       updates: Updates.statusAndProgress,
       allowPause: true,
       retries: 3,
+      // Waits, rather than fails, while the phone is on mobile data.
+      requiresWiFi: requiresWiFi,
     );
 
     // The plugin owns the transfer, so cancellation cannot be a check inside a

@@ -40,6 +40,7 @@ class _FakeTransport implements ModelDownloadTransport {
     Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
+    bool requiresWiFi = false,
   }) async {
     calls++;
     this.url = url;

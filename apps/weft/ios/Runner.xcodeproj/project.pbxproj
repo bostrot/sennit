@@ -11,6 +11,7 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		5F70000000000000000000A1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5F70000000000000000000A0 /* PrivacyInfo.xcprivacy */; };
 		48D2D4336432A5C24A2467D5 /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A6D5B4F206D3964CE1D3F20 /* RunnerUITests.m */; };
 		573D5CB27D07A6FF9930BB9A /* Pods_ShareExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 138B9DA8D3253921DA2F67C1 /* Pods_ShareExtension.framework */; };
 		5F10000000000000000000EE /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F10000000000000000000E1 /* ShareViewController.swift */; };
@@ -201,6 +202,7 @@
 		5F20000000000000000000F2 /* NotificationService.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NotificationService.xcconfig; sourceTree = "<group>"; };
 		5F20000000000000000000F4 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		5F30000000000000000000E2 /* ShareContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareContainer.swift; sourceTree = "<group>"; };
+		5F70000000000000000000A0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		5F30000000000000000000E5 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		5F30000000000000000000F0 /* ShareChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareChannel.swift; sourceTree = "<group>"; };
 		5F30000000000000000000F2 /* CallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallManager.swift; sourceTree = "<group>"; };
@@ -524,6 +526,7 @@
 				5F30000000000000000000F2 /* CallManager.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				5F30000000000000000000E5 /* Runner.entitlements */,
+				5F70000000000000000000A0 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -830,6 +833,7 @@
 				A11810000000000000000002 /* AppIntentVocabulary.plist in Resources */,
 				97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
+				5F70000000000000000000A1 /* PrivacyInfo.xcprivacy in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
 			);

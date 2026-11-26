@@ -28,6 +28,10 @@ abstract class ModelDownloadTransport {
   /// `Authorization: Bearer` — the media viewer's Save action reuses this
   /// transport, and without the header a saved photo would be a 401 page
   /// written to the user's Downloads folder.
+  ///
+  /// [requiresWiFi] holds the download until the device is on Wi-Fi, where
+  /// the operating system can tell; the plain HTTP transport cannot, and
+  /// runs on whatever network there is.
   Future<void> download({
     required Uri url,
     required File target,
@@ -36,6 +40,7 @@ abstract class ModelDownloadTransport {
     Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
+    bool requiresWiFi = false,
   });
 
   void dispose() {}
@@ -64,6 +69,7 @@ class HttpModelDownloadTransport implements ModelDownloadTransport {
     Map<String, String> headers = const {},
     void Function(int totalOnDisk)? onBytes,
     Future<bool> Function()? shouldContinue,
+    bool requiresWiFi = false,
   }) async {
     await target.parent.create(recursive: true);
 
