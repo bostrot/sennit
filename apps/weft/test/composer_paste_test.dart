@@ -94,6 +94,26 @@ void main() {
     );
   });
 
+  // In a browser the key has to reach the browser: a handled ⌘V is a paste
+  // the page never sees, and Sennit Web cannot read the clipboard itself.
+  test('the browser composer leaves paste to the browser', () {
+    expect(
+      browserComposerShortcuts.keys.cast<SingleActivator>().where(
+        (a) => a.trigger == LogicalKeyboardKey.keyV,
+      ),
+      isEmpty,
+    );
+    expect(
+      browserComposerShortcuts.values.whereType<PasteIntoComposerIntent>(),
+      isEmpty,
+    );
+    expect(
+      browserComposerShortcuts[const SingleActivator(LogicalKeyboardKey.enter)],
+      isA<SendComposerIntent>(),
+      reason: 'everything but paste is the composer it always was',
+    );
+  });
+
   testWidgets('pasting an image offers to send it', (tester) async {
     clipboardHolds(['shot.png']);
     await paste(tester);

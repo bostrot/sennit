@@ -287,6 +287,19 @@ const Map<ShortcutActivator, Intent> composerShortcuts = {
       PasteIntoComposerIntent(),
 };
 
+/// [composerShortcuts] in a browser, where paste is the browser's own.
+///
+/// Sennit Web cannot ask for the clipboard: over the phone's plain-http link
+/// the clipboard API is not there at all, and over the relay reading it asks
+/// for a permission. Binding ⌘V/Ctrl+V here marked the key handled, so the
+/// browser never pasted either, and the composer took nothing. Left unbound,
+/// the key reaches the browser's text field, which pastes the way any page
+/// does. Images are not lost by this: Sennit Web sends no attachments.
+final Map<ShortcutActivator, Intent> browserComposerShortcuts = {
+  for (final MapEntry(:key, :value) in composerShortcuts.entries)
+    if (value is! PasteIntoComposerIntent) key: value,
+};
+
 /// The composer's keys, given what Return is set to do.
 ///
 /// Both arrangements bind the same two intents; which key carries which is the
