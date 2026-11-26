@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
+import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 
 import '../../app/providers.dart';
@@ -148,7 +149,7 @@ class _AttachmentPreviewSheetState
                 const SizedBox(height: WeftSpace.xxs),
                 Text(
                   context.l10n.attachmentPreviewSizeTo(
-                    formatAttachmentSize(total),
+                    context.l10n.fileSize(total),
                     chat.title,
                   ),
                   style: context.text.bodySmall?.copyWith(
@@ -277,7 +278,7 @@ class _PickedFileTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(formatAttachmentSize(source.sizeBytes)),
+      subtitle: Text(context.l10n.fileSize(source.sizeBytes)),
       // Named: a preview of eight files is eight identical "Remove" buttons,
       // and which one a reader is on is exactly what they cannot see.
       trailing: IconButton(

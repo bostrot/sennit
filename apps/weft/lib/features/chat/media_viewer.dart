@@ -14,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:weft_attachments/weft_attachments.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
@@ -505,7 +504,7 @@ class _MediaPageState extends ConsumerState<_MediaPage> {
             : message.body,
         detail: message.mediaSizeBytes == null
             ? null
-            : formatAttachmentSize(message.mediaSizeBytes!),
+            : context.l10n.fileSize(message.mediaSizeBytes!),
       );
     }
 

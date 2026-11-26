@@ -18,6 +18,7 @@ import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 
 import 'support/attachment_fixtures.dart';
+import 'package:weft/app/l10n_labels.dart';
 import 'package:weft/app/localisation.dart';
 
 /// A picker that never touches a platform channel.
@@ -106,6 +107,7 @@ void main() {
     VideoPreviewLoader? previewLoader,
     InlineVideoBuilder? inlineVideo,
     bool reduceMotion = false,
+    Locale? locale,
   }) {
     return tester.pumpWidget(
       ProviderScope(
@@ -122,6 +124,8 @@ void main() {
             inlineVideoProvider.overrideWithValue(inlineVideo),
         ],
         child: MaterialApp(
+          locale: locale,
+          supportedLocales: AppL10n.supportedLocales,
           localizationsDelegates: weftLocalizationsDelegates,
           theme: WeftTheme.build(),
           home: MediaQuery(
@@ -141,6 +145,21 @@ void main() {
       expect(formatAttachmentSize(96000), '94 kB');
       expect(formatAttachmentSize(12 * 1024 * 1024), '12 MB');
       expect(formatAttachmentSize(3 * 1024 * 1024 * 1024), '3.0 GB');
+    });
+
+    test('a size is written with the reader\'s decimal mark', () {
+      const bytes = 2516582; // 2.4 MB
+      String sizeIn(String code) =>
+          lookupAppL10n(Locale(code)).fileSize(bytes);
+
+      for (final code in ['de', 'es', 'fr', 'pt']) {
+        expect(sizeIn(code), '2,4 MB', reason: code);
+      }
+      for (final code in ['en', 'zh', 'hi']) {
+        expect(sizeIn(code), '2.4 MB', reason: code);
+      }
+      // Whole numbers have no mark to localise.
+      expect(lookupAppL10n(const Locale('de')).fileSize(96000), '94 kB');
     });
 
     test('a filename in the body is not a caption', () {
@@ -677,6 +696,26 @@ void main() {
       expect(find.text('contract.pdf'), findsOneWidget);
       expect(find.text('2.0 MB'), findsOneWidget);
       expect(find.byIcon(Icons.picture_as_pdf_rounded), findsOneWidget);
+    });
+
+    testWidgets('a file\'s size uses a decimal comma in German', (
+      tester,
+    ) async {
+      await pumpBubble(
+        tester,
+        AttachmentBubble(
+          message: message(
+            kind: MessageKind.file,
+            body: 'Vertrag.pdf',
+            sizeBytes: 2516582,
+          ),
+          own: false,
+        ),
+        locale: const Locale('de'),
+      );
+
+      expect(find.text('2,4 MB'), findsOneWidget);
+      expect(find.text('2.4 MB'), findsNothing);
     });
 
     testWidgets('a file with no announced size shows none rather than 0 B', (

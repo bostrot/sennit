@@ -109,11 +109,22 @@ extension WeftFailureLabels on AppL10n {
       switch (rejection.reason) {
         UploadRejectionReason.empty => attachmentRejectedEmpty,
         UploadRejectionReason.tooLarge => attachmentRejectedTooLarge(
-          formatAttachmentSize(rejection.sizeBytes ?? 0),
-          formatAttachmentSize(rejection.limitBytes ?? 0),
+          fileSize(rejection.sizeBytes ?? 0),
+          fileSize(rejection.limitBytes ?? 0),
         ),
         UploadRejectionReason.unsupported => attachmentRejectedUnnamed,
       };
+
+  /// A file's size with the reader's decimal mark: "2.4 MB", "2,4 MB".
+  ///
+  /// The mark comes off `intl`'s number symbols for [localeName], like the
+  /// weekday names below, so it follows whatever locale the app runs in.
+  String fileSize(int bytes) => formatAttachmentSize(
+    bytes,
+    decimalSeparator: NumberFormat.decimalPattern(
+      localeName,
+    ).symbols.DECIMAL_SEP,
+  );
 }
 
 /// The words for auto-reply's codes.

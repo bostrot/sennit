@@ -19,12 +19,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:weft_attachments/weft_attachments.dart'
-    show formatAttachmentSize;
 import 'package:weft_backup/weft_backup.dart';
 import 'package:weft_design/weft_design.dart';
 
 import '../../app/a11y.dart';
+import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../services/backup/backup_service.dart';
 import 'settings_section.dart';
@@ -145,7 +144,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                 estimate == null
                     ? l10n.backupIncludeMediaSubtitle
                     : l10n.backupIncludeMediaSize(
-                        formatAttachmentSize(estimate.estimatedBytes),
+                        l10n.fileSize(estimate.estimatedBytes),
                       ),
               ),
               value: _includeMedia,

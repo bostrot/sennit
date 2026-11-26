@@ -562,10 +562,10 @@ class _ShareTargetSheetState extends ConsumerState<_ShareTargetSheet> {
     final bytes = files.fold(0, (sum, source) => sum + source.sizeBytes);
     final fileSummary = switch (files.length) {
       0 => null,
-      1 => '${files.single.basename} · ${formatAttachmentSize(bytes)}',
+      1 => '${files.single.basename} · ${l10n.fileSize(bytes)}',
       _ =>
         '${l10n.shareFileCount(files.length)} · '
-            '${formatAttachmentSize(bytes)}',
+            '${l10n.fileSize(bytes)}',
     };
 
     if (text.isEmpty) return fileSummary ?? l10n.shareNothingToSend;
