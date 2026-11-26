@@ -1852,5 +1852,7 @@
   "pushIntroOptOutTitle": "आपकी पसंद",
   "pushIntroOptOut": "आप कभी भी सूचना सेटिंग में अपना गेटवे इस्तेमाल कर सकते हैं या पुश बंद कर सकते हैं। Android पर बिल्ट-इन कनेक्शन और UnifiedPush Google के बिना काम करते हैं।",
   "pushIntroAccept": "Sennit का गेटवे इस्तेमाल करें",
-  "pushIntroOther": "दूसरा तरीका चुनें"
+  "pushIntroOther": "दूसरा तरीका चुनें",
+  "emojiSuggestionsLabel": "इमोजी सुझाव",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}, {count} में से {position}"
 }

@@ -1853,5 +1853,7 @@
   "pushIntroOptOutTitle": "由你决定",
   "pushIntroOptOut": "你随时可以在通知设置中改用自己的网关或关闭推送。在 Android 上，内置连接和 UnifiedPush 无需 Google 即可使用。",
   "pushIntroAccept": "使用 Sennit 网关",
-  "pushIntroOther": "选择其他方式"
+  "pushIntroOther": "选择其他方式",
+  "emojiSuggestionsLabel": "表情建议",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}，第 {position} 个，共 {count} 个"
 }

@@ -10696,5 +10696,35 @@
   "pushIntroOther": "Choose another way",
   "@pushIntroOther": {
     "description": "Secondary button on the push explanation screen: don't use Sennit's gateway and open the settings. Short."
+  },
+  "emojiSuggestionsLabel": "Emoji suggestions",
+  "@emojiSuggestionsLabel": {
+    "description": "Screen-reader-only name of the small list that opens above the message field when the user types a colon and part of an emoji name (like :thumbs). Never shown on screen."
+  },
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}, {position} of {count}",
+  "@emojiSuggestionAnnouncement": {
+    "description": "Announced to a screen reader when an emoji is selected in the suggestion list above the message field, with the arrow keys or when the list opens. Return or Tab then inserts it.",
+    "placeholders": {
+      "emoji": {
+        "type": "String",
+        "description": "The emoji character itself.",
+        "example": "👍"
+      },
+      "shortcode": {
+        "type": "String",
+        "description": "The emoji's English name between colons; never translated.",
+        "example": ":thumbsup:"
+      },
+      "position": {
+        "type": "int",
+        "description": "Which entry of the list is selected, counting from 1.",
+        "example": "1"
+      },
+      "count": {
+        "type": "int",
+        "description": "How many entries the list has.",
+        "example": "8"
+      }
+    }
   }
 }

@@ -1852,5 +1852,7 @@
   "pushIntroOptOutTitle": "Deine Wahl",
   "pushIntroOptOut": "Du kannst jederzeit in den Benachrichtigungseinstellungen ein eigenes Gateway nutzen oder Push ausschalten. Unter Android funktionieren die eingebaute Verbindung und UnifiedPush ohne Google.",
   "pushIntroAccept": "Sennit-Gateway nutzen",
-  "pushIntroOther": "Anders einrichten"
+  "pushIntroOther": "Anders einrichten",
+  "emojiSuggestionsLabel": "Emoji-Vorschläge",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}, {position} von {count}"
 }

@@ -1852,5 +1852,7 @@
   "pushIntroOptOutTitle": "القرار لك",
   "pushIntroOptOut": "يمكنك استخدام بوابتك الخاصة أو إيقاف الدفع في أي وقت من إعدادات الإشعارات. على Android، يعمل الاتصال المدمج وUnifiedPush دون Google.",
   "pushIntroAccept": "استخدام بوابة Sennit",
-  "pushIntroOther": "اختيار طريقة أخرى"
+  "pushIntroOther": "اختيار طريقة أخرى",
+  "emojiSuggestionsLabel": "اقتراحات الرموز التعبيرية",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}، {position} من {count}"
 }
