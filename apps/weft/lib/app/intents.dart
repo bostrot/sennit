@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_attachments/weft_attachments.dart';
+import 'package:weft_richtext/weft_richtext.dart' show mentionTargetFromUrl;
 
 import '../services/attachments/attachment_picker.dart';
 
@@ -26,6 +27,9 @@ sealed class WeftLink {
   ///                              from an Android App Action (Assistant or
   ///                              Gemini on the phone)
   ///
+  /// Plus Matrix room links — `https://matrix.to/#/#room:server` and
+  /// `matrix:r/room:server` — which open the room, or offer to join it.
+  ///
   /// Plus the four telephony schemes — `sms:`, `smsto:`, `mms:`, `mmsto:` —
   /// which are not Sennit's own links at all: they are what the dialer, the
   /// contacts app and a `sms:` link on a web page send, and handling them is
@@ -38,6 +42,8 @@ sealed class WeftLink {
     if (uri == null) return null;
 
     if (_smsSchemes.contains(uri.scheme)) return ComposeSmsLink.fromUri(uri);
+    final room = OpenRoomLink.tryParse(url);
+    if (room != null) return room;
 
     final isCustomScheme = uri.scheme == 'weft';
     final isAppLink =
@@ -94,6 +100,64 @@ class OpenUserLink extends WeftLink {
   const OpenUserLink(this.userId);
 
   final String userId;
+}
+
+/// A Matrix room by id or alias, from a matrix.to link or a `matrix:` uri.
+///
+/// Not necessarily a room the user is in: the link is how people invite each
+/// other into public rooms, so the router opens the room when it is already in
+/// the inbox and offers to join it otherwise.
+class OpenRoomLink extends WeftLink {
+  const OpenRoomLink(this.roomIdOrAlias, {this.via = const []});
+
+  /// `#room:example.org` or `!abc:example.org`.
+  final String roomIdOrAlias;
+
+  /// Servers to join through, from the link's `via` parameters. A room id
+  /// says nothing about where the room lives, and without these a server that
+  /// has never seen the room cannot find it.
+  final List<String> via;
+
+  /// The room [url] names, or null when it names a user, an event in no room,
+  /// or nothing Matrix at all.
+  static OpenRoomLink? tryParse(String url) {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) return null;
+    final target = mentionTargetFromUrl(url);
+    if (target == null ||
+        !(target.id.startsWith('#') || target.id.startsWith('!'))) {
+      return null;
+    }
+    // matrix.to keeps its query inside the fragment (`#/!id:hs?via=x`); a
+    // `matrix:` uri keeps it where a query belongs.
+    final query = uri.scheme.toLowerCase() == 'matrix'
+        ? uri.query
+        : uri.fragment.contains('?')
+        ? uri.fragment.substring(uri.fragment.indexOf('?') + 1)
+        : '';
+    List<String> via;
+    try {
+      via = Uri(query: query).queryParametersAll['via'] ?? const [];
+    } on FormatException {
+      via = const [];
+    }
+    return OpenRoomLink(
+      target.id,
+      via: via.where((server) => server.isNotEmpty).toList(),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is OpenRoomLink &&
+      other.roomIdOrAlias == roomIdOrAlias &&
+      listEquals(other.via, via);
+
+  @override
+  int get hashCode => Object.hash(roomIdOrAlias, Object.hashAll(via));
+
+  @override
+  String toString() => 'OpenRoomLink($roomIdOrAlias, via: $via)';
 }
 
 class OpenSearchLink extends WeftLink {

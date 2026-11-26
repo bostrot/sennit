@@ -35,7 +35,9 @@ import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/auth/verification_screen.dart';
 import 'features/call/call_overlay.dart';
+import 'data/chat_repository.dart';
 import 'features/chat/chat_view.dart';
+import 'features/chat/room_link.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/notifications/push_explanation_screen.dart';
 import 'features/settings/notifications_screen.dart';
@@ -510,6 +512,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
             builder: (_) => SearchScreen(initialQuery: query),
           ),
         );
+      case OpenRoomLink():
+        _openRoom(navigator, link);
       case OpenUserLink(:final userId):
         // DM creation from a user link needs the start-chat flow; until then
         // the inbox is the honest landing place.
@@ -527,6 +531,26 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       case OpenInboxLink():
         navigator.popUntil((route) => route.isFirst);
     }
+  }
+
+  /// A matrix.to or `matrix:` room link from outside the app: opens the
+  /// room, or asks before joining one the user is not in.
+  void _openRoom(NavigatorState navigator, OpenRoomLink link) {
+    final ChatRepository repository;
+    try {
+      repository = ref.read(chatRepositoryProvider);
+    } on Object {
+      // Signed out, or no client yet: nothing to open or join with.
+      return;
+    }
+    unawaited(
+      openRoomLink(
+        navigator.context,
+        repository: repository,
+        link: link,
+        open: (chatId) => _openChat(navigator, chatId),
+      ),
+    );
   }
 
   /// A voice assistant's "send a message to … on Sennit", held until the

@@ -143,6 +143,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="weft"/>
             </intent-filter>
+            <!-- Matrix room links: `matrix:r/room:server` and matrix.to. Not
+                 verified — matrix.to is nobody's own domain, so Android offers
+                 Sennit beside the browser rather than instead of it. The app
+                 opens the room, or asks before joining one. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="matrix"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="matrix.to"/>
+            </intent-filter>
             <!-- Verified App Links for weft.bostrot.com. Requires
                  tooling/web/assetlinks.json served at
                  https://weft.bostrot.com/.well-known/assetlinks.json with the

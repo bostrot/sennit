@@ -2283,6 +2283,24 @@
   "@chatUnavailableNotInInbox": {
     "description": "Shown in place of a conversation that could not be opened — usually from a notification or a link pointing at a room this account has left."
   },
+  "roomLinkJoinTitle": "Join this room?",
+  "@roomLinkJoinTitle": {
+    "description": "Title of the dialog shown after tapping a link to a Matrix room the user is not in yet. The room's address is shown below it.",
+    "maxLength": 40
+  },
+  "roomLinkJoinBody": "You’re not in this room yet. Its members will see that you joined.",
+  "@roomLinkJoinBody": {
+    "description": "Body of the dialog shown after tapping a link to a Matrix room the user is not in yet. Explains that joining is visible to the room's members."
+  },
+  "roomLinkJoin": "Join",
+  "@roomLinkJoin": {
+    "description": "Button in the join-room dialog that joins the Matrix room. A verb. Keep short.",
+    "maxLength": 16
+  },
+  "roomLinkJoinFailed": "Couldn’t join. The room may be private, or the link out of date.",
+  "@roomLinkJoinFailed": {
+    "description": "Shown in the join-room dialog when joining failed. The dialog stays open so the user can try again."
+  },
   "chatUnavailableHint": "It may have been left, or the link may be out of date.",
   "@chatUnavailableHint": {
     "description": "One line under the 'conversation unavailable' message offering the two likely reasons. Keep under ~54 chars."
