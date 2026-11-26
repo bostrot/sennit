@@ -131,15 +131,20 @@ void main() {
         book,
         const MemoryUpdate(
           updates: [
-            (id: 2, fact: 'Works at Deutsche Bahn since November'),
-            (id: 9, fact: 'Out of range'),
+            (
+              id: 2,
+              fact: 'Works at Deutsche Bahn since November',
+              until: null,
+              after: null,
+            ),
+            (id: 9, fact: 'Out of range', until: null, after: null),
           ],
           drops: [1],
         ),
         numbered: [
           ...numbered,
           // A model that numbers the pinned one anyway gets nowhere.
-          (keys: _chat, about: null, text: 'Calls me Ricky'),
+          (keys: _chat, about: null, text: 'Calls me Ricky', until: null),
         ],
       );
       expect(result.updated, 1);
@@ -152,7 +157,9 @@ void main() {
       final pinnedDrop = _apply(
         result.book,
         const MemoryUpdate(drops: [1]),
-        numbered: const [(keys: _chat, about: null, text: 'Calls me Ricky')],
+        numbered: const [
+          (keys: _chat, about: null, text: 'Calls me Ricky', until: null),
+        ],
       );
       expect(pinnedDrop.dropped, 0);
       expect(identical(pinnedDrop.book, result.book), isTrue);
@@ -351,7 +358,9 @@ void main() {
           ('Likes tea', null),
         ],
       );
-      expect(update.updates, [(id: 2, fact: 'Works remotely')]);
+      expect(update.updates, [
+        (id: 2, fact: 'Works remotely', until: null, after: null),
+      ]);
       expect(update.drops, [1, 4, 5]);
     });
 
@@ -377,9 +386,21 @@ void main() {
         transcript: const ['Anna: Ich bin jetzt bei der Bahn'],
         chatTitle: 'Anna',
         people: const ['Anna'],
+        today: DateTime(2026, 11, 26),
         fixed: 'About Anna:\n- My sister',
-        numbered: const [
-          (keys: _annaKeys, about: 'Anna', text: 'Works at the post office'),
+        numbered: [
+          (
+            keys: _annaKeys,
+            about: 'Anna',
+            text: 'Works at the post office',
+            until: null,
+          ),
+          (
+            keys: _annaKeys,
+            about: 'Anna',
+            text: 'Dentist on 27 Nov',
+            until: DateTime(2026, 11, 28),
+          ),
         ],
       );
       final last = messages.last['content']!;
@@ -389,7 +410,9 @@ void main() {
         last,
         contains('The user wrote (fixed):\nAbout Anna:\n- My sister'),
       );
-      expect(last, contains('1. [Anna] Works at the post office'));
+      expect(last, contains('1. [Anna] Works at the post office\n'));
+      expect(last, contains('2. [Anna] Dentist on 27 Nov (until 2026-11-27)'));
+      expect(last, startsWith('Today is 2026-11-26 (Thu).'));
       expect(messages.first['content'], contains('"drop"'));
     });
   });

@@ -146,10 +146,15 @@ List<String> eventTitleTranscript(
 /// exchange, thread replies left out as they are there. The same filter and
 /// the same line shape, so every prompt reads one kind of transcript, and the
 /// same budget rule: lines farthest back go first.
+///
+/// With a [dayMarker], a line it writes goes before the first message of
+/// each day, so a prompt that must date what is said — "tomorrow" in a
+/// message from last week — can. It counts toward [maxChars].
 List<String> recentConversationTranscript(
   Iterable<WeftMessage> conversation, {
   int maxMessages = kEventTitleContextMessages,
   int maxChars = kEventTitleContextChars,
+  String Function(DateTime day)? dayMarker,
 }) {
   // Not bound by `kAiContextMessages`: learning from a chat reads hundreds
   // of messages when the model's window has room for them.
@@ -161,17 +166,36 @@ List<String> recentConversationTranscript(
     }
   }
   final ordered = byId.values.toList()..sort(_chronological);
-  final lines = [
-    for (final m in ordered.skip(
-      ordered.length > maxMessages ? ordered.length - maxMessages : 0,
-    ))
-      _line(m, _lineChars),
-  ];
-  var length = lines.fold(0, (n, l) => n + l.length + 1);
-  while (length > maxChars && lines.length > 1) {
-    length -= lines.removeAt(0).length + 1;
+  final kept = ordered.skip(
+    ordered.length > maxMessages ? ordered.length - maxMessages : 0,
+  );
+  final lines = [for (final m in kept) _line(m, _lineChars)];
+  if (dayMarker == null) {
+    var length = lines.fold(0, (n, l) => n + l.length + 1);
+    while (length > maxChars && lines.length > 1) {
+      length -= lines.removeAt(0).length + 1;
+    }
+    return lines;
   }
-  return lines;
+
+  final days = [
+    for (final m in kept)
+      if (m.timestamp.toLocal() case final at)
+        DateTime(at.year, at.month, at.day),
+  ];
+  List<String> dated(int from) => [
+    for (var i = from; i < lines.length; i++) ...[
+      if (i == from || days[i] != days[i - 1]) dayMarker(days[i]),
+      lines[i],
+    ],
+  ];
+  var from = 0;
+  var result = dated(from);
+  while (from < lines.length - 1 &&
+      result.fold(0, (n, l) => n + l.length + 1) > maxChars) {
+    result = dated(++from);
+  }
+  return result;
 }
 
 int _chronological(WeftMessage a, WeftMessage b) {

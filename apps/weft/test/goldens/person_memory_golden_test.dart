@@ -10,14 +10,17 @@ import 'package:weft_store/weft_store.dart';
 
 import '../support/golden_harness.dart';
 
-/// Goldens for personal memory: a chat's memory with what Sennit learned by
-/// itself under it, a person's short memory, and the settings screen.
+/// Goldens for personal memory: a direct chat's one memory — what an older
+/// version kept for the chat and for Anna, folded together — with what
+/// Sennit learned by itself under it, a person's memory, and the settings
+/// screen.
 ///
 /// The editor frame is the one that matters. A learned fact has to read as
-/// learned — marked, dated, one pinned — and apart from the user's own note
-/// above it, with the last automatic update one tap from undone. The writing
-/// style stands apart from the facts: the user's in the chat's memory,
-/// Anna's in hers, the usual one on the settings screen.
+/// learned — marked, dated, one pinned, a temporary one with the day it goes
+/// — and apart from the user's own note above it, with the last automatic
+/// update one tap from undone. The writing styles stand apart from the
+/// facts: the user's here and Anna's in the chat's memory, the usual one on
+/// the settings screen.
 void main() {
   setUpAll(loadGoldenFonts);
 
@@ -68,7 +71,11 @@ void main() {
         .applyLearning(
           const MemoryUpdate(
             adds: [
-              MemoryAddition('Planning Mia’s birthday party, Sunday 15:00'),
+              MemoryAddition(
+                'Mia’s birthday party on Sun 29 Nov, 15:00',
+                until: '2026-11-29',
+                after: 'Had Mia’s birthday party on 29 Nov',
+              ),
             ],
           ),
           chatKeys: keys,

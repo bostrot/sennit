@@ -154,6 +154,7 @@ class PersonMemoryNotifier extends Notifier<MemoryBook> {
     required List<String> chatKeys,
     required List<MemoryPerson> people,
     required List<NumberedFact> numbered,
+    List<String>? ownStyleKeys,
     DateTime? now,
   }) {
     final result = state.applyLearning(
@@ -161,12 +162,46 @@ class PersonMemoryNotifier extends Notifier<MemoryBook> {
       chatKeys: chatKeys,
       people: people,
       numbered: numbered,
+      ownStyleKeys: ownStyleKeys,
       now: now ?? DateTime.now(),
     );
     final changed = result.added + result.updated + result.dropped;
     if (changed > 0) _publish(result.book);
     return changed;
   }
+
+  /// What older versions kept for the direct chat under [chatKeys] moved
+  /// into its person's memory — see [MemoryBook.foldChatInto]. Nothing is
+  /// written when there is nothing to move.
+  void fold(List<String> chatKeys, List<String> personKeys) {
+    final next = state.foldChatInto(chatKeys, personKeys);
+    if (!identical(next, state)) _publish(next);
+  }
+
+  /// Every direct chat's memory moved into its person's, once — see
+  /// [MemoryBook.mergeDirectChats].
+  void mergeDirectChats(
+    Iterable<({List<String> chatKeys, List<String> personKeys})> chats,
+  ) {
+    final next = state.mergeDirectChats(chats);
+    if (!identical(next, state)) _publish(next);
+  }
+
+  /// Temporary facts whose day has passed at [now] gone, or turned into what
+  /// they became. Returns how many changed.
+  int expire(DateTime now) {
+    final result = state.expire(now);
+    if (result.changed > 0) _publish(result.book);
+    return result.changed;
+  }
+
+  /// What the model said of facts learned before facts were sorted — see
+  /// [MemoryBook.classify].
+  void classify(
+    Map<String, FactClass> sorted, {
+    required List<LearnedFact> asked,
+    required DateTime now,
+  }) => _publish(state.classify(sorted, asked: asked, now: now));
 
   void editLearned(List<String> keys, LearnedFact fact, String text) =>
       _publish(state.editLearned(keys, fact, text, now: DateTime.now()));
@@ -219,6 +254,12 @@ List<String> personMemoryKeysFor(IdentityGraph graph, Chat chat) {
   );
 }
 
+/// The keys the one memory shown for [chat] is filed under: for a direct
+/// chat the person's — what was the chat's is folded into it, see
+/// [MemoryBook.foldChatInto] — and for a group the group's own.
+List<String> aboutKeysFor(IdentityGraph graph, Chat chat) =>
+    chat.isGroup ? chatMemoryKeys(chat) : personMemoryKeysFor(graph, chat);
+
 /// How many people of a group have their memory considered for one prompt.
 const int kAiMemoryPeople = 8;
 
@@ -261,6 +302,9 @@ List<MemoryPerson> memoryPeopleFor(
 /// the memory of [people], notes and learned facts, and how everyone writes —
 /// the style profiles, and the user's habits and [ownMessages] here. Null when
 /// there is none.
+///
+/// A direct chat's is one memory, its person's — with whatever is still
+/// filed under the chat's rooms, until that is folded in.
 AiMemory? aiMemoryFrom(
   MemoryBook book,
   Chat chat,
@@ -269,12 +313,15 @@ AiMemory? aiMemoryFrom(
 }) {
   final chatKeys = chatMemoryKeys(chat);
   final examples = ownStyleExamples(ownMessages);
+  final direct = chat.isGroup ? null : people.firstOrNull;
   final memory = AiMemory(
-    chat: book.memoryFor(chatKeys),
+    chat: book.memoryFor([...?direct?.keys, ...chatKeys]),
+    about: direct?.name,
     people: [
-      for (final person in people)
-        if (book.memoryFor(person.keys) case final note when note.isNotEmpty)
-          (name: person.name, note: note),
+      if (direct == null)
+        for (final person in people)
+          if (book.memoryFor(person.keys) case final note when note.isNotEmpty)
+            (name: person.name, note: note),
     ],
     style: AiStyle(
       mine: book.styleFor(chatKeys)?.text ?? '',
@@ -435,8 +482,11 @@ Future<PersonFactsResult> learnPersonFacts({
     int? status,
   }) => (outcome: outcome, changed: changed, status: status);
   if (!settings.useInAi) return done(PersonFactsOutcome.memoryOff);
-  final keys = chatMemoryKeys(chat);
-  if (keys.isEmpty) return done(PersonFactsOutcome.nothingToSend);
+  final roomKeys = chatMemoryKeys(chat);
+  if (roomKeys.isEmpty) return done(PersonFactsOutcome.nothingToSend);
+  // A direct chat learns into its person's memory, the one it shows.
+  final direct = chat.isGroup ? null : people.firstOrNull;
+  final keys = direct?.keys ?? roomKeys;
   final recent = messages.toList();
   if (!settings.mayLearnFrom(encrypted: recent.any((m) => m.encrypted))) {
     return done(PersonFactsOutcome.encrypted);
@@ -447,6 +497,8 @@ Future<PersonFactsResult> learnPersonFacts({
     recent,
     maxMessages: room.maxMessages,
     maxChars: room.transcriptChars,
+    // Which day "tomorrow" was said on decides when a temporary fact goes.
+    dayMarker: (day) => '--- ${promptDay(day)} ---',
   );
   if (transcript.isEmpty) {
     debugPrint(
@@ -455,6 +507,7 @@ Future<PersonFactsResult> learnPersonFacts({
     return done(PersonFactsOutcome.nothingToSend);
   }
 
+  if (direct != null) memory.fold(roomKeys, direct.keys);
   final book = memory.book;
   final memoryChars = endpoint.budget.memoryChars;
   final numbered = book.numberedFacts(keys, people, maxChars: memoryChars);
@@ -470,6 +523,7 @@ Future<PersonFactsResult> learnPersonFacts({
     fixed: fixedMemoryText(book, keys, people, maxChars: memoryChars),
     numbered: numbered,
     style: style,
+    today: now ?? DateTime.now(),
     budget: endpoint.budget,
     client: client,
     cancel: cancel,
@@ -504,6 +558,7 @@ Future<PersonFactsResult> learnPersonFacts({
     // Numbered against the book as it was sent; an edit made meanwhile is
     // found by its text, or the change to it is skipped.
     numbered: numbered,
+    ownStyleKeys: roomKeys,
     now: now,
   );
   debugPrint(
@@ -574,12 +629,23 @@ String fixedMemoryText(
     return trimPersonMemory(text, maxChars: chars);
   }
 
-  final share = people.isEmpty ? maxChars : maxChars ~/ 2;
+  // A direct chat's memory is its person's: one, under their name.
+  final chatId = chatKeys.join('\u0000');
+  final direct = people
+      .where((p) => p.keys.join('\u0000') == chatId)
+      .firstOrNull;
+  final others = [
+    for (final p in people)
+      if (p != direct) p,
+  ];
+  final share = others.isEmpty ? maxChars : maxChars ~/ 2;
   final parts = [
     if (fixed(chatKeys, share) case final chat when chat.isNotEmpty)
-      'About this chat:\n$chat',
-    for (final p in people)
-      if (fixed(p.keys, math.max(160, share ~/ people.length)) case final note
+      direct == null
+          ? 'About this group:\n$chat'
+          : 'About ${direct.name}:\n$chat',
+    for (final p in others)
+      if (fixed(p.keys, math.max(160, share ~/ others.length)) case final note
           when note.isNotEmpty)
         'About ${p.name}:\n$note',
   ];
@@ -686,3 +752,149 @@ Future<bool> learnInBackground(
     _ => true,
   };
 }
+
+/// How often temporary facts are checked for having passed while Sennit
+/// runs; also on every start and every return to the front.
+const Duration kMemoryExpiryTick = Duration(hours: 1);
+
+/// Keeps personal memory tidy on the device, with no server: moves each
+/// direct chat's memory into its person's, once the chats are known (see
+/// [MemoryBook.mergeDirectChats]), and lets temporary facts go when their day
+/// has passed ([MemoryBook.expire]).
+///
+/// And once, the facts learned before facts were sorted into lasting and
+/// temporary are sorted — through the model, so only while automatic
+/// learning is on and there is an endpoint, [kClassifyBatch] at a time, one
+/// request after the other. A batch that fails is tried again on the next
+/// start or return to the front.
+class MemoryHousekeeper {
+  MemoryHousekeeper({
+    required PersonMemoryNotifier Function() memory,
+    required bool Function() mayAsk,
+    required AutoReplyEndpoint? Function() endpoint,
+    ValueListenable<bool>? foreground,
+    DateTime Function()? now,
+  }) : _memory = memory,
+       _mayAsk = mayAsk,
+       _endpoint = endpoint,
+       _foreground = foreground,
+       _now = now ?? DateTime.now;
+
+  final PersonMemoryNotifier Function() _memory;
+  final bool Function() _mayAsk;
+  final AutoReplyEndpoint? Function() _endpoint;
+  final ValueListenable<bool>? _foreground;
+  final DateTime Function() _now;
+
+  Timer? _ticker;
+  bool _sorting = false;
+  bool _started = false;
+  bool _disposed = false;
+  bool _merged = false;
+  List<({List<String> chatKeys, List<String> personKeys})>? _waiting;
+
+  void start() {
+    if (_started) return;
+    _started = true;
+    _foreground?.addListener(_onForeground);
+    _ticker = Timer.periodic(kMemoryExpiryTick, (_) => tidy());
+    if (_waiting case final chats?) directChatsKnown(chats);
+    tidy();
+  }
+
+  void dispose() {
+    _disposed = true;
+    _ticker?.cancel();
+    _foreground?.removeListener(_onForeground);
+  }
+
+  void _onForeground() {
+    if (_foreground?.value ?? true) tidy();
+  }
+
+  /// The direct chats, each as its rooms' keys and its person's, for the
+  /// move — held until [start] when they come before it. Once a run: the
+  /// run after the one that moved them finds the book moved and drops its
+  /// backup, and a chat missed is folded when it is opened or learned from.
+  void directChatsKnown(
+    List<({List<String> chatKeys, List<String> personKeys})> chats,
+  ) {
+    if (_disposed || _merged) return;
+    if (!_started) {
+      _waiting = chats;
+      return;
+    }
+    _waiting = null;
+    _merged = true;
+    try {
+      _memory().mergeDirectChats(chats);
+    } on Object catch (error) {
+      debugPrint('weft: memory merge failed: ${error.runtimeType}');
+    }
+  }
+
+  /// Lets what has passed go, then sorts what was never sorted.
+  void tidy() {
+    if (_disposed) return;
+    final changed = _memory().expire(_now());
+    if (changed > 0) debugPrint('weft: memory: $changed facts expired');
+    unawaited(sortOldFacts());
+  }
+
+  /// Sorts the facts learned before they were sorted as they are learned,
+  /// a batch at a time, until none are left or a batch fails.
+  Future<void> sortOldFacts() async {
+    if (_sorting || _disposed) return;
+    _sorting = true;
+    try {
+      while (!_disposed && _mayAsk()) {
+        final endpoint = _endpoint();
+        if (endpoint == null) return;
+        final memory = _memory();
+        final batch = memory.book.unchecked.take(kClassifyBatch).toList();
+        if (batch.isEmpty) return;
+        final sorted = await requestFactClasses(
+          baseUrl: endpoint.baseUrl,
+          model: endpoint.model,
+          apiKey: endpoint.apiKey,
+          facts: batch,
+          today: _now(),
+          budget: endpoint.budget,
+        );
+        if (sorted == null || _disposed) return;
+        memory.classify(sorted, asked: batch, now: _now());
+      }
+    } on Object catch (error) {
+      debugPrint('weft: sort facts failed: ${error.runtimeType}');
+    } finally {
+      _sorting = false;
+    }
+  }
+}
+
+/// The [MemoryHousekeeper], or null in demo mode. Started with the session,
+/// like the learner.
+final memoryHousekeeperProvider = Provider<MemoryHousekeeper?>((ref) {
+  if (kDemoMode) return null;
+  final keeper = MemoryHousekeeper(
+    memory: () => ref.read(personMemoryProvider.notifier),
+    mayAsk: () => ref.read(personMemorySettingsProvider).learnsAutomatically,
+    endpoint: () => ref.read(autoReplyEndpointProvider),
+    foreground: ref.watch(appInForegroundProvider),
+  );
+  ref.listen(chatsProvider, (_, next) {
+    final chats = next.value;
+    if (chats == null || chats.isEmpty) return;
+    final graph = ref.read(chatRepositoryProvider).identityGraph;
+    keeper.directChatsKnown([
+      for (final chat in chats)
+        if (!chat.isGroup)
+          (
+            chatKeys: chatMemoryKeys(chat),
+            personKeys: personMemoryKeysFor(graph, chat),
+          ),
+    ]);
+  }, fireImmediately: true);
+  ref.onDispose(keeper.dispose);
+  return keeper;
+});

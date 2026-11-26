@@ -9937,33 +9937,6 @@
   "@personMemoryForgotAll": {
     "description": "Toast after all notes were deleted. About 30 chars."
   },
-  "memoryThisChat": "This chat",
-  "@memoryThisChat": {
-    "description": "Section header on the contact screen over the memory of this chat. Keep under ~20 chars."
-  },
-  "chatMemoryScreenTitle": "Memory: {name}",
-  "@chatMemoryScreenTitle": {
-    "description": "App bar title of the screen editing a chat's memory. Keep under ~28 chars.",
-    "placeholders": {
-      "name": {
-        "type": "String",
-        "description": "The chat's or the person's name.",
-        "example": "Anna"
-      }
-    }
-  },
-  "chatMemoryLabel": "About this chat",
-  "@chatMemoryLabel": {
-    "description": "Label of the chat memory field. Keep under ~24 chars."
-  },
-  "chatMemoryHint": "## Ongoing topics\n## Plans\n## Tone in this chat\n## Inside jokes",
-  "@chatMemoryHint": {
-    "description": "Placeholder of the chat memory field: suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
-  },
-  "chatMemoryEmpty": "Nothing noted for this chat yet. Tap to add topics, plans or the tone you use here.",
-  "@chatMemoryEmpty": {
-    "description": "Row on the contact screen when nothing is noted for the chat yet. About 60 chars."
-  },
   "personMemorySharedHint": "Used in every chat with this person. Keep it to a few lines.",
   "@personMemorySharedHint": {
     "description": "Helper text under the person note field. About 70 chars."
@@ -9996,7 +9969,7 @@
   "@personMemoryDetailsTitle": {
     "description": "Title of the dialog with the full explanation of personal memory."
   },
-  "personMemoryDetails": "Each chat, groups included, has a memory of its own: plans, topics, the tone you use there. Each person has a short one used in every chat they are in: name, relationship, birthday, formal or casual.\n\nWith automatic learning on, Sennit reads an active chat again after about 30 new messages, or once a day, while the app is open. It sends up to the last {count} messages to your AI model and updates the memory itself: it adds new facts, rewrites changed ones and drops stale ones. Each learned fact shows when it was learned. Edit, pin or delete it, or undo the last update; AI never changes a fact you edited or pinned.\n\nIt also learns how you write in each chat (language, length, emojis) and how the other person writes. Reply suggestions, quick messages and auto-replies are then written in your style, with a few of your recent messages in that chat as examples.\n\nWith personal memory on, every AI feature (reply suggestions, quick messages, auto-replies, to-dos and calendar titles) sends a shortened memory of the chat and its people with its request.\n\nMemory is stored only on this device, encrypted in the system keychain, not synced, included in backups and deleted with your account. Turn personal memory off and nothing is sent.",
+  "personMemoryDetails": "Each person has one memory, used in every chat with them on every network: name, relationship, birthday, formal or casual, and the plans and topics you talk about. Each group has its own: plans, topics, the tone used there.\n\nWith automatic learning on, Sennit reads an active chat again after about 30 new messages, or once a day, while the app is open. It sends up to the last {count} messages to your AI model and updates the memory itself: it adds new facts, rewrites changed ones and drops stale ones. Things that only last a while, like an appointment or a trip, are kept with their date and go once it has passed, leaving at most a short note such as “Had a dentist appointment on 27 Nov” for a month. Passing things like “I’m in the car” are not kept. Each learned fact shows when it was learned. Edit, pin or delete it, or undo the last update; AI never changes a fact you edited or pinned.\n\nIt also learns how you write in each chat (language, length, emojis) and how the other person writes. Reply suggestions, quick messages and auto-replies are then written in your style, with a few of your recent messages in that chat as examples.\n\nWith personal memory on, every AI feature (reply suggestions, quick messages, auto-replies, to-dos and calendar titles) sends a shortened memory of the chat and its people with its request.\n\nMemory is stored only on this device, encrypted in the system keychain, not synced, included in backups and deleted with your account. Turn personal memory off and nothing is sent.",
   "@personMemoryDetails": {
     "description": "The full explanation of personal memory, in a dialog behind Learn more: the two kinds of memory, how and when automatic learning runs, what is sent where, what is stored where. {count} is the most recent messages a learning pass sends, which depends on the AI model's context window.",
     "placeholders": {
@@ -10066,6 +10039,44 @@
         "type": "String",
         "description": "A short date, as the locale writes it.",
         "example": "24 Nov"
+      }
+    }
+  },
+  "groupMemoryTitle": "About this group",
+  "@groupMemoryTitle": {
+    "description": "Title of a group's memory: section header on the contact screen, app bar title of its editor, and the label of its note field. Keep under ~24 chars."
+  },
+  "groupMemoryHint": "## Ongoing topics\n## Plans\n## Tone in this group\n## Inside jokes",
+  "@groupMemoryHint": {
+    "description": "Placeholder of a group's memory field: suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "groupMemoryEmpty": "Nothing noted for this group yet. Tap to add topics, plans or the tone you use here.",
+  "@groupMemoryEmpty": {
+    "description": "Row on the contact screen when nothing is noted for the group yet. About 80 chars."
+  },
+  "directMemoryHint": "## Name or nickname\n## Relationship\n## Birthday\n## Formal or casual\n## Plans and ongoing topics",
+  "@directMemoryHint": {
+    "description": "Placeholder of the memory field of a one-to-one chat, which is the memory of the person it is with: suggested Markdown headings, one per line, each starting with '## '. Keep the '## ' and the line breaks."
+  },
+  "personMemoryUntil": "until {date}",
+  "@personMemoryUntil": {
+    "description": "Shown after 'Learned {date}' under a temporary learned fact (an appointment, a trip), joined with ' · ': the last day it is kept. Lowercase where the language allows. Keep under ~20 chars.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "A short date.",
+        "example": "27 Nov"
+      }
+    }
+  },
+  "personMemoryPastUntil": "kept until {date}",
+  "@personMemoryPastUntil": {
+    "description": "Shown after 'Learned {date}' under a short past-tense note a temporary fact left behind ('Had a dentist appointment on 27 Nov'), joined with ' · ': the last day the note is kept. Lowercase where the language allows. Keep under ~24 chars.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "description": "A short date.",
+        "example": "27 Dec"
       }
     }
   },
