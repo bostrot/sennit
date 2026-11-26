@@ -32,6 +32,11 @@ class VoiceRecorder {
 
   Duration get elapsed => _elapsed.elapsed;
 
+  /// Whether the take is on hold: the file stays open, nothing is captured
+  /// and the clock stands still until [resume].
+  bool get paused => _paused;
+  bool _paused = false;
+
   /// Asks for the microphone (first time) and starts recording.
   ///
   /// Returns false when permission was refused — the caller says so in words
@@ -75,9 +80,27 @@ class VoiceRecorder {
     return true;
   }
 
+  /// Holds the take without ending it, for a thought mid-sentence or a noise
+  /// in the room. The note stays one file; the pause is simply not in it.
+  Future<void> pause() async {
+    if (_path == null || _paused) return;
+    await _recorder.pause();
+    _elapsed.stop();
+    _paused = true;
+  }
+
+  /// Carries on recording into the same note after [pause].
+  Future<void> resume() async {
+    if (_path == null || !_paused) return;
+    await _recorder.resume();
+    _elapsed.start();
+    _paused = false;
+  }
+
   /// Stops and returns the note, or null when nothing usable was captured.
   Future<VoiceRecording?> stop() async {
     _elapsed.stop();
+    _paused = false;
     final path = await _recorder.stop() ?? _path;
     _path = null;
     if (path == null) return null;
@@ -113,6 +136,7 @@ class VoiceRecorder {
   /// Stops and deletes whatever was captured.
   Future<void> cancel() async {
     _elapsed.stop();
+    _paused = false;
     final path = await _recorder.stop() ?? _path;
     _path = null;
     if (path != null) await _discard(File(path));

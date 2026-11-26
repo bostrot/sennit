@@ -5432,6 +5432,15 @@ class _VoiceContent extends ConsumerWidget {
                 ),
               ),
             ),
+            // Only on the note in hand: a speed button on every bubble is
+            // noise, and the speed carries over to the next note anyway.
+            if (isCurrent && !loading)
+              _VoiceSpeedButton(
+                speed: playback.speed,
+                color: onBubble,
+                onPressed: () =>
+                    ref.read(voicePlayerProvider.notifier).cycleSpeed(),
+              ),
           ],
         ),
         AttachmentTranscript(
@@ -5442,6 +5451,61 @@ class _VoiceContent extends ConsumerWidget {
           onRetranscribe: onRetranscribe,
         ),
       ],
+    );
+  }
+}
+
+/// The 1× / 1.5× / 2× button beside a playing voice note.
+class _VoiceSpeedButton extends StatelessWidget {
+  const _VoiceSpeedButton({
+    required this.speed,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final double speed;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = context.l10n.chatVoiceSpeedValue(speed);
+    return Semantics(
+      container: true,
+      button: true,
+      excludeSemantics: true,
+      label: context.l10n.chatVoiceSpeedLabel(speed),
+      onTap: onPressed,
+      child: Tooltip(
+        message: context.l10n.chatVoiceSpeedTooltip,
+        child: InkWell(
+          borderRadius: WeftRadius.pill,
+          onTap: onPressed,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: WeftSpace.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: WeftRadius.pill,
+                  border: Border.all(color: color.withValues(alpha: 0.6)),
+                ),
+                child: Text(
+                  shown,
+                  style: context.text.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
