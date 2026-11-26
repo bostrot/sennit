@@ -36,7 +36,8 @@ so the night sends Google one set of changes to review:
 - open testing, `beta`, to everyone at once;
 - `production`, as a staged rollout to PLAY_PRODUCTION_ROLLOUT of users
   (default 0.2), next to the last completed release, which everyone else
-  keeps.
+  keeps. The first release on production cannot be staged, so it goes to
+  everyone.
 
 Before that, a staged production rollout that has been out a night is
 completed: when its build landed on the internal track 24 hours ago or more
@@ -273,11 +274,10 @@ def play_plan(track, target, release, decision, rollout, staged_landed, now):
     reasons.append(decision.reason)
     fraction = rollout if track == STAGED_TRACK else 1
     if decision.promote and fraction < 1 and not completed:
-        # Play: "The first release on a track cannot be staged". The first
-        # one to everyone is a person's call, not the night's.
-        reasons.append(f'but Play cannot stage the first release on {track}: release one '
-                       'to everyone first, in the Console or with PLAY_PRODUCTION_ROLLOUT=1')
-        return Decision(False, '; '.join(reasons)), None
+        # Play: "The first release on a track cannot be staged". So the first
+        # one goes to everyone, and the ones after it are staged again.
+        reasons.append(f'Play cannot stage the first release on {track}: it goes to everyone')
+        fraction = 1
     after = None
     if decision.promote:
         after = play_track_releases(release, {'releases': completed}, fraction)

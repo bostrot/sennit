@@ -248,12 +248,12 @@ class PlayPlanTest(unittest.TestCase):
         self.assertTrue(decision.failed)
         self.assertIsNone(after)
 
-    def test_the_first_production_release_is_not_staged(self):
+    def test_the_first_production_release_goes_to_everyone(self):
         # Play: "The first release on a track cannot be staged".
         decision, after = self.plan('production', [])
-        self.assertFalse(decision.promote)
         self.assertFalse(decision.failed)
-        self.assertIsNone(after)
+        self.assertEqual(decision.steps, [('promote', self.new, 1)])
+        self.assertEqual([r['status'] for r in after], ['completed'])
         self.assertIn('first release', decision.reason)
 
     def test_the_first_production_release_can_go_to_everyone(self):

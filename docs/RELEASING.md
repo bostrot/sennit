@@ -311,9 +311,8 @@ in the Console. To stop a bad build from going to 100 %, halt it in the
 Console before 03:00.
 
 Play cannot stage the first release on a track, so while production has
-none the nightly run leaves it alone (beta goes on) and says so. Release the
-first one to everyone by hand: in the Console, or once with
-`PLAY_PRODUCTION_ROLLOUT=1` and a manual run with `dry_run` off.
+no completed release the promotion sends the build there to everyone; from
+the next one on, production is staged again.
 
 The nightly run does not read Play vitals (crash and ANR rates) before
 completing: the Play Developer Reporting API needs its own scope and the
