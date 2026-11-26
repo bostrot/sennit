@@ -21,7 +21,7 @@ and what was noticed but not done.
 
 - 2026-11-25 · Feature · Tapping a contact's profile picture opens it full screen, uncropped and zoomable, fetched larger from the homeserver's thumbnail API · https://github.com/bostrot/sennit/pull/48
 
-- 2026-11-26 · Localization · File sizes use the reader's decimal mark ("2,4 MB" in German, Spanish, French and Portuguese) in file bubbles, upload progress, the attach preview, the media viewer, the share sheet, the backup screen and the "too large" error · PR_LINK
+- 2026-11-26 · Localization · File sizes use the reader's decimal mark ("2,4 MB" in German, Spanish, French and Portuguese) in file bubbles, upload progress, the attach preview, the media viewer, the share sheet, the backup screen and the "too large" error · https://github.com/bostrot/sennit/pull/82
 
 ## Lessons from reviews
 
