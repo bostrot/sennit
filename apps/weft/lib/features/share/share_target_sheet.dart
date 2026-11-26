@@ -775,7 +775,7 @@ class _TargetTile extends ConsumerWidget {
   }
 
   static String? _lastActivity(Chat chat) {
-    final at = chat.lastMessage?.timestamp;
+    final at = chat.lastActivityAt;
     return at == null ? null : DateFormat.yMMMd().format(at);
   }
 }

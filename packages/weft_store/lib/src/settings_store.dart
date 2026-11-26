@@ -245,6 +245,11 @@ abstract final class WeftSettings {
   /// memory and the request was back in the list on the next launch.
   static const String acceptedRequests = 'requests.accepted';
 
+  /// Per room, the newest message and reaction this device has seen — what
+  /// the inbox is ordered by. Ids and times only, no content; kept on this
+  /// device, since each one reads its own timeline.
+  static const String roomActivity = 'rooms.activity';
+
   /// Messages that failed to send and why, by event id. Kept on this device:
   /// the failed echoes it describes exist only here.
   static const String sendQueue = 'send.queue';

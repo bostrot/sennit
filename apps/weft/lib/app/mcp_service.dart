@@ -48,7 +48,7 @@ class AppMcpDataSource implements WeftMcpDataSource {
           unreadCount: chat.unreadCount,
           isMerged: chat.isMerged,
           lastMessagePreview: chat.lastMessage?.body,
-          lastMessageAt: chat.lastMessage?.timestamp,
+          lastMessageAt: chat.lastActivityAt,
         ),
     ];
   }

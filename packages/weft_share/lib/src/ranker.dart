@@ -160,7 +160,7 @@ class ShareTargetRanker {
     required DateTime now,
     ChatShareActivity activity = ChatShareActivity.none,
   }) {
-    final recency = _decay(chat.lastMessage?.timestamp, now);
+    final recency = _decay(chat.lastActivityAt, now);
 
     final sends = activity.sendCount <= 0
         ? 0.0

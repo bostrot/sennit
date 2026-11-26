@@ -19,6 +19,7 @@ import 'room_joiner.dart';
 import 'chat_repository.dart';
 import 'own_reactions.dart';
 import 'profile_lookups.dart';
+import 'room_activity.dart';
 import 'send_queue_source.dart';
 import 'sms_chat_repository.dart';
 
@@ -73,7 +74,8 @@ class MatrixChatRepository
        _videoPoster = videoPoster,
        _shrinkImage = imageShrinker,
        _sms = sms,
-       _onUploads = onUploads {
+       _onUploads = onUploads,
+       _activity = RoomActivityLog(settings: settings) {
     // Rehydrate: stored handles and decisions rebuild the same partition the
     // user last saw, which is what makes an unmerge survive a restart.
     final storedHandles = _store?.loadHandles() ?? const <NetworkHandle>[];
@@ -106,6 +108,11 @@ class MatrixChatRepository
       (event) => unawaited(_noteOwnReaction(event)),
     );
     _syncStatusSub = _session.client.onSyncStatus.stream.listen(_onSyncStatus);
+    _activitySubs = [
+      _session.client.onTimelineEvent.stream.listen(_onActivityEvent),
+      _session.client.onHistoryEvent.stream.listen(_onActivityEvent),
+    ];
+    unawaited(_seedActivity());
 
     final sms = _sms;
     if (sms != null) {
@@ -168,6 +175,11 @@ class MatrixChatRepository
   /// answered.
   late OwnReactionLog _ownReactions;
   StreamSubscription<sdk.SyncStatusUpdate>? _syncStatusSub;
+  List<StreamSubscription<sdk.Event>> _activitySubs = const [];
+
+  /// What last happened in each room that moves it up the inbox. See
+  /// [RoomActivityLog] for why that is not `Room.lastEvent`.
+  final RoomActivityLog _activity;
   StreamSubscription<void>? _smsSub;
 
   final _chatsController = StreamController<List<Chat>>.broadcast();
@@ -2347,6 +2359,10 @@ class MatrixChatRepository
     await _syncSub?.cancel();
     await _ownReactionSub?.cancel();
     await _syncStatusSub?.cancel();
+    for (final sub in _activitySubs) {
+      await sub.cancel();
+    }
+    _activity.flush();
     await _sendFailureChanges.close();
     await _smsSub?.cancel();
     await _uploadSub?.cancel();
@@ -2917,24 +2933,219 @@ class MatrixChatRepository
     return muted;
   }
 
-  /// The inbox preview, re-mapped only when the room's last event moves —
-  /// mapping every room's tail on every rebuild was pure repeat work.
+  /// The inbox preview, re-mapped only when what it shows moves — mapping
+  /// every room's tail on every rebuild was pure repeat work.
   final Map<String, (String, WeftMessage?)> _previewCache = {};
 
   WeftMessage? _previewFor(
     sdk.Room room,
-    sdk.Event lastEvent,
+    sdk.Event message,
+    ChatNetwork network, {
+    sdk.Event? edit,
+  }) {
+    final key = '${message.eventId}|${edit?.eventId}|${message.redacted}';
+    final cached = _previewCache[room.id];
+    if (cached != null && cached.$1 == key) return cached.$2;
+    final mapped = mapPreview(
+      message,
+      network: network,
+      ownUserId: _client.userID,
+      edit: edit,
+    );
+    _previewCache[room.id] = (key, mapped);
+    return mapped;
+  }
+
+  /// The reaction preview, cached the same way and for the same reason.
+  final Map<String, (String, WeftMessage?)> _reactionPreviewCache = {};
+
+  WeftMessage? _reactionPreviewFor(
+    sdk.Room room,
+    ActivityMark mark,
     ChatNetwork network,
   ) {
-    final cached = _previewCache[room.id];
-    if (cached != null && cached.$1 == lastEvent.eventId) return cached.$2;
-    final mapped = mapEvent(
-      lastEvent,
+    final reaction = mark.event;
+    if (reaction == null) {
+      _loadActivity(room, mark);
+      return null;
+    }
+    if (mark.target == null) _loadReactionTarget(room, mark);
+    final target = mark.target;
+    final key = '${reaction.eventId}|${target?.eventId}|${target?.redacted}';
+    final cached = _reactionPreviewCache[room.id];
+    if (cached != null && cached.$1 == key) return cached.$2;
+    final mapped = mapReactionPreview(
+      reaction,
+      target: target,
       network: network,
       ownUserId: _client.userID,
     );
-    _previewCache[room.id] = (lastEvent.eventId, mapped);
+    _reactionPreviewCache[room.id] = (key, mapped);
     return mapped;
+  }
+
+  // ---------------------------------------------------------------- activity
+
+  /// How far back the cached timeline is read for a room's first activity.
+  /// Enough to step over a backfill's worth of state; the database holds only
+  /// what sync and scrolling have brought in anyway.
+  static const int _activityScanDepth = 60;
+
+  /// The newest message in [room], as an event, or null when none is known.
+  ///
+  /// The SDK's `lastEvent` is taken when it is a message — it is the freshest
+  /// witness there is and usually the same event as the log's. Anything else it
+  /// may be (a placeholder after a limited sync, an edit, a call-membership
+  /// update) leaves the log's own answer standing.
+  sdk.Event? _lastMessageOf(sdk.Room room) {
+    final last = room.lastEvent;
+    if (last != null && roomActivityOf(last) == RoomActivityKind.message) {
+      _activity.record(room.id, last);
+    }
+    final mark = _activity[room.id]?.message;
+    if (mark == null) return null;
+    if (mark.event == null) {
+      if (last?.eventId == mark.eventId) {
+        mark.event = last;
+      } else {
+        _loadActivity(room, mark);
+      }
+    }
+    return mark.event;
+  }
+
+  /// When [room] last had activity, preview or not: the log's newest mark —
+  /// which outlives an event that cannot be read back or decrypted yet — or,
+  /// for a room the log knows nothing of, the time the SDK has for it.
+  DateTime? _activityAtOf(sdk.Room room) {
+    final activity = _activity[room.id];
+    final message = activity?.message?.at;
+    final reaction = activity?.reaction?.at;
+    if (message == null && reaction == null) {
+      // A room just made, an invite, or one whose cache holds nothing but
+      // state yet. Not the placeholder a limited sync leaves, though: that is
+      // stamped with whatever came first in the sync, a profile change as
+      // often as not, and is replaced by the real thing within seconds.
+      final last = room.lastEvent;
+      return last == null || last.type == sdk.EventTypes.refreshingLastEvent
+          ? null
+          : last.originServerTs;
+    }
+    if (message == null) return reaction;
+    if (reaction == null) return message;
+    return reaction.isAfter(message) ? reaction : message;
+  }
+
+  void _onActivityEvent(sdk.Event event) {
+    final room = event.room;
+    if (event.type == sdk.EventTypes.Redaction) {
+      final redacts = event.redacts ?? event.content.tryGet<String>('redacts');
+      final activity = _activity[room.id];
+      if (redacts == null || activity == null) return;
+      if (activity.reaction?.eventId == redacts) {
+        // A withdrawn reaction is not something that happened. What the row
+        // shows is whatever was newest before it, read again from the cache
+        // the redaction has already been written to.
+        _activity.dropReaction(room.id);
+        unawaited(_scanActivity(room));
+      } else if (activity.message?.eventId == redacts) {
+        // Deleted where it stood, at its own time.
+        activity.message!.event?.setRedactionEvent(event);
+      } else if (activity.reaction?.target?.eventId == redacts) {
+        activity.reaction!.target!.setRedactionEvent(event);
+      }
+      return;
+    }
+    if (_activity.record(room.id, event)) _loadReactionTargetOf(room);
+  }
+
+  /// Starts reading the message [room]'s newest reaction was put on, so the
+  /// rebuild the sync schedules has its words.
+  void _loadReactionTargetOf(sdk.Room room) {
+    final mark = _activity[room.id]?.reaction;
+    if (mark != null && mark.target == null) _loadReactionTarget(room, mark);
+  }
+
+  /// Reads the cached timelines of rooms this device has never read activity
+  /// for — every room, on the first start with this log, and a room whose
+  /// reaction was withdrawn.
+  Future<void> _seedActivity() async {
+    final rooms = [..._client.rooms];
+    if (rooms.isEmpty) return;
+    _activity.retainOnly({for (final room in rooms) room.id});
+    var any = false;
+    for (final room in rooms) {
+      if (room.isSpace || (_activity[room.id]?.scanned ?? false)) continue;
+      any |= await _scanActivity(room, rebuild: false);
+    }
+    if (any) _scheduleRebuild();
+  }
+
+  /// Reads [room]'s cached timeline into the log. True when it changed what
+  /// the room shows.
+  Future<bool> _scanActivity(sdk.Room room, {bool rebuild = true}) async {
+    final List<sdk.Event> events;
+    try {
+      events = await _client.database.getEventList(
+        room,
+        limit: _activityScanDepth,
+      );
+    } on Object catch (error) {
+      debugPrint('weft: reading activity for ${room.id} failed: $error');
+      return false;
+    }
+    var changed = false;
+    for (final event in events) {
+      changed |= _activity.record(room.id, event);
+    }
+    _activity.markScanned(room.id);
+    _loadReactionTargetOf(room);
+    if (changed && rebuild) _scheduleRebuild();
+    return changed;
+  }
+
+  /// Event ids already asked of the database, so a row drawn every rebuild
+  /// asks once.
+  final Set<String> _activityLookups = {};
+
+  /// Reads [mark]'s event back from the database, after a restart.
+  void _loadActivity(sdk.Room room, ActivityMark mark) {
+    final id = mark.eventId;
+    if (!_activityLookups.add(id)) return;
+    unawaited(() async {
+      try {
+        final event = await _client.database.getEventById(id, room);
+        if (event == null || mark.eventId != id) return;
+        mark.event = event;
+        if (roomActivityOf(event) == RoomActivityKind.reaction) {
+          _loadReactionTarget(room, mark);
+        }
+        _scheduleRebuild();
+      } on Object catch (error) {
+        debugPrint('weft: reading $id failed: $error');
+      }
+    }());
+  }
+
+  /// Reads the message [mark]'s reaction was put on, for the preview's words.
+  void _loadReactionTarget(sdk.Room room, ActivityMark mark) {
+    final targetId = switch (mark.event) {
+      final event? => mapReaction(event)?.targetEventId,
+      null => null,
+    };
+    // Its own entry: the same message is often also the room's last one, and
+    // read for that under its bare id.
+    if (targetId == null || !_activityLookups.add('target $targetId')) return;
+    unawaited(() async {
+      try {
+        final target = await _client.database.getEventById(targetId, room);
+        if (target == null) return;
+        mark.target = target;
+        _scheduleRebuild();
+      } on Object catch (error) {
+        debugPrint('weft: reading $targetId failed: $error');
+      }
+    }());
   }
 
   /// How many messages are waiting in [room].
@@ -2978,6 +3189,8 @@ class MatrixChatRepository
   Chat _chatFromRoom(sdk.Room room) {
     final network = _networkOf(room);
     final lastEvent = room.lastEvent;
+    final message = _lastMessageOf(room);
+    final reaction = _activity[room.id]?.reaction;
 
     return Chat(
       id: room.id,
@@ -3003,9 +3216,22 @@ class MatrixChatRepository
         ),
       ],
       avatarUrl: _avatarFor(room),
-      lastMessage: lastEvent == null
+      lastMessage: message == null
           ? null
-          : _previewFor(room, lastEvent, network),
+          : _previewFor(
+              room,
+              message,
+              network,
+              edit:
+                  lastEvent != null &&
+                      editTargetEventId(lastEvent.content) == message.eventId
+                  ? lastEvent
+                  : null,
+            ),
+      lastReaction: reaction == null
+          ? null
+          : _reactionPreviewFor(room, reaction, network),
+      activityAt: _activityAtOf(room),
       // The marked-unread flag keeps at least a badge of one; otherwise a
       // conversation the user has read is read — this session's optimistic
       // receipt, or the *persisted* one the SDK synced back, both beat the
@@ -3180,9 +3406,25 @@ class MatrixChatRepository
       legs.sort((a, b) {
         final at = a.lastMessage?.timestamp;
         final bt = b.lastMessage?.timestamp;
-        if (at == null || bt == null) return 0;
+        if (at == null) return bt == null ? 0 : 1;
+        if (bt == null) return -1;
         return bt.compareTo(at);
       });
+      // The merged row moves for a reaction on any leg, like it does for a
+      // message: the newest of them, wherever it was put.
+      WeftMessage? reaction;
+      DateTime? activityAt;
+      for (final leg in legs) {
+        final r = leg.lastReaction;
+        if (r != null &&
+            (reaction == null || r.timestamp.isAfter(reaction.timestamp))) {
+          reaction = r;
+        }
+        final at = leg.lastActivityAt;
+        if (at != null && (activityAt == null || at.isAfter(activityAt))) {
+          activityAt = at;
+        }
+      }
 
       final mergedId = 'merged:${contact.id}';
       out.add(
@@ -3198,6 +3440,8 @@ class MatrixChatRepository
           sources: [for (final leg in legs) leg.sources.single],
           avatarUrl: contact.avatarUrl ?? legs.first.avatarUrl,
           lastMessage: legs.first.lastMessage,
+          lastReaction: reaction,
+          activityAt: activityAt,
           unreadCount: legs.fold(0, (sum, leg) => sum + leg.unreadCount),
           pinned: legs.any((leg) => leg.pinned),
           muted: legs.every((leg) => leg.muted),

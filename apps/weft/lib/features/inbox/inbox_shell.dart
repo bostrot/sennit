@@ -287,11 +287,7 @@ class LiveChatTile extends ConsumerWidget {
         return (
           repository.typingIn(chat.id).isNotEmpty,
           repository.presenceFor(chat.id)?.online ?? false,
-          formatInboxTime(
-            chat.lastMessage?.timestamp,
-            now: now(),
-            justNow: justNow,
-          ),
+          formatInboxTime(chat.lastActivityAt, now: now(), justNow: justNow),
         );
       }),
     );

@@ -63,6 +63,8 @@ class Chat {
     this.contactId,
     this.avatarUrl,
     this.lastMessage,
+    this.lastReaction,
+    DateTime? activityAt,
     this.unreadCount = 0,
     this.isGroup = false,
     this.pinned = false,
@@ -72,7 +74,8 @@ class Chat {
     this.participantCount,
     this.reactedUpTo,
     ChatNetwork? preferredSendNetwork,
-  }) : _preferredSendNetwork = preferredSendNetwork;
+  }) : _preferredSendNetwork = preferredSendNetwork,
+       _activityAt = activityAt;
 
   /// Room id for a single-source chat; `merged:<contactId>` for a merged one.
   final String id;
@@ -85,6 +88,68 @@ class Chat {
 
   final String? avatarUrl;
   final WeftMessage? lastMessage;
+
+  /// The newest reaction in this conversation, from the user or from anyone
+  /// else, or null when none is known.
+  ///
+  /// Beside [lastMessage] rather than in its place: a reaction is activity —
+  /// somebody did something here, and the row should move up and say so — but
+  /// it is not a message. Whatever asks "who spoke last" (needs-reply, reply
+  /// reminders, the default send network, Siri) still gets the message.
+  ///
+  /// Carries [WeftMessage.reactionKey]; its kind and body are those of the
+  /// message reacted to, where that message is known.
+  final WeftMessage? lastReaction;
+
+  /// When something last happened here, as far as the inbox's order goes.
+  ///
+  /// A message or a reaction, from either side — and nothing else. A contact
+  /// changing their profile picture, a room renamed, a bridge updating its
+  /// state or an edit to an old message is not news, and used to put the
+  /// conversation on top of the inbox all the same.
+  ///
+  /// The newest of the two previews' times and `activityAt`, which a source
+  /// passes for activity it knows the time of but cannot preview yet — a
+  /// reaction still encrypted, a message being read back from a cache — and
+  /// for a conversation with no activity at all, the time it has for it.
+  DateTime? get lastActivityAt {
+    DateTime? newest;
+    for (final at in [
+      lastMessage?.timestamp,
+      lastReaction?.timestamp,
+      _activityAt,
+    ]) {
+      if (at != null && (newest == null || at.isAfter(newest))) newest = at;
+    }
+    return newest;
+  }
+
+  final DateTime? _activityAt;
+
+  /// [lastReaction] when it is newer than [lastMessage], else [lastMessage]:
+  /// what the inbox row's preview line describes.
+  WeftMessage? get lastActivity {
+    final reaction = lastReaction;
+    final message = lastMessage;
+    if (reaction == null) return message;
+    if (message == null || reaction.timestamp.isAfter(message.timestamp)) {
+      return reaction;
+    }
+    return message;
+  }
+
+  /// Newest activity first, conversations with none known last.
+  ///
+  /// A total order, unlike the "0 when either is null" it replaces, which made
+  /// the sort's result depend on where the nulls happened to start.
+  static int byActivity(Chat a, Chat b) {
+    final at = a.lastActivityAt;
+    final bt = b.lastActivityAt;
+    if (at == null) return bt == null ? 0 : 1;
+    if (bt == null) return -1;
+    return bt.compareTo(at);
+  }
+
   final int unreadCount;
   final bool isGroup;
   final bool pinned;
@@ -194,6 +259,7 @@ class Chat {
     List<ChatSource>? sources,
     String? avatarUrl,
     WeftMessage? lastMessage,
+    WeftMessage? lastReaction,
     int? unreadCount,
     bool? pinned,
     bool? archived,
@@ -210,6 +276,8 @@ class Chat {
       contactId: contactId,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       lastMessage: lastMessage ?? this.lastMessage,
+      lastReaction: lastReaction ?? this.lastReaction,
+      activityAt: _activityAt,
       unreadCount: unreadCount ?? this.unreadCount,
       isGroup: isGroup,
       pinned: pinned ?? this.pinned,
@@ -258,14 +326,18 @@ class Chat {
         other.participantCount != participantCount ||
         other.reactedUpTo != reactedUpTo ||
         other._preferredSendNetwork != _preferredSendNetwork ||
+        other._activityAt != _activityAt ||
         other.sources.length != sources.length) {
       return false;
     }
     for (var i = 0; i < sources.length; i++) {
       if (!sources[i].sameContentAs(other.sources[i])) return false;
     }
-    final last = lastMessage;
-    final otherLast = other.lastMessage;
+    return _samePreview(lastMessage, other.lastMessage) &&
+        _samePreview(lastReaction, other.lastReaction);
+  }
+
+  static bool _samePreview(WeftMessage? last, WeftMessage? otherLast) {
     if (identical(last, otherLast)) return true;
     if (last == null || otherLast == null) return false;
     // `WeftMessage ==` is the event plus everything that can change for it;
@@ -276,7 +348,8 @@ class Chat {
         last.isOwn == otherLast.isOwn &&
         last.network == otherLast.network &&
         last.senderName == otherLast.senderName &&
-        last.replyToEventId == otherLast.replyToEventId;
+        last.replyToEventId == otherLast.replyToEventId &&
+        last.reactionKey == otherLast.reactionKey;
   }
 
   /// Whether two inboxes hold the same conversations, in the same order, with

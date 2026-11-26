@@ -626,6 +626,129 @@ WeftMessage? mapReactionNotice(
   );
 }
 
+/// What an event does to a conversation's place in the inbox.
+enum RoomActivityKind {
+  /// Somebody said something: a message, a sticker, a poll, a call.
+  message,
+
+  /// Somebody reacted to something.
+  reaction,
+}
+
+/// Whether [event] is news that moves its conversation up the inbox, and as
+/// what — or null for everything that is not.
+///
+/// Matrix orders rooms by their newest event, whatever it is, so a bridged
+/// contact changing their profile picture put the conversation on top with
+/// nothing new in it. Only a message or a reaction counts here, from the user
+/// or from anyone else. Not activity:
+///
+/// - state of any kind: membership and profile changes, the room's name,
+///   avatar, topic, power levels, the bridge's own state;
+/// - an edit (`m.replace`) — correcting an old message is not a new one, and
+///   moving the row would put a three-day-old conversation on top for a typo;
+/// - a poll vote or any other `m.reference`, receipts, typing, call plumbing;
+/// - a bridge narrating its connection ([WeftMessage.isBridgeNotice]) and a
+///   server notice;
+/// - a withdrawn reaction — redaction strips its key.
+///
+/// A redacted *message* stays a message, at its own time: the row says
+/// "message deleted" where it was, rather than falling back down.
+///
+/// An undecrypted event is judged by its relation, which Matrix keeps in the
+/// clear for exactly this kind of question.
+RoomActivityKind? roomActivityOf(sdk.Event event) {
+  final content = event.content;
+  final relatesTo = content['m.relates_to'];
+  final relType = relatesTo is Map ? relatesTo['rel_type'] : null;
+  switch (event.type) {
+    case sdk.EventTypes.Reaction:
+      return annotationKey(content) == null ? null : RoomActivityKind.reaction;
+    case sdk.EventTypes.Encrypted:
+      return switch (relType) {
+        sdk.RelationshipTypes.reaction => RoomActivityKind.reaction,
+        sdk.RelationshipTypes.edit || sdk.RelationshipTypes.reference => null,
+        _ => RoomActivityKind.message,
+      };
+    case sdk.EventTypes.Message:
+      if (relType == sdk.RelationshipTypes.edit) return null;
+      final msgtype = content['msgtype'];
+      if (msgtype == 'm.server_notice') return null;
+      if (msgtype == sdk.MessageTypes.Notice &&
+          bridgeBotNetworkOf(event.senderId) != null) {
+        return null;
+      }
+      return RoomActivityKind.message;
+    case sdk.EventTypes.Sticker ||
+        kPollStartUnstable ||
+        kPollStartStable ||
+        sdk.EventTypes.CallInvite ||
+        sdk.EventTypes.CallHangup ||
+        sdk.EventTypes.CallReject:
+      return RoomActivityKind.message;
+  }
+  return null;
+}
+
+/// [event] mapped for the inbox preview, reading as its newest version when
+/// [edit] — the replacement the room last saw for it — is given.
+///
+/// The inbox has no timeline to aggregate edits from, only the one event the
+/// room knows was last; without this, a message corrected after it was sent
+/// previewed as nothing at all.
+WeftMessage? mapPreview(
+  sdk.Event event, {
+  required ChatNetwork network,
+  required String? ownUserId,
+  sdk.Event? edit,
+}) {
+  final message = mapEvent(event, network: network, ownUserId: ownUserId);
+  final replacement = edit == null ? null : mapEdit(edit);
+  if (message == null ||
+      message.redacted ||
+      replacement == null ||
+      replacement.targetEventId != event.eventId) {
+    return message;
+  }
+  return applyEdits([replacement], message).message;
+}
+
+/// A reaction as an inbox preview: the emoji, who put it there, and the
+/// message it was put on, or null when [reaction] is not a live reaction.
+///
+/// [target] is the message reacted to, when it is at hand. Its kind and words
+/// are borrowed so the row can say what was reacted to — "a photo", "see you
+/// at six" — and without it the preview names the emoji alone. Unlike
+/// [mapReactionNotice] it maps the user's own reactions too, and carries no
+/// reply relation: the row would draw a reply arrow for it.
+WeftMessage? mapReactionPreview(
+  sdk.Event reaction, {
+  required sdk.Event? target,
+  required ChatNetwork network,
+  required String? ownUserId,
+}) {
+  final annotation = mapReaction(reaction);
+  if (annotation == null) return null;
+  final reactedTo = target == null || target.eventId != annotation.targetEventId
+      ? null
+      : mapEvent(target, network: network, ownUserId: ownUserId);
+  final readable = reactedTo != null && !reactedTo.redacted;
+
+  return WeftMessage(
+    eventId: reaction.eventId,
+    roomId: reaction.roomId ?? '',
+    network: network,
+    senderId: reaction.senderId,
+    senderName: reaction.senderFromMemoryOrFallback.calcDisplayname(),
+    timestamp: reaction.originServerTs,
+    kind: readable ? reactedTo.kind : MessageKind.text,
+    isOwn: reaction.senderId == ownUserId,
+    reactionKey: annotation.key,
+    body: readable ? reactedTo.body : '',
+    transcript: readable ? reactedTo.transcript : null,
+  );
+}
+
 /// Maps an `m.replace` event, or null for anything that is not one.
 ///
 /// The replacement text comes from `m.new_content`, which is the authoritative

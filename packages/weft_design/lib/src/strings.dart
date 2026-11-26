@@ -36,7 +36,6 @@ class WeftDesignStrings {
     required this.muted,
     required this.typing,
     required this.online,
-    required this.merged,
     required this.mergedAcross,
     required this.unreadCount,
     required this.deliveryState,
@@ -44,6 +43,7 @@ class WeftDesignStrings {
     required this.messageDeleted,
     required this.messageKind,
     required this.reply,
+    this.reacted = _englishReacted,
     this.draft = 'Draft:',
   });
 
@@ -61,9 +61,6 @@ class WeftDesignStrings {
 
   /// The clause naming a contact as reachable right now.
   final String online;
-
-  /// The badge on a merged row.
-  final String merged;
 
   /// "merged across 3 networks: WhatsApp, Signal" — the clause that names
   /// *which* networks, since a count alone never said.
@@ -96,6 +93,16 @@ class WeftDesignStrings {
   /// blank line indistinguishable from an empty conversation.
   final String reply;
 
+  /// The preview line for a reaction: [own] when the user put it there,
+  /// [emoji] what it was, and [message] the preview of what it was put on, or
+  /// null when that message is not at hand.
+  final String Function({
+    required bool own,
+    required String emoji,
+    String? message,
+  })
+  reacted;
+
   /// The label in front of unsent text in the preview line, punctuation
   /// included — "Draft:" — so a language that spaces its colon can.
   final String draft;
@@ -107,7 +114,6 @@ class WeftDesignStrings {
     muted: 'muted',
     typing: 'typing',
     online: 'online',
-    merged: 'Merged',
     mergedAcross: _englishMergedAcross,
     unreadCount: _englishUnread,
     deliveryState: _englishDelivery,
@@ -122,6 +128,15 @@ String _englishMergedAcross(int count, String networks) =>
     'merged across $count networks: $networks';
 
 String _englishUnread(int count) => '$count unread';
+
+String _englishReacted({
+  required bool own,
+  required String emoji,
+  String? message,
+}) {
+  final who = own ? 'You reacted' : 'Reacted';
+  return message == null ? '$who $emoji' : '$who $emoji to “$message”';
+}
 
 String _englishDelivery(DeliveryState? state) => switch (state) {
   DeliveryState.sending => 'Sending',
