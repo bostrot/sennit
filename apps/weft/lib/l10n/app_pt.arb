@@ -1876,5 +1876,7 @@
   "pushIntroOptOutTitle": "Você escolhe",
   "pushIntroOptOut": "Você pode usar seu próprio gateway ou desligar o push quando quiser nas configurações de notificações. No Android, a conexão integrada e o UnifiedPush funcionam sem o Google.",
   "pushIntroAccept": "Usar o gateway do Sennit",
-  "pushIntroOther": "Escolher outra forma"
+  "pushIntroOther": "Escolher outra forma",
+  "emojiSuggestionsLabel": "Sugestões de emoji",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}, {position} de {count}"
 }

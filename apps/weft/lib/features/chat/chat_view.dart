@@ -81,6 +81,7 @@ import 'attachment_source_sheet.dart';
 import 'chat_search.dart';
 import 'invite_time_picker.dart';
 import 'edit_history_sheet.dart';
+import 'emoji_autocomplete.dart';
 import 'emoji_picker_sheet.dart';
 import 'bridge_buttons_bar.dart';
 import 'jump_to_date.dart';
@@ -5917,26 +5918,34 @@ class _Composer extends StatelessWidget {
                           // the app's language to write one sentence. The SMS bar
                           // above listens to the same controller for the same
                           // reason.
-                          child: ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: controller,
-                            builder: (context, value, _) => TextField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              minLines: 1,
-                              maxLines: 5,
-                              textDirection: textDirectionOf(value.text),
-                              // Kept for a soft keyboard, which sends no key
-                              // events at all: on a phone this is still what puts
-                              // a send glyph on the return key and what fires
-                              // `onSend`.
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => onSend(),
-                              decoration: InputDecoration(
-                                hintText: _fieldLabel(
-                                  context.l10n,
-                                  sendNetwork,
+                          child: EmojiShortcodeAutocomplete(
+                            controller: controller,
+                            focusNode: focusNode,
+                            // A hardware keyboard's feature: on a phone the
+                            // soft keyboard has emoji of its own, and the list
+                            // would sit on top of it.
+                            enabled: context.hasPointer,
+                            child: ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: controller,
+                              builder: (context, value, _) => TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                minLines: 1,
+                                maxLines: 5,
+                                textDirection: textDirectionOf(value.text),
+                                // Kept for a soft keyboard, which sends no key
+                                // events at all: on a phone this is still what puts
+                                // a send glyph on the return key and what fires
+                                // `onSend`.
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: (_) => onSend(),
+                                decoration: InputDecoration(
+                                  hintText: _fieldLabel(
+                                    context.l10n,
+                                    sendNetwork,
+                                  ),
+                                  isDense: true,
                                 ),
-                                isDense: true,
                               ),
                             ),
                           ),

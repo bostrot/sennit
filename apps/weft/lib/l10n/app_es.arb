@@ -1875,5 +1875,7 @@
   "pushIntroOptOutTitle": "Tú decides",
   "pushIntroOptOut": "Puedes usar tu propia pasarela o desactivar el push cuando quieras en los ajustes de notificaciones. En Android, la conexión integrada y UnifiedPush funcionan sin Google.",
   "pushIntroAccept": "Usar la pasarela de Sennit",
-  "pushIntroOther": "Elegir otra opción"
+  "pushIntroOther": "Elegir otra opción",
+  "emojiSuggestionsLabel": "Sugerencias de emoji",
+  "emojiSuggestionAnnouncement": "{emoji} {shortcode}, {position} de {count}"
 }
