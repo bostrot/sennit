@@ -117,9 +117,7 @@ class QuietHours {
   final bool allowMentions;
 
   /// When true a suppressed-by-quiet-hours message is posted without sound
-  /// instead of dropped, so it is waiting in the shade in the morning. This is
-  /// the only rule in this package that produces [SilentDecision] — everything
-  /// else either notifies or suppresses.
+  /// instead of dropped, so it is waiting in the shade in the morning.
   final bool deliverSilently;
 
   Duration get offset => Duration(minutes: offsetMinutes);
@@ -219,6 +217,7 @@ class ChatNotificationOverride {
     this.mutedUntil,
     this.mentionsOnly,
     this.bypassQuietHours = false,
+    this.silent = false,
   });
 
   /// Muted with no end date.
@@ -237,6 +236,11 @@ class ChatNotificationOverride {
   /// This chat pages through quiet hours. The VIP escape hatch.
   final bool bypassQuietHours;
 
+  /// Messages from this chat are shown but make no sound and do not vibrate —
+  /// the chat the user wants to read, just not to be interrupted by. Unlike a
+  /// mute nothing is held back, and a mention is as quiet as the rest.
+  final bool silent;
+
   /// Whether the chat is muted at [now].
   ///
   /// The boundary is exclusive: at exactly [mutedUntil] the mute has expired.
@@ -251,13 +255,18 @@ class ChatNotificationOverride {
   /// True when this override says nothing at all, so it can be dropped from
   /// the policy rather than persisted as noise.
   bool get isEmpty =>
-      !muted && mutedUntil == null && mentionsOnly == null && !bypassQuietHours;
+      !muted &&
+      mutedUntil == null &&
+      mentionsOnly == null &&
+      !bypassQuietHours &&
+      !silent;
 
   ChatNotificationOverride copyWith({
     bool? muted,
     Object? mutedUntil = _sentinel,
     Object? mentionsOnly = _sentinel,
     bool? bypassQuietHours,
+    bool? silent,
   }) {
     return ChatNotificationOverride(
       muted: muted ?? this.muted,
@@ -268,6 +277,7 @@ class ChatNotificationOverride {
           ? this.mentionsOnly
           : mentionsOnly as bool?,
       bypassQuietHours: bypassQuietHours ?? this.bypassQuietHours,
+      silent: silent ?? this.silent,
     );
   }
 
@@ -277,6 +287,7 @@ class ChatNotificationOverride {
       'mutedUntil': mutedUntil!.toUtc().millisecondsSinceEpoch,
     if (mentionsOnly != null) 'mentionsOnly': mentionsOnly,
     if (bypassQuietHours) 'bypassQuietHours': true,
+    if (silent) 'silent': true,
   };
 
   static ChatNotificationOverride? fromJson(Object? json) {
@@ -289,6 +300,7 @@ class ChatNotificationOverride {
           : DateTime.fromMillisecondsSinceEpoch(until, isUtc: true),
       mentionsOnly: _asBool(json['mentionsOnly']),
       bypassQuietHours: _asBool(json['bypassQuietHours']) ?? false,
+      silent: _asBool(json['silent']) ?? false,
     );
   }
 
@@ -300,16 +312,18 @@ class ChatNotificationOverride {
       other.muted == muted &&
       other.mutedUntil == mutedUntil &&
       other.mentionsOnly == mentionsOnly &&
-      other.bypassQuietHours == bypassQuietHours;
+      other.bypassQuietHours == bypassQuietHours &&
+      other.silent == silent;
 
   @override
   int get hashCode =>
-      Object.hash(muted, mutedUntil, mentionsOnly, bypassQuietHours);
+      Object.hash(muted, mutedUntil, mentionsOnly, bypassQuietHours, silent);
 
   @override
   String toString() =>
       'ChatNotificationOverride(muted: $muted, until: $mutedUntil, '
-      'mentionsOnly: $mentionsOnly, bypassQuietHours: $bypassQuietHours)';
+      'mentionsOnly: $mentionsOnly, bypassQuietHours: $bypassQuietHours, '
+      'silent: $silent)';
 }
 
 /// Everything the user has said about when they want to be interrupted.
@@ -656,8 +670,9 @@ sealed class DeliveredDecision extends NotificationDecision {
   final bool mentioned;
 }
 
-/// Posted, but without sound or vibration. Reached only through
-/// [QuietHours.deliverSilently].
+/// Posted, but without sound or vibration. Reached through
+/// [QuietHours.deliverSilently], a chat set to
+/// [ChatNotificationOverride.silent], and a chat request's first message.
 @immutable
 final class SilentDecision extends DeliveredDecision {
   const SilentDecision({super.mentioned});
@@ -918,6 +933,9 @@ NotificationDecision evaluateNotification({
             NotificationSuppression.pendingRequest,
           );
   }
+
+  // A chat the user set to silent is still shown, mention or not.
+  if (override.silent) return NotificationDecision.silent(mentioned: mentioned);
 
   return NotificationDecision.notify(mentioned: mentioned);
 }

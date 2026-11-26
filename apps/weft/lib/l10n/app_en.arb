@@ -9270,6 +9270,34 @@
   "@contactReplyRemindersSubtitle": {
     "description": "Subtitle of the reply reminders switch in a chat's profile."
   },
+  "chatSoundTitle": "Notification sound",
+  "@chatSoundTitle": {
+    "description": "Row in a chat's profile, and heading of its sheet: how this chat's notifications sound. Keep under ~28 chars.",
+    "maxLength": 36
+  },
+  "chatSoundDefault": "Default",
+  "@chatSoundDefault": {
+    "description": "Option and summary: this chat's notifications make the usual sound. Keep under ~20 chars.",
+    "maxLength": 28
+  },
+  "chatSoundSilent": "Silent",
+  "@chatSoundSilent": {
+    "description": "Option and summary: this chat's notifications are shown but make no sound. Keep under ~20 chars.",
+    "maxLength": 28
+  },
+  "chatSoundSilentSubtitle": "Shown without sound or vibration",
+  "@chatSoundSilentSubtitle": {
+    "description": "Explains the Silent option: notifications from this chat still appear, but without sound or vibration."
+  },
+  "chatSoundChoose": "Choose a sound",
+  "@chatSoundChoose": {
+    "description": "Android only: opens the system settings where a sound for this chat can be picked. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "chatSoundChooseSubtitle": "In Android’s settings for this chat",
+  "@chatSoundChooseSubtitle": {
+    "description": "Android only: says the sound is picked in Android's own settings for this chat. 'Android' is a product name."
+  },
   "composeRecipientMissing": "Pick the chat to send your message to.",
   "@composeRecipientMissing": {
     "description": "Snackbar after a voice assistant (Google Assistant or Gemini) asked Sennit to send a message but named nobody. The inbox is showing."

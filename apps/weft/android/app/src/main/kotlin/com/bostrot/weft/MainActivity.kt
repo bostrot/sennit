@@ -3,7 +3,9 @@ package com.bostrot.weft
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
+import android.provider.Settings
 import com.bostrot.weft.call.CallBridge
 import com.bostrot.weft.sms.SmsBridge
 import com.bostrot.weft.sync.SyncControlChannel
@@ -102,6 +104,19 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                 }
+                "openConversationNotificationSettings" -> {
+                    val channelId = call.argument<String>("channelId")
+                    if (channelId == null) {
+                        result.error("bad_args", "channelId is required", null)
+                    } else {
+                        result.success(
+                            openConversationNotificationSettings(
+                                channelId = channelId,
+                                shortcutId = call.argument<String>("shortcutId"),
+                            )
+                        )
+                    }
+                }
                 "publishShareTargets" -> {
                     val slots = call.argument<List<Map<String, Any?>>>("slots")
                     if (slots == null) {
@@ -172,6 +187,29 @@ class MainActivity : FlutterActivity() {
     /// waits — everything else is a channel call — so an unrecognised request
     /// code goes straight back to the plugins, which is what
     /// `super.onActivityResult` does.
+    /// Android's own settings for one conversation, where its sound is
+    /// chosen. The conversation page needs Android 11 and a shortcut the
+    /// notifications hang off; without either this lands on the channel the
+    /// conversation posts to, which is the next best place to pick a sound.
+    private fun openConversationNotificationSettings(
+        channelId: String,
+        shortcutId: String?,
+    ): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+        if (shortcutId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            intent.putExtra(Settings.EXTRA_CONVERSATION_ID, shortcutId)
+        }
+        return try {
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     @Deprecated("Flutter's FlutterActivity has not migrated to the Activity Result APIs")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (SmsBridge.onRoleResult(requestCode)) return

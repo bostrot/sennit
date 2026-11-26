@@ -15,6 +15,7 @@ import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
 import 'avatar_viewer.dart';
+import 'chat_sound_tile.dart';
 import 'nickname_dialog.dart';
 import 'native_app_link.dart';
 import 'person_memory_screen.dart';
@@ -225,6 +226,7 @@ class ContactProfileScreen extends ConsumerWidget {
               value: chat.muted,
               onChanged: (muted) => repository.setMuted(chat.id, muted: muted),
             ),
+            ChatSoundTile(chat: chat),
             // Only while reminders are on: a switch for a feature that is off
             // would be a switch that does nothing.
             if (reminders.enabled)

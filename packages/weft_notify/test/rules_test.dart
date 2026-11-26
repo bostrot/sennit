@@ -1246,4 +1246,39 @@ void main() {
       expect(NotificationPolicy.fromJson(const {}).reactionsInGroups, isFalse);
     });
   });
+
+  group('silent chats', () {
+    NotificationPolicy silentChat() => NotificationPolicy(
+      chats: const {
+        '!room:example.org': ChatNotificationOverride(silent: true),
+      },
+    );
+
+    test('a chat set to silent is still shown, without a sound', () {
+      expect(decide(policy: silentChat()), const SilentDecision());
+    });
+
+    test('a mention in a silent chat stays silent', () {
+      expect(
+        decide(
+          message: msg(body: 'Ada, are you coming?'),
+          policy: silentChat(),
+        ),
+        const SilentDecision(mentioned: true),
+      );
+    });
+
+    test('a mute still wins over silent', () {
+      expect(
+        reasonFor(decide(policy: silentChat(), forChat: chat(muted: true))),
+        NotificationSuppression.chatMuted,
+      );
+    });
+
+    test('silent is kept, and an override with only it is not empty', () {
+      final policy = silentChat();
+      expect(NotificationPolicy.fromJson(policy.toJson()), policy);
+      expect(const ChatNotificationOverride(silent: true).isEmpty, isFalse);
+    });
+  });
 }
