@@ -2071,6 +2071,56 @@
     "description": "Row in the message actions sheet: set a reminder to come back to this message. Phrased from the reader's point of view. Keep under ~18 chars.",
     "maxLength": 36
   },
+  "messageActionSave": "Save",
+  "@messageActionSave": {
+    "description": "Row in the message actions sheet: put this message on the user's list of saved messages. Keep under ~18 chars.",
+    "maxLength": 36
+  },
+  "messageActionUnsave": "Remove from saved",
+  "@messageActionUnsave": {
+    "description": "Row in the message actions sheet, and the tooltip of the remove button in the saved list: take a saved message off the list. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "chatMessageSaved": "Saved",
+  "@chatMessageSaved": {
+    "description": "Snackbar after the user saved a message to their saved list. Short."
+  },
+  "savedMessagesRemoved": "Removed from saved",
+  "@savedMessagesRemoved": {
+    "description": "Snackbar after the user took a message off their saved list. Short."
+  },
+  "chatMessageSavedUndo": "Undo",
+  "@chatMessageSavedUndo": {
+    "description": "Action on the snackbar after saving or unsaving a message: reverses it. Keep under ~12 chars.",
+    "maxLength": 24
+  },
+  "savedMessagesTitle": "Saved messages",
+  "@savedMessagesTitle": {
+    "description": "Title of the screen listing the messages the user saved, and of the row in a chat's profile that opens it. Keep under ~24 chars.",
+    "maxLength": 40
+  },
+  "savedMessagesSearch": "Search saved messages",
+  "@savedMessagesSearch": {
+    "description": "Hint and label of the search field on the saved messages screen. Keep under ~30 chars.",
+    "maxLength": 48
+  },
+  "savedMessagesEmpty": "Nothing saved yet. Long-press a message and choose Save.",
+  "@savedMessagesEmpty": {
+    "description": "Shown on the saved messages screen when nothing has been saved yet; says how to save one. 'Save' is the messageActionSave row."
+  },
+  "savedMessagesNoMatch": "No saved message matches.",
+  "@savedMessagesNoMatch": {
+    "description": "Shown on the saved messages screen when the search matches none of them."
+  },
+  "savedMessagesCount": "{count, plural, =1{1 message} other{{count} messages}}",
+  "@savedMessagesCount": {
+    "description": "Subtitle of the saved messages row in a chat's profile: how many messages from this chat are saved.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "messageActionSendToHomeAssistant": "Send to Home Assistant",
   "@messageActionSendToHomeAssistant": {
     "description": "Row in the message actions sheet, shown only when a Home Assistant integration is configured. 'Home Assistant' is a product name and is never translated. Keep the rest under ~14 chars."

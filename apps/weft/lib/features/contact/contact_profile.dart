@@ -9,6 +9,8 @@ import '../../app/nickname_providers.dart';
 import '../../app/providers.dart';
 import '../../app/reply_reminder_providers.dart';
 import '../../app/retention_providers.dart';
+import '../../app/saved_messages.dart';
+import '../chat/saved_messages_screen.dart';
 import '../chat/retention_sheet.dart';
 import '../inbox/label_sheet.dart';
 import '../merge/merge_screen.dart';
@@ -60,6 +62,11 @@ class ContactProfileScreen extends ConsumerWidget {
     ref.watch(chatLabelsProvider);
     final labels = ref.watch(chatLabelsProvider.notifier).ofChat(chat.id);
     final reminders = ref.watch(replyReminderSettingsProvider);
+    final rooms = {for (final source in chat.sources) source.roomId};
+    final savedHere = filterSavedMessages(
+      ref.watch(savedMessagesProvider),
+      rooms: rooms,
+    );
 
     return Scaffold(
       appBar: WeftAppBar(title: Text(context.l10n.contactTitle)),
@@ -114,6 +121,20 @@ class ContactProfileScreen extends ConsumerWidget {
                 subtitle: Text(context.l10n.contactMatrixUser),
               ),
             SharedContentSections(chatId: chat.id),
+            if (savedHere.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.bookmarks_outlined),
+                title: Text(context.l10n.savedMessagesTitle),
+                subtitle: Text(
+                  context.l10n.savedMessagesCount(savedHere.length),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SavedMessagesScreen(rooms: rooms),
+                  ),
+                ),
+              ),
             ChatMemorySections(chat: chat, header: _SectionHeader.new),
             if (handles.isNotEmpty) ...[
               _SectionHeader(context.l10n.contactOnTheseNetworks),

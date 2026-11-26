@@ -144,6 +144,12 @@ abstract final class WeftSettings {
   /// list, so two devices hiding different messages at once both keep theirs.
   static const String hiddenMessagePrefix = 'hidden.';
 
+  /// One row per message the user saved, keyed by this prefix and the event
+  /// id; the value is a JSON snapshot of the message (see `SavedMessage`), so
+  /// the list reads without the room's history loaded. Rows rather than one
+  /// list, so two devices saving different messages at once both keep theirs.
+  static const String savedMessagePrefix = 'saved.';
+
   /// Whether Return sends the message.
   ///
   /// False by default, which is the opposite of most messengers and is the
