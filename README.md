@@ -68,6 +68,10 @@ infrastructure you don't own.
   person's first name, into the composer for you to check and send.
 - 🔕 Read receipts, typing indicators and presence — sent and shown, with a
   privacy switch for each.
+- 📊 **No analytics unless you opt in.** Sennit asks once whether it may send
+  anonymous usage statistics — screens opened and a few feature events — to
+  our self-hosted, cookie-free Plausible; no is the default and can be changed
+  any time. See [PRIVACY.md](PRIVACY.md).
 - ⏳ **Disappearing messages**, per conversation: erase after an hour, a day or
   ninety days, counted from when a message arrived or from when you read it.
   Your own messages are redacted for everyone; the rest — text, photos and the

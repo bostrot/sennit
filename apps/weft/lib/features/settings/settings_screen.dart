@@ -223,6 +223,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               l10n.settingsSendOnEnterTitle,
               l10n.settingsSendOnEnterSubtitleOff,
             ),
+            row(
+              const _UsageStatsToggle(),
+              l10n.settingsUsageStatsTitle,
+              l10n.settingsUsageStatsSubtitle,
+            ),
             tile(
               icon: Icons.link_off_rounded,
               title: l10n.sennitWebUnpairTitle,
@@ -292,6 +297,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               l10n.settingsContactNamesTitle,
               l10n.settingsContactNamesSubtitle,
             ),
+            if (!kDemoMode)
+              row(
+                const _UsageStatsToggle(),
+                l10n.settingsUsageStatsTitle,
+                l10n.settingsUsageStatsSubtitle,
+              ),
             tile(
               icon: Icons.link_rounded,
               title: l10n.settingsLinkPreviewsTitle,
@@ -540,6 +551,38 @@ class _ReadReceiptsToggle extends ConsumerWidget {
       ),
       onChanged: (value) {
         stores.settings.setBool(WeftSettings.sendReadReceipts, value: value);
+        ref.read(settingsRevisionProvider.notifier).bump();
+      },
+    );
+  }
+}
+
+/// Whether anonymous usage statistics go to Sennit's Plausible server.
+///
+/// Read at every event, so flipping it stops or starts the very next one.
+class _UsageStatsToggle extends ConsumerWidget {
+  const _UsageStatsToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(settingsRevisionProvider);
+    final WeftStores stores;
+    try {
+      stores = ref.watch(storesProvider);
+    } on Object {
+      return const SizedBox.shrink();
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.insights_outlined),
+      title: Text(context.l10n.settingsUsageStatsTitle),
+      subtitle: Text(context.l10n.settingsUsageStatsSubtitle),
+      value: stores.settings.getBool(WeftSettings.usageStats),
+      onChanged: (value) {
+        stores.settings
+          ..setBool(WeftSettings.usageStats, value: value)
+          // Answered here, so the first-start question never comes.
+          ..setBool(WeftSettings.usageStatsAsked, value: true);
         ref.read(settingsRevisionProvider.notifier).bump();
       },
     );

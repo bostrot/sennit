@@ -10974,5 +10974,42 @@
   "appLockBiometricReason": "Unlock Sennit",
   "@appLockBiometricReason": {
     "description": "Reason shown in the system's fingerprint / Face ID / Windows Hello prompt. Short imperative."
+  },
+  "settingsUsageStatsTitle": "Share anonymous usage statistics",
+  "@settingsUsageStatsTitle": {
+    "description": "Title of a switch row in Settings → Privacy. Off by default; on sends anonymous usage statistics. Keep under ~40 chars.",
+    "maxLength": 48
+  },
+  "settingsUsageStatsSubtitle": "Screens opened and a few features used, via Plausible. No personal data, no message content.",
+  "@settingsUsageStatsSubtitle": {
+    "description": "Subtitle under the 'Share anonymous usage statistics' switch. 'Plausible' is the name of the analytics tool and stays."
+  },
+  "usageStatsConsentTitle": "Help improve Sennit?",
+  "@usageStatsConsentTitle": {
+    "description": "Title of the one-time dialog asking whether Sennit may send anonymous usage statistics. Neutral, not pushy. Keep under ~36 chars.",
+    "maxLength": 48
+  },
+  "usageStatsConsentBody": "Sennit can send anonymous usage statistics to Plausible Analytics on our own server: which screens are opened, a few features used (such as connecting a messenger or using AI), the app version and the platform. Plausible derives the country from the connection and does not store the IP address. No cookies.",
+  "@usageStatsConsentBody": {
+    "description": "Body of the usage-statistics dialog: what is sent. 'Plausible Analytics' is a product name and stays."
+  },
+  "usageStatsConsentNever": "Never sent: personal data, message content, contacts or Matrix IDs. You can change this any time in Settings → Privacy & security.",
+  "@usageStatsConsentNever": {
+    "description": "Second paragraph of the usage-statistics dialog: what is never sent, and where to change the answer. 'Matrix' stays."
+  },
+  "usageStatsConsentPolicy": "Privacy policy",
+  "@usageStatsConsentPolicy": {
+    "description": "Link in the usage-statistics dialog that opens the privacy policy in the browser. Keep under ~24 chars.",
+    "maxLength": 32
+  },
+  "usageStatsConsentAllow": "Allow",
+  "@usageStatsConsentAllow": {
+    "description": "Button in the usage-statistics dialog: yes, send anonymous statistics. Same visual weight as the decline button. Keep under ~14 chars.",
+    "maxLength": 20
+  },
+  "usageStatsConsentDecline": "No thanks",
+  "@usageStatsConsentDecline": {
+    "description": "Button in the usage-statistics dialog: no, do not send statistics. Same visual weight as the allow button. Keep under ~14 chars.",
+    "maxLength": 20
   }
 }

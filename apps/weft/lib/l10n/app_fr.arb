@@ -1905,5 +1905,13 @@
   "appLockWrongPin": "PIN incorrect",
   "appLockWait": "Trop d’essais. Attendez {seconds} secondes.",
   "appLockUseBiometrics": "Utiliser la biométrie",
-  "appLockBiometricReason": "Déverrouiller Sennit"
+  "appLockBiometricReason": "Déverrouiller Sennit",
+  "settingsUsageStatsTitle": "Partager des statistiques d’usage anonymes",
+  "settingsUsageStatsSubtitle": "Écrans ouverts et quelques fonctions utilisées, via Plausible. Aucune donnée personnelle, aucun contenu de message.",
+  "usageStatsConsentTitle": "Aider à améliorer Sennit ?",
+  "usageStatsConsentBody": "Sennit peut envoyer des statistiques d’usage anonymes à Plausible Analytics, sur notre propre serveur : les écrans ouverts, quelques fonctions utilisées (comme connecter une messagerie ou utiliser l’IA), la version de l’app et la plateforme. Plausible déduit le pays de la connexion et ne conserve pas l’adresse IP. Aucun cookie.",
+  "usageStatsConsentNever": "Jamais envoyés : données personnelles, contenu des messages, contacts ou identifiants Matrix. Vous pouvez changer d’avis à tout moment dans Réglages → Confidentialité et sécurité.",
+  "usageStatsConsentPolicy": "Politique de confidentialité",
+  "usageStatsConsentAllow": "Autoriser",
+  "usageStatsConsentDecline": "Non merci"
 }

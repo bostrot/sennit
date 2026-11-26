@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/analytics/usage_stats.dart' show ProPurchaseSource;
 import '../services/billing/billing_store.dart';
 import '../services/billing/entitlements.dart';
 import '../services/billing/license_client.dart';
 import 'stores.dart';
+import 'usage_stats_providers.dart';
 
 /// Where the last confirmed Pro purchase is kept, so a launch with no network
 /// still knows what was bought.
@@ -186,6 +188,13 @@ class ProController extends Notifier<ProStatus> {
           if (ProProduct.byId(purchase.productId) != null &&
               await ref.read(purchaseVerifierProvider)(purchase)) {
             _record(purchase.productId);
+            // A purchase, not a restore on a new device.
+            if (purchase.status == StorePurchaseStatus.purchased &&
+                ref.mounted) {
+              ref
+                  .read(usageStatsProvider)
+                  .proPurchased(ProPurchaseSource.store);
+            }
           }
           checkout.set(CheckoutState.idle);
       }
@@ -232,6 +241,7 @@ class ProController extends Notifier<ProStatus> {
     if (verdict == LicenseVerdict.valid && ref.mounted) {
       _saveLicense(key);
       _record(ProProduct.lifetime.id);
+      ref.read(usageStatsProvider).proPurchased(ProPurchaseSource.licence);
     }
     return verdict;
   }

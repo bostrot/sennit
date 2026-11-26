@@ -9,7 +9,7 @@ PRIVATE BY DESIGN
 • End-to-end encryption via Matrix, with device verification, cross-signing and key backup
 • Disappearing messages, set per conversation
 • Read receipts, typing indicators and online status, each with its own switch
-• No analytics, no tracking, no ads
+• No tracking, no ads; anonymous usage statistics only if you opt in
 • Open source under the AGPL-3.0: every line is public
 
 BRING YOUR OWN AI (SENNIT PRO)

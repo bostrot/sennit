@@ -59,5 +59,10 @@ and 16:9 tablet shots, `iphone_69_*` and `ipad_13_*` Apple's 6.9" iPhone and
 
 ## Data collection
 
-Both questionnaires: **no data collected** — no analytics or crash SDKs;
-the app only talks to user-configured servers. See PRIVACY.md.
+Both questionnaires: **optional usage data only** — anonymous usage
+statistics (screens opened and a few feature events) go to our self-hosted
+Plausible only if the user opts in; no crash SDKs, nothing linked to the
+user's identity, nothing used for tracking or advertising. Play Data safety:
+App activity → App interactions, collected, optional, analytics, not shared,
+encrypted in transit. App Store: Usage Data → Product Interaction, Analytics,
+not linked to the user, not used for tracking. See PRIVACY.md.
