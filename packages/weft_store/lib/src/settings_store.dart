@@ -211,6 +211,10 @@ abstract final class WeftSettings {
   /// memory and the request was back in the list on the next launch.
   static const String acceptedRequests = 'requests.accepted';
 
+  /// Messages that failed to send and why, by event id. Kept on this device:
+  /// the failed echoes it describes exist only here.
+  static const String sendQueue = 'send.queue';
+
   /// Whether the first-start setup flow has run. It runs once per install —
   /// including once on the update that introduced it, which is deliberate:
   /// existing installs get the same defaults offered the same way.

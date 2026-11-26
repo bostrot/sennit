@@ -18,4 +18,5 @@ export 'src/relations.dart';
 export 'src/reply_fallback.dart';
 export 'src/request.dart';
 export 'src/retention.dart';
+export 'src/send_failure.dart';
 export 'src/thread.dart';

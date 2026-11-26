@@ -1605,6 +1605,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
         : await showMessageActionsSheet(
             context,
             message: message,
+            sendFailure: message.deliveryState == DeliveryState.failed
+                ? (ref.read(sendFailuresProvider).value?[message.eventId])
+                : null,
             canTranscribe: message.canTranscribe,
             hasTranscript: message.transcript != null,
             homeAssistant: ref.read(homeAssistantProvider) != null,
@@ -2308,6 +2311,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // Read once for the whole list rather than per bubble: it is a settings
     // lookup, and the ticks under a hundred messages ask the same question.
     final receiptsEnabled = ref.watch(sendReadReceiptsProvider);
+    final sendFailures =
+        ref.watch(sendFailuresProvider).value ?? const <String, SendFailure>{};
     // Watched here and not in the item builder, which runs during layout —
     // after this build has already closed the subscriptions it did not renew.
     // Watched there, the service was dropped and picked up again on every
@@ -2571,6 +2576,10 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                         message: message,
                                         conversation: () => _view.messages,
                                         delivery: delivery,
+                                        sendFailure:
+                                            delivery == DeliveryState.failed
+                                            ? sendFailures[message.eventId]
+                                            : null,
                                         deliveryIsComplete:
                                             deliveryStateIsComplete(
                                               state: delivery,
@@ -4493,6 +4502,7 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     this.delivery,
     this.deliveryIsComplete = true,
+    this.sendFailure,
     required this.showNetwork,
     this.showSender = false,
     required this.groupedWithPrevious,
@@ -4611,6 +4621,11 @@ class _MessageBubble extends StatelessWidget {
   /// arrives separately from the event that is being ticked.
   final DeliveryState? delivery;
 
+  /// Why a [DeliveryState.failed] message did not leave, when that is known.
+  /// One that is only waiting for the connection draws the clock it drew
+  /// while sending, because it is still on its way.
+  final SendFailure? sendFailure;
+
   /// Whether [delivery] is the whole truth, or as far as anything can see.
   ///
   /// False when the user has read receipts switched off. Bridges relay the
@@ -4653,7 +4668,10 @@ class _MessageBubble extends StatelessWidget {
     l10n.chatSentAt(DateFormat.Hm().format(message.timestamp)),
     // The effective state, so a reader is told "Read" exactly when the ticks
     // are blue. Two answers to the same question is worse than either.
-    if (message.isOwn) l10n.deliveryState(delivery ?? message.deliveryState),
+    if (message.isOwn && sendFailure?.retriesAutomatically != true)
+      l10n.deliveryState(delivery ?? message.deliveryState),
+    if (message.isOwn && sendFailure != null)
+      l10n.sendFailureReason(sendFailure!),
     // And, when the ticks cannot say more, *why*. Two grey ticks with receipts
     // switched off do not mean "they have not looked at it" — they mean nobody
     // is telling us, and the difference is the whole reason the tick is looked
@@ -4737,7 +4755,10 @@ class _MessageBubble extends StatelessWidget {
                     // whose whole value is that it is
                     // already known.
                     message: semanticsSentence([
-                      context.l10n.deliveryState(delivery),
+                      if (sendFailure?.retriesAutomatically != true)
+                        context.l10n.deliveryState(delivery),
+                      if (sendFailure != null)
+                        context.l10n.sendFailureReason(sendFailure!),
                       if (!deliveryIsComplete)
                         context.l10n.deliveryUnknownReason,
                     ]),
@@ -4759,6 +4780,9 @@ class _MessageBubble extends StatelessWidget {
                       // side has seen it.
                       switch (delivery) {
                         DeliveryState.sending => Icons.schedule_rounded,
+                        DeliveryState.failed
+                            when sendFailure?.retriesAutomatically ?? false =>
+                          Icons.schedule_rounded,
                         DeliveryState.failed => Icons.error_outline_rounded,
                         DeliveryState.sent => Icons.done_rounded,
                         _ => Icons.done_all_rounded,
@@ -4775,11 +4799,14 @@ class _MessageBubble extends StatelessWidget {
                         // never left was invisible at
                         // 1.05:1. Found by the golden, not
                         // by reading this line.
-                        DeliveryState.failed => WeftContrast.ensure(
-                          context.colors.error,
-                          palette.ownBubble,
-                          minRatio: WeftContrast.uiComponent,
-                        ),
+                        DeliveryState.failed
+                            when !(sendFailure?.retriesAutomatically ??
+                                false) =>
+                          WeftContrast.ensure(
+                            context.colors.error,
+                            palette.ownBubble,
+                            minRatio: WeftContrast.uiComponent,
+                          ),
                         // Against the bubble, not the
                         // page: the token is corrected for
                         // the inbox row's background, and

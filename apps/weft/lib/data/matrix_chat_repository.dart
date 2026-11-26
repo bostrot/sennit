@@ -17,6 +17,7 @@ import '../services/attachments/video_poster.dart';
 import 'auto_reply_transport.dart';
 import 'chat_repository.dart';
 import 'profile_lookups.dart';
+import 'send_queue_source.dart';
 import 'sms_chat_repository.dart';
 
 /// Reads the whole of a picked file.
@@ -47,7 +48,8 @@ Future<Uint8List> readAttachmentFile(AttachmentSource source) =>
 /// Rooms become chats; the identity graph decides which of those chats are the
 /// same person and get folded into one merged conversation. The UI above this
 /// is identical to the demo path — that is the point of the interface.
-class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
+class MatrixChatRepository
+    implements ChatRepository, AutoReplyTransport, SendQueueSource {
   MatrixChatRepository(
     this._session, {
     IdentityStore? store,
@@ -95,6 +97,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     _resolveMediaSupport();
     _rebuild();
     _syncSub = _session.client.onSync.stream.listen((_) => _scheduleRebuild());
+    _syncStatusSub = _session.client.onSyncStatus.stream.listen(_onSyncStatus);
 
     final sms = _sms;
     if (sms != null) {
@@ -150,6 +153,7 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
+  StreamSubscription<sdk.SyncStatusUpdate>? _syncStatusSub;
   StreamSubscription<void>? _smsSub;
 
   final _chatsController = StreamController<List<Chat>>.broadcast();
@@ -524,7 +528,10 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     }
     final room = _roomFor(source);
     for (final piece in _piecesFor(source.network, body)) {
-      await room.sendTextEvent(piece);
+      await _trackSend(
+        room.id,
+        (txid) => room.sendTextEvent(piece, txid: txid),
+      );
     }
   }
 
@@ -1055,9 +1062,19 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     // replies still shows what this answers.
     // Only the first piece of a long reply quotes; the rest follow it.
     final pieces = _piecesFor(_networkOf(target.room), body);
-    await target.room.sendTextEvent(pieces.first, inReplyTo: target.event);
+    await _trackSend(
+      target.room.id,
+      (txid) => target.room.sendTextEvent(
+        pieces.first,
+        inReplyTo: target.event,
+        txid: txid,
+      ),
+    );
     for (final piece in pieces.skip(1)) {
-      await target.room.sendTextEvent(piece);
+      await _trackSend(
+        target.room.id,
+        (txid) => target.room.sendTextEvent(piece, txid: txid),
+      );
     }
   }
 
@@ -1095,12 +1112,18 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
     var latest = threadLatestEventId ?? threadRootId;
     var answering = explicit?.event;
     for (final piece in _piecesFor(_networkOf(root.room), body)) {
+      final threadLast = latest;
+      final inReplyTo = answering;
       latest =
-          await root.room.sendTextEvent(
-            piece,
-            threadRootEventId: threadRootId,
-            threadLastEventId: latest,
-            inReplyTo: answering,
+          await _trackSend(
+            root.room.id,
+            (txid) => root.room.sendTextEvent(
+              piece,
+              threadRootEventId: threadRootId,
+              threadLastEventId: threadLast,
+              inReplyTo: inReplyTo,
+              txid: txid,
+            ),
           ) ??
           latest;
       answering = null;
@@ -1882,15 +1905,162 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
   Future<void> retryFailedSend(String roomId, String eventId) async {
     final event = await _client.getRoomById(roomId)?.getEventById(eventId);
     if (event == null) return;
-    await event.sendAgain();
+    await _trackSend(roomId, (_) => event.sendAgain(), txid: eventId);
     _scheduleRebuild();
   }
 
   @override
   Future<void> discardFailedSend(String roomId, String eventId) async {
+    _forgetSend(eventId);
     final event = await _client.getRoomById(roomId)?.getEventById(eventId);
     if (event == null) return;
     await event.cancelSend();
+    _scheduleRebuild();
+  }
+
+  // ── Offline send queue ──────────────────────────────────────────────────
+
+  late final SendQueue _sendQueue = SendQueue.fromJson(
+    _settings?.getJson(WeftSettings.sendQueue),
+  );
+  final _sendFailureChanges =
+      StreamController<Map<String, SendFailure>>.broadcast();
+
+  /// Whether the last sync reached the homeserver. A send that times out
+  /// while this is false was lost to the connection, not refused.
+  bool _reachable = true;
+  bool _resending = false;
+
+  @override
+  Map<String, SendFailure> get sendFailures => _sendQueue.failures;
+
+  @override
+  Stream<Map<String, SendFailure>> get sendFailureChanges =>
+      _sendFailureChanges.stream;
+
+  void _onSyncStatus(sdk.SyncStatusUpdate update) {
+    switch (update.status) {
+      case sdk.SyncStatus.error:
+        _reachable = false;
+      case sdk.SyncStatus.finished:
+        _reachable = true;
+        if (!_sendQueue.isEmpty) unawaited(_resendQueued());
+      default:
+        break;
+    }
+  }
+
+  /// Sends through [send] with a transaction id of its own, and remembers
+  /// why it failed if it does.
+  ///
+  /// Written down as "offline" *before* the send starts and cleared when it
+  /// lands, so a message that was still going out when the app was killed is
+  /// in the queue at the next launch rather than stuck as a red bubble. The
+  /// SDK retries a lost connection on its own for a minute and then gives up
+  /// without saying why; whether the last sync reached the server is what
+  /// tells a dropped connection from a refusal.
+  Future<String?> _trackSend(
+    String roomId,
+    Future<String?> Function(String txid) send, {
+    String? txid,
+  }) async {
+    final id = txid ?? _client.generateUniqueTransactionId();
+    _recordSend(id, roomId, SendFailure.offline);
+    try {
+      final eventId = await send(id);
+      if (eventId != null) {
+        _forgetSend(id);
+      } else {
+        _recordSend(
+          id,
+          roomId,
+          _reachable ? SendFailure.rejected : SendFailure.offline,
+        );
+      }
+      return eventId;
+    } on sdk.EventTooLarge {
+      _recordSend(id, roomId, SendFailure.tooLarge);
+      rethrow;
+    } on sdk.MatrixException catch (error) {
+      _recordSend(
+        id,
+        roomId,
+        error.error == sdk.MatrixError.M_FORBIDDEN
+            ? SendFailure.notAllowed
+            : SendFailure.rejected,
+      );
+      rethrow;
+    }
+  }
+
+  void _recordSend(String eventId, String roomId, SendFailure failure) {
+    if (_sendQueue.record(eventId, roomId, failure)) _sendQueueChanged();
+  }
+
+  void _forgetSend(String eventId) {
+    if (_sendQueue.clear(eventId)) _sendQueueChanged();
+  }
+
+  void _sendQueueChanged() {
+    final settings = _settings;
+    if (settings != null) {
+      if (_sendQueue.isEmpty) {
+        settings.remove(WeftSettings.sendQueue);
+      } else {
+        settings.setJson(WeftSettings.sendQueue, _sendQueue.toJson());
+      }
+    }
+    if (!_sendFailureChanges.isClosed) {
+      _sendFailureChanges.add(_sendQueue.failures);
+    }
+  }
+
+  /// Sends again, oldest first, whatever was waiting for the connection.
+  ///
+  /// One at a time and in order: a conversation that comes back online
+  /// should read the way it was typed.
+  Future<void> _resendQueued() async {
+    if (_resending) return;
+    _resending = true;
+    try {
+      for (final (eventId, roomId) in _sendQueue.dueForRetry) {
+        if (!_reachable) break;
+        await _resend(roomId, eventId);
+      }
+    } finally {
+      _resending = false;
+    }
+  }
+
+  Future<void> _resend(String roomId, String eventId) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) {
+      // Left or forgotten: there is nowhere to send it any more.
+      _forgetSend(eventId);
+      return;
+    }
+    sdk.Event? event;
+    try {
+      event = await room.getEventById(eventId);
+    } on Object catch (error) {
+      debugPrint('weft: queued send $eventId not found: $error');
+    }
+    if (event == null) {
+      _forgetSend(eventId);
+      return;
+    }
+    // Still going out from this launch's own attempt, which clears it or
+    // records the new reason when it settles.
+    if (event.status.isSending) return;
+    if (!event.status.isError) {
+      _forgetSend(eventId);
+      return;
+    }
+    try {
+      await _trackSend(roomId, (_) => event!.sendAgain(), txid: eventId);
+    } on Object catch (error) {
+      debugPrint('weft: queued send $eventId failed again: $error');
+    }
     _scheduleRebuild();
   }
 
@@ -2003,6 +2173,8 @@ class MatrixChatRepository implements ChatRepository, AutoReplyTransport {
 
   Future<void> dispose() async {
     await _syncSub?.cancel();
+    await _syncStatusSub?.cancel();
+    await _sendFailureChanges.close();
     await _smsSub?.cancel();
     await _uploadSub?.cancel();
     _profileLane.close();

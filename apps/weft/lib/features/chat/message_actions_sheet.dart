@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
+import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 
 import 'emoji_picker_sheet.dart';
@@ -95,6 +96,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
   bool homeAssistant = false,
   List<String> quickReactions = kQuickReactions,
   bool canTranslate = false,
+  SendFailure? sendFailure,
 }) {
   return showWeftPanel<MessageActionChoice>(
     context: context,
@@ -112,6 +114,7 @@ Future<MessageActionChoice?> showMessageActionsSheet(
       homeAssistant: homeAssistant,
       quickReactions: quickReactions,
       canTranslate: canTranslate,
+      sendFailure: sendFailure,
     ),
   );
 }
@@ -124,6 +127,7 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.homeAssistant,
     required this.quickReactions,
     required this.canTranslate,
+    this.sendFailure,
   });
 
   final WeftMessage message;
@@ -136,6 +140,10 @@ class _MessageActionsSheet extends StatelessWidget {
 
   /// Whether the user has an AI model set up to translate with.
   final bool canTranslate;
+
+  /// Why the message failed, said under Retry so the choice is an informed
+  /// one.
+  final SendFailure? sendFailure;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +247,9 @@ class _MessageActionsSheet extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.refresh_rounded),
                     title: Text(context.l10n.messageActionRetrySend),
+                    subtitle: sendFailure == null
+                        ? null
+                        : Text(context.l10n.sendFailureReason(sendFailure!)),
                     onTap: () => choose(MessageAction.retrySend),
                   ),
                   ListTile(

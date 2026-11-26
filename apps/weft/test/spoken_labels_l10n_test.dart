@@ -115,12 +115,20 @@ void main() {
   });
 
   group('message actions sheet', () {
-    Future<void> open(WidgetTester tester, WeftMessage message) async {
+    Future<void> open(
+      WidgetTester tester,
+      WeftMessage message, {
+      SendFailure? sendFailure,
+    }) async {
       await _pump(
         tester,
         Builder(
           builder: (context) => TextButton(
-            onPressed: () => showMessageActionsSheet(context, message: message),
+            onPressed: () => showMessageActionsSheet(
+              context,
+              message: message,
+              sendFailure: sendFailure,
+            ),
             child: const Text('open'),
           ),
         ),
@@ -154,6 +162,20 @@ void main() {
         findsOneWidget,
       );
       semantics.dispose();
+    });
+
+    testWidgets('says why a message did not send, under Retry', (tester) async {
+      await open(
+        tester,
+        _message(isOwn: true).copyWith(deliveryState: DeliveryState.failed),
+        sendFailure: SendFailure.offline,
+      );
+
+      expect(find.text('Erneut senden'), findsOneWidget);
+      expect(
+        find.text('Wartet auf Verbindung. Wird von selbst gesendet.'),
+        findsOneWidget,
+      );
     });
   });
 }

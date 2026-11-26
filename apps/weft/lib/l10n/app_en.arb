@@ -1647,6 +1647,26 @@
     "description": "A message's delivery state: sending failed and it is still sitting in the timeline. Phrased as a fact rather than an error. Keep under ~14 chars.",
     "maxLength": 28
   },
+  "sendFailureOffline": "Waiting for a connection. Sends by itself.",
+  "@sendFailureOffline": {
+    "description": "Why a message did not send: the server could not be reached; it will go out on its own when the connection returns. Shown in a tooltip and under Retry.",
+    "maxLength": 80
+  },
+  "sendFailureTooLarge": "Too large to send here.",
+  "@sendFailureTooLarge": {
+    "description": "Why a message did not send: the server refused it for its size.",
+    "maxLength": 80
+  },
+  "sendFailureNotAllowed": "You can’t send messages in this chat.",
+  "@sendFailureNotAllowed": {
+    "description": "Why a message did not send: the account is not allowed to post in this chat.",
+    "maxLength": 80
+  },
+  "sendFailureRejected": "The server didn’t accept it.",
+  "@sendFailureRejected": {
+    "description": "Why a message did not send: the server refused it without saying why.",
+    "maxLength": 80
+  },
   "attachmentContactCard": "Contact card",
   "@attachmentContactCard": {
     "description": "Screen-reader-only kind label for a bubble holding a shared contact card (a .vcf). Read before the contact's name. Keep under ~20 chars.",

@@ -62,6 +62,14 @@ extension WeftDomainLabels on AppL10n {
     DeliveryState.failed => deliveryFailed,
     null => '',
   };
+
+  /// Why a message did not leave, in words.
+  String sendFailureReason(SendFailure failure) => switch (failure) {
+    SendFailure.offline => sendFailureOffline,
+    SendFailure.tooLarge => sendFailureTooLarge,
+    SendFailure.notAllowed => sendFailureNotAllowed,
+    SendFailure.rejected => sendFailureRejected,
+  };
 }
 
 /// The words for the codes packages answer in.
