@@ -566,8 +566,21 @@ void main() {
 
       // AI, integrations and MCP each carry the badge.
       expect(find.byType(ProBadge), findsNWidgets(3));
+      // The Pro row sits near the end of a list that builds lazily. The list
+      // is the first scrollable; a text field on the screen is another.
+      final list = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(
+        find.text(en.proTitle),
+        200,
+        scrollable: list,
+      );
       expect(find.text(en.proTitle), findsOneWidget);
 
+      await tester.scrollUntilVisible(
+        find.text(en.settingsMcpTitle),
+        -200,
+        scrollable: list,
+      );
       await tester.tap(find.text(en.settingsMcpTitle));
       await tester.pumpAndSettle();
       expect(find.byType(ProScreen), findsOneWidget);
