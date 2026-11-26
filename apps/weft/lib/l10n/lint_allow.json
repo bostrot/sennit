@@ -74,6 +74,8 @@
     "chatPollQuestion": "'Question' is French.",
     "chatPollVotes": "'vote'/'votes' are French, and pluralise the same way.",
     "commonPause": "'Pause' is French.",
+    "contactActionMessage": "'Message' is French.",
+    "contactGroupNotifications": "'Notifications' is French.",
     "contactTitle": "'Contact' is French.",
     "inboxTitleConversations": "'Conversations' is French.",
     "menuConversation": "'Conversation' is French.",

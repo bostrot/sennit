@@ -13,7 +13,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:weft_attachments/weft_attachments.dart';
-import 'package:weft_call/weft_call.dart' show CallBlocked, CallBlocker;
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_store/weft_store.dart' show WeftSettings;
@@ -26,7 +25,6 @@ import '../../app/a11y.dart';
 import '../../app/auto_reply_providers.dart' show autoReplyEndpointProvider;
 import '../../app/billing_providers.dart';
 import '../../app/quick_message_providers.dart';
-import '../../app/call_providers.dart';
 import '../../app/draft_providers.dart';
 import '../../app/intents.dart';
 import '../../app/hidden_messages.dart';
@@ -38,7 +36,6 @@ import '../../app/providers.dart';
 import '../../app/retention_providers.dart';
 import '../../app/review_providers.dart';
 import '../../app/saved_messages.dart';
-import '../../app/session_providers.dart' show kRemoteClient;
 import '../../app/search_providers.dart';
 import '../../app/share_providers.dart';
 import '../../app/shortcuts.dart';
@@ -72,8 +69,7 @@ import 'poll_card.dart';
 import 'quick_message_sheet.dart';
 import '../auth/verification_screen.dart';
 import '../call/call_labels.dart' show formatCallDuration;
-import '../call/external_call.dart';
-import '../call/start_call.dart';
+import '../call/chat_call_action.dart';
 import '../contact/contact_profile.dart';
 import '../merge/merge_screen.dart';
 import '../share/share_target_sheet.dart';
@@ -4035,7 +4031,8 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   void _openProfile(BuildContext context) => unawaited(
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ContactProfileScreen(chatId: chat.id),
+        builder: (_) =>
+            ContactProfileScreen(chatId: chat.id, onSearch: onSearch),
       ),
     ),
   );
@@ -4169,73 +4166,14 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   List<Widget> _actions(BuildContext context) => preview
       ? const []
       : [
-          // Disabled rather than hidden, with the reason in its tooltip: a
-          // conversation with no Matrix-native leg cannot carry a call, and a
-          // button that quietly disappeared for bridged chats would read as Sennit
-          // having lost the feature.
           Consumer(
             builder: (context, ref, _) {
-              final availability = ref.watch(callAvailabilityProvider(chat.id));
-              final target = availability.target;
-              // Sennit Web places no calls of its own; only the hand-off to
-              // the network's app or the dialler below works from a browser.
-              const none = SizedBox.shrink();
-              if (target != null) {
-                if (kRemoteClient) return none;
-                return _action(
-                  tooltip: context.l10n.callAvailability(availability),
-                  icon: Icons.call_rounded,
-                  onPressed: () => startCall(context, ref, target),
-                );
-              }
-              // No Matrix leg to call over — the call lives in the network's
-              // own app, so the button opens the conversation there (or the
-              // dialler, when all Weft knows is a number) instead of sitting
-              // greyed out under a tooltip explaining itself. Only for the
-              // *bridged* refusal: a group is refused as a group whatever apps
-              // its members are on.
-              if (availability is! CallBlocked ||
-                  availability.reason != CallBlocker.bridged) {
-                if (kRemoteClient) return none;
-                return _action(
-                  tooltip: context.l10n.callAvailability(availability),
-                  icon: Icons.call_rounded,
-                  onPressed: null,
-                );
-              }
-              final contact = chat.contactId == null
-                  ? null
-                  : ref
-                        .read(chatRepositoryProvider)
-                        .identityGraph
-                        .contacts()
-                        .where((c) => c.id == chat.contactId)
-                        .firstOrNull;
-              final external = externalCallRouteFor(
-                context.l10n,
-                chat,
-                contact,
-              );
-              if (external == null) {
-                if (kRemoteClient) return none;
-                return _action(
-                  tooltip: context.l10n.callAvailability(availability),
-                  icon: Icons.call_rounded,
-                  onPressed: null,
-                );
-              }
+              final call = chatCallAction(context, ref, chat);
+              if (call == null) return const SizedBox.shrink();
               return _action(
-                tooltip: external.label,
-                icon: Icons.phone_forwarded_rounded,
-                onPressed: () async {
-                  final opened = await launchUrl(
-                    external.uri,
-                    mode: LaunchMode.externalApplication,
-                  );
-                  if (!opened && context.mounted) {
-                    showWeftMessage(context, context.l10n.chatCallNoHandler);
-                  }
-                },
+                tooltip: call.tooltip,
+                icon: call.icon,
+                onPressed: call.onPressed,
               );
             },
           ),
