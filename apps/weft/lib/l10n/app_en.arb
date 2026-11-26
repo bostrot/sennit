@@ -3005,13 +3005,92 @@
   },
   "chatPollAddOption": "Add option",
   "@chatPollAddOption": {
-    "description": "Button in the poll dialog that adds another answer field. Capped at eight. Keep under ~18 chars.",
+    "description": "Button in the poll dialog that adds another answer field. Capped at twenty (fewer where the network allows less). Keep under ~18 chars.",
     "maxLength": 36
   },
   "chatPollCreate": "Create poll",
   "@chatPollCreate": {
     "description": "Confirming button of the poll dialog. Keep under ~18 chars.",
     "maxLength": 36
+  },
+  "attachSourcePollUnavailable": "{network} can’t carry polls in this chat",
+  "@attachSourcePollUnavailable": {
+    "description": "Grey line under the Poll row of the attach sheet when the chat's bridge cannot carry polls. Keep short.",
+    "maxLength": 70,
+    "placeholders": {
+      "network": {
+        "type": "String",
+        "example": "Google Messages",
+        "description": "Network name, e.g. WhatsApp; a product name, not translated."
+      }
+    }
+  },
+  "chatPollChooseUpTo": "{count, plural, =1{Choose 1} other{Choose up to {count}}}",
+  "@chatPollChooseUpTo": {
+    "description": "Small note under a poll's question when people may pick more than one answer.",
+    "maxLength": 40,
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "Most answers one person may pick."
+      }
+    }
+  },
+  "chatPollResultsHidden": "Results show when the poll ends",
+  "@chatPollResultsHidden": {
+    "description": "Small note under a poll's question when its results stay hidden until it ends.",
+    "maxLength": 60
+  },
+  "chatPollViewVotes": "View votes",
+  "@chatPollViewVotes": {
+    "description": "Small button under a poll that lists who voted for which answer.",
+    "maxLength": 24
+  },
+  "chatPollNoVotes": "No votes yet",
+  "@chatPollNoVotes": {
+    "description": "In the list of who voted: an answer nobody picked.",
+    "maxLength": 40
+  },
+  "chatPollEnd": "End poll",
+  "@chatPollEnd": {
+    "description": "Button under the reader's own poll that closes voting; also the confirm button. Keep short.",
+    "maxLength": 24
+  },
+  "chatPollEndConfirmTitle": "End this poll?",
+  "@chatPollEndConfirmTitle": {
+    "description": "Title of the dialog asking whether to close a poll.",
+    "maxLength": 40
+  },
+  "chatPollEndConfirmBody": "No one can vote after that, and everyone sees the final result.",
+  "@chatPollEndConfirmBody": {
+    "description": "Body of the dialog asking whether to close a poll: what closing means."
+  },
+  "chatPollEndedFallback": "The poll has ended.",
+  "@chatPollEndedFallback": {
+    "description": "Text sent along with the end of a poll, shown by chat apps that do not understand polls."
+  },
+  "chatPollRemoveOption": "Remove option",
+  "@chatPollRemoveOption": {
+    "description": "Tooltip on the x button that removes one answer field in the poll dialog.",
+    "maxLength": 36
+  },
+  "chatPollOptionsDistinct": "Each option needs different text.",
+  "@chatPollOptionsDistinct": {
+    "description": "Error in the poll dialog when two answers have the same text."
+  },
+  "chatPollMultipleChoice": "Allow multiple answers",
+  "@chatPollMultipleChoice": {
+    "description": "Switch in the poll dialog: people may pick more than one answer.",
+    "maxLength": 40
+  },
+  "chatPollMultipleChoiceOnly": "Polls on this network always allow several answers.",
+  "@chatPollMultipleChoiceOnly": {
+    "description": "Under the multiple-answers switch, which is locked on, when the chat's network only has multiple-choice polls (Messenger, Instagram)."
+  },
+  "chatPollHideResults": "Hide results until the poll ends",
+  "@chatPollHideResults": {
+    "description": "Switch in the poll dialog: keep results hidden until the poll ends.",
+    "maxLength": 44
   },
   "chatCalendarInvitation": "Calendar invitation",
   "@chatCalendarInvitation": {

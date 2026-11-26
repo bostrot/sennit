@@ -1089,27 +1089,43 @@ class MatrixChatRepository
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) async {
     final target = _sendSource(chatId, via: via);
     if (target.network == ChatNetwork.sms) {
       throw StateError('SMS cannot carry a poll');
     }
-    await _roomFor(target).sendEvent({
-      'org.matrix.msc3381.poll.start': {
-        'question': {'org.matrix.msc1767.text': question},
-        'kind': 'org.matrix.msc3381.poll.disclosed',
-        'max_selections': 1,
-        'answers': [
-          for (var i = 0; i < options.length; i++)
-            {'id': 'option_$i', 'org.matrix.msc1767.text': options[i]},
-        ],
-      },
-      // The text fallback older clients render instead of the poll.
-      'org.matrix.msc1767.text': [
-        question,
-        for (var i = 0; i < options.length; i++) '${i + 1}. ${options[i]}',
-      ].join('\n'),
-    }, type: 'org.matrix.msc3381.poll.start');
+    // The unstable type: it is the only one the mautrix bridges act on.
+    await _roomFor(target).sendEvent(
+      pollStartContent(
+        question: question,
+        options: options,
+        multipleChoice: multipleChoice,
+        undisclosed: undisclosed,
+      ),
+      type: kPollStartUnstable,
+    );
+  }
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) return const PollSupport.unavailable();
+    final network = _networkOf(room);
+    if (network == ChatNetwork.sms) return const PollSupport.unavailable();
+    return pollSupportFromFeatures(
+      [
+        for (final state
+            in room.states[roomFeaturesStateType]?.values ??
+                const <sdk.Event>[])
+          state.content,
+      ],
+      bridged:
+          network != ChatNetwork.matrix ||
+          room.states.containsKey('m.bridge') ||
+          room.states.containsKey('uk.half-shot.bridge'),
+    );
   }
 
   @override
@@ -1120,13 +1136,24 @@ class MatrixChatRepository
   ) async {
     final room = _client.getRoomById(roomId);
     if (room == null) throw StateError('That poll\'s room is gone');
-    await room.sendEvent({
-      'm.relates_to': {
-        'rel_type': sdk.RelationshipTypes.reference,
-        'event_id': startEventId,
-      },
-      'org.matrix.msc3381.poll.response': {'answers': answerIds.toList()},
-    }, type: 'org.matrix.msc3381.poll.response');
+    await room.sendEvent(
+      pollResponseContent(startEventId, answerIds),
+      type: kPollResponseUnstable,
+    );
+  }
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) throw StateError('That poll\'s room is gone');
+    await room.sendEvent(
+      pollEndContent(startEventId, fallback),
+      type: kPollEndUnstable,
+    );
   }
 
   @override

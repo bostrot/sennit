@@ -379,11 +379,40 @@ class RemoteChatRepository implements ChatRepository, SendQueueSource {
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) => _act(RemoteMethods.createPoll, {
     'chat': chatId,
     'question': question,
     'options': options,
     'via': ?via?.id,
+    if (multipleChoice) 'multi': true,
+    if (undisclosed) 'undisclosed': true,
+  });
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async {
+    try {
+      final reply = await _call(RemoteMethods.pollSupport, {'room': roomId});
+      return DomainCodec.pollSupportFrom(
+        reply is Map ? reply.cast<String, Object?>() : const {},
+      );
+    } on Object {
+      // A phone on an older Sennit does not know the question; it never
+      // withheld polls either.
+      return const PollSupport();
+    }
+  }
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) => _act(RemoteMethods.endPoll, {
+    'room': roomId,
+    'event': startEventId,
+    'fallback': fallback,
   });
 
   @override

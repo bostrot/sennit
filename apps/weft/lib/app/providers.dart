@@ -242,6 +242,14 @@ final _unreadByNetworkMemo = Provider(
   ),
 );
 
+/// What polls [roomId]'s bridge carries, for the "end poll" button on a poll
+/// the reader started. Room features change when a bridge is upgraded, not
+/// while a chat is open, so one read per room per screen is enough.
+final pollSupportProvider = FutureProvider.autoDispose
+    .family<PollSupport, String>(
+      (ref, roomId) => ref.watch(chatRepositoryProvider).pollSupport(roomId),
+    );
+
 /// Whether one conversation's encrypted rooms hold any unverified device.
 ///
 /// A family over the chat id rather than a field on [Chat], because it is the

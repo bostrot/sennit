@@ -307,6 +307,60 @@ void main() {
       );
     }
 
+    test('a WhatsApp poll riding an m.room.message is a poll', () {
+      // mautrix-whatsapp and -signal with extev_polls off, their default.
+      final message = map({
+        'msgtype': 'm.text',
+        'body':
+            'Lunch?\n\n1. Yes\n2. No\n\n(This message is a poll. '
+            'Please open WhatsApp to vote.)',
+        'org.matrix.msc3381.poll.start': {
+          'kind': 'org.matrix.msc3381.poll.disclosed',
+          'max_selections': 1,
+          'question': {'org.matrix.msc1767.text': 'Lunch?'},
+          'answers': [
+            {'id': 'h1', 'org.matrix.msc1767.text': 'Yes'},
+            {'id': 'h2', 'org.matrix.msc1767.text': 'No'},
+          ],
+        },
+      })!;
+      expect(message.kind, MessageKind.poll);
+      expect(message.body, 'Lunch?');
+      expect(message.poll!.options.map((o) => o.text), ['Yes', 'No']);
+    });
+
+    test('a message with a broken poll block keeps its text', () {
+      final message = map({
+        'msgtype': 'm.text',
+        'body': 'Poll: Lunch?',
+        'org.matrix.msc3381.poll.start': {'answers': 'nonsense'},
+      })!;
+      expect(message.kind, MessageKind.text);
+      expect(message.body, 'Poll: Lunch?');
+    });
+
+    test('a stable m.poll.start is a poll', () {
+      final message = map({
+        'm.poll': {
+          'question': {
+            'm.text': [
+              {'body': 'Which day?'},
+            ],
+          },
+          'answers': [
+            {
+              'm.id': 'mon',
+              'm.text': [
+                {'body': 'Monday'},
+              ],
+            },
+          ],
+        },
+      }, type: 'm.poll.start')!;
+      expect(message.kind, MessageKind.poll);
+      expect(message.poll!.question, 'Which day?');
+    });
+
     test('carries the attached link previews and the room\'s encryption', () {
       final message = map({
         'msgtype': 'm.text',

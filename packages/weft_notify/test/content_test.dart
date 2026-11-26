@@ -289,7 +289,7 @@ void main() {
         render(
           message: msg(kind: MessageKind.poll, body: 'Lunch where?'),
         ).body,
-        'Poll · Lunch where?',
+        '📊 Lunch where?',
       );
     });
 
