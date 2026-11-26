@@ -118,7 +118,13 @@ class _NoRoomsRepository implements ChatRepository {
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) async {}
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async =>
+      const PollSupport.unavailable();
 
   @override
   Future<void> votePoll(
@@ -126,6 +132,13 @@ class _NoRoomsRepository implements ChatRepository {
     String startEventId,
     Set<String> answerIds,
   ) async {}
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) async {}
 
   @override
   Set<String> get serviceChatIds => const {};

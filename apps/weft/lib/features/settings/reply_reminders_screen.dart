@@ -49,6 +49,16 @@ class ReplyRemindersScreen extends ConsumerWidget {
               onChanged: (v) => update((s) => s.copyWith(enabled: v)),
               contentPadding: EdgeInsets.zero,
             ),
+            // Shown with reminders off too: the inbox's "needs reply" filter
+            // goes by the same rule.
+            SwitchListTile(
+              title: Text(context.l10n.replyRemindersReactionsTitle),
+              subtitle: Text(context.l10n.replyRemindersReactionsSubtitle),
+              value: settings.reactionsCountAsReply,
+              onChanged: (v) =>
+                  update((s) => s.copyWith(reactionsCountAsReply: v)),
+              contentPadding: EdgeInsets.zero,
+            ),
             if (settings.enabled) ...[
               const Divider(height: WeftSpace.xl),
               SettingsSectionHeader(

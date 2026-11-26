@@ -30,6 +30,8 @@ abstract final class RemoteMethods {
   static const String respondCalendarInvite = 'respondCalendarInvite';
   static const String createPoll = 'createPoll';
   static const String votePoll = 'votePoll';
+  static const String endPoll = 'endPoll';
+  static const String pollSupport = 'pollSupport';
   static const String react = 'react';
   static const String unreact = 'unreact';
   static const String editMessage = 'editMessage';

@@ -9,7 +9,7 @@ PRIVACIDAD DESDE EL DISEÑO
 • Cifrado de extremo a extremo con Matrix, con verificación de dispositivos, firma cruzada y copia de claves
 • Mensajes temporales, configurables por conversación
 • Confirmaciones de lectura, indicador de escritura y estado en línea, cada uno con su propio interruptor
-• Sin analíticas, sin rastreo, sin anuncios
+• Sin rastreo ni anuncios; estadísticas de uso anónimas solo si las aceptas
 • Código abierto bajo la licencia AGPL-3.0: cada línea es pública
 
 TU PROPIA IA (SENNIT PRO)

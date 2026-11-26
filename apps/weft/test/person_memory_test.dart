@@ -169,7 +169,7 @@ Mia (5), Ben (3)
         block,
         endsWith(
           'About Anna:\nCalls me Ricky\n\n'
-          'About this chat:\nPlanning the Lisbon trip',
+          'About this group:\nPlanning the Lisbon trip',
         ),
       );
     });
@@ -202,7 +202,7 @@ Mia (5), Ben (3)
         );
         expect(block, contains('About Person 0'));
         expect(block, isNot(contains('About Person 7')));
-        expect(block, contains('About this chat:\nFamily group'));
+        expect(block, contains('About this group:\nFamily group'));
       },
     );
   });
@@ -633,9 +633,10 @@ Mia (5), Ben (3)
       expect((await learn(via: null)).outcome, PersonFactsOutcome.noEndpoint);
     });
 
-    test('writes into the chat and the person, never into a note', () async {
+    test('a direct chat learns into one memory, never into a note', () async {
       const annaKeys = ['dm:!dm:example.org'];
       memory
+        // What an older version kept for the chat: folded into Anna's.
         ..saveNote(keys, 'Planning the Lisbon trip')
         ..saveNote(annaKeys, 'Calls me Ricky');
       late Map<String, Object?> sent;
@@ -652,18 +653,17 @@ Mia (5), Ben (3)
         changed: 2,
         status: null,
       ));
-      expect(memory.book.noteFor(keys), 'Planning the Lisbon trip');
-      expect(memory.book.noteFor(annaKeys), 'Calls me Ricky');
+      expect(memory.book.noteFor(keys), isEmpty);
+      expect(
+        memory.book.noteFor(annaKeys),
+        'Calls me Ricky\n\nPlanning the Lisbon trip',
+      );
       expect(
         [for (final f in memory.book.learnedFor(annaKeys)) f.text],
-        ['Tochter Mia hat morgen Geburtstag'],
+        ['Tochter Mia hat morgen Geburtstag', 'Schreibt mit vielen Emojis'],
       );
-      expect(
-        [for (final f in memory.book.learnedFor(keys)) f.text],
-        ['Schreibt mit vielen Emojis'],
-      );
-      expect(memory.book.suggestionsFor(keys), isEmpty);
-      expect(memory.book.undoTouches(keys), isTrue);
+      expect(memory.book.learnedFor(keys), isEmpty);
+      expect(memory.book.undoTouches(annaKeys), isTrue);
       // The notes go along as fixed, so the model can leave out what is
       // known and cannot change it.
       final last = (sent['messages'] as List).last as Map;
@@ -692,14 +692,16 @@ Mia (5), Ben (3)
       late Map<String, Object?> sent;
       final result = await learn(
         client: _answering(
-          '{"add": [], "update": [{"id": 2, "fact": "Arbeitet jetzt bei '
-          'der Bahn"}], "drop": [1]}',
+          '{"add": [], "update": [{"id": 1, "fact": "Arbeitet jetzt bei '
+          'der Bahn"}], "drop": [2]}',
           onRequest: (b) => sent = b,
         ),
       );
       final last = ((sent['messages'] as List).last as Map)['content'];
-      expect(last, contains('1. [chat] Plant ein Treffen am Samstag'));
-      expect(last, contains('2. [Anna] Arbeitet bei der Post'));
+      // One memory for a direct chat: the person's first, then what was the
+      // chat's, all under Anna's name.
+      expect(last, contains('1. [Anna] Arbeitet bei der Post'));
+      expect(last, contains('2. [Anna] Plant ein Treffen am Samstag'));
       expect(result.outcome, PersonFactsOutcome.learned);
       expect(memory.book.learnedFor(keys), isEmpty);
       expect(

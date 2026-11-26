@@ -181,11 +181,29 @@ abstract class ChatRepository {
   });
 
   /// Starts an MSC3381 poll in the conversation.
+  ///
+  /// [multipleChoice] lets everyone pick any number of answers; otherwise
+  /// one. [undisclosed] hides the tally until the poll ends.
   Future<void> createPoll(
     String chatId, {
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
+  });
+
+  /// What a poll started in [roomId] can be, as far as its bridge carries
+  /// polls at all.
+  Future<PollSupport> pollSupport(String roomId);
+
+  /// Closes the local user's poll [startEventId] in [roomId].
+  ///
+  /// [fallback] is the line clients without polls show in its place.
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
   });
 
   /// Casts (or changes) the local user's vote on [startEventId]'s poll.

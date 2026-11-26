@@ -1452,6 +1452,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.6"
+  plausible_analytics:
+    dependency: transitive
+    description:
+      path: "."
+      ref: "6c55c89d1e57f3f0aebcdf9cccb7103fb8ec8da2"
+      resolved-ref: "6c55c89d1e57f3f0aebcdf9cccb7103fb8ec8da2"
+      url: "https://github.com/bostrot/flutter_plausible_analytics.git"
+    source: git
+    version: "0.5.0"
   plugin_platform_interface:
     dependency: transitive
     description:

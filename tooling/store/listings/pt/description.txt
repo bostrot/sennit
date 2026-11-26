@@ -9,7 +9,7 @@ PRIVACIDADE DESDE A ORIGEM
 • Criptografia de ponta a ponta via Matrix, com verificação de dispositivos, assinatura cruzada e backup de chaves
 • Mensagens temporárias, ajustáveis por conversa
 • Confirmações de leitura, indicador de digitação e status online, cada um com seu próprio botão
-• Sem análises, sem rastreamento, sem anúncios
+• Sem rastreamento nem anúncios; estatísticas de uso anônimas só se você aceitar
 • Código aberto sob a licença AGPL-3.0: cada linha é pública
 
 SUA PRÓPRIA IA (SENNIT PRO)

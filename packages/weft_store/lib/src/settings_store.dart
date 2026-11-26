@@ -207,6 +207,16 @@ abstract final class WeftSettings {
   /// but the other side sees no blue-tick equivalent.
   static const String sendReadReceipts = 'privacy.read_receipts';
 
+  /// Whether anonymous usage statistics go to Sennit's Plausible server.
+  /// Off until the user says yes: nothing is sent before that. Synced, like
+  /// the other privacy switches, so the answer given on one device holds on
+  /// all of them.
+  static const String usageStats = 'privacy.usage_stats';
+
+  /// Whether the user has been asked about [usageStats], so the question
+  /// comes once — per account rather than per device, since it syncs too.
+  static const String usageStatsAsked = 'privacy.usage_stats_asked';
+
   /// Whether the timeline fetches pictures by itself. Off, each one waits for
   /// a tap. Per device, like the limit below: a phone on mobile data and a
   /// desktop on fibre want different answers.
@@ -499,6 +509,12 @@ abstract final class WeftSettings {
   /// when. Kept so the reminder clock survives a restart.
   static const String notifyReplyReminderLedger =
       'notify.reply_reminder_ledger';
+
+  /// The user's own reactions this device has seen, per room (see
+  /// `OwnReactionLog`), so a chat answered with a reaction stays answered
+  /// across a restart. Bookkeeping of this device: the reactions themselves
+  /// reach the others through Matrix.
+  static const String notifyOwnReactions = 'notify.own_reactions';
 
   /// The reply reminders currently queued with the OS, as a list of plan keys
   /// under `keys`, so the next plan can cancel exactly what it replaces.

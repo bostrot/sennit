@@ -140,14 +140,44 @@ class RecordingChatRepository implements ChatRepository {
     required String question,
     required List<String> options,
     ChatNetwork? via,
-  }) async {}
+    bool multipleChoice = false,
+    bool undisclosed = false,
+  }) async => calls.add(
+    RecordedCall(
+      'createPoll',
+      body: [question, ...options].join('\n'),
+      key:
+          '${multipleChoice ? 'multi' : 'single'}'
+          '${undisclosed ? ',hidden' : ''}',
+    ),
+  );
+
+  /// What [pollSupport] answers; a plain Matrix room unless a test says not.
+  PollSupport pollSupportAnswer = const PollSupport();
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async => pollSupportAnswer;
 
   @override
   Future<void> votePoll(
     String roomId,
     String startEventId,
     Set<String> answerIds,
-  ) async {}
+  ) async => calls.add(
+    RecordedCall(
+      'votePoll',
+      eventId: startEventId,
+      key: (answerIds.toList()..sort()).join(','),
+    ),
+  );
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) async =>
+      calls.add(RecordedCall('endPoll', eventId: startEventId, body: fallback));
 
   @override
   Set<String> get serviceChatIds => const {};

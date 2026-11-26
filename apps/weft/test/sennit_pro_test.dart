@@ -530,7 +530,7 @@ void main() {
       Widget home, {
       SennitEdition edition = SennitEdition.store,
     }) async {
-      tester.view.physicalSize = const Size(600, 2400);
+      tester.view.physicalSize = const Size(600, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final stores = WeftStores.inMemory();
@@ -619,7 +619,7 @@ void main() {
     testWidgets('a direct build asks for a licence key instead of the store', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(600, 2400);
+      tester.view.physicalSize = const Size(600, 2600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final stores = WeftStores.inMemory();

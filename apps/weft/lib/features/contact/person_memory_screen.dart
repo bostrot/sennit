@@ -21,24 +21,32 @@ import '../../services/billing/entitlements.dart';
 import '../settings/person_memory_settings_screen.dart';
 import '../settings/pro_screen.dart';
 
-/// The people of a chat whose memory can be opened from it, or that a fact
-/// can be added to: the person a direct chat is with, or whoever wrote in the
-/// part of a group the timeline has loaded.
+/// The people of a group whose memory can be opened from it, or that a fact
+/// can be added to: whoever wrote in the part of it the timeline has loaded.
+/// See [directMemoryPerson] for a direct chat's.
 final chatMemoryPeopleProvider = FutureProvider.autoDispose
     .family<List<MemoryPerson>, String>((ref, chatId) async {
       final chat = (ref.watch(chatsProvider).value ?? const <Chat>[])
           .where((c) => c.id == chatId)
           .firstOrNull;
-      if (chat == null) return const [];
+      if (chat == null || !chat.isGroup) return const [];
       final repository = ref.watch(chatRepositoryProvider);
-      final messages = chat.isGroup
-          ? (await repository.timelineFor(chatId)).view().messages
-          : const <WeftMessage>[];
+      final messages = (await repository.timelineFor(chatId)).view().messages;
       return memoryPeopleFor(repository.identityGraph, chat, messages);
     });
 
-/// The memory of the chat [chatId]: the detailed note, what was learned on
-/// its own, and the button that learns from the chat now.
+/// The person the direct chat [chat] is with, whose memory is the chat's.
+MemoryPerson directMemoryPerson(WidgetRef ref, Chat chat) => (
+  name: chat.title,
+  keys: personMemoryKeysFor(
+    ref.read(chatRepositoryProvider).identityGraph,
+    chat,
+  ),
+);
+
+/// The one memory of the chat [chatId]: "About Anna" for a direct chat,
+/// "About this group" for a group. The note, what was learned on its own,
+/// and the button that learns from the chat now.
 class ChatMemoryScreen extends ConsumerWidget {
   const ChatMemoryScreen({super.key, required this.chatId});
 
@@ -58,14 +66,16 @@ class ChatMemoryScreen extends ConsumerWidget {
     final repository = ref.watch(chatRepositoryProvider);
     return MemoryEditor.chat(
       chat: chat,
-      people: ref.watch(chatMemoryPeopleProvider(chatId)).value ?? const [],
+      people: chat.isGroup
+          ? ref.watch(chatMemoryPeopleProvider(chatId)).value ?? const []
+          : [directMemoryPerson(ref, chat)],
       loadMessages: (wanted) async =>
           loadHistoryForAi(await repository.timelineFor(chat.id), wanted),
     );
   }
 }
 
-/// The short memory of one person, used in every chat they are in.
+/// The memory of one person of a group, used in every chat they are in.
 class PersonMemoryScreen extends StatelessWidget {
   const PersonMemoryScreen({super.key, required this.person});
 
@@ -78,16 +88,20 @@ class PersonMemoryScreen extends StatelessWidget {
 /// The editor for either layer, given what it edits rather than finding it —
 /// which is what lets a test pump it without a repository.
 class MemoryEditor extends ConsumerStatefulWidget {
-  /// A chat's memory. [people] are who a fact can be added to instead;
-  /// [loadMessages] is the conversation "Learn now" reads, at least
-  /// the number of messages it is given when there are that many.
+  /// A chat's memory: a group's own, or for a direct chat the person's it is
+  /// with — the single entry of [people] — which is all a direct chat has.
+  /// In a group, [people] are who a fact can be added to instead.
+  /// [loadMessages] is the conversation "Learn now" reads, at least the
+  /// number of messages it is given when there are that many.
   MemoryEditor.chat({
     super.key,
     required Chat this.chat,
     required this.people,
     required Future<List<WeftMessage>> Function(int wanted) this.loadMessages,
   }) : person = null,
-       keys = chatMemoryKeys(chat);
+       keys = !chat.isGroup && people.isNotEmpty
+           ? people.first.keys
+           : chatMemoryKeys(chat);
 
   /// A person's memory.
   MemoryEditor.person({super.key, required MemoryPerson this.person})
@@ -104,6 +118,9 @@ class MemoryEditor extends ConsumerStatefulWidget {
   /// Where the note is filed.
   final List<String> keys;
 
+  /// Whether this is a direct chat's memory: its person's.
+  bool get direct => chat != null && !chat!.isGroup && people.isNotEmpty;
+
   @override
   ConsumerState<MemoryEditor> createState() => _MemoryEditorState();
 }
@@ -114,8 +131,14 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
   late final PersonMemoryNotifier _memory = ref.read(
     personMemoryProvider.notifier,
   );
+  // A direct chat's, with what older versions kept for the chat itself
+  // folded in — saved after the first frame, see [initState].
   late final TextEditingController _note = TextEditingController(
-    text: _memory.book.noteFor(widget.keys),
+    text: widget.direct
+        ? _memory.book
+              .foldChatInto(chatMemoryKeys(widget.chat!), widget.keys)
+              .noteFor(widget.keys)
+        : _memory.book.noteFor(widget.keys),
   );
   Timer? _debounce;
   bool _busy = false;
@@ -124,6 +147,21 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
   String? _condensed;
 
   bool get _isChat => widget.chat != null;
+
+  bool get _direct => widget.direct;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_direct) {
+      // Not while building: publishing rebuilds whoever watches the memory.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _memory.fold(chatMemoryKeys(widget.chat!), widget.keys);
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -334,11 +372,22 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
       for (final f in book.learnedFor(widget.keys))
         if (!f.style) f,
     ];
-    final style = book.styleFor(widget.keys);
+    // How the user writes here — filed under the chat's rooms — and, for
+    // a person, how they write.
+    final myStyle = _isChat
+        ? book.styleFor(chatMemoryKeys(widget.chat!))
+        : null;
+    final theirStyle = _isChat && !_direct ? null : book.styleFor(widget.keys);
     final undo = book.undoTouches(widget.keys) ? book.undo : null;
-    final hint = _isChat ? l10n.chatMemoryHint : l10n.personMemoryHint;
+    final hint = _direct
+        ? l10n.directMemoryHint
+        : _isChat
+        ? l10n.groupMemoryHint
+        : l10n.personMemoryHint;
     final length = _note.text.trim().length;
-    final long = !_isChat && length > kPersonMemorySoftLimit;
+    // Only a group member's memory is meant to stay a few lines.
+    final short = !_isChat;
+    final long = short && length > kPersonMemorySoftLimit;
 
     Widget progress(IconData icon) => _busy
         ? const SizedBox.square(
@@ -350,8 +399,10 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
     return Scaffold(
       appBar: WeftAppBar(
         title: Text(
-          _isChat
-              ? l10n.chatMemoryScreenTitle(widget.chat!.title)
+          _direct
+              ? l10n.personMemoryScreenTitle(widget.people.first.name)
+              : _isChat
+              ? l10n.groupMemoryTitle
               : l10n.personMemoryScreenTitle(widget.person!.name),
         ),
       ),
@@ -398,17 +449,15 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
               keyboardType: TextInputType.multiline,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                labelText: _isChat
-                    ? l10n.chatMemoryLabel
+                labelText: _isChat && !_direct
+                    ? l10n.groupMemoryTitle
                     : l10n.personMemoryTitle,
                 alignLabelWithHint: true,
                 hintText: hint,
                 hintMaxLines: 12,
-                helperText: _isChat ? null : l10n.personMemorySharedHint,
+                helperText: short ? l10n.personMemorySharedHint : null,
                 helperMaxLines: 3,
-                counterText: _isChat
-                    ? null
-                    : '$length / $kPersonMemorySoftLimit',
+                counterText: short ? '$length / $kPersonMemorySoftLimit' : null,
                 counterStyle: long
                     ? TextStyle(color: context.colors.error)
                     : null,
@@ -445,19 +494,30 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                   ),
               ],
             ),
-            if (style != null) ...[
+            if (myStyle != null) ...[
               const SizedBox(height: WeftSpace.xl),
               _Heading(
                 title: l10n.personMemoryStyleTitle,
-                hint: _isChat
-                    ? l10n.personMemoryMyStyleHint
-                    : l10n.personMemoryTheirStyleHint,
+                hint: l10n.personMemoryMyStyleHint,
               ),
               LearnedFactTile(
                 key: const ValueKey('memory-style'),
                 memory: _memory,
+                keys: chatMemoryKeys(widget.chat!),
+                fact: myStyle,
+              ),
+            ],
+            if (theirStyle != null) ...[
+              SizedBox(height: myStyle == null ? WeftSpace.xl : WeftSpace.md),
+              _Heading(
+                title: myStyle == null ? l10n.personMemoryStyleTitle : '',
+                hint: l10n.personMemoryTheirStyleHint,
+              ),
+              LearnedFactTile(
+                key: const ValueKey('memory-their-style'),
+                memory: _memory,
                 keys: widget.keys,
-                fact: style,
+                fact: theirStyle,
               ),
             ],
             if (learned.isNotEmpty) ...[
@@ -516,7 +576,7 @@ class _MemoryEditorState extends ConsumerState<MemoryEditor> {
                 _Suggestion(
                   fact: fact,
                   onAccept: () => _accept(fact),
-                  onPromote: widget.people.isEmpty
+                  onPromote: widget.people.isEmpty || _direct
                       ? null
                       : () => _promote(fact),
                   onDismiss: () => _memory.dismiss(widget.keys, fact),
@@ -542,13 +602,15 @@ class _Heading extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: context.text.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+          if (title.isNotEmpty) ...[
+            Text(
+              title,
+              style: context.text.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: WeftSpace.xs),
+            const SizedBox(height: WeftSpace.xs),
+          ],
           Text(
             hint,
             style: context.text.bodySmall?.copyWith(
@@ -688,8 +750,8 @@ class _EditFactDialogState extends State<_EditFactDialog> {
 }
 
 /// One fact or style profile the model learned, filed under [keys]: what it
-/// says, that it was learned and when — or that the user edited it — and
-/// pin, edit and delete.
+/// says, that it was learned and when — or that the user edited it — until
+/// when it is kept when it is temporary, and pin, edit and delete.
 class LearnedFactTile extends StatelessWidget {
   const LearnedFactTile({
     super.key,
@@ -707,6 +769,14 @@ class LearnedFactTile extends StatelessWidget {
     final l10n = context.l10n;
     final colors = context.colors;
     final date = memoryDate(context, fact.at);
+    // The last day it is kept: it goes at the midnight after.
+    final until = switch (fact.until) {
+      final end? => memoryDate(
+        context,
+        end.subtract(const Duration(milliseconds: 1)),
+      ),
+      null => null,
+    };
     void onPin() => memory.pinLearned(keys, fact, pinned: !fact.pinned);
     void onEdit() => unawaited(editLearnedFact(context, memory, keys, fact));
     void onDelete() => memory.deleteLearned(keys, fact);
@@ -730,7 +800,9 @@ class LearnedFactTile extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        fact.edited
+                        until != null
+                            ? Icons.event_outlined
+                            : fact.edited
                             ? Icons.edit_outlined
                             : Icons.auto_awesome_outlined,
                         size: 14,
@@ -739,9 +811,15 @@ class LearnedFactTile extends StatelessWidget {
                       const SizedBox(width: WeftSpace.xs),
                       Flexible(
                         child: Text(
-                          fact.edited
-                              ? l10n.personMemoryEditedAt(date)
-                              : l10n.personMemoryLearnedAt(date),
+                          [
+                            fact.edited
+                                ? l10n.personMemoryEditedAt(date)
+                                : l10n.personMemoryLearnedAt(date),
+                            if (until != null)
+                              fact.past
+                                  ? l10n.personMemoryPastUntil(until)
+                                  : l10n.personMemoryUntil(until),
+                          ].join(' · '),
                           style: context.text.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -873,8 +951,9 @@ class _MemoryTile extends ConsumerWidget {
   }
 }
 
-/// The contact screen's memory sections: "This chat", then "About …" for the
-/// person a direct chat is with, or for each person who wrote in a group.
+/// The contact screen's memory sections: for a direct chat one, "About
+/// Anna"; for a group "About this group", then "About …" for each person who
+/// wrote in it.
 class ChatMemorySections extends ConsumerWidget {
   const ChatMemorySections({
     super.key,
@@ -890,16 +969,34 @@ class ChatMemorySections extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    if (!chat.isGroup) {
+      final person = directMemoryPerson(ref, chat);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header(l10n.personMemoryScreenTitle(person.name)),
+          _MemoryTile(
+            icon: Icons.person_outline_rounded,
+            // What is still filed under the chat's rooms too, until opening
+            // it folds that in.
+            keys: [...person.keys, ...chatMemoryKeys(chat)],
+            empty: l10n.personMemoryEmpty,
+            withSuggestions: true,
+            open: () => ChatMemoryScreen(chatId: chat.id),
+          ),
+        ],
+      );
+    }
     final people =
         ref.watch(chatMemoryPeopleProvider(chat.id)).value ?? const [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        header(l10n.memoryThisChat),
+        header(l10n.groupMemoryTitle),
         _MemoryTile(
-          icon: Icons.forum_outlined,
+          icon: Icons.groups_outlined,
           keys: chatMemoryKeys(chat),
-          empty: l10n.chatMemoryEmpty,
+          empty: l10n.groupMemoryEmpty,
           withSuggestions: true,
           open: () => ChatMemoryScreen(chatId: chat.id),
         ),

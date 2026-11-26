@@ -9,6 +9,7 @@ import 'package:weft_remote/weft_remote.dart';
 
 import '../services/remote/remote_protocol.dart';
 import 'chat_repository.dart';
+import 'send_queue_source.dart';
 
 /// Sennit Web's data: the phone's [ChatRepository], seen through a link.
 ///
@@ -16,7 +17,7 @@ import 'chat_repository.dart';
 /// phone's pushed state (see `RemoteChatHost`), and forwards every action as a
 /// call. Nothing here talks to Matrix: the session, its keys and the homeserver
 /// stay on the phone, and the browser only ever sees what the phone shows.
-class RemoteChatRepository implements ChatRepository {
+class RemoteChatRepository implements ChatRepository, SendQueueSource {
   RemoteChatRepository(RemoteLink link) {
     _peer = RpcPeer(link, onEvent: _onEvent);
   }
@@ -37,6 +38,9 @@ class RemoteChatRepository implements ChatRepository {
   final _settingsController =
       StreamController<Map<String, String?>>.broadcast();
   Map<String, String?> _pendingSettings = {};
+  Map<String, SendFailure> _failures = const {};
+  final _failuresController =
+      StreamController<Map<String, SendFailure>>.broadcast();
 
   /// The phone's preferences as they change; null removes. The first event
   /// after [connect] carries all of them.
@@ -68,6 +72,7 @@ class RemoteChatRepository implements ChatRepository {
     await _peer.close();
     await _chatsController.close();
     await _settingsController.close();
+    await _failuresController.close();
   }
 
   /// A picture the phone fetches with its homeserver credentials.
@@ -100,6 +105,13 @@ class RemoteChatRepository implements ChatRepository {
     if (frame['epoch'] case final int epoch when epoch != _epoch) {
       _epoch = epoch;
       _timelineByChat.clear();
+    }
+    if (frame['failures'] case final Map<Object?, Object?> failures) {
+      _failures = {
+        for (final MapEntry(:key, :value) in failures.entries)
+          key! as String: ?SendFailure.fromName(value as String?),
+      };
+      if (!_failuresController.isClosed) _failuresController.add(_failures);
     }
     if (frame['identity'] case final Map<Object?, Object?> identity) {
       _graph = IdentityGraph(
@@ -182,6 +194,14 @@ class RemoteChatRepository implements ChatRepository {
 
   @override
   int get timelineEpoch => _epoch;
+
+  /// The phone's send queue, as it pushes it.
+  @override
+  Map<String, SendFailure> get sendFailures => _failures;
+
+  @override
+  Stream<Map<String, SendFailure>> get sendFailureChanges =>
+      _failuresController.stream;
 
   @override
   Set<String> get serviceChatIds => _service;
@@ -359,11 +379,40 @@ class RemoteChatRepository implements ChatRepository {
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) => _act(RemoteMethods.createPoll, {
     'chat': chatId,
     'question': question,
     'options': options,
     'via': ?via?.id,
+    if (multipleChoice) 'multi': true,
+    if (undisclosed) 'undisclosed': true,
+  });
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async {
+    try {
+      final reply = await _call(RemoteMethods.pollSupport, {'room': roomId});
+      return DomainCodec.pollSupportFrom(
+        reply is Map ? reply.cast<String, Object?>() : const {},
+      );
+    } on Object {
+      // A phone on an older Sennit does not know the question; it never
+      // withheld polls either.
+      return const PollSupport();
+    }
+  }
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) => _act(RemoteMethods.endPoll, {
+    'room': roomId,
+    'event': startEventId,
+    'fallback': fallback,
   });
 
   @override

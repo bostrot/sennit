@@ -9,7 +9,7 @@ PRIVAT VON GRUND AUF
 • Ende-zu-Ende-Verschlüsselung über Matrix, mit Geräteverifizierung, Cross-Signing und Schlüssel-Backup
 • Selbstlöschende Nachrichten, pro Unterhaltung einstellbar
 • Lesebestätigungen, Tippanzeige und Online-Status, jeweils einzeln abschaltbar
-• Keine Analyse, kein Tracking, keine Werbung
+• Kein Tracking, keine Werbung; anonyme Nutzungsstatistik nur mit deiner Zustimmung
 • Open Source unter der AGPL-3.0: jede Zeile ist öffentlich
 
 DEINE EIGENE KI (SENNIT PRO)

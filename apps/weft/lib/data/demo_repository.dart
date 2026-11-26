@@ -312,7 +312,12 @@ class DemoChatRepository implements ChatRepository {
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) => send(chatId, 'Poll: $question', via: via);
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async => const PollSupport();
 
   @override
   Future<void> votePoll(
@@ -320,6 +325,13 @@ class DemoChatRepository implements ChatRepository {
     String startEventId,
     Set<String> answerIds,
   ) async {}
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) async {}
 
   @override
   Future<void> sendLocation(

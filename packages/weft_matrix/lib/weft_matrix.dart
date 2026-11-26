@@ -22,6 +22,7 @@ export 'src/key_backup.dart';
 export 'src/link_preview.dart';
 export 'src/login_methods.dart';
 export 'src/mapping.dart';
+export 'src/polls.dart';
 export 'src/media.dart';
 export 'src/matrix_timeline_source.dart';
 export 'src/push_delivery.dart';

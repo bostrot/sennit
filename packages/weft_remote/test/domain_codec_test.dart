@@ -48,7 +48,13 @@ void main() {
       question: 'Lunch?',
       options: [PollOption(id: 'y', text: 'Yes')],
       votes: {'y': 2},
+      voters: {
+        'y': ['Anna', 'Ben'],
+      },
+      voterCount: 2,
       ownVotes: {'y'},
+      undisclosed: true,
+      ended: true,
     ),
     calendarInvite: CalendarInvite(
       uid: 'u1',
@@ -73,6 +79,8 @@ void main() {
     expect(back.timestamp.isAtSameMomentAs(at), isTrue);
     expect(back.reactions.single.byLocalUser, isTrue);
     expect(back.poll!.ownVotes, {'y'});
+    expect(back.poll!.voters['y'], ['Anna', 'Ben']);
+    expect(back.poll!.undisclosed, isTrue);
     expect(back.calendarInvite!.responses.single.reply, CalendarReply.accepted);
   });
 
@@ -120,5 +128,30 @@ void main() {
     });
     expect(back.network, ChatNetwork.unknown);
     expect(back.kind, MessageKind.text);
+  });
+
+  test('what a room can do with polls survives the wire', () {
+    const support = PollSupport(
+      maxOptions: 12,
+      optionMaxLength: 100,
+      undisclosed: false,
+      canEnd: false,
+      uniqueOptions: true,
+    );
+    final back = DomainCodec.pollSupportFrom(
+      _wire(DomainCodec.pollSupport(support)),
+    );
+    expect(back.available, isTrue);
+    expect(back.maxOptions, 12);
+    expect(back.optionMaxLength, 100);
+    expect(back.undisclosed, isFalse);
+    expect(back.canEnd, isFalse);
+    expect(back.uniqueOptions, isTrue);
+    expect(
+      DomainCodec.pollSupportFrom(
+        _wire(DomainCodec.pollSupport(const PollSupport.unavailable())),
+      ).available,
+      isFalse,
+    );
   });
 }

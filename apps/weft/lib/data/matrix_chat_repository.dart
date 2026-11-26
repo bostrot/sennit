@@ -17,6 +17,7 @@ import '../services/attachments/video_poster.dart';
 import 'auto_reply_transport.dart';
 import 'room_joiner.dart';
 import 'chat_repository.dart';
+import 'own_reactions.dart';
 import 'profile_lookups.dart';
 import 'send_queue_source.dart';
 import 'sms_chat_repository.dart';
@@ -95,9 +96,15 @@ class MatrixChatRepository
     if (accepted is List) {
       _acceptedRequests.addAll(accepted.whereType<String>());
     }
+    _ownReactions = OwnReactionLog.fromJson(
+      _settings?.getJson(WeftSettings.notifyOwnReactions),
+    );
     _resolveMediaSupport();
     _rebuild();
     _syncSub = _session.client.onSync.stream.listen((_) => _scheduleRebuild());
+    _ownReactionSub = _session.client.onTimelineEvent.stream.listen(
+      (event) => unawaited(_noteOwnReaction(event)),
+    );
     _syncStatusSub = _session.client.onSyncStatus.stream.listen(_onSyncStatus);
 
     final sms = _sms;
@@ -154,6 +161,12 @@ class MatrixChatRepository
 
   late IdentityGraph _graph;
   StreamSubscription<sdk.SyncUpdate>? _syncSub;
+  StreamSubscription<sdk.Event>? _ownReactionSub;
+
+  /// The user's own reactions, for [Chat.reactedUpTo]. Persisted, because sync
+  /// hands each one over once and a restart must not forget the chats it
+  /// answered.
+  late OwnReactionLog _ownReactions;
   StreamSubscription<sdk.SyncStatusUpdate>? _syncStatusSub;
   StreamSubscription<void>? _smsSub;
 
@@ -509,6 +522,51 @@ class MatrixChatRepository
   /// one of their reactions from the tally.
   String _identityOf(String senderId) =>
       _graph.contactIdForUser(senderId) ?? senderId;
+
+  /// Keeps [_ownReactions] up to date with one timeline event from sync: a
+  /// reaction of the user's is recorded, a redaction of one forgets it.
+  ///
+  /// The user's own means the same as in the reaction bar — their account, or
+  /// a handle merged into it — which covers what a double-puppeting bridge
+  /// relays from the phone.
+  Future<void> _noteOwnReaction(sdk.Event event) async {
+    final roomId = event.roomId;
+    if (roomId == null) return;
+    if (event.type == sdk.EventTypes.Redaction) {
+      final redacts = event.redacts ?? event.content['redacts'];
+      if (redacts is String && _ownReactions.redact(roomId, redacts)) {
+        _ownReactionsChanged();
+      }
+      return;
+    }
+    final own = _client.userID;
+    if (own == null) return;
+    final target = ownReactionTarget(
+      type: event.type,
+      eventId: event.eventId,
+      senderId: event.senderId,
+      content: event.content,
+      isOwn: (sender) =>
+          sender == own || _identityOf(sender) == _identityOf(own),
+    );
+    if (target == null) return;
+    final room = event.room;
+    final last = room.lastEvent;
+    final targetAt = last?.eventId == target
+        ? last!.originServerTs
+        : (await _client.database.getEventById(target, room))?.originServerTs;
+    // A message this device never stored is older than anything a reaction
+    // could still answer.
+    if (targetAt == null) return;
+    if (_ownReactions.record(roomId, event.eventId, targetAt)) {
+      _ownReactionsChanged();
+    }
+  }
+
+  void _ownReactionsChanged() {
+    _settings?.setJson(WeftSettings.notifyOwnReactions, _ownReactions.toJson());
+    _scheduleRebuild();
+  }
 
   /// Releases an open chat's timelines when the user navigates away.
   void closeTimeline(String chatId) {
@@ -1031,27 +1089,43 @@ class MatrixChatRepository
     required String question,
     required List<String> options,
     ChatNetwork? via,
+    bool multipleChoice = false,
+    bool undisclosed = false,
   }) async {
     final target = _sendSource(chatId, via: via);
     if (target.network == ChatNetwork.sms) {
       throw StateError('SMS cannot carry a poll');
     }
-    await _roomFor(target).sendEvent({
-      'org.matrix.msc3381.poll.start': {
-        'question': {'org.matrix.msc1767.text': question},
-        'kind': 'org.matrix.msc3381.poll.disclosed',
-        'max_selections': 1,
-        'answers': [
-          for (var i = 0; i < options.length; i++)
-            {'id': 'option_$i', 'org.matrix.msc1767.text': options[i]},
-        ],
-      },
-      // The text fallback older clients render instead of the poll.
-      'org.matrix.msc1767.text': [
-        question,
-        for (var i = 0; i < options.length; i++) '${i + 1}. ${options[i]}',
-      ].join('\n'),
-    }, type: 'org.matrix.msc3381.poll.start');
+    // The unstable type: it is the only one the mautrix bridges act on.
+    await _roomFor(target).sendEvent(
+      pollStartContent(
+        question: question,
+        options: options,
+        multipleChoice: multipleChoice,
+        undisclosed: undisclosed,
+      ),
+      type: kPollStartUnstable,
+    );
+  }
+
+  @override
+  Future<PollSupport> pollSupport(String roomId) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) return const PollSupport.unavailable();
+    final network = _networkOf(room);
+    if (network == ChatNetwork.sms) return const PollSupport.unavailable();
+    return pollSupportFromFeatures(
+      [
+        for (final state
+            in room.states[roomFeaturesStateType]?.values ??
+                const <sdk.Event>[])
+          state.content,
+      ],
+      bridged:
+          network != ChatNetwork.matrix ||
+          room.states.containsKey('m.bridge') ||
+          room.states.containsKey('uk.half-shot.bridge'),
+    );
   }
 
   @override
@@ -1062,13 +1136,24 @@ class MatrixChatRepository
   ) async {
     final room = _client.getRoomById(roomId);
     if (room == null) throw StateError('That poll\'s room is gone');
-    await room.sendEvent({
-      'm.relates_to': {
-        'rel_type': sdk.RelationshipTypes.reference,
-        'event_id': startEventId,
-      },
-      'org.matrix.msc3381.poll.response': {'answers': answerIds.toList()},
-    }, type: 'org.matrix.msc3381.poll.response');
+    await room.sendEvent(
+      pollResponseContent(startEventId, answerIds),
+      type: kPollResponseUnstable,
+    );
+  }
+
+  @override
+  Future<void> endPoll(
+    String roomId,
+    String startEventId, {
+    String fallback = '',
+  }) async {
+    final room = _client.getRoomById(roomId);
+    if (room == null) throw StateError('That poll\'s room is gone');
+    await room.sendEvent(
+      pollEndContent(startEventId, fallback),
+      type: kPollEndUnstable,
+    );
   }
 
   @override
@@ -2260,6 +2345,7 @@ class MatrixChatRepository
 
   Future<void> dispose() async {
     await _syncSub?.cancel();
+    await _ownReactionSub?.cancel();
     await _syncStatusSub?.cancel();
     await _sendFailureChanges.close();
     await _smsSub?.cancel();
@@ -2936,6 +3022,7 @@ class MatrixChatRepository
       muted: _isMuted(room),
       request: _requestStateOf(room),
       participantCount: _peerCountOf(room),
+      reactedUpTo: _ownReactions.reactedUpTo(room.id),
       preferredSendNetwork: _sendNetworks[room.id],
     );
   }
@@ -3114,6 +3201,15 @@ class MatrixChatRepository
           unreadCount: legs.fold(0, (sum, leg) => sum + leg.unreadCount),
           pinned: legs.any((leg) => leg.pinned),
           muted: legs.every((leg) => leg.muted),
+          // A reaction on any leg answers the person.
+          reactedUpTo: legs
+              .map((leg) => leg.reactedUpTo)
+              .nonNulls
+              .fold<DateTime?>(
+                null,
+                (newest, at) =>
+                    newest == null || at.isAfter(newest) ? at : newest,
+              ),
           preferredSendNetwork: _sendNetworks[mergedId],
         ),
       );

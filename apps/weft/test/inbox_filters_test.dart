@@ -72,6 +72,20 @@ void main() {
       expect(needsReply(chat('!a', last: message(notice: true))), isFalse);
     });
 
+    test('my reaction on the last message answers it, unless switched off', () {
+      final last = message();
+      final reacted = chat(
+        '!a',
+        last: last,
+      ).copyWith(reactedUpTo: last.timestamp);
+      expect(needsReply(reacted), isFalse);
+      expect(needsReply(reacted, reactionsCount: false), isTrue);
+      final older = chat('!a', last: last).copyWith(
+        reactedUpTo: last.timestamp.subtract(const Duration(minutes: 1)),
+      );
+      expect(needsReply(older), isTrue);
+    });
+
     test('small groups count, big or unknown ones do not', () {
       expect(
         needsReply(chat('!g', last: message(), isGroup: true, peers: 4)),

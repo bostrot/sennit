@@ -14,6 +14,7 @@ import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../app/session_providers.dart';
 import '../../app/stores.dart';
+import '../../app/usage_stats_providers.dart';
 import '../chat/chat_view.dart';
 import 'bridge_login_flow.dart';
 import 'matrix_bot_channel.dart';
@@ -250,7 +251,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
     if (backend == null) return;
     final botUserId =
         found.botUserId ?? _status[found.network]?.whoami?.botUserId;
-    await Navigator.of(context).push(
+    final connected = await Navigator.of(context).push(
       MaterialPageRoute<bool>(
         builder: (flowContext) => BridgeLoginFlowScreen(
           client: backend,
@@ -266,6 +267,10 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
       ),
     );
     backend.dispose();
+    // A first connection, not a reconnection.
+    if ((connected ?? false) && reloginId == null) {
+      ref.read(usageStatsProvider).bridgeConnected(found.network);
+    }
     if (mounted) await _check(found);
   }
 
@@ -492,7 +497,7 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
             .map((d) => d.botUserId)
             .firstWhere((id) => id != null, orElse: () => null);
 
-    await Navigator.of(context).push(
+    final connected = await Navigator.of(context).push(
       MaterialPageRoute<bool>(
         builder: (flowContext) => BridgeLoginFlowScreen(
           client: client,
@@ -512,6 +517,9 @@ class _BridgesScreenState extends ConsumerState<BridgesScreen> {
       ),
     );
     client.dispose();
+    if ((connected ?? false) && reloginId == null) {
+      ref.read(usageStatsProvider).bridgeConnected(network);
+    }
     if (mounted) await _probe(bridge);
   }
 

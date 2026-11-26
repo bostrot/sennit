@@ -25,6 +25,7 @@ abstract final class DomainCodec {
     if (c.muted) 'muted': true,
     'request': ?c.request?.name,
     'participants': ?c.participantCount,
+    'reactedUpTo': ?c.reactedUpTo?.millisecondsSinceEpoch,
     'via': ?c.preferredSendNetwork?.id,
   };
 
@@ -42,6 +43,7 @@ abstract final class DomainCodec {
     muted: j['muted'] == true,
     request: _enum(ChatRequestState.values, j['request']),
     participantCount: j['participants'] as int?,
+    reactedUpTo: _time(j['reactedUpTo']),
     preferredSendNetwork: _network(j['via']),
   );
 
@@ -203,7 +205,10 @@ abstract final class DomainCodec {
     'votes': p.votes,
     'mine': p.ownVotes.toList(),
     if (p.ended) 'ended': true,
+    if (p.undisclosed) 'hidden': true,
     'max': p.maxSelections,
+    if (p.voters.isNotEmpty) 'voters': p.voters,
+    'n': p.voterCount,
   };
 
   static PollData _pollFrom(Map<String, Object?> j) => PollData(
@@ -221,8 +226,35 @@ abstract final class DomainCodec {
     },
     ownVotes: {for (final v in _list(j['mine'])) v! as String},
     ended: j['ended'] == true,
+    undisclosed: j['hidden'] == true,
     maxSelections: (j['max'] as int?) ?? 1,
+    voters: {
+      for (final MapEntry(:key, :value) in _map(j['voters']).entries)
+        key: [for (final name in _list(value)) name! as String],
+    },
+    voterCount: (j['n'] as int?) ?? 0,
   );
+
+  static Map<String, Object?> pollSupport(PollSupport s) => {
+    'on': s.available,
+    'max': s.maxOptions,
+    'len': s.optionMaxLength,
+    if (s.multipleChoiceOnly) 'multiOnly': true,
+    if (s.undisclosed) 'hidden': true,
+    if (s.canEnd) 'end': true,
+    if (s.uniqueOptions) 'unique': true,
+  };
+
+  static PollSupport pollSupportFrom(Map<String, Object?> j) => j['on'] != true
+      ? const PollSupport.unavailable()
+      : PollSupport(
+          maxOptions: (j['max'] as int?) ?? PollSupport.maxAnswers,
+          optionMaxLength: (j['len'] as int?) ?? 0,
+          multipleChoiceOnly: j['multiOnly'] == true,
+          undisclosed: j['hidden'] == true,
+          canEnd: j['end'] == true,
+          uniqueOptions: j['unique'] == true,
+        );
 
   static Map<String, Object?> _invite(CalendarInvite i) => {
     'uid': i.uid,

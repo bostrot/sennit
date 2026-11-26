@@ -510,8 +510,11 @@ String _bodyForKind(WeftNotifyStrings words, WeftMessage message) {
     MessageKind.video ||
     MessageKind.file ||
     MessageKind.audio ||
-    MessageKind.sticker ||
-    MessageKind.poll => _labelled(words.messageKind(message.kind), body),
+    MessageKind.sticker => _labelled(words.messageKind(message.kind), body),
+    // The question is the poll: "📊 Lunch where?" says what is being asked,
+    // which the fallback text (a numbered list of answers) never fit into a
+    // line. The emoji stands in for the label the way it does in the inbox.
+    MessageKind.poll => _poll(words, message, body),
     MessageKind.voice => _voice(words, message),
     MessageKind.location => words.messageKind(message.kind),
     // Suppressed by `evaluateNotification` before it ever reaches here; handled
@@ -520,6 +523,13 @@ String _bodyForKind(WeftNotifyStrings words, WeftMessage message) {
     MessageKind.text ||
     MessageKind.event => body.isEmpty ? words.hiddenPreview : body,
   };
+}
+
+String _poll(WeftNotifyStrings words, WeftMessage message, String body) {
+  final question = (message.poll?.question ?? body).trim();
+  return question.isEmpty
+      ? '📊 ${words.messageKind(MessageKind.poll)}'
+      : '📊 $question';
 }
 
 String _voice(WeftNotifyStrings words, WeftMessage message) {

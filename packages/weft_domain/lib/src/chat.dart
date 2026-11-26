@@ -70,6 +70,7 @@ class Chat {
     this.muted = false,
     this.request,
     this.participantCount,
+    this.reactedUpTo,
     ChatNetwork? preferredSendNetwork,
   }) : _preferredSendNetwork = preferredSendNetwork;
 
@@ -122,6 +123,17 @@ class Chat {
   /// Null only for a group whose size is genuinely unknown, where
   /// [resolveDeliveryState] stops at delivered rather than guessing: one receipt
   /// out of nine looks exactly like one out of one.
+  /// When the newest message the user still has a reaction on was sent, or
+  /// null when they have none that this device has seen.
+  ///
+  /// Their own reactions only — from their account, which is also where a
+  /// double-puppeting bridge puts the ones made on the phone — and a reaction
+  /// taken back no longer counts. Measured by the *message's* time, not the
+  /// reaction's: a thumbs-up on the last thing someone said is what answers
+  /// it, whenever it was pressed. Reply reminders and the "needs reply" filter
+  /// read it, when the user lets a reaction count as a reply.
+  final DateTime? reactedUpTo;
+
   int? get peerCount => participantCount ?? (isGroup ? null : 1);
 
   /// Whether this conversation is still waiting for the user to answer it.
@@ -188,6 +200,7 @@ class Chat {
     bool? muted,
     Object? request = _sentinel,
     int? participantCount,
+    DateTime? reactedUpTo,
     Object? preferredSendNetwork = _sentinel,
   }) {
     return Chat(
@@ -210,6 +223,7 @@ class Chat {
           ? this.request
           : request as ChatRequestState?,
       participantCount: participantCount ?? this.participantCount,
+      reactedUpTo: reactedUpTo ?? this.reactedUpTo,
       preferredSendNetwork: identical(preferredSendNetwork, _sentinel)
           ? _preferredSendNetwork
           : preferredSendNetwork as ChatNetwork?,
@@ -242,6 +256,7 @@ class Chat {
         other.muted != muted ||
         other.request != request ||
         other.participantCount != participantCount ||
+        other.reactedUpTo != reactedUpTo ||
         other._preferredSendNetwork != _preferredSendNetwork ||
         other.sources.length != sources.length) {
       return false;

@@ -1,8 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:weft/data/demo_repository.dart';
 import 'package:weft/data/remote_chat_repository.dart';
+import 'package:weft/data/send_queue_source.dart';
 import 'package:weft/services/remote/remote_chat_host.dart';
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_remote/weft_remote.dart';
+
+import 'support/recording_repository.dart';
+
+/// The demo repository with a send queue the test fills.
+class _QueueRepository extends RecordingChatRepository
+    implements SendQueueSource {
+  _QueueRepository() : super(DemoChatRepository(uploadTick: Duration.zero));
+
+  final _changes = StreamController<Map<String, SendFailure>>.broadcast();
+
+  @override
+  Map<String, SendFailure> sendFailures = const {};
+
+  @override
+  Stream<Map<String, SendFailure>> get sendFailureChanges => _changes.stream;
+
+  void fail(Map<String, SendFailure> failures) =>
+      _changes.add(sendFailures = failures);
+}
 
 /// The browser's repository against the phone's host, serving the demo
 /// repository, over an in-memory link — the whole protocol in one process.
@@ -112,5 +135,49 @@ void main() {
       browser.markRead(chat.id),
       throwsA(isA<RemoteException>()),
     );
+  });
+
+  group('send failures', () {
+    late _QueueRepository queue;
+    late RemoteChatHost queueHost;
+
+    Future<RemoteChatRepository> connect() async {
+      final link = linkedPair();
+      queueHost = RemoteChatHost(queue, link.a);
+      addTearDown(queueHost.dispose);
+      final repository = RemoteChatRepository(link.b);
+      await repository.connect();
+      return repository;
+    }
+
+    setUp(() => queue = _QueueRepository());
+
+    test('reach the browser as the phone records them', () async {
+      final repository = await connect();
+      addTearDown(repository.dispose);
+      expect(repository.sendFailures, isEmpty);
+
+      final seen = repository.sendFailureChanges.first;
+      queue.fail({'txn-1': SendFailure.notAllowed});
+      expect(await seen, {'txn-1': SendFailure.notAllowed});
+      expect(repository.sendFailures, {'txn-1': SendFailure.notAllowed});
+
+      // Sent after all: the failure goes on the browser too.
+      final cleared = repository.sendFailureChanges.first;
+      queue.fail(const {});
+      expect(await cleared, isEmpty);
+    });
+
+    test('a browser that reconnects starts from the phone queue', () async {
+      final first = await connect();
+      queue.fail({'txn-1': SendFailure.offline});
+      await settle();
+      await first.dispose();
+      queueHost.dispose();
+
+      final again = await connect();
+      addTearDown(again.dispose);
+      expect(again.sendFailures, {'txn-1': SendFailure.offline});
+    });
   });
 }

@@ -19,7 +19,8 @@ import 'app/l10n_labels.dart';
 import 'app/localisation.dart';
 import 'app/menus.dart';
 import 'app/notification_providers.dart';
-import 'app/person_memory_providers.dart' show memoryLearnerProvider;
+import 'app/person_memory_providers.dart'
+    show memoryHousekeeperProvider, memoryLearnerProvider;
 import 'app/providers.dart';
 import 'app/reply_reminder_providers.dart';
 import 'app/retention_providers.dart';
@@ -32,6 +33,7 @@ import 'app/stores.dart';
 import 'app/sync_providers.dart';
 import 'app/text_size.dart';
 import 'app/todo_providers.dart';
+import 'app/usage_stats_providers.dart';
 import 'app/settings.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/auth/verification_screen.dart';
@@ -43,8 +45,10 @@ import 'features/lock/lock_screen.dart';
 import 'features/notifications/notification_rationale_sheet.dart';
 import 'features/notifications/push_explanation_screen.dart';
 import 'features/settings/notifications_screen.dart';
+import 'features/settings/usage_stats_consent.dart';
 import 'features/search/search_screen.dart';
 import 'features/share/share_target_sheet.dart';
+import 'services/analytics/usage_stats.dart';
 import 'services/attachments/local_media_storage.dart';
 import 'services/notifications/background_actions.dart';
 import 'services/notifications/background_push.dart';
@@ -107,6 +111,12 @@ class WeftApp extends ConsumerStatefulWidget {
 
 class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
+
+  /// Counts screens for usage statistics. Each one checks the setting, so
+  /// nothing is sent unless the user opted in.
+  late final _usageStatsObserver = UsageStatsObserver(
+    () => ref.read(usageStatsProvider),
+  );
   late final WeftIntents _intents;
 
   @override
@@ -340,7 +350,11 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     _listenForVerificationRequests();
 
     final service = await ref.read(notificationServiceProvider.future);
-    if (service == null || !mounted) return;
+    if (service == null || !mounted) {
+      // No notification questions to wait for on this platform.
+      unawaited(_askUsageStatsOnce());
+      return;
+    }
 
     // One router. A notification tap produces the same `weft://chat/<id>` a
     // shared link does, goes through the same `WeftLink.parse`, and lands in
@@ -428,6 +442,8 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     // settled first: on iOS the APNs token does not exist until the user has
     // said yes, so registering before the prompt reliably yields `noToken`.
     await _explainPushOnce();
+    // Last of the first-start questions, and the least important.
+    unawaited(_askUsageStatsOnce());
     await ref.read(pushRegistrationProvider.future);
     await reconcilePushRules(
       session: ref.read(matrixSessionProvider),
@@ -489,6 +505,20 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
     markNotificationPermissionAsked(settings);
     final service = await ref.read(notificationServiceProvider.future);
     await service?.requestPermission();
+  }
+
+  /// Asks about anonymous usage statistics, once, once the steps after
+  /// sign-in are done — never during sign-in itself. Not in the demo build.
+  Future<void> _askUsageStatsOnce() async {
+    if (kDemoMode) return;
+    await untilSignInStepsDone(ref);
+    final context = _navigatorKey.currentContext;
+    if (!mounted || context == null || !context.mounted) return;
+    await askUsageStatsOnce(
+      context,
+      ref.read(storesProvider).settings,
+      onChanged: ref.read(settingsRevisionProvider.notifier).bump,
+    );
   }
 
   /// Explains Sennit's push gateway, once, before a store build registers
@@ -703,6 +733,9 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
           // Counts what arrives from the start of the session, and learns
           // only while personal memory and automatic learning are on.
           ref.read(memoryLearnerProvider)?.start();
+          // One memory per direct chat, and temporary facts gone when their
+          // day has passed — on the device, whatever learning is set to.
+          ref.read(memoryHousekeeperProvider)?.start();
           // Held, not read once: a listener is what makes the backfill rebuild
           // — and so start — the moment a model or an endpoint is switched on,
           // rather than the next time something happens to ask for it.
@@ -751,6 +784,7 @@ class _WeftAppState extends ConsumerState<WeftApp> with WidgetsBindingObserver {
       title: 'Sennit',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
+      navigatorObservers: [_usageStatsObserver],
       // The whole of Weft's right-to-left support hangs off these two lines:
       // `Directionality` has no other source, and until they were here every
       // directional layout API downstream was decoration. English first is the

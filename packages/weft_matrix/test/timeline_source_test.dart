@@ -54,15 +54,28 @@ void main() {
     room: room,
   );
 
+  sdk.Event own(String eventId, sdk.EventStatus status) => sdk.Event(
+    type: sdk.EventTypes.Message,
+    content: const {'msgtype': 'm.text', 'body': 'when do you need the HDDs?'},
+    eventId: eventId,
+    senderId: '@me:example.org',
+    originServerTs: DateTime(2026, 5, 1, 10),
+    status: status,
+    room: room,
+  );
+
   MatrixTimelineSource sourceOver(
     List<sdk.Event> events, {
     Set<String> purged = const {},
+    sdk.Timeline? timeline,
   }) {
     return MatrixTimelineSource(
-      timeline: sdk.Timeline(
-        room: room,
-        chunk: sdk_chunk.TimelineChunk(events: events),
-      ),
+      timeline:
+          timeline ??
+          sdk.Timeline(
+            room: room,
+            chunk: sdk_chunk.TimelineChunk(events: events),
+          ),
       network: ChatNetwork.matrix,
       ownUserId: '@me:example.org',
       purgedEventIds: purged,
@@ -104,5 +117,46 @@ void main() {
     );
 
     expect(source.loaded, hasLength(1));
+  });
+
+  // The SDK settles a send by replacing its local echo where it stands. When a
+  // reply landed above it first, neither the length nor the newest event
+  // moves, and the clock stayed for good — in the app and in Sennit Web, which
+  // is served from this same source.
+  test('a send settled in place below a newer event is seen', () {
+    final timeline = sdk.Timeline(
+      room: room,
+      chunk: sdk_chunk.TimelineChunk(
+        events: [
+          message(r'$reply:example.org', 'one sec'),
+          own('txn-1', sdk.EventStatus.sending),
+        ],
+      ),
+    );
+    final source = sourceOver(const [], timeline: timeline);
+    expect(source.loaded.last.deliveryState, DeliveryState.sending);
+
+    timeline.events[1] = own(r'$sent:example.org', sdk.EventStatus.sent);
+    expect(source.loaded.last.eventId, r'$sent:example.org');
+    expect(source.loaded.last.deliveryState, DeliveryState.sent);
+  });
+
+  test('the remote echo moves a send on to delivered', () {
+    final timeline = sdk.Timeline(
+      room: room,
+      chunk: sdk_chunk.TimelineChunk(
+        events: [own(r'$sent:example.org', sdk.EventStatus.sent)],
+      ),
+    );
+    final source = sourceOver(const [], timeline: timeline);
+    expect(source.loaded.single.deliveryState, DeliveryState.sent);
+
+    timeline.events[0] = own(r'$sent:example.org', sdk.EventStatus.synced);
+    expect(source.loaded.single.deliveryState, DeliveryState.delivered);
+  });
+
+  test('an unchanged timeline is not mapped again', () {
+    final source = sourceOver([message(r'$a:example.org', 'first')]);
+    expect(identical(source.loaded, source.loaded), isTrue);
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 // `SelectionArea` reports what it holds as a `SelectedContent`, which lives in
 // the rendering layer and is not re-exported by `material.dart`.
@@ -41,12 +42,14 @@ import '../../app/shortcuts.dart';
 import '../../app/stores.dart';
 import '../../app/text_size.dart';
 import '../../app/transcription_service.dart';
+import '../../app/usage_stats_providers.dart';
 import '../../data/chat_repository.dart';
 import '../../services/ai/event_title.dart'
     show messageWords, recentConversationTranscript;
 import '../../services/ai/translate_message.dart';
 import '../../services/ai/llm_budget.dart' show AiFeature;
 import '../../services/ai/quick_messages.dart';
+import '../../services/analytics/usage_stats.dart' show AiUsage;
 import '../../services/attachments/attachment_picker.dart';
 import '../../services/billing/entitlements.dart';
 import '../../services/attachments/send_attachments.dart';
@@ -62,6 +65,7 @@ import '../settings/integrations_screen.dart';
 import '../settings/pro_screen.dart';
 import '../settings/quick_messages_screen.dart';
 import 'paperless_picker_sheet.dart';
+import 'poll_card.dart';
 import 'quick_message_sheet.dart';
 import '../auth/verification_screen.dart';
 import '../call/call_labels.dart' show formatCallDuration;
@@ -364,6 +368,12 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// The repository's merge composition when the timeline was opened.
   int _timelineEpoch = 0;
 
+  /// The repository the timeline was opened from. Sennit Web gets a new one
+  /// each time the link to the phone comes back, and a timeline from the old
+  /// one never moves again: a message sent just before the link dropped kept
+  /// its clock while the phone showed it sent.
+  ChatRepository? _timelineRepository;
+
   /// Held rather than read back in [dispose], where `ref` is already unsafe:
   /// a `ConsumerState` is unmounted before its `dispose` runs, and reading a
   /// provider through a dead `BuildContext` throws.
@@ -526,15 +536,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// Cheap fingerprint rather than deep equality: recomputing the merged view
   /// is O(loaded) and fine, but rebuilding the tree on every sync of every
   /// unrelated room is a scroll hitch the reader can feel. Reactions and edits
-  /// are folded in so a remote edit updates the open bubble too.
+  /// are folded in so a remote edit updates the open bubble too, and so is
+  /// where each of the user's own messages stands: a send that is not the
+  /// newest message changes neither the count nor the newest id when its
+  /// clock turns into a tick.
   int _viewFingerprint(MergedTimelineView view) {
     var reactions = 0;
     var edited = 0;
     var redacted = 0;
+    var own = 0;
     for (final m in view.messages) {
       reactions += m.reactions.length;
       if (m.isEdited) edited++;
       if (m.redacted) redacted++;
+      if (m.isOwn) own = Object.hash(own, m.eventId, m.deliveryState);
     }
     return Object.hash(
       view.messages.length,
@@ -542,6 +557,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       reactions,
       edited,
       redacted,
+      own,
     );
   }
 
@@ -554,7 +570,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     final repository = ref.read(chatRepositoryProvider);
     if (_timelineChatId != null &&
         (_timelineChatId != _chatId ||
-            _timelineEpoch != repository.timelineEpoch)) {
+            _timelineEpoch != repository.timelineEpoch ||
+            !identical(_timelineRepository, repository))) {
       _open();
       return;
     }
@@ -703,6 +720,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _announcedEventId = null;
     final chatId = _chatId;
     _timelineChatId = chatId;
+    final repository = ref.read(chatRepositoryProvider);
+    _timelineRepository = repository;
     _reportOnScreen(chatId);
     try {
       // Before the timeline is built, not after: a self-deleting chat that
@@ -711,10 +730,8 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // immediately for a chat with no policy, which is nearly every chat.
       await ref.read(retentionSweeperProvider)?.sweepChat(chatId);
       if (overtaken()) return;
-      _timelineEpoch = ref.read(chatRepositoryProvider).timelineEpoch;
-      final timeline = await ref
-          .read(chatRepositoryProvider)
-          .timelineFor(chatId);
+      _timelineEpoch = repository.timelineEpoch;
+      final timeline = await repository.timelineFor(chatId);
       if (overtaken()) return;
       setState(() {
         _timeline = timeline;
@@ -1723,13 +1740,16 @@ class _ChatViewState extends ConsumerState<ChatView> {
           defaultTranslationLanguage(
             Localizations.localeOf(context).languageCode,
           ),
-      translate: (language) => translateMessage(
-        baseUrl: endpoint.baseUrl,
-        model: endpoint.model,
-        apiKey: endpoint.apiKey,
-        text: text,
-        language: language,
-      ),
+      translate: (language) {
+        ref.read(usageStatsProvider).aiUsed(AiUsage.translate);
+        return translateMessage(
+          baseUrl: endpoint.baseUrl,
+          model: endpoint.model,
+          apiKey: endpoint.apiKey,
+          text: text,
+          language: language,
+        );
+      },
       onLanguage: (language) {
         settings.setString(WeftSettings.translateLanguage, language);
         revision.bump();
@@ -2775,7 +2795,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                             ? null
                                             : () => _editInvite(message),
                                         onVote: message.kind == MessageKind.poll
-                                            ? (optionId) => _run(
+                                            ? (answers) => _run(
                                                 () => ref
                                                     .read(
                                                       chatRepositoryProvider,
@@ -2783,9 +2803,23 @@ class _ChatViewState extends ConsumerState<ChatView> {
                                                     .votePoll(
                                                       message.roomId,
                                                       message.eventId,
-                                                      {optionId},
+                                                      answers,
                                                     ),
                                               )
+                                            : null,
+                                        onEndPoll:
+                                            message.isOwn &&
+                                                message.poll?.ended == false &&
+                                                (ref
+                                                        .watch(
+                                                          pollSupportProvider(
+                                                            message.roomId,
+                                                          ),
+                                                        )
+                                                        .value
+                                                        ?.canEnd ??
+                                                    false)
+                                            ? () => _endPoll(message)
                                             : null,
                                         showNetwork: chat.isMerged,
                                         showSender: chat.isGroup,
@@ -3103,6 +3137,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     announce(context, context.l10n.attachmentTranscribing);
 
     final service = ref.read(transcriptionServiceProvider);
+    ref.read(usageStatsProvider).aiUsed(AiUsage.transcribe);
     try {
       final transcript = await service.transcribe(
         message,
@@ -3403,14 +3438,26 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   Future<void> _attach(Chat chat, {BuildContext? anchor}) async {
     final picker = ref.read(attachmentPickerProvider);
+    final network = chat.sendNetwork;
+    final roomId = network == null ? null : chat.sourceFor(network)?.roomId;
+    final pollSupport = roomId == null
+        ? const PollSupport.unavailable()
+        : await ref.read(chatRepositoryProvider).pollSupport(roomId);
+    if (!mounted) return;
     final source = await showAttachmentSourceSheet(
       context,
       picker,
+      pollUnavailableReason: pollSupport.available
+          ? null
+          : context.l10n.attachSourcePollUnavailable(
+              network?.label ?? ChatNetwork.unknown.label,
+            ),
       paperless: ref.read(paperlessProvider) != null,
       quickMessageLocked: !ref
           .read(proControllerProvider)
           .unlocks(ProFeature.aiReplies),
-      anchorContext: anchor,
+      // The button may have gone while the room was asked about polls.
+      anchorContext: anchor != null && anchor.mounted ? anchor : null,
     );
     if (source == null || !mounted) return;
 
@@ -3426,7 +3473,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       return;
     }
     if (source == AttachmentPickSource.poll) {
-      await _createPoll(chat);
+      await _createPoll(chat, pollSupport);
       return;
     }
     if (source == AttachmentPickSource.calendar) {
@@ -3613,22 +3660,52 @@ class _ChatViewState extends ConsumerState<ChatView> {
     );
   }
 
-  Future<void> _createPoll(Chat chat) async {
-    final result = await showDialog<(String, List<String>)>(
+  Future<void> _createPoll(Chat chat, PollSupport support) async {
+    final draft = await showDialog<PollDraft>(
       context: context,
-      builder: (context) => const _PollComposerDialog(),
+      builder: (context) => PollComposerDialog(support: support),
     );
-    if (result == null || !mounted) return;
-    final (question, options) = result;
+    if (draft == null || !mounted) return;
     await _run(
       () => ref
           .read(chatRepositoryProvider)
           .createPoll(
             _chatId,
-            question: question,
-            options: options,
+            question: draft.question,
+            options: draft.options,
             via: chat.sendNetwork,
+            multipleChoice: draft.multipleChoice,
+            undisclosed: draft.undisclosed,
           ),
+    );
+  }
+
+  /// Closes the reader's own poll, once they have said so: nobody can vote
+  /// again afterwards, and there is no reopening.
+  Future<void> _endPoll(WeftMessage message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.chatPollEndConfirmTitle),
+        content: Text(context.l10n.chatPollEndConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.chatPollEnd),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final fallback = context.l10n.chatPollEndedFallback;
+    await _run(
+      () => ref
+          .read(chatRepositoryProvider)
+          .endPoll(message.roomId, message.eventId, fallback: fallback),
     );
   }
 
@@ -3723,6 +3800,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       maxMessages: room.maxMessages,
       maxChars: room.transcriptChars,
     );
+    ref.read(usageStatsProvider).aiUsed(AiUsage.quickMessage);
     final draft = await composeQuickMessage(
       baseUrl: endpoint.baseUrl,
       model: endpoint.model,
@@ -4515,6 +4593,7 @@ class _MessageBubble extends StatelessWidget {
     required this.groupedWithPrevious,
     this.replyPreview,
     this.onVote,
+    this.onEndPoll,
     this.onRespondInvite,
     this.onAddInviteToCalendar,
     this.onEditInvite,
@@ -4556,8 +4635,12 @@ class _MessageBubble extends StatelessWidget {
   /// Opens the attachment full screen. Null for a message that has none.
   final VoidCallback? onOpen;
 
-  /// Casts a vote on this message's poll. Null for everything else.
-  final ValueChanged<String>? onVote;
+  /// Sends the local user's new selection on this message's poll. Null for
+  /// everything else.
+  final ValueChanged<Set<String>>? onVote;
+
+  /// Ends this message's poll. Null unless the reader may.
+  final VoidCallback? onEndPoll;
 
   /// Answers this message's calendar invitation.
   final void Function(CalendarReply reply, DateTime? proposedStart)?
@@ -5117,10 +5200,11 @@ class _MessageBubble extends StatelessWidget {
                               )
                             else if (message.kind == MessageKind.poll &&
                                 message.poll != null)
-                              _PollContent(
-                                message: message,
+                              PollCard(
+                                poll: message.poll!,
                                 own: own,
-                                onVote: onVote ?? (_) {},
+                                onVote: onVote,
+                                onEnd: onEndPoll,
                               )
                             else if (message.kind == MessageKind.voice)
                               _VoiceContent(
@@ -5822,7 +5906,9 @@ class _Composer extends StatelessWidget {
                       // `performAction` for both, so a five-line composer had no
                       // reachable line two.
                       child: Shortcuts(
-                        shortcuts: composerShortcuts,
+                        shortcuts: kIsWeb
+                            ? browserComposerShortcuts
+                            : composerShortcuts,
                         child: Actions(
                           actions: <Type, Action<Intent>>{
                             SendComposerIntent:
@@ -6327,254 +6413,6 @@ class _LocationContent extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// A poll: the question, one tappable row per option, and the running tally.
-///
-/// Disclosed results, which is what bridges send: every row shows its count
-/// and the bar behind it is the share of votes. Tapping votes (or re-votes —
-/// MSC3381 counts each voter's latest response); a closed poll ignores taps.
-class _PollContent extends StatelessWidget {
-  const _PollContent({
-    required this.message,
-    required this.own,
-    required this.onVote,
-  });
-
-  final WeftMessage message;
-  final bool own;
-  final ValueChanged<String> onVote;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
-    final poll = message.poll!;
-    final total = poll.totalVotes;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.poll_rounded, size: 18, color: onBubble),
-            const SizedBox(width: WeftSpace.sm),
-            Flexible(
-              child: Text(
-                poll.question,
-                style: context.text.bodyMedium?.copyWith(
-                  color: onBubble,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: WeftSpace.sm),
-        for (final option in poll.options) ...[
-          _PollOptionRow(
-            option: option,
-            votes: poll.votes[option.id] ?? 0,
-            total: total,
-            chosen: poll.ownVotes.contains(option.id),
-            ended: poll.ended,
-            own: own,
-            onTap: poll.ended ? null : () => onVote(option.id),
-          ),
-          const SizedBox(height: WeftSpace.xs),
-        ],
-        Text(
-          poll.ended
-              ? context.l10n.chatPollFinalResult(total)
-              : context.l10n.chatPollVotes(total),
-          style: context.text.labelSmall?.copyWith(
-            color: palette.mutedOnBubble(own),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PollOptionRow extends StatelessWidget {
-  const _PollOptionRow({
-    required this.option,
-    required this.votes,
-    required this.total,
-    required this.chosen,
-    required this.ended,
-    required this.own,
-    this.onTap,
-  });
-
-  final PollOption option;
-  final int votes;
-  final int total;
-  final bool chosen;
-  final bool ended;
-  final bool own;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final onBubble = own ? palette.ownBubbleText : palette.peerBubbleText;
-    final share = total == 0 ? 0.0 : votes / total;
-
-    return WeftFocusable(
-      button: onTap != null,
-      onTap: onTap,
-      label: semanticsSentence([
-        option.text,
-        context.l10n.chatPollVotes(votes),
-        if (chosen) context.l10n.chatPollYourVote,
-        if (ended)
-          context.l10n.chatPollClosed
-        else if (onTap != null)
-          context.l10n.chatPollTapToVote,
-      ]),
-      borderRadius: WeftRadius.allSm,
-      child: Stack(
-        children: [
-          // The share bar, behind the words.
-          Positioned.fill(
-            child: FractionallySizedBox(
-              alignment: AlignmentDirectional.centerStart,
-              widthFactor: share.clamp(0.0, 1.0),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: onBubble.withValues(alpha: 0.15),
-                  borderRadius: WeftRadius.allSm,
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: WeftSpace.sm,
-              vertical: WeftSpace.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  chosen ? Icons.check_circle_rounded : Icons.circle_outlined,
-                  size: 16,
-                  color: onBubble,
-                ),
-                const SizedBox(width: WeftSpace.sm),
-                Expanded(
-                  child: Text(
-                    option.text,
-                    style: context.text.bodySmall?.copyWith(color: onBubble),
-                  ),
-                ),
-                Text(
-                  context.l10n.chatPollOptionVotes(votes),
-                  style: context.text.labelSmall?.copyWith(
-                    color: palette.mutedOnBubble(own),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Question plus two-to-eight options; pops `(question, options)` or null.
-class _PollComposerDialog extends StatefulWidget {
-  const _PollComposerDialog();
-
-  @override
-  State<_PollComposerDialog> createState() => _PollComposerDialogState();
-}
-
-class _PollComposerDialogState extends State<_PollComposerDialog> {
-  final _question = TextEditingController();
-  final List<TextEditingController> _options = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-
-  @override
-  void dispose() {
-    _question.dispose();
-    for (final option in _options) {
-      option.dispose();
-    }
-    super.dispose();
-  }
-
-  void _submit() {
-    final question = _question.text.trim();
-    final options = [
-      for (final option in _options)
-        if (option.text.trim().isNotEmpty) option.text.trim(),
-    ];
-    if (question.isEmpty || options.length < 2) return;
-    Navigator.of(context).pop((question, options));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(context.l10n.chatNewPollTitle),
-      content: SizedBox(
-        width: 360,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _question,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: context.l10n.chatPollQuestion,
-                ),
-              ),
-              const SizedBox(height: WeftSpace.sm),
-              for (var i = 0; i < _options.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: WeftSpace.sm),
-                  child: TextField(
-                    controller: _options[i],
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.chatPollOptionN(i + 1),
-                    ),
-                  ),
-                ),
-              if (_options.length < 8)
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        setState(() => _options.add(TextEditingController())),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: Text(context.l10n.chatPollAddOption),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(context.l10n.commonCancel),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text(context.l10n.chatPollCreate),
-        ),
-      ],
     );
   }
 }
