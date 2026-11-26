@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
 
 import 'package:weft_store/weft_store.dart';
+import '../../app/hidden_messages.dart';
 import '../../app/localisation.dart';
 
 import '../../app/settings.dart';
@@ -128,6 +129,19 @@ class _AppearanceSheet extends ConsumerWidget {
                     .read(storesProvider)
                     .settings
                     .setBool(WeftSettings.railMultiSelect, value: value);
+                ref.read(settingsRevisionProvider.notifier).bump();
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(context.l10n.appearanceHideDeletedTitle),
+              subtitle: Text(context.l10n.appearanceHideDeletedSubtitle),
+              value: ref.watch(hideDeletedMessagesProvider),
+              onChanged: (value) {
+                ref
+                    .read(storesProvider)
+                    .settings
+                    .setBool(WeftSettings.hideDeletedMessages, value: value);
                 ref.read(settingsRevisionProvider.notifier).bump();
               },
             ),
