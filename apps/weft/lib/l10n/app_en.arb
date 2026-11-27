@@ -7336,6 +7336,10 @@
     "description": "Small heading above the messages that match the search, below the matching chats. Keep under ~16 chars.",
     "maxLength": 24
   },
+  "searchResultGroup": "group chat",
+  "@searchResultGroup": {
+    "description": "Screen-reader only: a clause in a search result's spoken label saying the matching chat is a group chat, e.g. 'Family, group chat, WhatsApp'. Lower case where the language allows; it sits mid-sentence."
+  },
   "searchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
   "@searchResultCount": {
     "description": "The live summary line above the results, saying how many there are.",

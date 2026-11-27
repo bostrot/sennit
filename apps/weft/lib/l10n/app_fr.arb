@@ -1262,6 +1262,7 @@
   "searchSectionChats": "Discussions",
   "searchSectionChatsSemantics": "{count, plural, =1{1 discussion correspond au nom} other{{count} discussions correspondent au nom}}",
   "searchSectionMessages": "Messages",
+  "searchResultGroup": "discussion de groupe",
   "searchResultCount": "{count, plural, =1{1 résultat} other{{count} résultats}}",
   "searchTagMeaning": "sens",
   "searchTagBoth": "les deux",

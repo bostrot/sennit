@@ -1262,6 +1262,7 @@
   "searchSectionChats": "Chats",
   "searchSectionChatsSemantics": "{count, plural, =1{1 chat coincide por nombre} other{{count} chats coinciden por nombre}}",
   "searchSectionMessages": "Mensajes",
+  "searchResultGroup": "chat de grupo",
   "searchResultCount": "{count, plural, =1{1 resultado} other{{count} resultados}}",
   "searchTagMeaning": "sentido",
   "searchTagBoth": "ambos",

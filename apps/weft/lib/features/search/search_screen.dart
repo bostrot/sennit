@@ -439,7 +439,7 @@ class _ChatResultTile extends ConsumerWidget {
       onTap: open,
       label: semanticsSentence([
         chat.title,
-        chat.isGroup ? 'group' : null,
+        chat.isGroup ? context.l10n.searchResultGroup : null,
         chat.networks.map((n) => n.label).join(', '),
       ]),
       child: ListTile(

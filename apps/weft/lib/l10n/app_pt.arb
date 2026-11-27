@@ -1263,6 +1263,7 @@
   "searchSectionChats": "Conversas",
   "searchSectionChatsSemantics": "{count, plural, =1{1 conversa corresponde ao nome} other{{count} conversas correspondem ao nome}}",
   "searchSectionMessages": "Mensagens",
+  "searchResultGroup": "conversa em grupo",
   "searchResultCount": "{count, plural, =1{1 resultado} other{{count} resultados}}",
   "searchTagMeaning": "sentido",
   "searchTagBoth": "ambos",

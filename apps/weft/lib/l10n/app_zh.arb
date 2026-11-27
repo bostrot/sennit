@@ -1263,6 +1263,7 @@
   "searchSectionChats": "聊天",
   "searchSectionChatsSemantics": "{count, plural, other{{count} 个聊天的名称匹配}}",
   "searchSectionMessages": "消息",
+  "searchResultGroup": "群聊",
   "searchResultCount": "{count, plural, other{{count} 条结果}}",
   "searchTagMeaning": "语义",
   "searchTagBoth": "两者",

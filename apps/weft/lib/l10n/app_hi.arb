@@ -1262,6 +1262,7 @@
   "searchSectionChats": "चैट",
   "searchSectionChatsSemantics": "{count, plural, =1{नाम से 1 चैट मिली} other{नाम से {count} चैट मिलीं}}",
   "searchSectionMessages": "मैसेज",
+  "searchResultGroup": "ग्रुप चैट",
   "searchResultCount": "{count, plural, =1{1 नतीजा} other{{count} नतीजे}}",
   "searchTagMeaning": "अर्थ",
   "searchTagBoth": "दोनों",
