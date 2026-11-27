@@ -192,4 +192,36 @@ void main() {
     expect(clock(), findsNothing);
     expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
   });
+
+  // The SDK's own English error ("The sender has not sent us the session
+  // key.") used to be the bubble's text, in every language; a key that comes
+  // in later turns the same event into the message in place.
+  testWidgets('a message without its key says so in the app\'s words', (
+    tester,
+  ) async {
+    final locked = WeftMessage(
+      eventId: r'$locked',
+      roomId: _room,
+      network: ChatNetwork.whatsapp,
+      senderId: '@anna:example.org',
+      senderName: 'Anna',
+      timestamp: DateTime.utc(2026, 11, 26, 16, 20),
+      kind: MessageKind.text,
+      isOwn: false,
+      undecryptable: true,
+    );
+    final source = _Source([locked]);
+    final repository = _Repository(source);
+    addTearDown(repository.dispose);
+    await pump(tester, repository);
+    await tester.pumpAndSettle();
+    expect(find.text('Encrypted message'), findsWidgets);
+    expect(find.textContaining('Verify this device'), findsOneWidget);
+
+    source.loaded = [_message(r'$locked', own: false, minute: 20)];
+    await repository.beat();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Verify this device'), findsNothing);
+    expect(find.text('one sec'), findsWidgets);
+  });
 }

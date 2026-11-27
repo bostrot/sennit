@@ -23,7 +23,9 @@ class MatrixTimelineSource extends TimelineSource {
        _ownUserId = ownUserId,
        _clockOffset = clockOffset,
        _resolveSender = resolveSender,
-       _purgedEventIds = purgedEventIds;
+       _purgedEventIds = purgedEventIds {
+    _requestMissingKeys();
+  }
 
   final sdk.Timeline _timeline;
   final String? _ownUserId;
@@ -148,7 +150,23 @@ class MatrixTimelineSource extends TimelineSource {
   Future<int> loadMore({int count = 30}) async {
     final before = _timeline.events.length;
     await _timeline.requestHistory(historyCount: count);
+    _requestMissingKeys();
     return _timeline.events.length - before;
+  }
+
+  /// Asks for the keys of the events here this device cannot read yet.
+  ///
+  /// The SDK only ever asks the server-side key backup on its own, and only for
+  /// events it happens to decrypt; nothing asked the user's *other* devices,
+  /// so a message from before this device signed in, missing from the backup,
+  /// stayed "The sender has not sent us the session key." forever on the
+  /// desktop while the phone next to it could read it. A key that arrives
+  /// re-decrypts the event in place: the timeline listens for it.
+  ///
+  /// Each session is asked once per run (the SDK remembers), and an unverified
+  /// device asks nobody: no well-behaved client shares keys with one.
+  void _requestMissingKeys() {
+    _timeline.requestKeys(onlineKeyBackupOnly: false);
   }
 
   /// Releases the underlying timeline's subscriptions.

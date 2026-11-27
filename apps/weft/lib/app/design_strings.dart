@@ -31,4 +31,5 @@ WeftDesignStrings weftDesignStringsFrom(AppL10n l10n) => WeftDesignStrings(
       ? l10n.chatTileReacted(own ? 'own' : 'other', emoji)
       : l10n.chatTileReactedTo(own ? 'own' : 'other', emoji, message),
   draft: l10n.chatTileDraft,
+  messageUndecryptable: l10n.chatMessageUndecryptable,
 );

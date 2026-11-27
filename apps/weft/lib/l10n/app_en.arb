@@ -2701,6 +2701,16 @@
   "@chatMessageDeleted": {
     "description": "Drawn in italics in place of a message that was redacted. Also the inbox preview for one. Keep under ~22 chars."
   },
+  "chatMessageUndecryptable": "Encrypted message",
+  "@chatMessageUndecryptable": {
+    "description": "Shown in a message bubble, and as the inbox preview, for an end-to-end encrypted message this device has no key for (yet). Keep under ~32 chars.",
+    "maxLength": 48
+  },
+  "chatMessageUndecryptableHint": "This device has no key for it yet. Verify this device or restore your key backup to read it.",
+  "@chatMessageUndecryptableHint": {
+    "description": "Small line under 'Encrypted message' in the bubble: what the user can do so this device can read it. 'Verify' is the same action as the red 'not verified' banner's button. Keep under ~90 chars.",
+    "maxLength": 130
+  },
   "messageActionHideForMe": "Hide for me",
   "@messageActionHideForMe": {
     "description": "Row in the message actions sheet: removes the message from the user's own view of the conversation only. Nothing is deleted and nobody else is told. Keep under ~18 chars.",

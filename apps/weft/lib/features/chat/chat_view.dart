@@ -548,16 +548,20 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// are folded in so a remote edit updates the open bubble too, and so is
   /// where each of the user's own messages stands: a send that is not the
   /// newest message changes neither the count nor the newest id when its
-  /// clock turns into a tick.
+  /// clock turns into a tick. So is how many messages still wait for their
+  /// key: one arriving decrypts a message in place, and nothing else here
+  /// moves when it does.
   int _viewFingerprint(MergedTimelineView view) {
     var reactions = 0;
     var edited = 0;
     var redacted = 0;
+    var locked = 0;
     var own = 0;
     for (final m in view.messages) {
       reactions += m.reactions.length;
       if (m.isEdited) edited++;
       if (m.redacted) redacted++;
+      if (m.undecryptable) locked++;
       if (m.isOwn) own = Object.hash(own, m.eventId, m.deliveryState);
     }
     return Object.hash(
@@ -566,6 +570,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       reactions,
       edited,
       redacted,
+      locked,
       own,
     );
   }
@@ -5213,6 +5218,10 @@ class _MessageBubble extends StatelessWidget {
                                   color: palette.mutedOnBubble(own),
                                 ),
                               )
+                            // Before the attachment branch too: an encrypted
+                            // event's metadata says nothing about what is in it.
+                            else if (message.undecryptable)
+                              _UndecryptableContent(own: own)
                             else if (rendersAsAttachment(message))
                               AttachmentBubble(
                                 message: message,
@@ -6895,4 +6904,49 @@ class _LoadedIndex {
   /// room it was sent in, and a merged chat's other legs do not count.
   WeftMessage? inRoom(String roomId, String eventId) =>
       _byRoom[roomId]?[eventId];
+}
+
+/// An encrypted message this device has no key for, in the user's words.
+///
+/// The SDK's own sentence ("The sender has not sent us the session key.") was
+/// shown here before, in English, as if the other person had written it. The
+/// hint says what the user can do about it; when the key comes in — from the
+/// backup once this device is verified, or from another of their devices — the
+/// bubble turns into the message on its own.
+class _UndecryptableContent extends StatelessWidget {
+  const _UndecryptableContent({required this.own});
+
+  final bool own;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.palette.mutedOnBubble(own);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_clock_outlined, size: 16, color: muted),
+            const SizedBox(width: WeftSpace.xs),
+            Flexible(
+              child: Text(
+                context.l10n.chatMessageUndecryptable,
+                style: context.text.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          context.l10n.chatMessageUndecryptableHint,
+          style: context.text.bodySmall?.copyWith(color: muted),
+        ),
+      ],
+    );
+  }
 }

@@ -347,6 +347,14 @@ WeftMessage? mapEvent(
 
   final voice = isVoiceMessage(content);
 
+  // An event this device has no key for. The SDK hands it over with its own
+  // English error as the body ("The sender has not sent us the session key."),
+  // which read as something the other person had said; the flag lets the UI say
+  // it in the user's language.
+  final undecryptable =
+      event.type == sdk.EventTypes.Encrypted ||
+      msgtype == sdk.MessageTypes.BadEncrypted;
+
   final message = WeftMessage(
     eventId: event.eventId,
     roomId: event.roomId ?? '',
@@ -378,7 +386,7 @@ WeftMessage? mapEvent(
     // no body key — which perfectly legal bridged media (captionless photos,
     // albums) sometimes does, and which then rendered as that sentence in the
     // middle of a conversation.
-    body: event.redacted
+    body: event.redacted || undecryptable
         ? ''
         : (event.text.isNotEmpty ? event.text : _fallbackBody(content)),
     formattedBody: event.redacted ? null : formattedBodyOf(content),
@@ -400,6 +408,7 @@ WeftMessage? mapEvent(
     mediaMimeType: _infoMimeType(content),
     playsAsGif: isGifVideo(content),
     encrypted: event.room.encrypted,
+    undecryptable: undecryptable,
     bridgedLinkPreviews: event.redacted ? null : bridgedLinkPreviewsOf(content),
   );
 

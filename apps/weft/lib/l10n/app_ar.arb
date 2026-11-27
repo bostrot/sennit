@@ -462,6 +462,8 @@
   "chatQuickReact": "تفاعل",
   "chatShowActionsHint": "عرض الإجراءات",
   "chatMessageDeleted": "حُذفت الرسالة",
+  "chatMessageUndecryptable": "رسالة مشفّرة",
+  "chatMessageUndecryptableHint": "لا يملك هذا الجهاز مفتاحها بعد. تحقّق من الجهاز أو استعد نسخة المفاتيح الاحتياطية لقراءتها.",
   "messageActionHideForMe": "إخفاء لديّ",
   "chatMessageHidden": "أُخفيت لديك. لا يزال الآخرون يرونها.",
   "chatMessageHiddenUndo": "تراجع",

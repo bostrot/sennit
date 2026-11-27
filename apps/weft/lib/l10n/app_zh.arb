@@ -463,6 +463,8 @@
   "chatQuickReact": "回应",
   "chatShowActionsHint": "显示操作",
   "chatMessageDeleted": "消息已删除",
+  "chatMessageUndecryptable": "加密消息",
+  "chatMessageUndecryptableHint": "此设备尚无该消息的密钥。请验证此设备或恢复密钥备份后查看。",
   "messageActionHideForMe": "仅对我隐藏",
   "chatMessageHidden": "已对你隐藏，其他人仍能看到。",
   "chatMessageHiddenUndo": "撤销",
