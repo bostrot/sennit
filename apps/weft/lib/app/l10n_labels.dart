@@ -20,6 +20,7 @@ import 'package:weft_autoreply/weft_autoreply.dart';
 import 'package:weft_bridges/weft_bridges.dart';
 import 'package:weft_call/weft_call.dart';
 import 'package:weft_domain/weft_domain.dart';
+import 'package:weft_merge/weft_merge.dart';
 import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_search/weft_search.dart';
 
@@ -61,6 +62,20 @@ extension WeftDomainLabels on AppL10n {
     DeliveryState.read => deliveryRead,
     DeliveryState.failed => deliveryFailed,
     null => '',
+  };
+
+  /// One piece of a merge suggestion's evidence, in words.
+  ///
+  /// The scorer's own [MergeSignal.explanation] is English for logs; the merge
+  /// screen showed it as it stood, in every language.
+  String mergeSignal(MergeSignal signal) => switch (signal) {
+    MergeSignal.phoneExact => mergeSignalPhone,
+    MergeSignal.emailExact => mergeSignalEmail,
+    MergeSignal.nameExact => mergeSignalNameExact,
+    MergeSignal.nameMiddleDropped => mergeSignalNameMiddle,
+    MergeSignal.nameSimilar => mergeSignalNameSimilar,
+    MergeSignal.avatarSimilar => mergeSignalAvatar,
+    MergeSignal.sharedGroups => mergeSignalSharedGroups,
   };
 
   /// Why a message did not leave, in words.

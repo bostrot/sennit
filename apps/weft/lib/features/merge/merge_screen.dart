@@ -5,6 +5,7 @@ import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_merge/weft_merge.dart';
 
 import '../../app/a11y.dart';
+import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 import '../../app/providers.dart';
 import '../../data/chat_repository.dart';
@@ -259,14 +260,14 @@ class _SuggestionCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: WeftSpace.sm),
-                  // The evidence, verbatim from the scorer.
+                  // The evidence, one chip per signal the scorer found.
                   Wrap(
                     spacing: WeftSpace.xs,
                     runSpacing: WeftSpace.xs,
                     children: [
                       for (final signal in candidate.signals)
                         Chip(
-                          label: Text(signal.explanation),
+                          label: Text(context.l10n.mergeSignal(signal)),
                           labelStyle: context.text.labelSmall,
                           visualDensity: VisualDensity.compact,
                           side: BorderSide.none,
@@ -424,7 +425,7 @@ String _proposalLabel(AppL10n l10n, MergeCandidate candidate) =>
       l10n.mergeSuggestionConfidence((candidate.score * 100).round()),
       if (candidate.signals.isNotEmpty)
         l10n.mergeSuggestionBecause(
-          candidate.signals.map((s) => s.explanation).join(', '),
+          candidate.signals.map(l10n.mergeSignal).join(', '),
         ),
     ]);
 

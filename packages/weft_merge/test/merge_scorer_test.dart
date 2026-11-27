@@ -61,6 +61,54 @@ void main() {
       );
     });
 
+    test('a middle name on one side only is suggested, not merged', () {
+      // The owner's own case: Telegram and Google Messages say "Joanne
+      // Kristina Trenkel", WhatsApp "Joanne Trenkel". Neither identical nor
+      // close by edit distance, so it was never suggested at all.
+      final candidate = scorer.score(
+        handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+        handle(
+          'b',
+          ChatNetwork.telegram,
+          displayName: 'Joanne Kristina Trenkel',
+        ),
+      );
+
+      expect(candidate, isNotNull);
+      expect(candidate!.signals, contains(MergeSignal.nameMiddleDropped));
+      expect(candidate.qualifiesForAutoMerge, isFalse);
+    });
+
+    test('a different first or last name is not a dropped middle name', () {
+      for (final (x, y) in [
+        ('Joanne Trenkel', 'Joanne Kristina Meyer'),
+        ('Anna Trenkel', 'Joanne Kristina Trenkel'),
+        ('Joanne Trenkel', 'Joanne Trenkel Kristina'),
+      ]) {
+        final candidate = scorer.score(
+          handle('a', ChatNetwork.whatsapp, displayName: x),
+          handle('b', ChatNetwork.telegram, displayName: y),
+        );
+        expect(
+          candidate?.signals ?? const [],
+          isNot(contains(MergeSignal.nameMiddleDropped)),
+          reason: '$x / $y',
+        );
+      }
+    });
+
+    test('scoreAll finds a pair that differs by a middle name', () {
+      final found = scorer.scoreAll([
+        handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+        handle(
+          'b',
+          ChatNetwork.telegram,
+          displayName: 'Joanne Kristina Trenkel',
+        ),
+      ]);
+      expect(found, hasLength(1));
+    });
+
     test('an identical single-word name is still not evidence', () {
       expect(
         scorer.score(
