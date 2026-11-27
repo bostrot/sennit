@@ -22,6 +22,18 @@ enum MergeSignal {
   /// bar. It is still a *suggestion*: nothing merges without a tap.
   nameExact('Identical name', 0.62),
 
+  /// The same first and last name, one of the two also carrying a middle name
+  /// — "Joanne Trenkel" on WhatsApp, "Joanne Kristina Trenkel" on Telegram.
+  ///
+  /// Networks disagree about middle names all the time: a phone book entry
+  /// has one, a profile somebody typed on a phone does not. Neither identical
+  /// nor close enough by edit distance (the middle name is a third of the
+  /// string), so the same person stayed two chats with no suggestion at all.
+  /// Counted as exact for the gate below — every part of the shorter name is
+  /// in the longer one, in order, first and last included — but weighted under
+  /// [nameExact] and never enough to merge without a tap.
+  nameMiddleDropped('Same first and last name', 0.58),
+
   nameSimilar('Very similar name', 0.50),
   avatarSimilar('Nearly identical avatar', 0.40),
   sharedGroups('Shared group memberships', 0.15);
@@ -164,6 +176,8 @@ class MergeScorer {
       if (substantial && !identifierShaped) {
         if (nameA == nameB) {
           signals.add(MergeSignal.nameExact);
+        } else if (_middleDropped(nameA, nameB)) {
+          signals.add(MergeSignal.nameMiddleDropped);
         } else if (jaroWinkler(nameA, nameB) >=
             config.nameSimilarityThreshold) {
           signals.add(MergeSignal.nameSimilar);
@@ -195,6 +209,7 @@ class MergeScorer {
       MergeSignal.phoneExact,
       MergeSignal.emailExact,
       MergeSignal.nameExact,
+      MergeSignal.nameMiddleDropped,
     };
     if (!signals.any(exact.contains)) return null;
 
@@ -234,6 +249,9 @@ class MergeScorer {
       if (f.phone case final phone?) bucket('p:$phone', i);
       if (f.email case final email?) bucket('e:$email', i);
       if (f.name.isNotEmpty) bucket('n:${f.name}', i);
+      // First and last name, so a pair that differs only by a middle name
+      // meets in one bucket too.
+      if (_firstAndLast(f.name) case final core?) bucket('c:$core', i);
     }
     final pairs = <int>{};
     for (final members in buckets.values) {
@@ -268,6 +286,34 @@ class MergeScorer {
     out.sort((x, y) => y.score.compareTo(x.score));
     return out;
   }
+}
+
+/// "first last" of a normalised name with at least two parts, else null.
+String? _firstAndLast(String name) {
+  final parts = name.split(' ');
+  if (parts.length < 2) return null;
+  return '${parts.first} ${parts.last}';
+}
+
+/// Whether one normalised name is the other with middle names left out:
+/// the same first and last part, and every part of the shorter one found in
+/// the longer one in order. "joanne trenkel" and "joanne kristina trenkel" are;
+/// "anna maria" and "anna marie" are not, nor is a bare first name.
+bool _middleDropped(String a, String b) {
+  final pa = a.split(' ');
+  final pb = b.split(' ');
+  if (pa.length < 2 || pb.length < 2 || pa.length == pb.length) return false;
+  final (short, long) = pa.length < pb.length ? (pa, pb) : (pb, pa);
+  if (short.first != long.first || short.last != long.last) return false;
+  var j = 0;
+  for (final part in short) {
+    while (j < long.length && long[j] != part) {
+      j++;
+    }
+    if (j == long.length) return false;
+    j++;
+  }
+  return true;
 }
 
 /// What [MergeScorer] compares of one handle, normalised once.

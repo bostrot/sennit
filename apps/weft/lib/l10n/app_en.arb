@@ -9377,6 +9377,41 @@
       }
     }
   },
+  "mergeSignalPhone": "Same phone number",
+  "@mergeSignalPhone": {
+    "description": "Evidence chip on a merge suggestion: phone numbers match. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalEmail": "Same email address",
+  "@mergeSignalEmail": {
+    "description": "Evidence chip on a merge suggestion: email addresses match. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalNameExact": "Identical name",
+  "@mergeSignalNameExact": {
+    "description": "Evidence chip on a merge suggestion: display names match exactly. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalNameMiddle": "Same first and last name",
+  "@mergeSignalNameMiddle": {
+    "description": "Evidence chip on a merge suggestion: same first and last name, one side also has a middle name (e.g. \"Joanne Trenkel\" / \"Joanne Kristina Trenkel\"). Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalNameSimilar": "Very similar name",
+  "@mergeSignalNameSimilar": {
+    "description": "Evidence chip on a merge suggestion: display names are nearly the same. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalAvatar": "Nearly identical avatar",
+  "@mergeSignalAvatar": {
+    "description": "Evidence chip on a merge suggestion: profile pictures look nearly the same. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
+  "mergeSignalSharedGroups": "Shared group memberships",
+  "@mergeSignalSharedGroups": {
+    "description": "Evidence chip on a merge suggestion: both are in the same group chats. Also read out after \"because\". Keep under ~28 chars.",
+    "maxLength": 44
+  },
   "notificationChannelReplyReminders": "Reply reminders",
   "@notificationChannelReplyReminders": {
     "description": "Name of the reply-reminder notification channel, shown in the operating system's notification settings. Keep under ~26 chars."
