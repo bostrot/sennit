@@ -45,6 +45,7 @@ class WeftDesignStrings {
     required this.reply,
     this.reacted = _englishReacted,
     this.draft = 'Draft:',
+    this.messageUndecryptable = 'Encrypted message',
   });
 
   /// Screen-reader hint for the long-press that starts multi-select.
@@ -79,6 +80,9 @@ class WeftDesignStrings {
 
   /// The preview line for a conversation whose newest message was redacted.
   final String messageDeleted;
+
+  /// The preview line for an encrypted message this device has no key for.
+  final String messageUndecryptable;
 
   /// The preview line for a message with no words of its own — a photo, a
   /// file, a poll. The emoji in front of it is the component's, not the app's.

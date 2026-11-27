@@ -520,6 +520,7 @@ class _ChatTileState extends State<ChatTile> {
 
   static String _messagePreview(WeftDesignStrings words, WeftMessage last) {
     if (last.redacted) return words.messageDeleted;
+    if (last.undecryptable) return words.messageUndecryptable;
     String kind(String emoji) => '$emoji ${words.messageKind(last.kind)}';
     return switch (last.kind) {
       MessageKind.image => kind('📷'),

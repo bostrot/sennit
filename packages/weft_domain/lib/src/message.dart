@@ -188,6 +188,7 @@ class WeftMessage {
     this.mediaMimeType,
     this.playsAsGif = false,
     this.encrypted = false,
+    this.undecryptable = false,
     this.bridgedLinkPreviews,
   });
 
@@ -422,6 +423,16 @@ class WeftMessage {
   /// see — so previews there are a separate, off-by-default choice.
   final bool encrypted;
 
+  /// Whether this is an encrypted message this device has no key for.
+  ///
+  /// The SDK hands such an event over with its own English error as the
+  /// body — "The sender has not sent us the session key." — which then read as
+  /// something the other person said, in English whatever the app's language.
+  /// [body] is empty instead and the UI says it in the user's words. A key that
+  /// arrives later (from the backup, or from another of the user's devices)
+  /// turns the same event into an ordinary message.
+  final bool undecryptable;
+
   /// Link previews the *sender* attached to the event, raw from the wire.
   ///
   /// `com.beeper.linkpreviews` from the mautrix bridges and Beeper, or MSC4095's
@@ -533,6 +544,7 @@ class WeftMessage {
       mediaMimeType: mediaMimeType,
       playsAsGif: playsAsGif,
       encrypted: encrypted,
+      undecryptable: undecryptable,
       bridgedLinkPreviews: bridgedLinkPreviews,
     );
   }
@@ -560,6 +572,7 @@ class WeftMessage {
       other.transcript == transcript &&
       other.editedAt == editedAt &&
       other.redacted == redacted &&
+      other.undecryptable == undecryptable &&
       other.deliveryState == deliveryState &&
       other.replyPreview == replyPreview &&
       const ListEquality<ReactionTally>().equals(other.reactions, reactions) &&
@@ -574,6 +587,7 @@ class WeftMessage {
     transcript,
     editedAt,
     redacted,
+    undecryptable,
     deliveryState,
     replyPreview,
     const ListEquality<ReactionTally>().hash(reactions),

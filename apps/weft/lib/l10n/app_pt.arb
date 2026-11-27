@@ -463,6 +463,8 @@
   "chatQuickReact": "Reagir",
   "chatShowActionsHint": "mostrar as ações",
   "chatMessageDeleted": "Mensagem excluída",
+  "chatMessageUndecryptable": "Mensagem criptografada",
+  "chatMessageUndecryptableHint": "Este dispositivo ainda não tem a chave. Verifique-o ou restaure o backup de chaves para ler.",
   "messageActionHideForMe": "Ocultar para mim",
   "chatMessageHidden": "Ocultada para você. Os outros ainda a veem.",
   "chatMessageHiddenUndo": "Desfazer",

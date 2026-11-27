@@ -462,6 +462,8 @@
   "chatQuickReact": "प्रतिक्रिया",
   "chatShowActionsHint": "विकल्प दिखाएँ",
   "chatMessageDeleted": "मैसेज हटाया गया",
+  "chatMessageUndecryptable": "एन्क्रिप्टेड मैसेज",
+  "chatMessageUndecryptableHint": "इस डिवाइस के पास अभी इसकी की नहीं है। पढ़ने के लिए डिवाइस वेरिफ़ाई करें या की बैकअप रीस्टोर करें।",
   "messageActionHideForMe": "मेरे लिए छिपाएँ",
   "chatMessageHidden": "आपके लिए छिपाया गया। दूसरे अब भी देख सकते हैं।",
   "chatMessageHiddenUndo": "पलटें",

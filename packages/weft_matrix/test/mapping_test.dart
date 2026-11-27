@@ -307,6 +307,27 @@ void main() {
       );
     }
 
+    test('an event this device has no key for is flagged, not quoted', () {
+      // What the SDK hands over when decryption fails: the encrypted type,
+      // with its own English error written into the body.
+      final message = map({
+        'algorithm': 'm.megolm.v1.aes-sha2',
+        'session_id': 'session',
+        'sender_key': 'key',
+        'msgtype': 'm.bad.encrypted',
+        'body': 'The sender has not sent us the session key.',
+        'can_request_session': true,
+      }, type: sdk.EventTypes.Encrypted)!;
+      expect(message.undecryptable, isTrue);
+      expect(message.body, isEmpty);
+    });
+
+    test('a readable message is not flagged undecryptable', () {
+      final message = map({'msgtype': 'm.text', 'body': 'Hallo'})!;
+      expect(message.undecryptable, isFalse);
+      expect(message.body, 'Hallo');
+    });
+
     test('a WhatsApp poll riding an m.room.message is a poll', () {
       // mautrix-whatsapp and -signal with extev_polls off, their default.
       final message = map({

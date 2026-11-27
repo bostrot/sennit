@@ -462,6 +462,8 @@
   "chatQuickReact": "Reaccionar",
   "chatShowActionsHint": "mostrar las acciones",
   "chatMessageDeleted": "Mensaje eliminado",
+  "chatMessageUndecryptable": "Mensaje cifrado",
+  "chatMessageUndecryptableHint": "Este dispositivo aún no tiene la clave. Verifícalo o restaura tu copia de claves para leerlo.",
   "messageActionHideForMe": "Ocultar para mí",
   "chatMessageHidden": "Oculto para ti. Los demás aún lo ven.",
   "chatMessageHiddenUndo": "Deshacer",

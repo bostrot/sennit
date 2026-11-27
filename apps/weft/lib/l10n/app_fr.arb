@@ -462,6 +462,8 @@
   "chatQuickReact": "Réagir",
   "chatShowActionsHint": "afficher les actions",
   "chatMessageDeleted": "Message supprimé",
+  "chatMessageUndecryptable": "Message chiffré",
+  "chatMessageUndecryptableHint": "Cet appareil n’a pas encore la clé. Vérifie-le ou restaure ta sauvegarde des clés pour le lire.",
   "messageActionHideForMe": "Masquer pour moi",
   "chatMessageHidden": "Masqué pour vous. Les autres le voient toujours.",
   "chatMessageHiddenUndo": "Annuler",

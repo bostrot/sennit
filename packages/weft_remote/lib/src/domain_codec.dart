@@ -109,6 +109,7 @@ abstract final class DomainCodec {
     'mime': ?m.mediaMimeType,
     if (m.playsAsGif) 'gif': true,
     if (m.encrypted) 'e2e': true,
+    if (m.undecryptable) 'locked': true,
     'previews': ?m.bridgedLinkPreviews,
   };
 
@@ -148,6 +149,7 @@ abstract final class DomainCodec {
     mediaMimeType: j['mime'] as String?,
     playsAsGif: j['gif'] == true,
     encrypted: j['e2e'] == true,
+    undecryptable: j['locked'] == true,
     bridgedLinkPreviews: j['previews'] == null
         ? null
         : [for (final p in _list(j['previews'])) _map(p)],
