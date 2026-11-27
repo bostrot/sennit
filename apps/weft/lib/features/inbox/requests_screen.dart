@@ -107,7 +107,7 @@ class RequestsScreen extends ConsumerWidget {
     final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.requestsTitle)),
+      appBar: WeftAppBar(title: Text(l10n.requestsTitle)),
       body: requests.isEmpty
           ? Center(
               child: Padding(

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:weft_design/weft_design.dart';
@@ -148,28 +149,44 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
               child: WeftLabelledField(
                 label: context.l10n.inboxSearchAll,
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  onChanged: _onChanged,
-                  decoration: InputDecoration(
-                    hintText: context.l10n.searchHint,
-                    // All three borders, not just `border` — and only on a
-                    // desktop. The theme gives every field a two-point focus
-                    // ring, and this one is autofocused inside a 52-point
-                    // toolbar, so the ring drew and was clipped along its top
-                    // edge: a field apparently hanging off the top of the
-                    // window. On a phone the bar is 56 points, the ring fits,
-                    // and it is the only thing marking where the caret is.
-                    border: context.isDesktop ? InputBorder.none : null,
-                    enabledBorder: context.isDesktop ? InputBorder.none : null,
-                    focusedBorder: context.isDesktop ? InputBorder.none : null,
-                    filled: false,
-                    // Dense on a desktop only. Unconditionally it took the
-                    // field to 24 points tall on a phone as well, which is
-                    // half the target a thumb is owed.
-                    isDense: context.isDesktop,
-                    contentPadding: context.isDesktop ? EdgeInsets.zero : null,
+                // Escape closes search, as it does every search field on a
+                // desktop. On the field rather than app-wide: a bare key
+                // bound at the top would be one no other text field could
+                // type past.
+                child: CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.escape): () =>
+                        unawaited(Navigator.of(context).maybePop()),
+                  },
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    onChanged: _onChanged,
+                    decoration: InputDecoration(
+                      hintText: context.l10n.searchHint,
+                      // All three borders, not just `border` — and only on a
+                      // desktop. The theme gives every field a two-point focus
+                      // ring, and this one is autofocused inside a 52-point
+                      // toolbar, so the ring drew and was clipped along its top
+                      // edge: a field apparently hanging off the top of the
+                      // window. On a phone the bar is 56 points, the ring fits,
+                      // and it is the only thing marking where the caret is.
+                      border: context.isDesktop ? InputBorder.none : null,
+                      enabledBorder: context.isDesktop
+                          ? InputBorder.none
+                          : null,
+                      focusedBorder: context.isDesktop
+                          ? InputBorder.none
+                          : null,
+                      filled: false,
+                      // Dense on a desktop only. Unconditionally it took the
+                      // field to 24 points tall on a phone as well, which is
+                      // half the target a thumb is owed.
+                      isDense: context.isDesktop,
+                      contentPadding: context.isDesktop
+                          ? EdgeInsets.zero
+                          : null,
+                    ),
                   ),
                 ),
               ),
@@ -443,6 +460,11 @@ class _ChatResultTile extends ConsumerWidget {
         chat.networks.map((n) => n.label).join(', '),
       ]),
       child: ListTile(
+        // Tall enough for the face. A desktop's list tiles are compact — 30
+        // points, a menu row — and a tile does not grow for its leading
+        // widget, so three 40-point avatars were drawn over one another down
+        // a list of people with the same name.
+        minTileHeight: 40 + 2 * WeftSpace.sm,
         leading: WeftAvatar(
           label: chat.title,
           imageUrl: chat.avatarUrl,

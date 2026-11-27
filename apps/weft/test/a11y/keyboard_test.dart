@@ -380,6 +380,25 @@ void main() {
           expectFired: (tester, container) =>
               expect(find.text('New line'), findsOneWidget),
         ),
+        // A conversation opened from search covers the whole window, and on a
+        // desktop the arrow in its bar was the only way back out of it.
+        'Back': (
+          arrange: (tester, container) async {
+            unawaited(
+              tester
+                  .state<NavigatorState>(find.byType(Navigator).first)
+                  .push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const Scaffold(body: Text('Pushed')),
+                    ),
+                  ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('Pushed'), findsOneWidget);
+          },
+          expectFired: (tester, container) =>
+              expect(find.text('Pushed'), findsNothing),
+        ),
       };
 
   group('every shortcut fires its action', () {

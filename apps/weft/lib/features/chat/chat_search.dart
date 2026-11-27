@@ -180,6 +180,9 @@ class ChatSearchBar extends StatelessWidget implements PreferredSizeWidget {
           bottom: BorderSide(color: context.palette.divider, width: 0.5),
         ),
         child: MacToolbar(
+          // The conversation's own bar keeps clear of the traffic lights on a
+          // pushed route; the search that replaces it has to as well.
+          leadingInset: macToolbarInsetFor(context),
           titleWidget: DecoratedBox(
             decoration: BoxDecoration(
               color: context.colors.onSurface.withValues(alpha: 0.07),

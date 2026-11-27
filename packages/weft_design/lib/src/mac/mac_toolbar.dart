@@ -4,6 +4,20 @@ import '../surface.dart';
 import '../theme.dart';
 import '../tokens.dart';
 
+/// Whether the route [context] sits in covers the whole window.
+///
+/// The shell's own panes live in the first route, where the sidebar's toolbar
+/// already keeps clear of the traffic lights. Anything pushed over it — a
+/// conversation opened from search, a thread, a settings page — starts at the
+/// window's top-left corner, under the close, minimise and zoom buttons.
+bool macRouteCoversWindow(BuildContext context) =>
+    context.isMac && !(ModalRoute.of(context)?.isFirst ?? true);
+
+/// The leading clearance a toolbar at the top of [context]'s route needs:
+/// [MacMetrics.trafficLightInset] on a pushed Mac route, nothing otherwise.
+double macToolbarInsetFor(BuildContext context) =>
+    macRouteCoversWindow(context) ? MacMetrics.trafficLightInset : 0;
+
 /// One pane's slice of the window's unified toolbar.
 ///
 /// The window has a single toolbar running its whole width, divided by the
