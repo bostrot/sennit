@@ -423,6 +423,7 @@
   "chatConfirmLinkTitle": "Ouvrir ce lien ?",
   "chatConfirmLinkBody": "Le texte de ce lien ne correspond pas à sa destination.",
   "chatJumpToLatest": "Aller aux derniers messages",
+  "chatNewMessagesBelow": "{count, plural, =1{1 nouveau message} other{{count} nouveaux messages}}",
   "chatLoadingOlder": "Chargement des messages plus anciens",
   "chatLoadOlder": "Charger les messages plus anciens",
   "chatBeginningOfConversation": "Début de la conversation",

@@ -424,6 +424,7 @@
   "chatConfirmLinkBody": "نص هذا الرابط لا يطابق وجهته.",
   "chatLoadingOlder": "جارٍ تحميل الرسائل الأقدم",
   "chatJumpToLatest": "الانتقال إلى الأحدث",
+  "chatNewMessagesBelow": "{count, plural, =1{رسالة جديدة واحدة} =2{رسالتان جديدتان} few{{count} رسائل جديدة} other{{count} رسالة جديدة}}",
   "chatLoadOlder": "تحميل الرسائل الأقدم",
   "chatBeginningOfConversation": "بداية المحادثة",
   "chatTranscriptionFailed": "فشل التفريغ: {error}",

@@ -424,6 +424,7 @@
   "chatConfirmLinkBody": "इस लिंक का टेक्स्ट उसकी असली मंज़िल से मेल नहीं खाता।",
   "chatLoadingOlder": "पुराने मैसेज लोड हो रहे हैं",
   "chatJumpToLatest": "नवीनतम पर जाएँ",
+  "chatNewMessagesBelow": "{count, plural, =1{1 नया संदेश} other{{count} नए संदेश}}",
   "chatLoadOlder": "पुराने मैसेज लोड करें",
   "chatBeginningOfConversation": "बातचीत की शुरुआत",
   "chatTranscriptionFailed": "ट्रांसक्रिप्शन विफल: {error}",
