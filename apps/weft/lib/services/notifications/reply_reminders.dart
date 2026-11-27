@@ -10,8 +10,10 @@ import 'package:weft_notify/weft_notify.dart';
 import 'package:weft_store/weft_store.dart';
 
 import '../../app/localisation.dart';
+import 'notification_actions.dart';
 import 'notification_channels.dart';
 import 'notification_presentation.dart';
+import 'notification_service.dart' show NotificationActivation;
 
 /// One reply reminder as the OS is handed it.
 @immutable
@@ -160,10 +162,11 @@ typedef ReplyReminderWords = ({
 /// with [planReplyReminders] and diffs the plan against what was queued last
 /// time, so an ordinary tick — nothing read, nothing answered — makes no
 /// platform call at all. Replying shows up as the chat's last message being
-/// the user's own, which drops it from the plan and cancels its reminders,
-/// delivered ones included. Until then the last reminder queued for a chat
-/// repeats daily, so the reminding outlasts the queue when Sennit does not
-/// run to plan again.
+/// the user's own, which drops it from the plan and cancels its reminder,
+/// a delivered one included. Until then each person has one reminder, under
+/// one notification id, that repeats daily, so the reminding goes on when
+/// Sennit does not run to plan again — and a new message from them moves that
+/// one instead of adding another.
 ///
 /// Everything stays on the device: the plan is built from the chat list
 /// already in memory, and a reminder names the chat — or, with previews off,
@@ -241,6 +244,11 @@ class ReplyReminderService {
   }
 
   /// "Stop reminding" for [chatId]'s current message.
+  ///
+  /// Works with no inbox too — a background engine answering the action with
+  /// Sennit closed has none to plan against. Then [chatId]'s queued reminder
+  /// is taken back directly, and the dismissal recorded for the app to plan
+  /// with when it next runs.
   Future<void> dismiss(String chatId, {String? eventId}) async {
     _saveLedger(
       _loadLedger().dismiss(
@@ -249,7 +257,24 @@ class ReplyReminderService {
         eventId: eventId == null || eventId.isEmpty ? null : eventId,
       ),
     );
+    if (_chats == null) return _cancelChat(chatId);
     await replan();
+  }
+
+  Future<void> _cancelChat(String chatId) async {
+    final previous = _loadQueued();
+    final kept = [
+      for (final queued in previous)
+        if (queued.chatId != chatId) queued,
+    ];
+    if (kept.length == previous.length) return;
+    for (final queued in previous) {
+      if (queued.chatId == chatId) await _poster.cancel(queued.id);
+    }
+    _queued = List.unmodifiable(kept);
+    _store?.setJson(WeftSettings.notifyReplyRemindersQueued, {
+      'queued': [for (final q in kept) q.toJson()],
+    });
   }
 
   /// Cancels every queued reminder and forgets every clock. For sign-out.
@@ -324,34 +349,19 @@ class ReplyReminderService {
     }
 
     final previous = _loadQueued();
-    final stillReminded = {for (final r in plan.reminders) r.chatId};
     final kept = <_Queued>[];
     final cancel = <int>{};
-    // Delivered reminders of a chat still being reminded about stay in the
-    // shade — only the newest, so a day of nudges is one row, not eight.
-    final newestDelivered = <String, _Queued>{};
+    // Anything no longer planned is taken back, delivered or not. A person
+    // still waiting keeps their one notification: it is planned again under
+    // the same id, so it is moved rather than cancelled, and the copy in the
+    // shade is replaced when the next one fires instead of joined by it.
     for (final queued in previous) {
       if (wanted.containsKey(queued.key)) {
         if (_requeued) kept.add(queued);
         continue;
       }
-      // A repeating one is never left behind as delivered: it would go on
-      // firing beside its replacement.
-      if (!queued.repeatsDaily &&
-          !queued.at.isAfter(now) &&
-          stillReminded.contains(queued.chatId)) {
-        final newest = newestDelivered[queued.chatId];
-        if (newest == null || queued.at.isAfter(newest.at)) {
-          if (newest != null) cancel.add(newest.id);
-          newestDelivered[queued.chatId] = queued;
-        } else {
-          cancel.add(queued.id);
-        }
-        continue;
-      }
       cancel.add(queued.id);
     }
-    kept.addAll(newestDelivered.values);
 
     final keptKeys = {for (final q in kept) q.key};
     final toQueue = [
@@ -444,4 +454,41 @@ class _Queued {
       repeatsDaily: raw['repeatsDaily'] == true,
     );
   }
+}
+
+/// "Stop reminding" pressed with no UI to hand it to.
+///
+/// What `runBackgroundNotificationAction` does for that one action: it needs
+/// only the settings store, where the ledger and the queue are kept, so it
+/// opens nothing else — no session, no repository — and is quick enough to
+/// skip through a shade of reminders without Sennit coming up for any of
+/// them.
+Future<NotificationActionResult> stopReplyReminderHeadless(
+  NotificationActivation activation, {
+  required Future<SettingsStore> Function() store,
+  ReplyReminderPoster? poster,
+}) async {
+  final chatId = notificationChatId(activation.payload);
+  if (chatId.isEmpty) return NotificationActionResult.ignored;
+  try {
+    final settings = await store();
+    // Only [ReplyReminderService.dismiss] runs, and it neither plans nor
+    // words a notification: the settings, policy and words are never read.
+    final service = ReplyReminderService(
+      poster: poster ?? LocalReplyReminderPoster(),
+      store: settings,
+      settings: () => ReplyReminderSettings.fromJson(
+        settings.getJson(WeftSettings.notifyReplyReminders),
+      ),
+      policy: () => NotificationPolicy.fromJson(
+        settings.getJson(WeftSettings.notifyPolicy),
+      ),
+      words: () => (title: (chat) => chat, hiddenTitle: '', body: ''),
+    );
+    await service.dismiss(chatId, eventId: activation.payload.eventId);
+  } on Object catch (error) {
+    debugPrint('weft: reply reminders for $chatId could not stop: $error');
+    return NotificationActionResult.failed;
+  }
+  return NotificationActionResult.remindersStopped;
 }

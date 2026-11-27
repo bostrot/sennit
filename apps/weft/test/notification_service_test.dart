@@ -1233,11 +1233,11 @@ void main() {
         categories[kReplyReminderCategoryId]!.options,
         isNot(contains(DarwinNotificationCategoryOption.allowInCarPlay)),
       );
-      // Stopping reminders needs the UI isolate's ledger, so it opens Sennit
-      // rather than dying in a background engine with the app closed.
+      // Stopping reminders is done from the shade, one after another, so it
+      // runs in a background engine and never brings Sennit up.
       expect(
         categories[kReplyReminderCategoryId]!.actions.single.options,
-        contains(DarwinNotificationActionOption.foreground),
+        isNot(contains(DarwinNotificationActionOption.foreground)),
       );
     });
 
@@ -1246,7 +1246,9 @@ void main() {
 
       expect(action.semanticAction, isNot(SemanticAction.reply));
       expect(action.semanticAction, isNot(SemanticAction.markAsRead));
-      expect(action.showsUserInterface, isTrue);
+      // Headless: stopping a reminder does not open the app.
+      expect(action.showsUserInterface, isFalse);
+      expect(action.cancelNotification, isTrue);
     });
 
     test('a posted message notification actually carries them', () {

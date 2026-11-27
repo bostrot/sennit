@@ -355,6 +355,7 @@ void main() {
         interval: const Duration(hours: 1),
         now: now,
         giveUpAt: readAt.add(const Duration(hours: 2)),
+        count: 6,
       );
       expect(times, hasLength(2));
     });
@@ -387,12 +388,14 @@ void main() {
       ReplyReminderSettings? settings,
       ReplyReminderLedger? ledger,
       DateTime? at,
+      int perChat = kReplyRemindersPerChat,
       int total = kReplyRemindersTotal,
     }) => planReplyReminders(
       chats: chats,
       settings: settings ?? on,
       ledger: ledger ?? ReplyReminderLedger.empty,
       now: at ?? now,
+      perChat: perChat,
       total: total,
     );
 
@@ -405,13 +408,16 @@ void main() {
           chatId: '!room:example.org',
           title: 'Grace',
           at: now.add(kDefaultReplyReminderInterval),
+          repeatsDaily: true,
         ),
       );
-      expect(result.reminders, hasLength(kReplyRemindersPerChat));
+      // One per person, so the next one replaces the last in the shade.
+      expect(result.reminders, hasLength(1));
     });
 
     test('the last reminder of a chat repeats daily, the others do not', () {
-      final reminders = plan([waiting()]).reminders;
+      final reminders = plan([waiting()], perChat: 6).reminders;
+      expect(reminders, hasLength(6));
       expect(reminders.last.repeatsDaily, isTrue);
       expect(reminders.where((r) => r.repeatsDaily), hasLength(1));
       expect(reminders.last.key, endsWith('+daily'));
@@ -497,6 +503,7 @@ void main() {
         [waiting(id: '!a:x', title: 'A'), waiting(id: '!b:x', title: 'B')],
         ledger: first.ledger,
         at: now.add(const Duration(hours: 1)),
+        perChat: 6,
         total: 3,
       );
       expect(result.reminders, hasLength(3));
@@ -507,6 +514,172 @@ void main() {
       final sorted = [...result.reminders]
         ..sort((a, b) => a.at.compareTo(b.at));
       expect(result.reminders, sorted);
+    });
+  });
+
+  group('one reminder per person', () {
+    // Grace on WhatsApp, Signal and Telegram: merged into one person, but
+    // each chat still its own row here — the case the merge fold misses, and
+    // the shape the rule must hold for either way.
+    Chat leg(
+      String id, {
+      required String eventId,
+      required Duration age,
+      bool isOwn = false,
+      int unread = 0,
+      DateTime? reactedUpTo,
+    }) {
+      final chat = waiting(
+        id: id,
+        eventId: eventId,
+        age: age,
+        isOwn: isOwn,
+        unread: unread,
+        reactedUpTo: reactedUpTo,
+      );
+      return Chat(
+        id: chat.id,
+        title: chat.title,
+        sources: chat.sources,
+        contactId: 'contact_grace',
+        lastMessage: chat.lastMessage,
+        unreadCount: chat.unreadCount,
+        reactedUpTo: chat.reactedUpTo,
+      );
+    }
+
+    List<Chat> grace({
+      bool repliedOnSignal = false,
+      bool newOnTelegram = false,
+    }) => [
+      leg('!wa:x', eventId: r'$wa', age: const Duration(hours: 3)),
+      leg(
+        '!signal:x',
+        eventId: repliedOnSignal ? r'$mine' : r'$signal',
+        age: repliedOnSignal ? Duration.zero : const Duration(hours: 2),
+        isOwn: repliedOnSignal,
+      ),
+      leg(
+        '!tg:x',
+        eventId: newOnTelegram ? r'$tg_2' : r'$tg',
+        age: newOnTelegram
+            ? const Duration(minutes: 1)
+            : const Duration(hours: 1),
+      ),
+    ];
+
+    ReplyReminderPlan plan(
+      List<Chat> chats, {
+      ReplyReminderLedger? ledger,
+      DateTime? at,
+    }) => planReplyReminders(
+      chats: chats,
+      settings: on,
+      ledger: ledger ?? ReplyReminderLedger.empty,
+      now: at ?? now,
+    );
+
+    test('several merged chats with read messages give one reminder', () {
+      final result = plan(grace());
+      expect(result.reminders, hasLength(1));
+      // About the message they sent last, wherever they sent it.
+      expect(result.reminders.single.chatId, '!tg:x');
+      expect(result.ledger.entries.keys, ['!tg:x']);
+      expect(result.ledger['!tg:x']?.eventId, r'$tg');
+    });
+
+    test('an unread message in any of them waits for it to be read', () {
+      final chats = grace();
+      chats[0] = leg(
+        '!wa:x',
+        eventId: r'$wa',
+        age: const Duration(hours: 3),
+        unread: 1,
+      );
+      expect(plan(chats).reminders, isEmpty);
+    });
+
+    test('replying in one merged chat clears it', () {
+      final first = plan(grace());
+      final replied = plan(
+        grace(repliedOnSignal: true),
+        ledger: first.ledger,
+        at: now.add(const Duration(minutes: 1)),
+      );
+      expect(replied.reminders, isEmpty);
+      expect(replied.ledger.entries, isEmpty);
+    });
+
+    test('a reaction in one merged chat clears it too', () {
+      final chats = grace();
+      chats[0] = leg(
+        '!wa:x',
+        eventId: r'$wa',
+        age: const Duration(hours: 3),
+        reactedUpTo: now,
+      );
+      expect(plan(chats).reminders, isEmpty);
+    });
+
+    test('a new message re-arms it once', () {
+      final first = plan(grace());
+      final later = now.add(const Duration(hours: 1));
+      final next = plan(
+        grace(newOnTelegram: true),
+        ledger: first.ledger,
+        at: later,
+      );
+      expect(next.reminders, hasLength(1));
+      expect(next.ledger.entries, hasLength(1));
+      expect(next.ledger['!tg:x']?.eventId, r'$tg_2');
+      expect(next.ledger['!tg:x']?.readAt, later);
+      expect(
+        next.reminders.single.at,
+        later.add(kDefaultReplyReminderInterval),
+      );
+      // And planning again changes nothing: it is one reminder, kept.
+      final again = plan(
+        grace(newOnTelegram: true),
+        ledger: next.ledger,
+        at: later.add(const Duration(minutes: 5)),
+      );
+      expect(again.reminders, next.reminders);
+      expect(again.ledger, next.ledger);
+    });
+
+    test('its clock holds when someone else in the chats moves first', () {
+      final first = plan(grace());
+      // The same three chats in another order: still Telegram's message.
+      final later = plan(
+        grace().reversed.toList(),
+        ledger: first.ledger,
+        at: now.add(const Duration(minutes: 5)),
+      );
+      expect(later.ledger, first.ledger);
+      expect(later.reminders, first.reminders);
+    });
+
+    test('excluding one of their chats excludes the person', () {
+      final result = planReplyReminders(
+        chats: grace(),
+        settings: on.withChatExcluded('!wa:x', excluded: true),
+        ledger: ReplyReminderLedger.empty,
+        now: now,
+      );
+      expect(result.reminders, isEmpty);
+    });
+
+    test('different people and groups are not folded together', () {
+      final result = plan([
+        ...grace(),
+        waiting(id: '!ada:x', title: 'Ada'),
+        waiting(id: '!bob:x', title: 'Bob'),
+      ]);
+      expect(result.reminders.map((r) => r.chatId).toSet(), {
+        '!tg:x',
+        '!ada:x',
+        '!bob:x',
+      });
     });
   });
 

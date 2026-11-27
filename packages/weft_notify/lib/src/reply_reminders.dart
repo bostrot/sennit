@@ -32,15 +32,17 @@ const Duration kDefaultReplyReminderInterval = Duration(hours: 3);
 /// spring, read long ago, does not start buzzing every three hours.
 const Duration kReplyReminderMaxAge = Duration(days: 7);
 
-/// How many reminders one chat may have queued with the OS at a time.
+/// How many reminders one person may have queued with the OS at a time.
 ///
-/// The rest are scheduled the next time the app runs, and the last of them
-/// repeats daily until then (see [PlannedReplyReminder.repeatsDaily]), so a
-/// chat is still reminded about with Sennit closed for longer than these
-/// cover. Bounded because iOS keeps at most 64 pending local notifications
-/// for an app — shared with every "remind me" the user set by hand — and
-/// silently drops the rest.
-const int kReplyRemindersPerChat = 6;
+/// One. Every reminder about a person shares one notification, so the next
+/// one replaces the last in the shade instead of stacking beside it: a person
+/// left waiting all day is one row, not a row per interval. That one repeats
+/// daily (see [PlannedReplyReminder.repeatsDaily]), so a person is still
+/// reminded about with Sennit closed; whenever the app runs it plans again and
+/// moves the reminder to the next interval. Bounded anyway because iOS keeps at
+/// most 64 pending local notifications for an app — shared with every "remind
+/// me" the user set by hand — and silently drops the rest.
+const int kReplyRemindersPerChat = 1;
 
 /// How many reminders may be queued with the OS across all chats. Below the
 /// iOS limit of 64 with room left for the user's own reminders.
@@ -586,6 +588,11 @@ DateTime _afterQuietHours(DateTime at, QuietHours quiet) {
 /// Pure: [ledger] is what was remembered last time, and the returned plan
 /// carries the ledger to remember next time. The rules, in order:
 ///
+/// * One-to-one chats with the same person — [Chat.contactId] — are planned
+///   as one: the newest message across them is the one waiting, replying or
+///   reacting in any of them answers it, and the person gets one reminder,
+///   keyed by the chat they spoke in last. A merged chat already is one chat;
+///   this also covers a person whose chats were not folded into it.
 /// * A chat awaiting a reply with no entry, or whose entry names an older
 ///   message, gets a fresh entry read at [now].
 /// * A chat that is not awaiting a reply — the user answered (or reacted, see
@@ -593,8 +600,9 @@ DateTime _afterQuietHours(DateTime at, QuietHours quiet) {
 ///   unread — loses its entry, which is what stops its reminders.
 /// * A chat that no longer exists loses its entry too.
 /// * Every awaiting chat that [replyReminderSkipFor] lets through gets up to
-///   [perChat] reminders from [replyReminderTimes]; across all chats the
-///   soonest [total] are kept.
+///   [perChat] reminders from [replyReminderTimes] — one by default, so a
+///   person is one notification however many chats or messages are waiting;
+///   across all chats the soonest [total] are kept.
 /// * The last reminder kept for each chat repeats daily, so reminding goes on
 ///   until the chat is answered even if the app does not run to plan again.
 ///
@@ -621,7 +629,8 @@ ReplyReminderPlan planReplyReminders({
   final reminders = <PlannedReplyReminder>[];
   final quiet = settings.respectQuietHours ? policy?.quietHours : null;
 
-  for (final chat in chats) {
+  for (final person in _byPerson(chats)) {
+    final chat = _foldPerson(person);
     if (!isAwaitingReply(
       chat,
       reactionsCount: settings.reactionsCountAsReply,
@@ -629,10 +638,13 @@ ReplyReminderPlan planReplyReminders({
       continue;
     }
     final last = chat.lastMessage!;
-    final previous = ledger[chat.id];
-    final entry = previous != null && previous.eventId == last.eventId
-        ? previous
-        : ReplyReminderEntry(eventId: last.eventId, readAt: now);
+    // Under any of the person's chats: the one they spoke in last can change
+    // without the message waiting changing with it.
+    final previous = person
+        .map((c) => ledger[c.id])
+        .firstWhereOrNull((e) => e != null && e.eventId == last.eventId);
+    final entry =
+        previous ?? ReplyReminderEntry(eventId: last.eventId, readAt: now);
     entries[chat.id] = entry;
 
     final skip = replyReminderSkipFor(
@@ -644,6 +656,8 @@ ReplyReminderPlan planReplyReminders({
       entry: entry,
     );
     if (skip != null) continue;
+    // Switched off for one of the person's chats is switched off for them.
+    if (person.any((c) => settings.isExcluded(c.id))) continue;
 
     final times = replyReminderTimes(
       readAt: entry.readAt,
@@ -684,5 +698,47 @@ ReplyReminderPlan planReplyReminders({
               )
             : r,
     ],
+  );
+}
+
+/// [chats] gathered per person: one-to-one chats sharing a [Chat.contactId]
+/// together, every other chat on its own. In the order the chats came.
+List<List<Chat>> _byPerson(Iterable<Chat> chats) {
+  final groups = <String, List<Chat>>{};
+  for (final chat in chats) {
+    final contactId = chat.contactId;
+    final key = !chat.isGroup && contactId != null
+        ? 'contact:$contactId'
+        : 'chat:${chat.id}';
+    (groups[key] ??= []).add(chat);
+  }
+  return groups.values.toList();
+}
+
+/// One person's chats as the one conversation a reminder is about.
+///
+/// The chat with the newest message stands for them, as the newest leg does
+/// for a merged chat: whoever spoke last there spoke last to the person. Its
+/// unread count is the sum, and a reaction in any of them counts — the same
+/// folding a merged chat gets.
+Chat _foldPerson(List<Chat> person) {
+  if (person.length == 1) return person.single;
+  final newest = person.reduce((a, b) {
+    final at = a.lastMessage?.timestamp;
+    final bt = b.lastMessage?.timestamp;
+    if (bt == null) return a;
+    if (at == null) return b;
+    return bt.isAfter(at) ? b : a;
+  });
+  DateTime? reactedUpTo;
+  for (final chat in person) {
+    final at = chat.reactedUpTo;
+    if (at != null && (reactedUpTo == null || at.isAfter(reactedUpTo))) {
+      reactedUpTo = at;
+    }
+  }
+  return newest.copyWith(
+    unreadCount: person.fold<int>(0, (sum, c) => sum + c.unreadCount),
+    reactedUpTo: reactedUpTo,
   );
 }
