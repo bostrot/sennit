@@ -1472,6 +1472,48 @@ void main() {
       )!;
     }
 
+    test('a proposed new time reads on the local clock', () async {
+      final start = DateTime(2026, 8, 22, 0, 48);
+      final invite = sdk.Event(
+        type: sdk.EventTypes.Message,
+        content: {
+          'msgtype': 'm.text',
+          'body': '📅 Test — 22.8.2026, 00:48',
+          kCalendarInviteKey: {
+            'uid': 'weft-1@weft.bostrot.com',
+            'title': 'Test',
+            'start': start.toUtc().toIso8601String(),
+          },
+        },
+        eventId: r'$original:example.org',
+        senderId: '@me:example.org',
+        originServerTs: original,
+        room: room,
+      );
+      final proposed = DateTime(2026, 8, 22, 9, 15);
+      final answer = sdk.Event(
+        type: kCalendarResponseType,
+        content: {
+          'm.relates_to': {
+            'rel_type': 'm.reference',
+            'event_id': r'$original:example.org',
+          },
+          'response': 'reschedule',
+          'proposed_start': proposed.toUtc().toIso8601String(),
+        },
+        eventId: r'$answer:example.org',
+        senderId: '@sam:example.org',
+        originServerTs: DateTime(2026, 8, 17, 10),
+        room: room,
+      );
+
+      final mapped = await mapWith(invite, [answer]);
+      final response = mapped.calendarInvite!.responses.single;
+      expect(response.proposedStart!.isUtc, isFalse);
+      expect(response.proposedStart, proposed);
+      expect(mapped.calendarInvite!.start, start);
+    });
+
     test('an edited message reads as the newest version', () async {
       final event = message();
       final mapped = await mapWith(event, [

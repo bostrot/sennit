@@ -1103,9 +1103,11 @@ List<CalendarResponse> _calendarResponsesFor(
         senderId: entry.key,
         senderName: entry.value.senderFromMemoryOrFallback.calcDisplayname(),
         reply: reply,
+        // Written in UTC; the card shows it on the reader's own clock, as it
+        // does the invitation's own start.
         proposedStart: DateTime.tryParse(
           entry.value.content['proposed_start'] as String? ?? '',
-        ),
+        )?.toLocal(),
       );
     }
   }
