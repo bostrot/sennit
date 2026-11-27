@@ -738,11 +738,7 @@ class MatrixChatRepository
       'start': when.toIso8601String(),
       'end': until.toIso8601String(),
     };
-    final readable =
-        '📅 $title — '
-        '${start.day}.${start.month}.${start.year}, '
-        '${start.hour.toString().padLeft(2, '0')}:'
-        '${start.minute.toString().padLeft(2, '0')}';
+    final readable = _readableInvite(title, start);
 
     if (room.encrypted) {
       // No plain-media upload in an encrypted room; the custom key carries
@@ -806,10 +802,7 @@ class MatrixChatRepository
         CalendarReply.reschedule =>
           proposedStart == null
               ? '🔄 Asking for another time: ${inviteEvent.text}'
-              : '🔄 Proposing ${proposedStart.day}.${proposedStart.month}.'
-                    '${proposedStart.year}, '
-                    '${proposedStart.hour.toString().padLeft(2, '0')}:'
-                    '${proposedStart.minute.toString().padLeft(2, '0')} '
+              : '🔄 Proposing ${_readableTime(proposedStart)} '
                     'instead: ${inviteEvent.text}',
       };
       await room.sendTextEvent(line);
@@ -841,11 +834,7 @@ class MatrixChatRepository
       'start': when.toIso8601String(),
       'end': until.toIso8601String(),
     };
-    final readable =
-        '📅 $title — '
-        '${start.day}.${start.month}.${start.year}, '
-        '${start.hour.toString().padLeft(2, '0')}:'
-        '${start.minute.toString().padLeft(2, '0')}';
+    final readable = _readableInvite(title, start);
 
     // A standard m.replace: Weft peers re-read the block from the newest
     // version, everyone else — bridges included — shows an edited message.
@@ -3559,4 +3548,22 @@ bool isReadLocally({
   if (receiptEventId == null || receiptTs == null) return false;
   if (receiptEventId == lastEventId) return true;
   return receiptTs >= lastEventTs;
+}
+
+/// The line an invitation carries for people and bridges:
+/// `📅 Dinner — 22.8.2026, 19:30`, the shape [bridgedCalendarInvitePattern]
+/// reads back.
+String _readableInvite(String title, DateTime start) =>
+    '📅 $title — ${_readableTime(start)}';
+
+/// [time] on the user's own clock, `22.8.2026, 19:30`.
+///
+/// Converted first: a time that came back from the wire — a proposed new time,
+/// adopted with one tap — is in UTC, and its hour read as it stood put the
+/// invitation two hours off in a German summer.
+String _readableTime(DateTime time) {
+  final t = time.toLocal();
+  return '${t.day}.${t.month}.${t.year}, '
+      '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
 }
