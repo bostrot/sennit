@@ -69,6 +69,10 @@ const Set<String> _textParameters = {
   'labelText', 'hintText', 'helperText', 'errorText', 'fieldLabel',
   // Empty states and error panels.
   'emptyMessage', 'placeholder',
+  // A screen's own notice, label or row widget: `_Notice(text: ...)` is as
+  // user-facing as a `Text`, and leaving `text:` out let whole sentences reach
+  // the search screen in English.
+  'text', 'semantics',
 };
 
 /// Functions whose given positional argument is a sentence shown to the user.
