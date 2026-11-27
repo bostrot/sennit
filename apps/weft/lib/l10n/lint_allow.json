@@ -45,6 +45,7 @@
     "quickMessageFieldEmoji": "'Emoji' and 'optional' are both German.",
     "richSpoiler": "German messengers say 'Spoiler'.",
     "searchResultInChat": "'In {chat}' is identical in both languages.",
+    "searchSectionChats": "Same word as settingsSectionChats: German messengers say 'Chats'.",
     "securityPassphraseField": "'Passphrase' is the German term, and '(optional)' is spelled the same.",
     "settingsBridgesTitle": "Same word as commonBridges.",
     "settingsSectionChats": "German messengers say 'Chats'.",
@@ -58,6 +59,7 @@
     "messageKindAudio": "'Audio' is Spanish.",
     "messageKindSticker": "WhatsApp and Telegram in Spanish both say 'Sticker'.",
     "richSpoiler": "Spanish messengers say 'Spoiler'.",
+    "searchSectionChats": "Same word as settingsSectionChats: Spanish messengers say 'Chats'.",
     "settingsSectionChats": "Spanish messengers say 'Chats'."
   },
   "fr": {
@@ -87,6 +89,7 @@
     "notificationChannelGroupMessages": "'Messages' is French.",
     "notificationsRemainingMinutes": "'minute'/'minutes' are French, and pluralise the same way.",
     "notificationsTitle": "'Notifications' is French.",
+    "searchSectionMessages": "'Messages' is the French word, as in notificationChannelGroupMessages.",
     "securityBackupVersion": "'version' is French.",
     "securitySuggestionSemantics": "'Suggestion' is French.",
     "settingsDimensionsField": "'Dimensions' is French.",

@@ -61,6 +61,7 @@ class _EndpointsScreenState extends ConsumerState<EndpointsScreen> {
     text: _settings.getString(WeftSettings.embeddingModel) ?? '',
   );
   late final _embeddingDims = TextEditingController(
+    // l10n-ignore: a number in a text field.
     text: '${_settings.getInt('search.embedding_dimensions') ?? 1536}',
   );
   final _embeddingKey = TextEditingController();

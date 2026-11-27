@@ -353,6 +353,7 @@ void insertComposerNewline(TextEditingController controller) {
   final selection = value.selection;
   if (!selection.isValid) {
     controller.value = TextEditingValue(
+      // l10n-ignore: the user's own draft with a line break added.
       text: '${value.text}\n',
       selection: TextSelection.collapsed(offset: value.text.length + 1),
     );

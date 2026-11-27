@@ -14,6 +14,7 @@ import '../../app/providers.dart';
 import '../../app/search_providers.dart';
 import '../chat/chat_view.dart';
 import '../chat/saved_messages_screen.dart';
+import '../settings/endpoints_screen.dart';
 
 /// Search across every conversation.
 ///
@@ -242,10 +243,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             if (!semanticAvailable)
               _Notice(
                 icon: Icons.psychology_outlined,
-                text:
-                    'Keyword search only. To also search by meaning, download '
-                    'the search model under Settings → Endpoints → Local models '
-                    'and switch it on, or configure an embedding endpoint.',
+                text: context.l10n.searchKeywordOnlyNotice,
+                action: TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const EndpointsScreen(),
+                    ),
+                  ),
+                  child: Text(context.l10n.searchKeywordOnlySetUp),
+                ),
               )
             else if (backfill != null)
               _BackfillNotice(backfill: backfill),
@@ -283,13 +289,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final chatRows = <Widget>[
       if (chatMatches.isNotEmpty) ...[
         _SectionLabel(
-          text: 'Chats',
-          semantics:
-              '${chatMatches.length} chat${chatMatches.length == 1 ? '' : 's'} '
-              'matching by name',
+          text: context.l10n.searchSectionChats,
+          semantics: context.l10n.searchSectionChatsSemantics(
+            chatMatches.length,
+          ),
         ),
         for (final chat in chatMatches) _ChatResultTile(chat: chat),
-        if (_results.isNotEmpty) _SectionLabel(text: 'Messages'),
+        if (_results.isNotEmpty)
+          _SectionLabel(text: context.l10n.searchSectionMessages),
       ],
     ];
 
@@ -566,6 +573,7 @@ class _BackfillNotice extends StatelessWidget {
         if (reason != null) {
           return _Notice(
             icon: Icons.sync_problem_rounded,
+            // l10n-ignore: the second line is the endpoint's own error.
             text: '${context.l10n.searchIndexingPaused(pending)}\n$reason',
             action: TextButton(
               onPressed: () => unawaited(backfill.retryNow()),

@@ -7308,6 +7308,34 @@
   "@searchNothingMatched": {
     "description": "The live summary line above the results when the search found nothing. Keep under ~24 chars."
   },
+  "searchKeywordOnlyNotice": "Keyword search only. To also search by meaning, turn on a search model on this device or set up an embedding endpoint.",
+  "@searchKeywordOnlyNotice": {
+    "description": "Notice above search results when search by meaning is off: no search model on this device and no embedding endpoint. A 'Set up' button beside it opens the settings for both. Keep under ~130 chars."
+  },
+  "searchKeywordOnlySetUp": "Set up",
+  "@searchKeywordOnlySetUp": {
+    "description": "Button beside the keyword-only notice on the search screen; opens the search settings (local model or embedding endpoint). Keep under ~14 chars.",
+    "maxLength": 24
+  },
+  "searchSectionChats": "Chats",
+  "@searchSectionChats": {
+    "description": "Small heading above the chats whose name matches the search. Same word as settingsSectionChats. Keep under ~16 chars.",
+    "maxLength": 24
+  },
+  "searchSectionChatsSemantics": "{count, plural, =1{1 chat matching by name} other{{count} chats matching by name}}",
+  "@searchSectionChatsSemantics": {
+    "description": "Screen-reader label for the 'Chats' heading in search results: how many chats matched by name.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchSectionMessages": "Messages",
+  "@searchSectionMessages": {
+    "description": "Small heading above the messages that match the search, below the matching chats. Keep under ~16 chars.",
+    "maxLength": 24
+  },
   "searchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
   "@searchResultCount": {
     "description": "The live summary line above the results, saying how many there are.",

@@ -414,7 +414,7 @@ class _ConnectionNote extends StatelessWidget {
     if (state.reconnecting) {
       return _Note(
         icon: Icons.wifi_tethering_error_rounded,
-        text: 'Weak connection — trying to recover',
+        text: context.l10n.callAnnounceReconnecting,
         colour: context.colors.tertiary,
         onDark: onDark,
       );
