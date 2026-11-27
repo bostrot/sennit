@@ -7,6 +7,10 @@ import 'package:weft/app/providers.dart';
 import 'package:weft/app/reply_reminder_providers.dart';
 import 'package:weft/app/stores.dart';
 import 'package:weft/features/settings/reply_reminders_screen.dart';
+import 'package:weft/services/notifications/notification_actions.dart';
+import 'package:weft/services/notifications/notification_channels.dart';
+import 'package:weft/services/notifications/notification_presentation.dart';
+import 'package:weft/services/notifications/notification_service.dart';
 import 'package:weft/services/notifications/reply_reminders.dart';
 import 'package:weft_design/weft_design.dart';
 import 'package:weft_domain/weft_domain.dart';
@@ -24,9 +28,12 @@ void main() {
     String title = 'Grace',
     bool isOwn = false,
     String eventId = r'$1',
+    String? contactId,
+    Duration age = const Duration(minutes: 5),
   }) => Chat(
     id: id,
     title: title,
+    contactId: contactId,
     sources: [ChatSource(roomId: id, network: ChatNetwork.signal)],
     lastMessage: WeftMessage(
       eventId: eventId,
@@ -34,7 +41,7 @@ void main() {
       network: ChatNetwork.signal,
       senderId: isOwn ? '@me:example.org' : '@grace:example.org',
       senderName: isOwn ? 'Me' : 'Grace',
-      timestamp: now.subtract(const Duration(minutes: 5)),
+      timestamp: now.subtract(age),
       kind: MessageKind.text,
       isOwn: isOwn,
       body: 'are you coming?',
@@ -115,7 +122,9 @@ void main() {
       // The first one has fired by the time the user answers.
       final later = now.add(kDefaultReplyReminderInterval * 1.5);
       await withClock(Clock.fixed(later), () => reminders.onChats([dm()]));
-      expect(poster.queued, hasLength(kReplyRemindersPerChat + 1));
+      // Still one: the fired reminder is moved under its own id, so the one
+      // in the shade is replaced by the next rather than joined by it.
+      expect(poster.queued, hasLength(1));
 
       await withClock(
         Clock.fixed(later),
@@ -167,6 +176,97 @@ void main() {
         () => reminders.onChats([dm(eventId: r'$3')]),
       );
       expect(poster.queued, isNotEmpty);
+    });
+
+    test('a person in several chats is one notification', () async {
+      final reminders = service();
+      List<Chat> grace({String? telegram}) => [
+        dm(
+          id: '!wa:x',
+          eventId: r'$wa',
+          contactId: 'grace',
+          age: const Duration(minutes: 30),
+        ),
+        dm(
+          id: '!signal:x',
+          eventId: r'$signal',
+          contactId: 'grace',
+          age: const Duration(minutes: 20),
+        ),
+        dm(
+          id: '!tg:x',
+          eventId: telegram ?? r'$tg',
+          contactId: 'grace',
+          age: telegram == null ? const Duration(minutes: 10) : Duration.zero,
+        ),
+      ];
+      await withClock(Clock.fixed(now), () => reminders.onChats(grace()));
+      expect(poster.queued, hasLength(1));
+      final first = poster.queued.values.single;
+
+      // A new message from her, read: the same notification is moved, not a
+      // second one queued beside it.
+      final later = now.add(const Duration(hours: 1));
+      await withClock(
+        Clock.fixed(later),
+        () => reminders.onChats(grace(telegram: r'$tg_2')),
+      );
+      expect(poster.queued, hasLength(1));
+      final moved = poster.queued.values.single;
+      expect(moved.payload.eventId, r'$tg_2');
+      expect(moved.at, later.add(kDefaultReplyReminderInterval));
+      expect(moved.id, first.id);
+    });
+
+    test('stopping from the shade works with no inbox', () async {
+      // The UI queued it; then Sennit was closed.
+      await withClock(Clock.fixed(now), () => service().onChats([dm()]));
+      expect(poster.queued, hasLength(1));
+
+      // The background engine: a fresh process, no chats, only the store.
+      final background = _FakePoster()..queued.addAll(poster.queued);
+      final result = await withClock(
+        Clock.fixed(now),
+        () => stopReplyReminderHeadless(
+          NotificationActivation(
+            actionId: WeftNotificationActions.stopReplyReminder,
+            payload: poster.queued.values.single.payload,
+          ),
+          store: () async => stores.settings,
+          poster: background,
+        ),
+      );
+      expect(result, NotificationActionResult.remindersStopped);
+      expect(background.queued, isEmpty);
+
+      // And when the app runs again, the message is still dismissed.
+      poster.queued.clear();
+      await withClock(Clock.fixed(now), () => service().onChats([dm()]));
+      expect(poster.queued, isEmpty);
+      // Until something new arrives.
+      await withClock(
+        Clock.fixed(now),
+        () => service().onChats([dm(eventId: r'$2')]),
+      );
+      expect(poster.queued, hasLength(1));
+    });
+
+    test('stopping from the shade without a chat does nothing', () async {
+      final result = await stopReplyReminderHeadless(
+        NotificationActivation(
+          actionId: WeftNotificationActions.stopReplyReminder,
+          payload: const NotificationPayload(
+            link: '',
+            chatId: '',
+            roomId: '',
+            eventId: '',
+            network: ChatNetwork.unknown,
+          ),
+        ),
+        store: () async => stores.settings,
+        poster: poster,
+      );
+      expect(result, NotificationActionResult.ignored);
     });
 
     test('a new process queues everything again', () async {

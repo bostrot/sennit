@@ -26,7 +26,9 @@ import '../billing/entitlements.dart';
 import '../status/status_feed.dart' show isStatusBroadcastChat;
 import 'background_actions.dart';
 import 'notification_actions.dart';
+import 'notification_channels.dart' show WeftNotificationActions;
 import 'notification_service.dart';
+import 'reply_reminders.dart';
 import 'reply_suggester.dart';
 import '../schedule/scheduled_actions.dart';
 
@@ -178,6 +180,18 @@ Future<void> runBackgroundNotificationAction(
 
   if (await forwardNotificationAction(activation) != null) return;
 
+  // Stopping a reply reminder needs no session: the ledger and the queue are
+  // in the settings store. Booting a Matrix client for it would make every
+  // tap from the shade a slow one.
+  if (activation.actionId == WeftNotificationActions.stopReplyReminder) {
+    final result = await stopReplyReminderHeadless(
+      activation,
+      store: () async => (await _openStores()).settings,
+    );
+    debugPrint('weft: background notification action: ${result.name}');
+    return;
+  }
+
   await _service();
   final actions = _bootedActions;
   if (actions == null) return;
@@ -196,10 +210,17 @@ NotificationActionHandler? _bootedActions;
 /// the process lives long enough to receive.
 Future<WeftNotificationService?>? _boot;
 
+/// The stores, opened once per background process.
+Future<WeftStores>? _stores;
+
+Future<WeftStores> _openStores() => _stores ??= () {
+  DartPluginRegistrant.ensureInitialized();
+  return WeftStores.open();
+}();
+
 Future<WeftNotificationService?> _service() => _boot ??= () async {
   try {
-    DartPluginRegistrant.ensureInitialized();
-    final stores = await WeftStores.open();
+    final stores = await _openStores();
     final session = WeftMatrixSession();
     _bootedSession = session;
     final state = await session.initialize();

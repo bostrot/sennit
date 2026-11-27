@@ -280,18 +280,24 @@ List<AndroidNotificationChannel> weftNotificationChannels() {
 
 /// The one action a reply reminder carries on Android.
 ///
-/// `showsUserInterface: true`: the reminder ledger and its scheduler live in
-/// the UI isolate, which a headless action could not reach with the app
-/// closed. No semantic action either, on purpose — a reminder is Sennit
-/// talking, not a person, so it is posted without `MessagingStyle` and stays
-/// off Android Auto, which reads only conversations, and off CarPlay, which
-/// announces only messages.
+/// `showsUserInterface: false`: stopping is something a user does from the
+/// shade *instead* of opening Sennit, one reminder after another, and an
+/// action that brought the app up each time would defeat it. The broadcast
+/// reaches `runBackgroundNotificationAction`, which hands it to the UI isolate
+/// when it is alive and otherwise records the dismissal in the settings store
+/// and cancels the reminder itself — the ledger and the queue live there, so
+/// that needs no session. The tapped notification is taken down at once.
+///
+/// No semantic action, on purpose — a reminder is Sennit talking, not a
+/// person, so it is posted without `MessagingStyle` and stays off Android
+/// Auto, which reads only conversations, and off CarPlay, which announces
+/// only messages.
 List<AndroidNotificationAction> weftAndroidReplyReminderActions() => [
   AndroidNotificationAction(
     WeftNotificationActions.stopReplyReminder,
     weftPlatformL10n().notificationActionStopReminding,
-    showsUserInterface: true,
-    cancelNotification: false,
+    showsUserInterface: false,
+    cancelNotification: true,
   ),
 ];
 
@@ -356,13 +362,11 @@ List<DarwinNotificationCategory> weftDarwinCategories() {
     DarwinNotificationCategory(
       kReplyReminderCategoryId,
       actions: [
-        // Foreground, for the reason the Android action gives: the reminder
-        // ledger is the UI isolate's, and a background engine with the app
-        // closed has no scheduler to stop.
+        // Not foreground, for the reason the Android action gives: it runs in
+        // a background engine, which needs only the settings store.
         DarwinNotificationAction.plain(
           WeftNotificationActions.stopReplyReminder,
           l10n.notificationActionStopReminding,
-          options: {DarwinNotificationActionOption.foreground},
         ),
       ],
     ),
