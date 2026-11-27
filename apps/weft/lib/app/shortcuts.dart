@@ -70,6 +70,17 @@ class JumpToLatestIntent extends Intent {
   const JumpToLatestIntent();
 }
 
+/// Leave the screen on top: a conversation opened from search, a settings
+/// page.
+///
+/// A pushed screen on a desktop has no system back gesture: the arrow in its
+/// bar was the only way out, and on a Mac the window's own buttons sit next to
+/// it. Only enabled while there is something to go back from, so on the shell
+/// itself the key carries on to whoever else wants it.
+class GoBackIntent extends Intent {
+  const GoBackIntent();
+}
+
 /// Show the list of every binding in this file.
 class ShowShortcutsIntent extends Intent {
   const ShowShortcutsIntent();
@@ -182,6 +193,18 @@ List<WeftKeyBinding> weftKeyBindings(AppL10n l10n, {bool? useMetaKey}) {
       description: l10n.shortcutsTitle,
       activators: [primary(LogicalKeyboardKey.slash)],
       intent: const ShowShortcutsIntent(),
+    ),
+    // ⌘[ is a Mac's "back" in every app with a history; Alt+← is the same
+    // everywhere else.
+    WeftKeyBinding(
+      description: l10n.commonBack,
+      activators: [
+        if (meta)
+          const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true)
+        else
+          const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true),
+      ],
+      intent: const GoBackIntent(),
     ),
     // The composer's three. Documented here, bound there — see the library
     // comment above for why they are not in the app-wide map.
@@ -637,6 +660,10 @@ class _WeftShortcutsState extends ConsumerState<WeftShortcuts> {
           ShowShortcutsIntent: WeftGuardedAction<ShowShortcutsIntent>(
             onInvoke: _showShortcuts,
           ),
+          GoBackIntent: WeftGuardedAction<GoBackIntent>(
+            onInvoke: () => unawaited(_navigator?.maybePop()),
+            enabled: () => _navigator?.canPop() ?? false,
+          ),
         },
         child: widget.child,
       ),
@@ -668,6 +695,7 @@ String _triggerLabel(LogicalKeyboardKey key) {
     return 'Enter';
   }
   if (key == LogicalKeyboardKey.escape) return 'Esc';
+  if (key == LogicalKeyboardKey.arrowLeft) return 'Arrow Left';
   if (key == LogicalKeyboardKey.arrowUp) return 'Arrow Up';
   if (key == LogicalKeyboardKey.arrowDown) return 'Arrow Down';
   if (key == LogicalKeyboardKey.pageUp) return 'Page Up';

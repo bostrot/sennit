@@ -46,7 +46,7 @@ class PushExplanationScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: const WeftAppBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsetsDirectional.fromSTEB(

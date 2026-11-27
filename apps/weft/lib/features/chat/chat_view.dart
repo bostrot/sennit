@@ -2432,7 +2432,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
       // [_chatArrivalGrace], and a full-screen spinner with no way off it is
       // not somewhere to leave someone who tapped the wrong notification.
       return Scaffold(
-        appBar: AppBar(),
+        appBar: const WeftAppBar(),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -3103,7 +3103,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   Widget _unavailableScaffold(BuildContext context, String message) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: const WeftAppBar(),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(WeftSpace.xl),
@@ -3963,7 +3963,9 @@ class _ThreadAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
+    // Pushed over the whole window: on a Mac the back arrow has to start
+    // where the traffic lights stop.
+    return WeftAppBar(
       backgroundColor: context.colors.surfaceContainerLowest,
       // One node, marked as the heading. "Bugs" and "in Design Team" read as
       // two unrelated fragments when a reader lands on them separately.
@@ -4291,27 +4293,45 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         bottom: BorderSide(color: context.palette.divider, width: 0.5),
       ),
       child: MacToolbar(
+        // Opened over the whole window — from search, a notification, a
+        // link — the bar starts under the traffic lights and has no list
+        // beside it to go back to. It keeps clear of the one and offers the
+        // other; in the shell's thread pane it is neither.
+        leadingInset: macToolbarInsetFor(context),
         leading: Consumer(
-          builder: (context, ref, _) => Semantics(
-            button: true,
-            label: context.l10n.chatContactDetails,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.basic,
-              child: GestureDetector(
-                onTap: preview ? null : () => _openProfile(context),
-                child: ExcludeSemantics(
-                  child: WeftAvatar(
-                    label: chat.title,
-                    imageUrl: chat.avatarUrl,
-                    imageHeaders: ref.watch(mediaHeadersProvider),
-                    networks: chat.networks,
-                    online: online,
-                    size: 26,
-                    semanticsLabel: '',
+          builder: (context, ref, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (macRouteCoversWindow(context)) ...[
+                MacToolbarButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  tooltip: context.l10n.commonBack,
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: WeftSpace.xs),
+              ],
+              Semantics(
+                button: true,
+                label: context.l10n.chatContactDetails,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.basic,
+                  child: GestureDetector(
+                    onTap: preview ? null : () => _openProfile(context),
+                    child: ExcludeSemantics(
+                      child: WeftAvatar(
+                        label: chat.title,
+                        imageUrl: chat.avatarUrl,
+                        imageHeaders: ref.watch(mediaHeadersProvider),
+                        networks: chat.networks,
+                        online: online,
+                        size: 26,
+                        semanticsLabel: '',
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
         // The name opens the profile as well as the face beside it: the
@@ -5901,19 +5921,21 @@ class _Composer extends StatelessWidget {
                       SmsComposerBar(body: value.text),
                 ),
               Row(
-                // Centred on a desktop, where the field is one line tall and
-                // every control beside it is 24 points: aligning to the bottom
-                // there leaves each of them sitting on a different line. A phone's
-                // field grows to five lines, and the buttons belong at its foot.
-                crossAxisAlignment: mac
-                    ? CrossAxisAlignment.center
-                    : CrossAxisAlignment.end,
+                // At the field's foot, on every surface: the field grows to
+                // five lines, and the buttons belong where the caret is when
+                // the message is done. On a Mac each control sits in a lane as
+                // tall as the field's first line (see [_macLane]), so a
+                // one-line field still has them all on one line.
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (chat.isMerged && sendNetwork != null) ...[
-                    SendNetworkChip(
-                      chat: chat,
-                      current: sendNetwork,
-                      onPick: onPickNetwork,
+                    _macLane(
+                      mac,
+                      SendNetworkChip(
+                        chat: chat,
+                        current: sendNetwork,
+                        onPick: onPickNetwork,
+                      ),
                     ),
                     const SizedBox(width: WeftSpace.sm),
                   ],
@@ -5921,24 +5943,30 @@ class _Composer extends StatelessWidget {
                   // is a popover, and it points at this button rather than
                   // dropping from the top of the window, a screen's height
                   // away from where the pointer is.
-                  Builder(
-                    builder: (button) => IconButton(
-                      icon: const Icon(Icons.add_rounded),
-                      iconSize: mac ? 17 : null,
-                      visualDensity: mac ? VisualDensity.compact : null,
-                      // Wider than the round send button on purpose. Squeezed to
-                      // 24 with no padding it stopped reading as a control at all
-                      // — a stray plus sign between the network chip and the
-                      // field, with nothing to hover.
-                      constraints: mac
-                          ? const BoxConstraints.tightFor(width: 28, height: 28)
-                          : null,
-                      padding: mac ? EdgeInsets.zero : null,
-                      tooltip: context.l10n.attachSheetTitle,
-                      // An edit replaces one event's text. There is no such thing
-                      // as editing a message into a photo, so the picker is closed
-                      // rather than left to fail somewhere further down.
-                      onPressed: editing ? null : () => onAttach(button),
+                  _macLane(
+                    mac,
+                    Builder(
+                      builder: (button) => IconButton(
+                        icon: const Icon(Icons.add_rounded),
+                        iconSize: mac ? 17 : null,
+                        visualDensity: mac ? VisualDensity.compact : null,
+                        // Wider than the round send button on purpose. Squeezed to
+                        // 24 with no padding it stopped reading as a control at all
+                        // — a stray plus sign between the network chip and the
+                        // field, with nothing to hover.
+                        constraints: mac
+                            ? const BoxConstraints.tightFor(
+                                width: 28,
+                                height: 28,
+                              )
+                            : null,
+                        padding: mac ? EdgeInsets.zero : null,
+                        tooltip: context.l10n.attachSheetTitle,
+                        // An edit replaces one event's text. There is no such thing
+                        // as editing a message into a photo, so the picker is closed
+                        // rather than left to fail somewhere further down.
+                        onPressed: editing ? null : () => onAttach(button),
+                      ),
                     ),
                   ),
                   Expanded(
@@ -6008,6 +6036,12 @@ class _Composer extends StatelessWidget {
                                 minLines: 1,
                                 maxLines: 5,
                                 textDirection: textDirectionOf(value.text),
+                                // Centred in the taller Mac line rather than
+                                // stuck to its top, where a multi-line field
+                                // puts the caret by default.
+                                textAlignVertical: mac
+                                    ? TextAlignVertical.center
+                                    : null,
                                 // Kept for a soft keyboard, which sends no key
                                 // events at all: on a phone this is still what puts
                                 // a send glyph on the return key and what fires
@@ -6020,6 +6054,22 @@ class _Composer extends StatelessWidget {
                                     sendNetwork,
                                   ),
                                   isDense: true,
+                                  // The Mac theme's 6-point padding is a form
+                                  // field's, and left the one place a message
+                                  // is written 23 points tall — a search box,
+                                  // not a composer. One line is
+                                  // [_macComposerLine] tall, like Messages.
+                                  contentPadding: mac
+                                      ? const EdgeInsets.symmetric(
+                                          horizontal: WeftSpace.md,
+                                          vertical: WeftSpace.sm,
+                                        )
+                                      : null,
+                                  constraints: mac
+                                      ? const BoxConstraints(
+                                          minHeight: _macComposerLine,
+                                        )
+                                      : null,
                                 ),
                               ),
                             ),
@@ -6033,52 +6083,57 @@ class _Composer extends StatelessWidget {
                   // is the microphone; the first typed character turns it into
                   // send. Listening to the controller keeps the swap in step
                   // with typing without rebuilding the whole composer.
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: controller,
-                    builder: (context, value, _) {
-                      final showMic =
-                          !editing &&
-                          onRecordVoice != null &&
-                          value.text.trim().isEmpty;
-                      if (showMic) {
-                        return IconButton.filled(
-                          onPressed: onRecordVoice,
-                          iconSize: mac ? 13 : 18,
-                          visualDensity: mac ? VisualDensity.compact : null,
-                          constraints: mac ? _macButton : null,
-                          padding: mac ? EdgeInsets.zero : null,
-                          icon: const Icon(Icons.mic_rounded),
-                          tooltip: context.l10n.chatRecordVoice,
-                        );
-                      }
-                      // A press on Send sends, however long it is held.
-                      // Holding it used to open the scheduler's date picker,
-                      // and half a second is not a deliberate act: a slow
-                      // press, a thumb that lingered, a click on a busy
-                      // machine all landed in a calendar with the message
-                      // unsent. Scheduling is "Send later" in the attach
-                      // menu, where it has a name.
-                      return Tooltip(
-                        message: editing
-                            ? context.l10n.chatSaveEdit
-                            : context.l10n.commonSend,
-                        // Hover shows it; a hold does not. A `Tooltip` claims
-                        // long presses by default and would win the press
-                        // from the button under it — the label would appear
-                        // and nothing would be sent.
-                        triggerMode: TooltipTriggerMode.manual,
-                        child: IconButton.filled(
-                          onPressed: onSend,
-                          iconSize: mac ? 13 : 18,
-                          visualDensity: mac ? VisualDensity.compact : null,
-                          constraints: mac ? _macButton : null,
-                          padding: mac ? EdgeInsets.zero : null,
-                          icon: Icon(
-                            editing ? Icons.check_rounded : Icons.send_rounded,
+                  _macLane(
+                    mac,
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: controller,
+                      builder: (context, value, _) {
+                        final showMic =
+                            !editing &&
+                            onRecordVoice != null &&
+                            value.text.trim().isEmpty;
+                        if (showMic) {
+                          return IconButton.filled(
+                            onPressed: onRecordVoice,
+                            iconSize: mac ? 13 : 18,
+                            visualDensity: mac ? VisualDensity.compact : null,
+                            constraints: mac ? _macButton : null,
+                            padding: mac ? EdgeInsets.zero : null,
+                            icon: const Icon(Icons.mic_rounded),
+                            tooltip: context.l10n.chatRecordVoice,
+                          );
+                        }
+                        // A press on Send sends, however long it is held.
+                        // Holding it used to open the scheduler's date picker,
+                        // and half a second is not a deliberate act: a slow
+                        // press, a thumb that lingered, a click on a busy
+                        // machine all landed in a calendar with the message
+                        // unsent. Scheduling is "Send later" in the attach
+                        // menu, where it has a name.
+                        return Tooltip(
+                          message: editing
+                              ? context.l10n.chatSaveEdit
+                              : context.l10n.commonSend,
+                          // Hover shows it; a hold does not. A `Tooltip` claims
+                          // long presses by default and would win the press
+                          // from the button under it — the label would appear
+                          // and nothing would be sent.
+                          triggerMode: TooltipTriggerMode.manual,
+                          child: IconButton.filled(
+                            onPressed: onSend,
+                            iconSize: mac ? 13 : 18,
+                            visualDensity: mac ? VisualDensity.compact : null,
+                            constraints: mac ? _macButton : null,
+                            padding: mac ? EdgeInsets.zero : null,
+                            icon: Icon(
+                              editing
+                                  ? Icons.check_rounded
+                                  : Icons.send_rounded,
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -6656,6 +6711,23 @@ class _CalendarInviteContent extends StatelessWidget {
 /// `IconButton` sizes itself from a 48dp tap target, which is a thumb. Nothing
 /// on this surface is pressed with a thumb, and a 34pt circle beside a 24pt
 /// field is the composer's loudest remaining phone tell.
+/// How tall the Mac composer's field is on one line, and so the lane each
+/// control beside it is centred in.
+const double _macComposerLine = 36;
+
+/// [child] centred in a lane as tall as the composer's first line, on a Mac.
+///
+/// The row is aligned to its foot, which is right once the field has grown
+/// and wrong for a 24-point button next to a 36-point field: it sat on the
+/// field's bottom edge. Centred in the lane it lines up with the text, and
+/// still stays at the foot as the field grows.
+Widget _macLane(bool mac, Widget child) => mac
+    ? SizedBox(
+        height: _macComposerLine,
+        child: Center(child: child),
+      )
+    : child;
+
 const BoxConstraints _macButton = BoxConstraints.tightFor(
   width: 24,
   height: 24,
