@@ -42,7 +42,7 @@ Future<void> scrollToLatest(
 
 /// The round button over the bottom corner of a conversation that returns to
 /// the newest message, shown only while [visible] says the reader has scrolled
-/// away from it.
+/// away from it, with a count of what [arrived] since they did.
 ///
 /// Absent rather than transparent when hidden: a control nobody can see must
 /// not be something a screen reader lands on or Tab stops at.
@@ -50,10 +50,16 @@ class JumpToLatestButton extends StatelessWidget {
   const JumpToLatestButton({
     super.key,
     required this.visible,
+    required this.arrived,
     required this.onPressed,
   });
 
   final ValueListenable<bool> visible;
+
+  /// Messages that arrived at the bottom while the reader was away; a badge
+  /// on the button while it is above zero.
+  final ValueListenable<int> arrived;
+
   final VoidCallback onPressed;
 
   @override
@@ -69,18 +75,70 @@ class JumpToLatestButton extends StatelessWidget {
           child: ScaleTransition(scale: animation, child: child),
         ),
         child: visible
-            ? Material(
-                elevation: 3,
-                shape: const CircleBorder(),
-                color: context.colors.surfaceContainerHigh,
-                child: IconButton(
-                  tooltip: context.l10n.chatJumpToLatest,
-                  icon: const Icon(Icons.keyboard_arrow_down),
-                  onPressed: onPressed,
-                ),
+            ? ValueListenableBuilder<int>(
+                valueListenable: arrived,
+                builder: (context, count, _) => _button(context, count),
               )
             : const SizedBox.shrink(),
       ),
+    );
+  }
+
+  Widget _button(BuildContext context, int count) {
+    final l10n = context.l10n;
+    final button = Material(
+      elevation: 3,
+      shape: const CircleBorder(),
+      color: context.colors.surfaceContainerHigh,
+      child: IconButton(
+        // The count is part of the name, so a screen reader hears why the
+        // button is worth pressing; the badge itself is not read again.
+        tooltip: count > 0
+            ? semanticsSentence([
+                l10n.chatJumpToLatest,
+                l10n.chatNewMessagesBelow(count),
+              ])
+            : l10n.chatJumpToLatest,
+        icon: const Icon(Icons.keyboard_arrow_down),
+        onPressed: onPressed,
+      ),
+    );
+    // A stack even without a count, so the first arrival adds the badge
+    // beside the button instead of rebuilding it — which would take keyboard
+    // focus off it the moment a message lands.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        button,
+        if (count > 0)
+          // Over the button's top corner, the way a count sits on an app icon,
+          // so it reads as belonging to the button without covering the arrow.
+          // Lifted by a share of its own height, which grows with the text, but
+          // held to the button's edge sideways: a wide "12" pushed out past it
+          // would leave the screen on a phone. Its growth with the text is
+          // capped too — at 2.0× an uncapped badge is as wide as the button and
+          // hides the arrow it labels — and the number is in the button's name
+          // for anyone who needs it larger still.
+          PositionedDirectional(
+            top: 0,
+            end: -WeftSpace.xs,
+            child: FractionalTranslation(
+              translation: const Offset(0, -0.4),
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: MediaQuery.withClampedTextScaling(
+                    maxScaleFactor: 1.4,
+                    child: WeftUnreadBadge(
+                      count: count,
+                      color: context.palette.unreadDot,
+                      ink: context.colors.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

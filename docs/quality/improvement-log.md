@@ -23,6 +23,8 @@ and what was noticed but not done.
 
 - 2026-11-26 · Localization · File sizes use the reader's decimal mark ("2,4 MB" in German, Spanish, French and Portuguese) in file bubbles, upload progress, the attach preview, the media viewer, the share sheet, the backup screen and the "too large" error · https://github.com/bostrot/sennit/pull/82
 
+- 2026-11-27 · User experience · The jump-to-latest button counts the messages that arrived while you were scrolled up, as a badge and in its spoken name · https://github.com/bostrot/sennit/pull/94
+
 ## Lessons from reviews
 
 - 2026-11-16 · First run: there were no earlier `daily-improvement` pull
@@ -75,9 +77,22 @@ and what was noticed but not done.
   quietly falls back to English and a localisation test passes or fails
   for the wrong reason.
 
+- 2026-11-27 · #82 merged with no review comments; nothing closed
+  unmerged, no issues open. A full local `flutter test` rewrites the store
+  screenshots and `docs/images` (the `test/tools/` tests write them), and
+  `dart format` with the newer local Flutter reformats files CI leaves
+  alone: check `git status` after a full run and restore everything that
+  isn't the change. To make an open chat re-read its timeline in a test,
+  emit on `watchChats` (the real sync path, works on every surface) rather
+  than reacting to a bubble, which the Mac surface does not open a sheet for.
+
 ## Ideas backlog
 
-- **Count what arrived while scrolled up.** The jump-to-latest button knows
+- ~~**Count what arrived while scrolled up.**~~ Done 2026-11-27 (own
+  messages from another device do not count). Left out: the count is not
+  kept when the reader leaves the chat and comes back; the unread divider
+  below would cover that.
+  Was: The jump-to-latest button knows
   the reader is away from the bottom but not that anything new landed there.
   A small `UnreadBadge` on it for messages that arrived since they scrolled up
   is the natural second half. Where: `_syncRefresh` / `_announceIncoming` in
@@ -196,3 +211,9 @@ and what was noticed but not done.
   by `share_target_sheet.dart`. Turning them into a small value (name,
   reason, size, limit) that the sheet words through `context.l10n` — the way
   `UploadRejection` already works — would localise them and their sizes.
+- **The unread badge reads "+99" in Arabic and the other RTL layouts.**
+  `WeftUnreadBadge` draws `'99+'` as plain text, so the bidi algorithm puts
+  the `+` on the left in a right-to-left locale (seen on the jump-to-latest
+  button, and the inbox rows use the same widget). Wrapping it in a
+  left-to-right isolate (`\u2066…\u2069`) or `Directionality(ltr)` around
+  the digits, with a widget test in `ar`, is probably the whole fix.

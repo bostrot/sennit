@@ -264,6 +264,15 @@ class _ChatViewState extends ConsumerState<ChatView> {
   /// depends on it.
   final _awayFromLatest = ValueNotifier<bool>(false);
 
+  /// Messages from others that landed at the bottom while the reader was up
+  /// in the history — the count on the jump-to-latest button, so the reader
+  /// knows there is something to go back down for. Cleared once they are
+  /// back near the newest message, where they can see the arrivals.
+  final _arrivedWhileAway = ValueNotifier<int>(0);
+
+  /// The newest drawn message [_arrivedWhileAway] has counted up to.
+  String? _countedEventId;
+
   /// Keys for built bubbles, so a jump can scroll to one that is on screen.
   final Map<String, GlobalKey> _messageKeys = {};
 
@@ -683,6 +692,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
     _composer.dispose();
     _scroll.dispose();
     _awayFromLatest.dispose();
+    _arrivedWhileAway.dispose();
     _presence.dispose();
     _peerReceipts.dispose();
     _searchDebounce?.cancel();
@@ -699,7 +709,33 @@ class _ChatViewState extends ConsumerState<ChatView> {
 
   void _onScrolled() {
     if (!_scroll.hasClients) return;
-    _awayFromLatest.value = isAwayFromLatest(_scroll.position);
+    final away = isAwayFromLatest(_scroll.position);
+    _awayFromLatest.value = away;
+    if (!away) _arrivedWhileAway.value = 0;
+  }
+
+  /// Adds to [_arrivedWhileAway] what is new at the bottom of [drawn] since
+  /// the last frame, while the reader is away from it.
+  ///
+  /// Counted from what the list draws rather than from the timeline: a reply
+  /// folded into a thread, or a message the user hid, never appears at the
+  /// bottom, so a number promising it would send them down for nothing. The
+  /// user's own messages — sent from another device — are not news to them.
+  ///
+  /// `drawn` is newest-first, matching the reversed list.
+  void _countArrivals(List<WeftMessage> drawn) {
+    final newest = drawn.firstOrNull;
+    if (newest == null) return;
+    final previous = _countedEventId;
+    _countedEventId = newest.eventId;
+    if (previous == null || previous == newest.eventId) return;
+    if (!_awayFromLatest.value) return;
+    final seen = drawn.indexWhere((m) => m.eventId == previous);
+    // The old newest is gone — deleted and hidden, or the list was replaced.
+    // Nothing says how much arrived, and a guess too high is worse than none.
+    if (seen < 0) return;
+    final fresh = drawn.take(seen).where((m) => !m.isOwn).length;
+    if (fresh > 0) _arrivedWhileAway.value += fresh;
   }
 
   Future<void> _open() async {
@@ -718,6 +754,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // newest message of the chat they just *opened* would be announced as one
     // that had arrived.
     _announcedEventId = null;
+    // Per conversation too: the count was the last chat's news.
+    _countedEventId = null;
+    _arrivedWhileAway.value = 0;
     final chatId = _chatId;
     _timelineChatId = chatId;
     final repository = ref.read(chatRepositoryProvider);
@@ -2428,7 +2467,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
     // and a build is not the place to make one, and the message being announced
     // has to be on screen by the time a reader goes looking for it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _announceIncoming(_view.messages, merged: chat.isMerged);
+      if (!mounted) return;
+      _announceIncoming(_view.messages, merged: chat.isMerged);
+      _countArrivals(visible);
     });
 
     return Scaffold(
@@ -2527,6 +2568,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                       // out at the edge of the glass.
                       overlay: JumpToLatestButton(
                         visible: _awayFromLatest,
+                        arrived: _arrivedWhileAway,
                         onPressed: _jumpToLatest,
                       ),
                       child: _selectableMessages(

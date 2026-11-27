@@ -424,6 +424,7 @@
   "chatConfirmLinkTitle": "Abrir este link?",
   "chatConfirmLinkBody": "O texto deste link não corresponde ao destino dele.",
   "chatJumpToLatest": "Ir para as mais recentes",
+  "chatNewMessagesBelow": "{count, plural, =1{1 mensagem nova} other{{count} mensagens novas}}",
   "chatLoadingOlder": "Carregando mensagens anteriores",
   "chatLoadOlder": "Carregar mensagens anteriores",
   "chatBeginningOfConversation": "Início da conversa",

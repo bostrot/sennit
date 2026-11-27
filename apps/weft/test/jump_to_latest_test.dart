@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,11 +52,13 @@ void main() {
     WeftSurface surface = WeftSurface.touch,
     double textScale = 1,
     bool reduceMotion = false,
+    SeededChatRepository? seeded,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final repository = SeededChatRepository(demo, messages: history(messages));
+    final repository =
+        seeded ?? SeededChatRepository(demo, messages: history(messages));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [chatRepositoryProvider.overrideWithValue(repository)],
@@ -206,6 +210,109 @@ void main() {
         ),
       };
 
+  WeftMessage arrival(int n, {bool isOwn = false}) => seededMessage(
+    eventId: '\$new$n',
+    body: 'new $n',
+    isOwn: isOwn,
+    minutesAgo: -n,
+  );
+
+  Finder badge() => find.descendant(
+    of: find.byType(JumpToLatestButton),
+    matching: find.byType(WeftUnreadBadge),
+  );
+
+  group('counts what arrived while scrolled up', () {
+    testWidgets("on the button, without the reader's own messages", (
+      tester,
+    ) async {
+      final repository = _SyncingRepository(demo, messages: history(60));
+      await pumpChat(tester, seeded: repository);
+      await scrollUp(tester, 600);
+      await scrollUp(tester, 600);
+      expect(badge(), findsNothing);
+
+      repository
+        ..arrive(arrival(1))
+        ..arrive(arrival(2, isOwn: true))
+        ..arrive(arrival(3));
+      repository.sync();
+      await tester.pumpAndSettle();
+
+      expect(find.text('2'), findsOneWidget);
+      expect(badge(), findsOneWidget);
+      // Said as well as drawn: the badge is a number only a sighted reader
+      // gets, so the button's name carries it.
+      expect(find.byTooltip('$tooltip, 2 new messages'), findsOneWidget);
+
+      repository.arrive(arrival(4));
+      repository.sync();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('$tooltip, 3 new messages'), findsOneWidget);
+    });
+
+    testWidgets('and forgets it once back at the newest message', (
+      tester,
+    ) async {
+      final repository = _SyncingRepository(demo, messages: history(60));
+      await pumpChat(tester, seeded: repository);
+      await scrollUp(tester, 600);
+      await scrollUp(tester, 600);
+      repository.arrive(arrival(1));
+      repository.sync();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('$tooltip, 1 new message'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('$tooltip, 1 new message'));
+      await tester.pumpAndSettle();
+      expect(find.text('new 1', findRichText: true), findsOneWidget);
+
+      // Up again: what arrived before is no longer news.
+      await scrollUp(tester, 600);
+      await scrollUp(tester, 600);
+      expect(find.byTooltip(tooltip), findsOneWidget);
+      expect(badge(), findsNothing);
+    });
+
+    testWidgets('without taking keyboard focus off the button', (tester) async {
+      final repository = _SyncingRepository(demo, messages: history(60));
+      await pumpChat(tester, seeded: repository);
+      await scrollUp(tester, 600);
+      await scrollUp(tester, 600);
+      Focus.of(
+        tester.element(find.byIcon(Icons.keyboard_arrow_down)),
+      ).requestFocus();
+      await tester.pump();
+
+      repository.arrive(arrival(1));
+      repository.sync();
+      await tester.pumpAndSettle();
+
+      expect(badge(), findsOneWidget);
+      final focused = FocusManager.instance.primaryFocus?.context;
+      expect(focused, isNotNull);
+      expect(
+        focused!.findAncestorWidgetOfExactType<JumpToLatestButton>(),
+        isNotNull,
+      );
+    });
+
+    testWidgets('but not what arrived while the newest was in view', (
+      tester,
+    ) async {
+      final repository = _SyncingRepository(demo, messages: history(60));
+      await pumpChat(tester, seeded: repository);
+      repository.arrive(arrival(1));
+      repository.sync();
+      await tester.pumpAndSettle();
+
+      await scrollUp(tester, 600);
+      await scrollUp(tester, 600);
+      expect(find.byTooltip(tooltip), findsOneWidget);
+      expect(badge(), findsNothing);
+    });
+  });
+
   for (final MapEntry(key: name, value: layout) in layouts.entries) {
     testWidgets('sits inside the timeline and works on a $name', (
       tester,
@@ -232,5 +339,50 @@ void main() {
       expect(position(tester).pixels, 0);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('keeps its count inside the timeline on a $name', (
+      tester,
+    ) async {
+      final repository = _SyncingRepository(demo, messages: history(60));
+      await pumpChat(
+        tester,
+        seeded: repository,
+        size: layout.size,
+        surface: layout.surface,
+        brightness: layout.brightness,
+        textScale: layout.scale,
+      );
+      await scrollUp(tester, layout.size.height);
+      await scrollUp(tester, layout.size.height);
+      for (var n = 1; n <= 12; n++) {
+        repository.arrive(arrival(n));
+      }
+      repository.sync();
+      await tester.pumpAndSettle();
+
+      expect(find.text('12'), findsOneWidget);
+      final count = tester.getRect(badge());
+      final timeline = tester.getRect(find.byType(ListView));
+      expect(timeline.contains(count.topLeft), isTrue);
+      expect(timeline.contains(count.bottomRight), isTrue);
+      expect(tester.takeException(), isNull);
+    });
   }
+}
+
+/// A chat that can be told a sync happened, the way the app learns that
+/// something arrived: the chat list emits, and the open conversation re-reads
+/// its timeline.
+class _SyncingRepository extends GrowingChatRepository {
+  _SyncingRepository(super.inner, {required super.messages});
+
+  final _syncs = StreamController<List<Chat>>.broadcast();
+
+  @override
+  Stream<List<Chat>> watchChats() async* {
+    yield [chat];
+    yield* _syncs.stream;
+  }
+
+  void sync() => _syncs.add([chat]);
 }

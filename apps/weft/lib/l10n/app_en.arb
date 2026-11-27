@@ -2465,6 +2465,18 @@
     "description": "Tooltip and screen-reader label of the round arrow button that appears over a conversation once the reader has scrolled up into older messages. Pressing it scrolls back down to the newest message. Keep under ~28 chars.",
     "maxLength": 40
   },
+  "chatNewMessagesBelow": "{count, plural, =1{1 new message} other{{count} new messages}}",
+  "@chatNewMessagesBelow": {
+    "description": "Read by a screen reader and shown as a tooltip after \"Jump to latest\" when messages arrived at the bottom of a conversation while the reader was scrolled up in older messages. The button also shows the number as a badge. Keep under ~24 chars.",
+    "maxLength": 32,
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "description": "How many messages from others arrived since the reader scrolled up. Always one or more.",
+        "example": "3"
+      }
+    }
+  },
   "chatLoadOlder": "Load older messages",
   "@chatLoadOlder": {
     "description": "Button at the top of the timeline that fetches more history from the server. Keep under ~26 chars.",
