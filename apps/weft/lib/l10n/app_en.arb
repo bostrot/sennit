@@ -1608,6 +1608,11 @@
     "description": "Label and tooltip of the chip at the end of the reaction row that opens the emoji picker. It is the one chip with no text in it. Keep under ~18 chars.",
     "maxLength": 36
   },
+  "reactionCustomEmoji": "Custom emoji",
+  "@reactionCustomEmoji": {
+    "description": "Shown and read aloud in place of a custom emoji — a reaction that is a small picture from someone's image pack, not a character — in the reaction chip, the list of who reacted, and screen-reader labels.",
+    "maxLength": 30
+  },
   "reactionPeopleCount": "{count, plural, =1{1 person} other{{count} people}}",
   "@reactionPeopleCount": {
     "description": "Heading of the sheet listing who reacted with one emoji, above their names.",

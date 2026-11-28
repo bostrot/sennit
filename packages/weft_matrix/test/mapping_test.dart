@@ -1322,6 +1322,49 @@ void main() {
         );
       });
 
+      test('a custom emoji is named by its shortcode, never its URI', () {
+        sdk.Event custom(Map<String, Object?> extra) => event(
+          type: sdk.EventTypes.Reaction,
+          eventId: r'$custom:example.org',
+          senderId: '@sam:example.org',
+          content: {
+            'm.relates_to': {
+              'rel_type': 'm.annotation',
+              'event_id': r'$mine:example.org',
+              'key': 'mxc://sosnowkadub.de/oqtPprznzrRiQzEJntyYIzUw',
+            },
+            ...extra,
+          },
+        );
+        String? keyOf(sdk.Event reaction) => mapReactionNotice(
+          reaction,
+          target: own(),
+          network: ChatNetwork.matrix,
+          ownUserId: '@ada:example.org',
+        )!.reactionKey;
+
+        expect(keyOf(custom({'shortcode': ':blobcat:'})), ':blobcat:');
+        expect(
+          keyOf(custom({'com.beeper.reaction.shortcode': 'party'})),
+          ':party:',
+        );
+        expect(keyOf(custom({})), kImageReactionStandIn);
+        expect(
+          mapReactionPreview(
+            custom({}),
+            target: own(),
+            network: ChatNetwork.matrix,
+            ownUserId: '@ada:example.org',
+          )!.reactionKey,
+          kImageReactionStandIn,
+        );
+        // The tally keeps the URI: reacting with it again sends the same key.
+        expect(
+          mapReaction(custom({}))!.key,
+          'mxc://sosnowkadub.de/oqtPprznzrRiQzEJntyYIzUw',
+        );
+      });
+
       test('a target that could not be fetched is not a notice', () {
         expect(
           mapReactionNotice(

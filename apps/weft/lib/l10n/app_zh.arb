@@ -282,6 +282,7 @@
   "reactionCount": "{count}",
   "reactionSeeWhoHint": "查看谁回应了",
   "reactionAdd": "添加回应",
+  "reactionCustomEmoji": "自定义表情",
   "reactionPeopleCount": "{count, plural, other{{count} 人}}",
   "richListMarker": "{number}.",
   "richCodeBlock": "代码块",

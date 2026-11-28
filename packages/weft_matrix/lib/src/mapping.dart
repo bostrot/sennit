@@ -592,6 +592,24 @@ ReactionEvent? mapReaction(sdk.Event event) {
   );
 }
 
+/// The reaction [key] as words for a line of text: itself when it is an emoji,
+/// and for a custom emoji (see `isImageReactionKey`) the shortcode its sender
+/// attached — `:blobcat:` — or [kImageReactionStandIn] when there is none.
+///
+/// Only for the inbox and notification previews, which carry the key to show
+/// it and do nothing else with it. The tallies keep the URI: reacting with the
+/// same picture again has to send the same key.
+String reactionKeyText(Map<String, Object?> content, String key) {
+  if (!isImageReactionKey(key)) return key;
+  for (final field in const ['shortcode', 'com.beeper.reaction.shortcode']) {
+    final value = content[field];
+    if (value is! String) continue;
+    final name = value.trim().replaceAll(RegExp(r'^:+|:+$'), '');
+    if (name.isNotEmpty) return ':$name:';
+  }
+  return kImageReactionStandIn;
+}
+
 /// Turns a reaction to one of the user's own messages into something the
 /// notification rules can decide on, or null when it is not one.
 ///
@@ -627,7 +645,7 @@ WeftMessage? mapReactionNotice(
     timestamp: reaction.originServerTs,
     kind: reactedTo.kind,
     isOwn: false,
-    reactionKey: annotation.key,
+    reactionKey: reactionKeyText(reaction.content, annotation.key),
     replyToEventId: target.eventId,
     body: reactedTo.body,
     formattedBody: reactedTo.formattedBody,
@@ -752,7 +770,7 @@ WeftMessage? mapReactionPreview(
     timestamp: reaction.originServerTs,
     kind: readable ? reactedTo.kind : MessageKind.text,
     isOwn: reaction.senderId == ownUserId,
-    reactionKey: annotation.key,
+    reactionKey: reactionKeyText(reaction.content, annotation.key),
     body: readable ? reactedTo.body : '',
     transcript: readable ? reactedTo.transcript : null,
   );

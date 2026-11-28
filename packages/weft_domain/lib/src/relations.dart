@@ -89,6 +89,20 @@ class ReactionTally {
       'ReactionTally($key ×$count${byLocalUser ? ', mine' : ''})';
 }
 
+/// Whether [key] is a custom emoji: a picture, not a character.
+///
+/// MSC4027 reactions — Element, Cinny, FluffyChat's image packs — put the
+/// picture's `mxc://` URI where the emoji would go. Drawn as text it is a
+/// server name and forty random letters, which is what the long-press row
+/// showed for a reader who had once tapped someone's custom-emoji chip: the
+/// URI went into the recents, from there into the quick row, and wrapped the
+/// row round it. Every place that draws a key asks this first.
+bool isImageReactionKey(String key) => key.trim().startsWith('mxc://');
+
+/// What stands for an image reaction where only text fits — an inbox line, a
+/// notification — when the sender gave it no shortcode.
+const String kImageReactionStandIn = '🖼️';
+
 /// One version of a message body, for the edit-history sheet.
 @immutable
 class EditRecord {

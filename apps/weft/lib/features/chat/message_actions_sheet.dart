@@ -5,6 +5,7 @@ import 'package:weft_richtext/weft_richtext.dart';
 import '../../app/l10n_labels.dart';
 import '../../app/localisation.dart';
 
+import 'attachment_bubble.dart';
 import 'emoji_picker_sheet.dart';
 
 /// What a long-press on a bubble can lead to.
@@ -80,6 +81,27 @@ class MessageActionChoice {
   @override
   String toString() =>
       'MessageActionChoice($action${emoji == null ? '' : ', $emoji'})';
+}
+
+/// Whether the quick row can draw [key]. It draws keys as text, and a custom
+/// emoji's key is a URI; `quickReactionsWith` already leaves those out, and
+/// this keeps a caller that builds its own list from putting one back.
+bool _drawable(String key) => !isImageReactionKey(key);
+
+/// Whether [message] has words of its own to copy, select or translate.
+///
+/// Not the same as a non-empty body. A photo's or a file's body is usually its
+/// filename, and "Copy text" on a photo that copied `IMG_4021.jpg` was a
+/// control that did the wrong thing. A body that is nothing but an `mxc://`
+/// URI is an address, not words. An attachment has words when it has a caption, the same rule the
+/// bubble uses to decide whether to print one; a sticker's body is a
+/// description for screen readers, never text the sender wrote.
+@visibleForTesting
+bool hasWords(WeftMessage message) {
+  if (message.kind == MessageKind.sticker) return false;
+  if (rendersAsAttachment(message)) return attachmentCaption(message) != null;
+  final body = message.body.trim();
+  return body.isNotEmpty && !body.startsWith('mxc://');
 }
 
 /// The actions available on one message.
@@ -218,7 +240,7 @@ class _MessageActionsSheet extends StatelessWidget {
                         // to a screen reader — it is a character, announced by
                         // whatever name the platform has for that glyph, with no
                         // hint that tapping it sends a reaction.
-                        for (final key in quickReactions)
+                        for (final key in quickReactions.where(_drawable))
                           Semantics(
                             button: true,
                             label: context.l10n.messageActionReactWith(key),
@@ -293,7 +315,7 @@ class _MessageActionsSheet extends StatelessWidget {
                     title: Text(context.l10n.messageActionEditInvite),
                     onTap: () => choose(MessageAction.editInvite),
                   ),
-                if (message.body.trim().isNotEmpty) ...[
+                if (hasWords(message)) ...[
                   ListTile(
                     leading: const Icon(Icons.copy_rounded),
                     title: Text(context.l10n.messageActionCopy),
@@ -439,7 +461,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final key in quickReactions)
+              for (final key in quickReactions.where(_drawable))
                 InkWell(
                   borderRadius: WeftRadius.pill,
                   onTap: () => Navigator.of(
@@ -476,7 +498,7 @@ Future<MessageActionChoice?> showDesktopMessageMenu(
             Icons.edit_calendar_rounded,
             l10n.messageActionEditInvite,
           ),
-        if (message.body.trim().isNotEmpty) ...[
+        if (hasWords(message)) ...[
           item(MessageAction.copy, Icons.copy_rounded, l10n.messageActionCopy),
           item(
             MessageAction.selectText,

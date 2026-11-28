@@ -281,6 +281,7 @@
   "reactionCount": "{count}",
   "reactionSeeWhoHint": "عرض من تفاعل",
   "reactionAdd": "إضافة تفاعل",
+  "reactionCustomEmoji": "رمز تعبيري مخصص",
   "reactionPeopleCount": "{count, plural, =1{شخص واحد} =2{شخصان} few{{count} أشخاص} other{{count} شخصًا}}",
   "richListMarker": "{number}.",
   "richCodeBlock": "كتلة برمجية",
