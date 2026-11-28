@@ -30,8 +30,10 @@ enum MergeSignal {
   /// nor close enough by edit distance (the middle name is a third of the
   /// string), so the same person stayed two chats with no suggestion at all.
   /// Counted as exact for the gate below — every part of the shorter name is
-  /// in the longer one, in order, first and last included — but weighted under
-  /// [nameExact] and never enough to merge without a tap.
+  /// in the longer one, in order, first and last included — and merges on its
+  /// own under the same rule as [nameExact] (see
+  /// [MergeCandidate.qualifiesForAutoMerge]). Weighted just under it, so a
+  /// pair with the identical name still ranks first.
   nameMiddleDropped('Same first and last name', 0.58),
 
   nameSimilar('Very similar name', 0.50),
@@ -71,12 +73,19 @@ class MergeCandidate {
   );
 
   /// Whether this pair merges without asking: a one-to-one conversation
-  /// (handles only ever describe DM peers), the identical substantial name,
-  /// and two *different* messengers. Nothing else auto-merges — a phone or
-  /// email match still only suggests, because those can be shared devices
-  /// and family addresses.
+  /// (handles only ever describe DM peers), the same first and last name —
+  /// identical, or one side with a middle name the other leaves out — at
+  /// least two words long, and two *different* messengers. Nothing else
+  /// auto-merges — a phone or email match still only suggests, because those
+  /// can be shared devices and family addresses.
+  ///
+  /// The pair is not the whole check: [IdentityGraph.applyAutoMerges] also
+  /// refuses two *contacts* that each already reach someone on the same
+  /// network, and an unmerge is remembered so it does not happen again.
   bool get qualifiesForAutoMerge =>
-      a.network != b.network && signals.contains(MergeSignal.nameExact);
+      a.network != b.network &&
+      (signals.contains(MergeSignal.nameExact) ||
+          signals.contains(MergeSignal.nameMiddleDropped));
 
   String get explanation => signals.map((s) => s.explanation).join(' · ');
 

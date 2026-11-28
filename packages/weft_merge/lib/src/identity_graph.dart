@@ -282,18 +282,39 @@ class IdentityGraph {
   }
 
   /// Auto-merges the pairs [MergeCandidate.qualifiesForAutoMerge] accepts —
-  /// identical substantial name, different networks, one-to-one — when the
+  /// the same first and last name, different networks, one-to-one — when the
   /// user has opted in. Returns the pairs actually merged.
+  ///
+  /// Two contacts that each already have a conversation on the same network
+  /// are left apart even then: a bridge gives one person one handle per
+  /// network, so two WhatsApp chats under one name are two people, and folding
+  /// a third network's "Anna Maven" into one of them would be a coin toss.
+  /// Checked against the contacts as they stand after each merge, so a chain
+  /// of merges cannot sneak a second handle on one network in.
+  ///
+  /// Pairs the user has unmerged or dismissed never come back here:
+  /// [suggestions] already leaves them out.
   List<MergeCandidate> applyAutoMerges({DateTime? now}) {
     if (!_scorer.config.autoMergeOnIdentitySignal) return const [];
     final applied = <MergeCandidate>[];
     for (final c in suggestions()) {
       if (!c.qualifiesForAutoMerge) continue;
+      final ca = _contactOf[c.a.id];
+      final cb = _contactOf[c.b.id];
+      if (ca == null || cb == null || ca == cb) continue;
+      if (_networksOf(ca).intersection(_networksOf(cb)).isNotEmpty) continue;
       merge(c.a.id, c.b.id, source: MergeDecisionSource.auto, now: now);
       applied.add(c);
     }
     return applied;
   }
+
+  /// The networks [contactId]'s handles are on.
+  Set<ChatNetwork> _networksOf(String contactId) => {
+    for (final e in _contactOf.entries)
+      if (e.value == contactId)
+        if (_handles[e.key] case final handle?) handle.network,
+  };
 
   /// Merges two handles into one contact, along with everything already merged
   /// into either of them.

@@ -61,7 +61,7 @@ void main() {
       );
     });
 
-    test('a middle name on one side only is suggested, not merged', () {
+    test('a middle name on one side only qualifies to merge', () {
       // The owner's own case: Telegram and Google Messages say "Joanne
       // Kristina Trenkel", WhatsApp "Joanne Trenkel". Neither identical nor
       // close by edit distance, so it was never suggested at all.
@@ -76,7 +76,7 @@ void main() {
 
       expect(candidate, isNotNull);
       expect(candidate!.signals, contains(MergeSignal.nameMiddleDropped));
-      expect(candidate.qualifiesForAutoMerge, isFalse);
+      expect(candidate.qualifiesForAutoMerge, isTrue);
     });
 
     test('a different first or last name is not a dropped middle name', () {
