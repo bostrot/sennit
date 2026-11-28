@@ -372,9 +372,11 @@ class MatrixChatRepository
       // The scorer reads its two knobs from settings: the country code that
       // makes national numbers comparable, and whether same-name pairs merge
       // on their own. Auto-merge defaults on — its rule is narrow enough to
-      // trust (identical substantial name, different networks, one-to-one)
-      // and it is what makes a fresh login fold a person's three apps into
-      // one conversation without a tour through the merge screen.
+      // trust (the same first and last name of two words or more, middle
+      // names aside; different networks; one-to-one; never two contacts that
+      // already share a network; never again after an unmerge) and it is what
+      // makes a fresh login fold a person's three apps into one conversation
+      // without a tour through the merge screen.
       scorer: MergeScorer(
         config: MergeScoringConfig(
           autoMergeOnIdentitySignal:

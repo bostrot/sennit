@@ -336,6 +336,87 @@ void main() {
       );
     });
 
+    test('a middle name on one side only merges on its own', () {
+      // The owner's call (item 101): "Joanne Trenkel" on WhatsApp and
+      // "Joanne Kristina Trenkel" on Telegram are one person.
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+          handle(
+            'b',
+            ChatNetwork.telegram,
+            displayName: 'joanne kristína TRENKEL',
+          ),
+          // Single words and same-network namesakes stay apart.
+          handle('c', ChatNetwork.instagram, displayName: 'Joanne'),
+          handle('d', ChatNetwork.whatsapp, displayName: 'Joanne K. Trenkel'),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      graph.applyAutoMerges();
+
+      expect(graph.contactIdOf('a'), graph.contactIdOf('b'));
+      expect(graph.contactIdOf('c'), isNot(graph.contactIdOf('a')));
+      expect(
+        graph.contactIdOf('d'),
+        isNot(graph.contactIdOf('a')),
+        reason: 'two WhatsApp chats under one name are two people',
+      );
+    });
+
+    test('two contacts that both reach someone on one network stay apart', () {
+      // a+b are one Anna (WhatsApp, Signal); c is another Anna on WhatsApp
+      // who also has Telegram (d). Merging d's contact into a's would put two
+      // WhatsApp chats in one person.
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Anna Maven'),
+          handle('b', ChatNetwork.signal, displayName: 'Anna Maven'),
+          handle('c', ChatNetwork.whatsapp, displayName: 'Anna Maven'),
+          handle('d', ChatNetwork.telegram, displayName: 'Anna Maven'),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      graph.applyAutoMerges();
+
+      final contacts = {
+        for (final id in ['a', 'b', 'c', 'd']) graph.contactIdOf(id),
+      };
+      expect(contacts.length, greaterThanOrEqualTo(2));
+      expect(graph.contactIdOf('a'), isNot(graph.contactIdOf('c')));
+    });
+
+    test('an unmerged middle-name match is not merged again', () {
+      final graph = IdentityGraph(
+        handles: [
+          handle('a', ChatNetwork.whatsapp, displayName: 'Joanne Trenkel'),
+          handle(
+            'b',
+            ChatNetwork.telegram,
+            displayName: 'Joanne Kristina Trenkel',
+          ),
+        ],
+        scorer: const MergeScorer(
+          config: MergeScoringConfig(autoMergeOnIdentitySignal: true),
+        ),
+        idFactory: counterIds(),
+      );
+
+      expect(graph.applyAutoMerges(), hasLength(1));
+      graph.unmerge('a');
+      expect(graph.applyAutoMerges(), isEmpty);
+      expect(graph.suggestions(), isEmpty);
+      expect(graph.contactIdOf('a'), isNot(graph.contactIdOf('b')));
+    });
+
     test('a number wearing a name is not name evidence', () {
       // Bridge ghosts without a profile show their phone number as the
       // display name; two strangers formatting alike must not merge.
