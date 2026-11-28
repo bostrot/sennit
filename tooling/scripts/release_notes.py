@@ -31,7 +31,9 @@ publish anything first. Needs the full history (`fetch-depth: 0`) for 2.
     --app-asset  The JSON `apps/weft/assets/release_notes.json` the app reads.
     --check      Fails when the version in pubspec.yaml, or any version with
                  notes since 1.0.25, lacks the en-US or de-DE Play text or
-                 has one over 500 characters. CI runs it.
+                 has one over 500 characters, and when the notes of a version
+                 after 1.0.27 are more than short topic lines (see
+                 topic_problems). CI runs it.
 
 Python 3 and git, nothing else.
 """
@@ -53,6 +55,15 @@ PLAY_NAME = re.compile(r'^(\d+\.\d+\.\d+)\.play(?:\.([A-Za-z]{2,3}(?:-[A-Za-z0-9
 PLAY_REQUIRED = ('en-US', 'de-DE')
 PUBSPEC = os.path.join(REPO, 'apps', 'weft', 'pubspec.yaml')
 APP_STORE_LIMIT = 4000
+
+# From 1.0.28 on the notes name each change and stop there: one bullet per
+# feature ("Polls", "React with any emoji"), under optional short headings.
+# Published notes stay as they were.
+FIRST_TOPIC_VERSION = (1, 0, 28)
+TOPIC_LIMIT = 60
+HEADING_LIMIT = 30
+# A full stop, "!" or "?" with more after it: a second sentence.
+SENTENCE_BREAK = re.compile(r'[.!?]\s+\S')
 
 RELEASE_SUBJECT = re.compile(r'^Release (\d+\.\d+\.\d+)$')
 # Merges that carry no change of their own: main into a branch, and back.
@@ -91,7 +102,7 @@ def from_history(version):
             continue
         items.append(subject)
     if not items:
-        items = ['Fixes and improvements.']
+        items = ['Fixes and improvements']
     return '\n'.join(f'- {item}' for item in items) + '\n'
 
 
@@ -170,6 +181,29 @@ def play_problems(version):
     return problems
 
 
+def topic_problems(version, markdown):
+    """Why [markdown] is more than short topic lines: only headings and
+    bullets, each a short topic of a single sentence with no full stop."""
+    problems = []
+    for line in markdown.splitlines():
+        if not line.strip() or re.match(r'^\s*<!--.*-->\s*$', line):
+            continue
+        heading = re.match(r'^#+\s+(.*)$', line)
+        bullet = re.match(r'^\s*[-*+]\s+(.*)$', line)
+        if not heading and not bullet:
+            problems.append(f'{version}: {line.strip()!r} is neither a heading nor a bullet')
+            continue
+        text = plain(heading.group(1) if heading else bullet.group(1))
+        limit = HEADING_LIMIT if heading else TOPIC_LIMIT
+        if len(text) > limit:
+            problems.append(f'{version}: {text!r} has {len(text)} characters, '
+                            f'at most {limit} — name the change, do not describe it')
+        if SENTENCE_BREAK.search(text) or text.endswith('.'):
+            problems.append(f'{version}: {text!r} is a sentence, not a topic — '
+                            f'drop the explanation and the full stop')
+    return problems
+
+
 def check():
     versions = set()
     with open(PUBSPEC, encoding='utf-8') as f:
@@ -186,6 +220,10 @@ def check():
         if key(version) < FIRST_PLAY_VERSION:
             continue
         problems += play_problems(version)
+        path = os.path.join(NOTES_DIR, f'{version}.md')
+        if key(version) >= FIRST_TOPIC_VERSION and os.path.exists(path):
+            with open(path, encoding='utf-8') as f:
+                problems += topic_problems(version, f.read())
         for language, text in play_texts(version).items():
             print(f'{version} {language}: {play_length(text)}/{PLAY_LIMIT}')
     for problem in problems:

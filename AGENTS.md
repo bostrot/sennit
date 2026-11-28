@@ -46,6 +46,16 @@ cd apps/weft && flutter test test/l10n_test.dart test/l10n_overflow_test.dart
 and [docs/architecture/l10n-pipeline.md](docs/architecture/l10n-pipeline.md)
 how the catalogues are built.
 
+## Release notes are short topic lines
+
+`docs/release-notes/<version>.md` is the GitHub release body and the app's
+"What's new". One bullet per feature, just its short topic ("Polls",
+"React with any emoji", "Sennit Web copy & paste"), optionally under short
+headings; bug fixes as one short line each or a single "Bug fixes". No
+explanatory sentences. `release_notes.py --check` (CI) fails on a bullet over
+60 characters, a second sentence or a full stop. Leave published notes as
+they are.
+
 ## Every release needs a short Play text
 
 Google Play's "What's new" shows at most 500 characters; longer notes show

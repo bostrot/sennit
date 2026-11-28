@@ -44,7 +44,12 @@ them come from
 `tooling/scripts/release_notes.py <version>`, which reads:
 
 1. `docs/release-notes/<version>.md` when it exists — write one for every
-   release, for people who use the app, as a short Markdown list;
+   release, for people who use the app: one bullet per feature with just its
+   short topic ("Polls", "React with any emoji"), optionally under short
+   headings, bug fixes as one short line each or a single "Bug fixes". No
+   explanatory sentences; `release_notes.py --check` fails on a bullet over
+   60 characters, a second sentence, or a paragraph (versions after 1.0.27,
+   see [the notes' README](release-notes/README.md));
 2. otherwise the first-parent history of `main` since the previous
    `Release x.y.z` commit: pull request titles, and the subjects of commits
    pushed directly. It works without tags and without pull requests, and it

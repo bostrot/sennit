@@ -41,6 +41,10 @@ for name in "$VERSION.play.md" "$VERSION.play.de-DE.md"; do
 done
 [ "$missing" = 0 ] || exit 1
 
+# The same checks CI runs: Play's 500 characters, and notes that are short
+# topic lines, not descriptions.
+python3 "$REPO/tooling/scripts/release_notes.py" --check >/dev/null
+
 # +1 for the release commit this script is about to make.
 BUILD=$(( $(git -C "$REPO" rev-list --count HEAD) + 1 ))
 
