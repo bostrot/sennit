@@ -4,6 +4,7 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' show Category;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:weft_design/weft_design.dart';
+import 'package:weft_domain/weft_domain.dart';
 import 'package:weft_richtext/weft_richtext.dart';
 
 import '../../app/localisation.dart';
@@ -26,7 +27,9 @@ const int kQuickReactionsFixed = 4;
 ///
 /// Same length as [kQuickReactions], so the row still fits a phone on one
 /// line: the fixed four, then the reader's two latest picks from outside them,
-/// topped up with the defaults when there are fewer than two.
+/// topped up with the defaults when there are fewer than two. A custom emoji
+/// is never one of them — this row draws keys as text, and its URI would wrap
+/// the row round itself; see `isImageReactionKey`.
 List<String> quickReactionsWith(List<String> recents) {
   final fixed = kQuickReactions.take(kQuickReactionsFixed).toList();
   final taken = {for (final k in fixed) normaliseReactionKey(k)};
@@ -36,6 +39,7 @@ List<String> quickReactionsWith(List<String> recents) {
     ...kQuickReactions.skip(kQuickReactionsFixed),
   ]) {
     if (tail.length == kQuickReactions.length - kQuickReactionsFixed) break;
+    if (isImageReactionKey(key)) continue;
     if (taken.add(normaliseReactionKey(key))) tail.add(key);
   }
   return [...fixed, ...tail];
@@ -61,15 +65,17 @@ class ReactionRecents extends Notifier<List<String>> {
     )?.settings.getJson(kReactionRecentsSetting)?['keys'];
     return saved is List
         ? [
+            // Older builds noted custom emoji too; the picker and the quick
+            // row draw these as text, so they are dropped on the way in.
             for (final key in saved)
-              if (key is String) key,
+              if (key is String && !isImageReactionKey(key)) key,
           ]
         : const [];
   }
 
   void note(String key) {
     final normalised = normaliseReactionKey(key);
-    if (normalised.isEmpty) return;
+    if (normalised.isEmpty || isImageReactionKey(normalised)) return;
     state = [
       key.trim(),
       ...state.where((k) => normaliseReactionKey(k) != normalised),

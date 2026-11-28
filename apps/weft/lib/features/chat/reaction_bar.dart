@@ -84,6 +84,39 @@ class ReactionBar extends StatelessWidget {
   }
 }
 
+/// A reaction key as it is drawn: the emoji, or for a custom emoji — whose key
+/// is the picture's `mxc://` URI, see `isImageReactionKey` — a smiley outline
+/// the size of the emoji it stands in for. The URI itself is never drawn.
+class ReactionKeyGlyph extends StatelessWidget {
+  const ReactionKeyGlyph(this.reactionKey, {super.key, required this.fontSize});
+
+  final String reactionKey;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isImageReactionKey(reactionKey)) {
+      return Text(reactionKey, style: TextStyle(fontSize: fontSize));
+    }
+    return Tooltip(
+      message: context.l10n.reactionCustomEmoji,
+      excludeFromSemantics: true,
+      child: Icon(
+        Icons.emoji_emotions_outlined,
+        // Scaled like the emoji around it, which are text.
+        size: MediaQuery.textScalerOf(context).scale(fontSize) * 1.2,
+        color: context.colors.onSurfaceVariant,
+        semanticLabel: context.l10n.reactionCustomEmoji,
+      ),
+    );
+  }
+}
+
+/// A reaction key as a screen reader should say it: the emoji, which the
+/// reader names itself, or "Custom emoji" in place of a URI.
+String spokenReactionKey(BuildContext context, String key) =>
+    isImageReactionKey(key) ? context.l10n.reactionCustomEmoji : key;
+
 /// One key's chip: the emoji, the count, and whether it is the reader's.
 class ReactionChip extends StatelessWidget {
   const ReactionChip({
@@ -118,7 +151,10 @@ class ReactionChip extends StatelessWidget {
       onLongPressHint: onLongPress == null
           ? null
           : context.l10n.reactionSeeWhoHint,
-      label: context.l10n.reactionChipSemantics(tally.key, tally.count),
+      label: context.l10n.reactionChipSemantics(
+        spokenReactionKey(context, tally.key),
+        tally.count,
+      ),
       // Inside the annotation, so the node the reader touches and the box the
       // guideline measures are both the grown one. A 28dp pill is comfortable
       // to read and roughly half of what a thumb can be asked to find.
@@ -158,7 +194,7 @@ class ReactionChip extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(tally.key, style: const TextStyle(fontSize: 13)),
+                  ReactionKeyGlyph(tally.key, fontSize: 13),
                   const SizedBox(width: WeftSpace.xs),
                   Text(
                     context.l10n.reactionCount(tally.count),
@@ -254,7 +290,7 @@ Future<void> showReactionSendersSheet(
             ),
             child: Row(
               children: [
-                Text(tally.key, style: const TextStyle(fontSize: 22)),
+                ReactionKeyGlyph(tally.key, fontSize: 22),
                 const SizedBox(width: WeftSpace.sm),
                 Text(
                   context.l10n.reactionPeopleCount(tally.count),

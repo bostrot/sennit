@@ -265,6 +265,21 @@ void main() {
       // A recent ❤ without its selector is still the heart in the fixed four.
       expect(quickReactionsWith(const ['❤']), kQuickReactions);
     });
+
+    test('a custom emoji never reaches the quick row', () {
+      // What the owner's phone showed: a recent custom-emoji reaction — its
+      // key an mxc URI — drawn as text in the row and wrapping it in two.
+      const custom = 'mxc://sosnowkadub.de/oqtPprznzrRiQzEJntyYIzUw';
+      expect(quickReactionsWith(const [custom]), kQuickReactions);
+      expect(quickReactionsWith(const [custom, '🎉']), [
+        '👍',
+        '❤️',
+        '😂',
+        '😮',
+        '🎉',
+        '😢',
+      ]);
+    });
   });
 }
 

@@ -282,6 +282,7 @@
   "reactionCount": "{count}",
   "reactionSeeWhoHint": "ver quem reagiu",
   "reactionAdd": "Adicionar reação",
+  "reactionCustomEmoji": "Emoji personalizado",
   "reactionPeopleCount": "{count, plural, =1{1 pessoa} other{{count} pessoas}}",
   "richListMarker": "{number}.",
   "richCodeBlock": "Bloco de código",
