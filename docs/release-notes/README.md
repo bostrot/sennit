@@ -13,10 +13,29 @@ language. Name every highlight in one short line, at most 500 characters per
 file, counted as Play does (UTF-16 code units). CI fails without them or over
 the limit (`release_notes.py --check`).
 
-Keep it to a short Markdown list for people who use the app, not for people
-who build it — it is what the stores show. Bold, `code` and links are fine;
-they are dropped from the store and in-app text. English only, except the
-Play texts.
+Name each change and stop there: one bullet per feature, just its short
+topic, optionally under short `###` headings. No explanations — the GitHub
+release and the app show the list as it is.
+
+```markdown
+### Messages
+- Polls
+- React with any emoji
+
+### Sennit Web
+- Sennit Web copy & paste
+
+### Fixes
+- Bug fixes
+```
+
+At most 60 characters a bullet and 30 a heading, one sentence with no full
+stop, nothing but headings and bullets. Bug fixes get one short line each,
+or a single "Bug fixes". It is for people who use the app, not for people
+who build it. Bold, `code` and links are fine; they are dropped from the
+store and in-app text. English only, except the Play texts.
+`release_notes.py --check` (CI) holds every version after 1.0.27 to this;
+published notes stay as they were.
 
 A version without a file still gets notes: the script lists the pull request
 titles and direct commit subjects on `main` since the previous `Release x.y.z`
